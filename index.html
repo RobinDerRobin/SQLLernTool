@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SQL Lernen Tool</title>
+  </head>
+  <body>
+    <!-- The fallback below is replaced the moment the app mounts (createApp
+         overwrites #app). It therefore only stays visible when this file was
+         opened directly from disk, where /src/main.ts cannot resolve. -->
+    <div id="app">
+      <div style="font-family: system-ui, sans-serif; max-width: 40rem; margin: 4rem auto; padding: 0 1.5rem; line-height: 1.6; color: #f5ead9; background: #171310">
+        <h1 style="font-size: 1.25rem">Diese Datei lässt sich nicht direkt öffnen</h1>
+        <p>
+          Du hast <code>index.html</code> per Doppelklick geöffnet. Das kann nicht funktionieren:
+          diese Datei lädt <code>/src/main.ts</code>, das erst von Vite übersetzt werden muss.
+        </p>
+        <p><b>Zum Entwickeln</b> im Projektordner ausführen:</p>
+        <pre style="background: #100b08; padding: 0.75rem 1rem; overflow-x: auto">npm run dev</pre>
+        <p>… und dann <a href="http://localhost:5173" style="color: #e8541f">http://localhost:5173</a> öffnen.</p>
+        <p><b>Zum Benutzen</b> stattdessen die gebaute Einzeldatei nehmen:</p>
+        <pre style="background: #100b08; padding: 0.75rem 1rem; overflow-x: auto">npm run build</pre>
+        <p>
+          Das erzeugt <code>dist/index.html</code> — eine einzelne, in sich geschlossene Datei.
+          Deren Inhalt fügst du in einen claude.ai-Chat ein; nur dort funktioniert auch der Claude-Chat im Tool.
+        </p>
+      </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

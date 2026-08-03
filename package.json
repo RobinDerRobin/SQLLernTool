@@ -1,0 +1,25 @@
+{
+  "name": "sql-lernen-tool",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "build:check": "npm run typecheck && npm run test && npm run build && vitest run test/build/distOutput.test.ts"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.0",
+    "@types/node": "^22.10.2",
+    "jsdom": "^25.0.1",
+    "linkedom": "^0.18.5",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "vite-plugin-singlefile": "^2.1.0",
+    "vitest": "^2.1.8",
+    "zod": "^3.24.1"
+  }
+}
