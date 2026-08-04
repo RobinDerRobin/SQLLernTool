@@ -157,6 +157,50 @@ Querverbindungen sind im Tag-Katalog (Abschnitt 4) exakt vermerkt — der
 vereinfachte Zweig-Überblick ist nur eine Lesehilfe, keine vollständige
 Wahrheit.
 
+### 1.10 Syntax ist Teil jedes Tags — nicht implizit vorausgesetzt
+
+Berechtigter Einwand: „Ein Konzept verstehen" verlangt zuerst, seine Syntax
+überhaupt zu erkennen und korrekt zu schreiben — reicht ein Tag wie
+`where-clause` nicht eigentlich für zwei getrennte Fähigkeiten (Syntax
+tippen können vs. verstehen, was es tut)?
+
+**Die Antwort ist ja, aber nicht als 82 zusätzliche Knoten.** Jeder Tag in
+diesem Dokument bündelt per Definition beides — „ein Tag kennen" heißt
+immer *sowohl* die Syntax korrekt schreiben/erkennen *als auch* erklären
+können, was sie bewirkt und wann man sie einsetzt. Ein Lernender, der
+`WHERE status = 'offen'` zuverlässig hinschreibt, aber nicht sagen kann,
+warum genau diese Zeilen übrig bleiben, hat `where-clause` **nicht**
+abgeschlossen — beide Hälften gehören untrennbar zum selben Tag.
+
+Ein eigener Syntax-Tag lohnt sich nur, wenn die Syntax **über mehrere
+Konzepte hinweg identisch wiederverwendet wird** — dann ist sie tatsächlich
+ein eigenständiges, wiederverwendbares Stück Wissen, kein Duplikat. Genau
+dafür existiert `function-call-syntax` bereits (Abschnitt 1.3): `name(args)`
+ist die *gleiche* Schreibweise für `date()`, `RANDOM()`, `COUNT()` und
+`CAST()` — sie einmal zu lernen und neunmal wiederzuverwenden ist etwas
+anderes, als sie neunmal neu zu erklären. Geprüfte Gegenprobe: Die
+`AS`-Syntax für Spalten- und Tabellen-Alias ist zwar auch identisch, taucht
+aber nur an zwei Stellen auf — zu wenig Wiederverwendung, um einen eigenen
+Knoten zu rechtfertigen; sie bleibt Teil von `column-alias` bzw.
+`table-alias`. Und die "boolescher Ausdruck"-Syntax, die `WHERE`, `CASE`,
+`JOIN...ON`, `CHECK` und `HAVING` alle brauchen, ist bereits als eigener
+Baustein vorhanden — nicht als "Syntax-Tag", sondern als die Kombination
+`comparison-operators` + `logical-operators`, von der alle fünf abhängen.
+
+Wichtiger, ehrlicher Hinweis: Der Abstand zwischen "Syntax nachtippen
+können" und "wirklich verstehen" ist **nicht bei jedem Tag gleich groß**.
+Bei `column-alias` ist er praktisch null — wer die Syntax schreibt, versteht
+sie auch. Bei `case-expression`, `recursive-cte` und allem in B7
+(Subqueries) ist er real und pädagogisch relevant: ein Lernender kann das
+`WITH RECURSIVE`-Muster aus Challenge 03 kopieren, ohne zu begreifen, dass
+er gerade eine Schleife baut — genau das beschreibt Challenge 3.2/3.3
+implizit, indem sie denselben Mechanismus mit einem anderen Zustand
+(Datum statt Zähler) wiederholt, um die Musterkopie von echtem Verständnis
+zu unterscheiden. Für eine spätere Umsetzung als Code wäre das ein
+Kandidat für ein optionales zweites Signal pro Challenge (z. B. "kann die
+Syntax reproduzieren" vs. "kann sie auf ein neues Problem übertragen"),
+nicht für einen zusätzlichen Graph-Knoten.
+
 ## 2. Was ein Tag NICHT ist
 
 - **Dialekt-Unterschiede** (SQLite vs. Postgres/MySQL) sind keine
