@@ -11,5 +11,11 @@ export default defineConfig({
       ['src/ui/**', 'jsdom'],
       ['src/theme/**', 'jsdom'],
     ],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'text-summary', 'json-summary', 'html'],
+      include: ['src/**/*.ts'],
+      exclude: ['src/**/*.test.ts', 'src/**/*.d.ts'],
+    },
   },
 });
