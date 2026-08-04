@@ -19,7 +19,7 @@ function sliceThemePicker(state: AppState): ThemePickerSlice {
 function renderOption(id: string, name: string, swatch: readonly string[], active: boolean): string {
   const cells = swatch.map((color) => `<div style="background:${escapeHtml(color)}"></div>`).join('');
   return `
-    <button class="theme-option ${active ? 'selected' : ''}" data-theme-id="${escapeHtml(id)}">
+    <button type="button" class="theme-option ${active ? 'selected' : ''}" data-theme-id="${escapeHtml(id)}" aria-pressed="${active}">
       <div class="theme-swatch">${cells}</div>
       <span class="theme-option-name">${escapeHtml(name)}</span>
     </button>`;
@@ -32,7 +32,7 @@ function renderThemePicker(slice: ThemePickerSlice): string {
       <div class="theme-picker">
         <div class="theme-picker-title">
           <span>Design wählen</span>
-          <button class="theme-picker-close" title="Schließen">✕</button>
+          <button type="button" class="theme-picker-close" title="Schließen" aria-label="Design-Auswahl schließen">✕</button>
         </div>
         <div class="theme-grid">${options}</div>
       </div>
@@ -45,7 +45,7 @@ function renderThemePicker(slice: ThemePickerSlice): string {
  * because the button that opens it lives in a different module.
  */
 export function mountThemePicker(root: HTMLElement, ctx: AppContext): Unsubscribe {
-  return mountView(
+  const unsubscribeStore = mountView(
     root,
     ctx.store,
     sliceThemePicker,
@@ -68,4 +68,16 @@ export function mountThemePicker(root: HTMLElement, ctx: AppContext): Unsubscrib
     },
     ctx,
   );
+
+  // Escape closes the modal, matching standard dialog behavior — the picker
+  // has no other keyboard-reachable close control besides Tab-ing to the ✕.
+  function onKeydown(e: KeyboardEvent): void {
+    if (e.key === 'Escape' && ctx.store.getState().session.themePickerOpen) toggleThemePicker(ctx, false);
+  }
+  document.addEventListener('keydown', onKeydown);
+
+  return () => {
+    unsubscribeStore();
+    document.removeEventListener('keydown', onKeydown);
+  };
 }

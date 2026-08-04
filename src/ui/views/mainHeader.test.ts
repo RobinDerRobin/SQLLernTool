@@ -51,6 +51,17 @@ describe('mountMainHeader', () => {
     expect(root.querySelector('[data-tab="task"]')?.classList.contains('active')).toBe(true);
   });
 
+  it('exposes tab semantics via role and aria-selected', () => {
+    const ctx = makeCtx();
+    mountMainHeader(root, ctx);
+
+    expect(root.querySelector('.tab-row')?.getAttribute('role')).toBe('tablist');
+    const taskTab = root.querySelector('[data-tab="task"]');
+    expect(taskTab?.getAttribute('role')).toBe('tab');
+    expect(taskTab?.getAttribute('aria-selected')).toBe('true');
+    expect(root.querySelector('[data-tab="editor"]')?.getAttribute('aria-selected')).toBe('false');
+  });
+
   it('clicking a tab switches to it', () => {
     const ctx = makeCtx();
     mountMainHeader(root, ctx);

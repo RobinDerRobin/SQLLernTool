@@ -44,7 +44,7 @@ function renderSolution(slice: SolutionSlice): string {
   if (!slice.num || slice.mode === 'exam') return '';
   return `
     <div class="solution-block">
-      <button class="btn solution-toggle-btn">Lösung anzeigen</button>
+      <button type="button" class="btn solution-toggle-btn">Lösung anzeigen</button>
       <div class="solution-panel">
         ${slice.solutionViewed ? '<div class="solution-cost-note">Lösung angesehen — diese Challenge zählt mit 0 Sternen.</div>' : ''}
         <span class="sp-label">Musterlösung</span>
@@ -53,7 +53,7 @@ function renderSolution(slice: SolutionSlice): string {
           <div class="se-label">Syntax erklärt</div>
           <div class="se-text">${slice.syntaxExplanation}</div>
         </div>
-        <button class="btn solution-insert-btn">In den Editor übernehmen</button>
+        <button type="button" class="btn solution-insert-btn">In den Editor übernehmen</button>
       </div>
     </div>`;
 }

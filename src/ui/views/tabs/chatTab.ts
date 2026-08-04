@@ -44,8 +44,8 @@ function renderChat(slice: ChatSlice): string {
       <div class="chat-status"></div>
       <div class="chat-input-row">
         <textarea class="chat-input" rows="2" placeholder="Frag Claude etwas zu dieser Challenge …"></textarea>
-        <button class="btn chat-feedback-btn" title="Feedback zu deinem Code">Code-Feedback</button>
-        <button class="btn chat-send-btn">Senden</button>
+        <button type="button" class="btn chat-feedback-btn" title="Feedback zu deinem Code">Code-Feedback</button>
+        <button type="button" class="btn chat-send-btn">Senden</button>
       </div>
     </div>`;
 }

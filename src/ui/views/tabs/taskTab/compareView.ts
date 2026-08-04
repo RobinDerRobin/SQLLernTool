@@ -31,7 +31,7 @@ function renderCompare(slice: CompareSlice): string {
   if (!slice.num || slice.mode === 'exam') return '';
   return `
     <div class="compare-block">
-      <button class="btn compare-btn">Mit Musterlösung vergleichen</button>
+      <button type="button" class="btn compare-btn">Mit Musterlösung vergleichen</button>
       <div class="compare-panel">
         <div class="compare-cols">
           <div class="compare-col compare-col-mine">

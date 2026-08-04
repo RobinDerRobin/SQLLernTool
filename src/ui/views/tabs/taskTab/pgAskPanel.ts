@@ -35,10 +35,10 @@ function renderPgAsk(slice: PgAskSlice): string {
       <div class="pg-label">So sieht es in PostgreSQL aus</div>
       ${noteBody}
       <div class="ask-section">
-        <button class="btn pg-ask-toggle-btn">Claude hierzu befragen</button>
+        <button type="button" class="btn pg-ask-toggle-btn">Claude hierzu befragen</button>
         <div class="ask-panel">
           <textarea class="ask-textarea" rows="2" placeholder="Frage zum Postgres-Unterschied …"></textarea>
-          <button class="btn pg-ask-submit-btn">Fragen</button>
+          <button type="button" class="btn pg-ask-submit-btn">Fragen</button>
           <div class="ask-status"></div>
           <div class="ask-answer"></div>
         </div>

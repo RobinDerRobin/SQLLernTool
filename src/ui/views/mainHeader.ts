@@ -45,13 +45,14 @@ function renderMainHeader(slice: MainHeaderSlice): string {
     : `${slice.total} Challenges`;
   const tabs = TABS.map((tab) => {
     const badge = tab.id === 'chat' && slice.chatUnread ? '<span class="tab-badge"></span>' : '';
-    return `<button class="tab-btn ${slice.activeTab === tab.id ? 'active' : ''}" data-tab="${tab.id}">${tab.label}${badge}</button>`;
+    const active = slice.activeTab === tab.id;
+    return `<button type="button" class="tab-btn ${active ? 'active' : ''}" data-tab="${tab.id}" role="tab" aria-selected="${active}" aria-controls="tabpanel-${tab.id}" id="tab-${tab.id}">${tab.label}${badge}</button>`;
   }).join('');
 
   return `
     <div class="kicker">${kicker}</div>
     <h2>${escapeHtml(slice.title)}</h2>
-    <div class="tab-row">${tabs}</div>`;
+    <div class="tab-row" role="tablist">${tabs}</div>`;
 }
 
 export function mountMainHeader(root: HTMLElement, ctx: AppContext): Unsubscribe {

@@ -25,9 +25,10 @@ function buildElements() {
   const sidebarContainer = document.createElement('div');
   const headRoot = document.createElement('div');
   const footRoot = document.createElement('div');
+  const backdrop = document.createElement('div');
   sidebarContainer.append(headRoot, footRoot);
-  document.body.append(sidebarContainer);
-  return { sidebarContainer, headRoot, footRoot };
+  document.body.append(sidebarContainer, backdrop);
+  return { sidebarContainer, headRoot, footRoot, backdrop };
 }
 
 describe('mountSidebarShell', () => {
@@ -97,5 +98,28 @@ describe('mountSidebarShell', () => {
     elements.footRoot.querySelector('.reset-confirm-no')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(elements.footRoot.querySelector('.reset-confirm-row')?.classList.contains('open')).toBe(false);
+  });
+
+  it('clicking the backdrop collapses an expanded sidebar (mobile overlay close)', () => {
+    const elements = buildElements();
+    const ctx = makeCtx();
+    mountSidebarShell(elements, ctx);
+    expect(ctx.store.getState().progress.app.sidebarCollapsed).toBe(false);
+
+    elements.backdrop.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(ctx.store.getState().progress.app.sidebarCollapsed).toBe(true);
+  });
+
+  it('clicking the backdrop while already collapsed does not re-expand the sidebar', () => {
+    const elements = buildElements();
+    const ctx = makeCtx();
+    mountSidebarShell(elements, ctx);
+    elements.headRoot.querySelector('.sidebar-toggle-btn')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(ctx.store.getState().progress.app.sidebarCollapsed).toBe(true);
+
+    elements.backdrop.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(ctx.store.getState().progress.app.sidebarCollapsed).toBe(true);
   });
 });
