@@ -9,7 +9,8 @@ die SQL-Struktur blind zu kopieren — die beiden Dokumente sind bewusst
 **unabhängige Graphen**, keine Unterbäume eines gemeinsamen Ober-Graphen
 (Begründung: Abschnitt 8).
 
-C# bleibt weiterhin außen vor.
+C# hat inzwischen ein eigenes, unabhängiges Dokument:
+[`docs/csharp-concept-hierarchy.md`](csharp-concept-hierarchy.md).
 
 ## 1. Grundprinzipien
 

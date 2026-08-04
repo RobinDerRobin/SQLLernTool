@@ -7,7 +7,9 @@ Konzepten, ohne die es unverständlich bleibt. Die aktuelle Implementierung
 deckt einen Teil davon ab (siehe Abschnitt 6) — der Rest ist Planungsgrundlage
 für künftige Challenges.
 
-Python und C# sind bewusst außen vor (siehe Abschnitt 8).
+Python ([`docs/python-concept-hierarchy.md`](python-concept-hierarchy.md))
+und C# ([`docs/csharp-concept-hierarchy.md`](csharp-concept-hierarchy.md))
+haben inzwischen eigene, unabhängige Dokumente (siehe Abschnitt 8/9).
 
 ## 1. Grundprinzipien
 
@@ -543,4 +545,15 @@ bleiben (kein gemeinsamer sprachneutraler Ober-Layer): `recursive-cte`
 jeweiligen Graphen (Level 6 vs. Level 3) — ein gemeinsamer Wurzelknoten
 hätte diese Tiefe für eine der beiden Seiten verfälscht. Die Verbindung
 bleibt eine Prosa-Referenz zwischen den Dokumenten, keine Graph-Kante.
+
+**Zweites Update:** [`docs/csharp-concept-hierarchy.md`](csharp-concept-hierarchy.md)
+existiert jetzt ebenfalls — drittes unabhängiges Dokument, gleiche
+Entscheidung. Bemerkenswertester Fund dort (Abschnitt 8): `linq-query-syntax`
+(C#, `from x in coll where ... select ...`) ist syntaktisch fast identisch
+mit genau den beiden hier dokumentierten SQL-Tags `select-statement`/
+`where-clause` — liegt aber in C# auf Level 7, fast am tiefsten Punkt des
+gesamten C#-Graphen, während `select-statement`/`where-clause` hier zu den
+flachsten Tags gehören. Dieselbe Oberflächen-Syntax an entgegengesetzten
+Enden der jeweiligen Tiefe — eine noch schärfere Illustration desselben
+Prinzips als das SQL/Python-Paar oben.
 C# bleibt weiterhin offen.
