@@ -41,6 +41,12 @@ import { challenge11_6 } from './challenges/11_6';
 import { challenge11_7 } from './challenges/11_7';
 import { challenge12 } from './challenges/12';
 import { challenge13 } from './challenges/13';
+import { challenge14 } from './challenges/14';
+import { challenge14_1 } from './challenges/14_1';
+import { challenge14_2 } from './challenges/14_2';
+import { challenge14_3 } from './challenges/14_3';
+import { challenge14_4 } from './challenges/14_4';
+import { challenge14_5 } from './challenges/14_5';
 
 const challenges: SqlChallenge[] = [
   challenge01,
@@ -84,6 +90,12 @@ const challenges: SqlChallenge[] = [
   challenge11_7,
   challenge12,
   challenge13,
+  challenge14,
+  challenge14_1,
+  challenge14_2,
+  challenge14_3,
+  challenge14_4,
+  challenge14_5,
 ];
 
 export const sqlLernenToolCourse: Course<SqlChallenge> = {
