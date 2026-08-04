@@ -46,6 +46,8 @@ wie gut das jeweils testabgedeckt ist.
 | F-010 | Coverage-Lücke | Niedrig | `pyodideEngine.ts` (25%) kaum getestet — lädt Pyodide/WASM vom CDN, wirkte schwer isoliert zu testen. (Die ursprünglich mitgenannte „Python-Sprachplugin-Index (0%)" war beim Nachprüfen `LanguagePlugin.ts`, ein reines Interface — kein echtes Test-Loch, siehe Hinweis unten.) | ✅ Fixed | `pyodideEngine.test.ts` (10 Tests: `createPyodideEngine` inkl. Driver-Script, `loadPyodideFromCdn` inkl. Script-Tag-Simulation für Erfolg/Fehler/Retry/gleichzeitige Aufrufe); `runtime/python/executeAndValidate.test.ts` (4 Tests, Fehler- und Catch-Branch) |
 | F-011 | Coverage-Lücke | Niedrig | `loadSqlJsFromCdn` in `app.ts` (der SQL-Gegenpart zu F-010) ist der einzige verbliebene ungetestete CDN-Loader im Projekt — Tests injizieren immer einen Fake-`loadSqlJs`, der echte Ladepfad läuft nie. | 🔴 Open | Noch keine — `pyodideEngine.test.ts`s Script-Tag-Simulation ist die Vorlage für den analogen Test. |
 | F-012 | Toter Code | Niedrig | `knip`-Analyse (TS-Modulgraph, nicht Regex — manuell gegen False Positives geprüft, z. B. Prosa-Treffer auf das deutsche Wort „Track"): 2 nie aufgerufene Funktionen (`getCurrentChallenge`/`getChallengeSolution` in `actions.ts` — der „In den Editor übernehmen"-Button holt die Lösung längst über einen eigenen Selector), 1 vollständig ungenutztes Interface (`Track<TChallenge>`, superseded durch `ContentTrack`), 5 Funktionen/Konstanten + 25 Typen nur intern genutzt aber unnötig exportiert, ein dupliziertes `Unsubscribe`-Type (`delegate.ts` vs. `state/store.ts`), 2 unbenutzte devDependencies (`@testing-library/dom`, `linkedom`). | ✅ Fixed | `knip` danach: 0 Findings. Volle Testsuite (558 Tests) + `build:check` grün nach jeder Änderung. |
+| F-013 | Bug | Hoch | SQL-Editor: `maybeUppercaseLastWord` (Auto-Uppercase für SQL-Keywords beim Tippen) hatte keine String-/Kommentar-Awareness, obwohl der Tokenizer sie für die Syntax-Hervorhebung längst korrekt berechnet. Ein Wort, das zufällig wie ein Keyword aussieht, wurde auch **innerhalb eines String-Literals oder Kommentars** großgeschrieben und damit der eigentliche Wert verfälscht — reproduziert live im Browser: `SELECT 'select ` wurde beim Tippen zu `SELECT 'SELECT '`. | ✅ Fixed | `uppercaseKeyword.test.ts`: 5 neue Tests (String-Literal, Kommentar `--` und `/* */`, sowie Bestätigung, dass echte Keywords *nach* einem geschlossenen String weiterhin großgeschrieben werden). Live in Playwright gegen den echten Dev-Server nachgestellt (vorher/nachher). |
+| F-014 | Bug | Mittel | SQL/Python-Editor: Auto-Close für Klammern/Anführungszeichen (`applyAutoClose`, von SQL für Python mitübernommen) kannte `{`/`}` nicht — 1:1 aus einem SQL-only-Prototyp portiert, der nie geschweifte Klammern braucht. Für Python (Dict-/Set-Literale, f-String-Ausdrücke `f"{x}"`) fehlt dadurch ein zentrales Auto-Close-Paar; `{` blieb beim Tippen einfach offen. | ✅ Fixed | `autoClosePairs.test.ts`: 2 neue Tests (Einfügen + Skip-over). Live in Playwright bestätigt: `d = {"a": 1` schließt jetzt korrekt zu `d = {"a": 1}`. |
 
 **Hinweis zu 0%-Dateien in der Coverage:** `ProgressStore.ts`, `Runtime.ts`,
 `SqlEngine.ts`, `editorBridge.ts`, `LanguagePlugin.ts`, `PythonRuntime.ts`
@@ -62,6 +64,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-04 | ece5451 | 91.58 % | 80.31 % | 93.84 % | 91.58 % |
 | 2026-08-04 | HEAD (F-010-Fix) | 92.26 % | 80.67 % | 95.10 % | 92.26 % |
 | 2026-08-04 | HEAD (F-012-Cleanup) | 92.38 % | 80.58 % | 95.69 % | 92.38 % |
+| 2026-08-04 | HEAD (F-013/F-014-Fix) | 92.88 % | 80.85 % | 96.01 % | 92.88 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -123,3 +126,40 @@ sondern pro PR direkt in den Checks sichtbar.
   nur Löschungen/Sichtbarkeits-Downgrades, nichts Neues gebaut.
 - **Tests:** 558 unverändert (kein neuer Code, der Tests bräuchte),
   `typecheck` + `build:check` grün nach jedem Schritt.
+
+### 2026-08-04 — Editor ausgiebig getestet (F-013, F-014)
+
+- **Umfang:** Auf explizite Anfrage der Code-Editor selbst (nicht die
+  umgebende UI) — statische Durchsicht aller Dateien in `src/editor/`
+  (domEditor, textOps, beide LanguagePlugins, Tokenizer, Auto-Indent,
+  Auto-Close, Auto-Uppercase), dann Live-Verifikation gegen den echten
+  Dev-Server per Playwright (lokale sql.js-Kopie statt CDN, siehe
+  Abschnitt oben).
+- **Vorgehen:** Coverage-Report zeigte bereits vor dem Durchgang zwei
+  ungetestete Zweige (`autoIndent.ts` beider Sprachen, Python-Tokenizer
+  2-Zeichen-Operatoren) — beim Nachvollziehen, *warum* sie ungetestet
+  waren, stellte sich einer als echte Sicherheitslücke heraus: die
+  Auto-Uppercase-Funktion tokenisiert den Code nicht selbst, sondern
+  scannt naiv rückwärts nach Buchstaben — ohne zu wissen, ob diese
+  Buchstaben in einem String stehen. Per Playwright reproduziert, dann
+  behoben, indem `maybeUppercaseLastWord` denselben Tokenizer wiederverwendet,
+  den die Syntax-Hervorhebung schon nutzt (eine Quelle der Wahrheit für
+  „was ist ein String", statt zwei unabhängige Annäherungen). Die zweite
+  Lücke (fehlendes `{`/`}` beim Auto-Close) kam beim gezielten Testen
+  Python-typischer Eingaben (Dict-Literale, f-String-Ausdrücke) zutage —
+  das Paar-Set war 1:1 aus dem SQL-only-Prototyp übernommen worden, ohne
+  je für Python (das `{}` intensiv nutzt) überprüft zu werden.
+- **Ergebnis:** F-013 (Hoch, verfälscht String-Inhalte) und F-014 (Mittel,
+  fehlende Editor-Funktionalität für einen ganzen Zeichentyp in Python)
+  gefunden und behoben. Beide live im Browser vorher/nachher bestätigt,
+  nicht nur per Unit-Test. Nebenbei: eine veraltete Code-Doku-Zeile in
+  `LanguagePlugin.ts` korrigiert (nannte den längst existierenden
+  Python-Plugin fälschlich „zukünftig"). Zwei tote Ternary-Zweige in
+  beiden `autoIndent.ts`-Dateien (`indentMatch ? ... : ''`, technisch
+  unerreichbar, weil ein `*`-Quantifier-Regex nie `null` zurückgibt)
+  bewusst **nicht** angefasst — echtes, aber folgenloses Dead-Code-Detail,
+  kein Bug, geringste Priorität.
+- **Tests:** 577 → 597 (+20: 2 Auto-Close-Tests für `{`/`}`, 5 neue
+  String-/Kommentar-Awareness-Tests für Auto-Uppercase, 13
+  parametrisierte Tests für die bisher ungetesteten Python-
+  Zwei-Zeichen-Operatoren), `typecheck` + volle Testsuite grün.
