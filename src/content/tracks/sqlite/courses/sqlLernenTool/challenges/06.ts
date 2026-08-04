@@ -27,12 +27,41 @@ SELECT * FROM products;`,
   },
   validate: (engine) => {
     try {
-      const count = Number(engine.exec('SELECT COUNT(*) FROM products')[0]?.values[0]?.[0]);
-      if (count === 20) return { ok: true, message: 'products enthält alle 20 Kombinationen.' };
-      return { ok: false, message: `products hat ${count} Zeile(n), erwartet 20 (5 Farben × 4 Größen).` };
+      const row = engine.exec(
+        'SELECT COUNT(*), COUNT(DISTINCT color), COUNT(DISTINCT size) FROM products',
+      )[0]?.values[0];
+      const count = Number(row?.[0]);
+      const distinctColors = Number(row?.[1]);
+      const distinctSizes = Number(row?.[2]);
+      if (count !== 20) {
+        return { ok: false, message: `products hat ${count} Zeile(n), erwartet 20 (5 Farben × 4 Größen).` };
+      }
+      if (distinctColors !== 5 || distinctSizes !== 4) {
+        return {
+          ok: false,
+          message: `products hat 20 Zeilen, aber nur ${distinctColors} verschiedene Farben und ${distinctSizes} verschiedene Größen — erwartet werden die tatsächlichen 5 Farben und 4 Größen aus colors/sizes, nicht 20 beliebige Zeilen.`,
+        };
+      }
+      return { ok: true, message: 'products enthält alle 20 Kombinationen.' };
     } catch (e) {
       if (!tableExists(engine, 'products')) return { ok: false, message: 'Tabelle products wurde noch nicht angelegt.' };
       return { ok: false, message: `Tabelle products existiert, aber die Prüfung schlug fehl: ${(e as Error).message}` };
     }
   },
+  distractors: [
+    {
+      code: `CREATE TABLE colors (color TEXT);
+INSERT INTO colors VALUES ('Rot'),('Blau'),('Grün'),('Gelb'),('Schwarz');
+
+CREATE TABLE sizes (size TEXT);
+INSERT INTO sizes VALUES ('S'),('M'),('L'),('XL');
+
+CREATE TABLE products AS
+WITH RECURSIVE cnt(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM cnt WHERE n < 20)
+SELECT 'x' AS color, 'y' AS size FROM cnt;
+
+SELECT * FROM products;`,
+      reason: 'liefert zufällig genau 20 Zeilen, aber ohne jeden Bezug zu colors/sizes — CROSS JOIN nie benutzt',
+    },
+  ],
 };

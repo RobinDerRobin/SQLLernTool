@@ -29,6 +29,15 @@ export interface BaseChallenge<TEngine, TResult, TExtra = Record<string, never>>
   prereqNote?: string;
   /** Drives repeated (10x) validation runs in the automated challenge-runner test suite. */
   nondeterministic?: boolean;
+  /**
+   * Plausible wrong solutions that must fail `validate` — the automated
+   * stand-in for a human who already understands the tag checking "does this
+   * challenge actually test what it claims to". See challenge-anforderungen.md
+   * section 12. Optional: not every challenge needs one, but any challenge
+   * where a shortcut could coincidentally pass (e.g. hardcoding an expected
+   * row count instead of computing it) should have at least one.
+   */
+  distractors?: readonly { code: string; reason: string }[];
   extra: TExtra;
 }
 

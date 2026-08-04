@@ -22,6 +22,9 @@ export const baseChallengeSchema = z.object({
   prereqNums: z.array(z.string()).optional(),
   prereqNote: z.string().optional(),
   nondeterministic: z.boolean().optional(),
+  distractors: z
+    .array(z.object({ code: z.string().min(1), reason: z.string().min(1) }))
+    .optional(),
 });
 
 const sqliteChallengeExtraSchema = z.object({

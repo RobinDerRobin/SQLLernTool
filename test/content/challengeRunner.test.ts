@@ -26,6 +26,14 @@ const REPS_FOR_NONDETERMINISTIC = 10;
  * replay actually works standalone, not just when challenges happen to run
  * in order in the same session — the exact bug this suite exists to guard
  * against (challenge-anforderungen.md section 11).
+ *
+ * Also runs Gate 2 (challenge-anforderungen.md section 12): every
+ * `distractors` entry on a challenge — a plausible wrong solution a learner
+ * without the intended understanding might submit — must fail the same
+ * `validate()`. A distractor that passes means the check doesn't actually
+ * test the concept it claims to. `distractors` is optional per challenge;
+ * not declaring any yields zero extra tests for that challenge, not a
+ * failure.
  */
 function runOneChallenge(engine: SqlEngine, challenge: SqlChallenge, allChallenges: SqlChallenge[]) {
   prepareChallenge(engine, challenge, allChallenges);
@@ -47,6 +55,18 @@ function describeSqlCourse(courseLabel: string, challenges: SqlChallenge[]) {
           expect(outcome.ok, `[${challenge.num} rep ${i + 1}/${reps}] validate() failed: ${outcome.message}`).toBe(true);
         }
       });
+
+      for (const [i, distractor] of (challenge.distractors ?? []).entries()) {
+        it(`${challenge.num} — distractor ${i + 1}/${challenge.distractors!.length} (${distractor.reason}) must fail validate`, () => {
+          const engine = createNodeSqliteEngine();
+          prepareChallenge(engine, challenge, challenges);
+          const outcome = executeAndValidate(engine, distractor.code, challenge.validate);
+          expect(
+            outcome.ok,
+            `Distractor "${distractor.reason}" for ${challenge.num} passed validate() — the check does not actually test the intended concept.`,
+          ).toBe(false);
+        });
+      }
     }
   });
 }
@@ -80,6 +100,17 @@ function describePythonCourse(courseLabel: string, challenges: PythonChallenge[]
           expect(outcome.ok, `[${challenge.num} rep ${i + 1}/${reps}] validate() failed: ${outcome.message}`).toBe(true);
         }
       });
+
+      for (const [i, distractor] of (challenge.distractors ?? []).entries()) {
+        it(`${challenge.num} — distractor ${i + 1}/${challenge.distractors!.length} (${distractor.reason}) must fail validate`, () => {
+          const engine = createNodePythonEngine();
+          const outcome = executeAndValidatePython(engine, distractor.code, challenge.validate);
+          expect(
+            outcome.ok,
+            `Distractor "${distractor.reason}" for ${challenge.num} passed validate() — the check does not actually test the intended concept.`,
+          ).toBe(false);
+        });
+      }
     }
   });
 }
