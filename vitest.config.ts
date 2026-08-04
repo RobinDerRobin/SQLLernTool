@@ -7,6 +7,7 @@ export default defineConfig({
     environmentMatchGlobs: [
       ['src/editor/domEditor.{ts,test.ts}', 'jsdom'],
       ['src/editor/domEditor.test.ts', 'jsdom'],
+      ['src/runtime/python/pyodideEngine.{ts,test.ts}', 'jsdom'],
       ['src/persistence/**', 'jsdom'],
       ['src/ui/**', 'jsdom'],
       ['src/theme/**', 'jsdom'],

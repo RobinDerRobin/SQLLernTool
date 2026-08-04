@@ -43,12 +43,13 @@ wie gut das jeweils testabgedeckt ist.
 | F-007 | Accessibility | Niedrig | Kein einheitlicher `:focus-visible`-Stil für Custom-Elemente (Challenge-Item, Tab-Buttons, Theme-Optionen). | ✅ Fixed | Playwright-Screenshot mit sichtbarem Fokusring; kein Unit-Test (reines CSS) |
 | F-008 | Accessibility | Niedrig | Theme-Picker-Modal ließ sich nicht per Escape schließen (nur Klick auf ✕ oder Backdrop). | ✅ Fixed | `themePicker.test.ts`: Escape schließt, Escape im geschlossenen Zustand ist No-op, Listener wird bei Unmount entfernt |
 | F-009 | Kontrast | Niedrig | WCAG-Kontrast-Check über alle 10 Themes (Skript, siehe unten) zeigt Grenzfälle: `solar-flare` fällt bei Button-Text auf 3.56–3.69:1 (Ziel 4.5:1), mehrere andere Themes liegen bei 4.1–4.4:1 für `muted`-Text auf `panel-2`. | 🟡 Deferred | Kein Test — Farbwahl ist eine Design-Entscheidung, nicht automatisch verändert. Nächster Schritt: bewusst pro Theme die `*-ink`-Farbwerte nachjustieren und mit Screenshot gegenprüfen. |
-| F-010 | Coverage-Lücke | Niedrig | `pyodideEngine.ts` (25%) und Python-Sprachplugin-Index (0%) kaum getestet — beides lädt Pyodide/WASM vom CDN, schwer isoliert zu testen. `sqlJsEngine.ts` CDN-Ladepfad ähnlich (71%). | 🔴 Open | Noch keine — bräuchte gemockte `window.initSqlJs`/Pyodide-Ladepfade als eigene Testfälle. |
+| F-010 | Coverage-Lücke | Niedrig | `pyodideEngine.ts` (25%) kaum getestet — lädt Pyodide/WASM vom CDN, wirkte schwer isoliert zu testen. (Die ursprünglich mitgenannte „Python-Sprachplugin-Index (0%)" war beim Nachprüfen `LanguagePlugin.ts`, ein reines Interface — kein echtes Test-Loch, siehe Hinweis unten.) | ✅ Fixed | `pyodideEngine.test.ts` (10 Tests: `createPyodideEngine` inkl. Driver-Script, `loadPyodideFromCdn` inkl. Script-Tag-Simulation für Erfolg/Fehler/Retry/gleichzeitige Aufrufe); `runtime/python/executeAndValidate.test.ts` (4 Tests, Fehler- und Catch-Branch) |
+| F-011 | Coverage-Lücke | Niedrig | `loadSqlJsFromCdn` in `app.ts` (der SQL-Gegenpart zu F-010) ist der einzige verbliebene ungetestete CDN-Loader im Projekt — Tests injizieren immer einen Fake-`loadSqlJs`, der echte Ladepfad läuft nie. | 🔴 Open | Noch keine — `pyodideEngine.test.ts`s Script-Tag-Simulation ist die Vorlage für den analogen Test. |
 
 **Hinweis zu 0%-Dateien in der Coverage:** `ProgressStore.ts`, `Runtime.ts`,
-`SqlEngine.ts`, `editorBridge.ts` zeigen 0%, sind aber reine
-TypeScript-Interfaces ohne ausführbaren Code — kein echtes Test-Loch,
-sondern ein Artefakt der Zählweise (0/0 Statements).
+`SqlEngine.ts`, `editorBridge.ts`, `LanguagePlugin.ts`, `PythonRuntime.ts`
+zeigen 0%, sind aber reine TypeScript-Interfaces ohne ausführbaren Code —
+kein echtes Test-Loch, sondern ein Artefakt der Zählweise (0/0 Statements).
 
 ## Coverage-Snapshot
 
@@ -58,6 +59,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | Datum | Commit | Statements | Branches | Functions | Lines |
 |---|---|---|---|---|---|
 | 2026-08-04 | ece5451 | 91.58 % | 80.31 % | 93.84 % | 91.58 % |
+| 2026-08-04 | HEAD (F-010-Fix) | 92.26 % | 80.67 % | 95.10 % | 92.26 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -77,3 +79,25 @@ sondern pro PR direkt in den Checks sichtbar.
   Coverage-Tooling und dieses Dokument neu eingeführt.
 - **Commits:** `91e46bd` (Mobile-Layout, Tastatur, Buttons, Tab-Rollen),
   `ece5451` (Theme-Picker-Bug).
+
+### 2026-08-04 — F-010 gezielt geschlossen
+
+- **Umfang:** Auf explizite Anfrage nur F-010 (Coverage-Lücke `pyodideEngine.ts`)
+  bearbeitet, keine erneute volle UI/UX-Runde.
+- **Vorgehen:** Beim Nachprüfen stellte sich heraus, dass die ursprüngliche
+  Beschreibung teils ungenau war — der "Python-Sprachplugin-Index" war ein
+  reines Interface (kein echtes Loch), der eigentliche Gewinn liegt komplett
+  in `pyodideEngine.ts`. `loadPyodideFromCdn`/`loadPyodideScript` per
+  simuliertem `<script>`-Tag in jsdom getestet (onload/onerror, Retry nach
+  Fehlschlag, geteiltes In-Flight-Promise bei gleichzeitigen Aufrufen),
+  `createPyodideEngine` per Fake-`PyodideInterface`. `runtime/python/executeAndValidate.ts`
+  bekam dabei ebenfalls einen eigenen direkten Unit-Test (vorher nur
+  indirekt über `challengeRunner.test.ts` mitgetestet).
+  `vitest.config.ts` bekam dafür einen neuen jsdom-Match für
+  `src/runtime/python/pyodideEngine.{ts,test.ts}`.
+- **Ergebnis:** `src/runtime/python` (Verzeichnis) 41.5 % → 100 % Statements.
+  F-010 auf Fixed gesetzt; ein Analogfall (F-011, der SQL-seitige
+  `loadSqlJsFromCdn` in `app.ts`) neu dokumentiert und bewusst offen gelassen,
+  da nicht angefragt.
+- **Tests:** 543 → 558 (+15: 10 `pyodideEngine.test.ts`, 4
+  `python/executeAndValidate.test.ts`, siehe Test-Dateien), `build:check` grün.
