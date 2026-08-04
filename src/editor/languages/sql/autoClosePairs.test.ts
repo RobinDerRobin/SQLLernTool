@@ -16,6 +16,16 @@ describe('applyAutoClose', () => {
     expect(result).toEqual({ text: '[]', selectionStart: 1, selectionEnd: 1 });
   });
 
+  it('inserts a matching close brace for { (needed for Python dict/set literals and f-string expressions)', () => {
+    const result = applyAutoClose('{', state('', 0));
+    expect(result).toEqual({ text: '{}', selectionStart: 1, selectionEnd: 1 });
+  });
+
+  it('skips over an existing closing brace instead of inserting a new one', () => {
+    const result = applyAutoClose('}', state('{}', 1));
+    expect(result).toEqual({ text: '{}', selectionStart: 2, selectionEnd: 2 });
+  });
+
   it('wraps a selection when typing an open bracket, keeping the wrapped text selected', () => {
     const result = applyAutoClose('(', state('abc', 0, 3));
     expect(result).toEqual({ text: '(abc)', selectionStart: 1, selectionEnd: 4 });

@@ -16,9 +16,9 @@ export interface UppercaseResult {
 
 /**
  * Everything domEditor.ts needs to drive a code editor for one language,
- * without knowing anything about that language itself. The SQL plugin
- * (./sql/sqlLanguagePlugin.ts) is the only implementation today; a future
- * Python/C# plugin would implement the same shape.
+ * without knowing anything about that language itself. Implemented by
+ * ./sql/sqlLanguagePlugin.ts and ./python/pythonLanguagePlugin.ts; a future
+ * C# plugin would implement the same shape.
  */
 export interface LanguagePlugin {
   id: string;

@@ -20,7 +20,7 @@ ORDER BY signup_date ASC;`,
   extra: {
     pg: `Identisch in Postgres. Bei einer echten DATE-Spalte würdest du dort ohne Anführungszeichen um das Datum herum genauso filtern, z. B. WHERE signup_date >= DATE '2025-01-10'.`,
   },
-  validate: (_engine, lastResult) => {
+  validate: (engine, lastResult) => {
     if (!lastResult || !lastResult.columns) return { ok: false, message: 'Es gibt noch kein SELECT-Ergebnis.' };
     const cols = lastResult.columns.map((c) => c.toLowerCase());
     if (cols.length !== 2 || !cols.includes('name') || !cols.includes('signup_date')) {
@@ -37,6 +37,23 @@ ORDER BY signup_date ASC;`,
         return { ok: false, message: 'Die Zeilen sind nicht aufsteigend nach signup_date sortiert.' };
       }
     }
+    const expectedCount = Number(
+      engine.exec("SELECT COUNT(*) FROM users WHERE signup_date >= '2025-01-10'")[0]?.values[0]?.[0],
+    );
+    if (values.length !== expectedCount) {
+      return {
+        ok: false,
+        message: `Das Ergebnis hat ${values.length} Zeile(n), aber users enthält tatsächlich ${expectedCount} passende — es fehlen Zeilen (WHERE zu eng gefasst?).`,
+      };
+    }
     return { ok: true, message: `Ergebnis korrekt gefiltert und sortiert (${values.length} Zeile(n)).` };
   },
+  distractors: [
+    {
+      code: `SELECT name, signup_date FROM users
+WHERE signup_date >= '2025-01-20'
+ORDER BY signup_date ASC;`,
+      reason: 'jede zurückgegebene Zeile erfüllt die Bedingung und ist sortiert, aber die WHERE-Grenze ist zu eng — echte Treffer zwischen 2025-01-10 und 2025-01-20 fehlen unbemerkt',
+    },
+  ],
 };

@@ -73,7 +73,7 @@ function sliceChallengeList(state: AppState, registry: AppContext['registry']): 
 
 function renderRow(row: ChallengeRow): string {
   return `
-    <li class="challenge-item ${row.active ? 'active' : ''}" data-track="${escapeHtml(row.trackId)}" data-course="${escapeHtml(row.courseId)}" data-num="${escapeHtml(row.num)}">
+    <li class="challenge-item ${row.active ? 'active' : ''}" data-track="${escapeHtml(row.trackId)}" data-course="${escapeHtml(row.courseId)}" data-num="${escapeHtml(row.num)}" tabindex="0" aria-current="${row.active ? 'true' : 'false'}">
       <div class="ci-top">
         <span class="challenge-num">${escapeHtml(row.num)}</span>
         <span class="challenge-title">${escapeHtml(row.title)}</span>
@@ -81,7 +81,7 @@ function renderRow(row: ChallengeRow): string {
       <div class="ci-bottom">
         <span class="stars">${row.completed ? renderStars(row.stars) : ''}</span>
         <span class="ci-actions">
-          <button class="play-btn" data-play-num="${escapeHtml(row.num)}" ${row.hasCode ? '' : 'disabled'} title="Diese Challenge ausführen">▶</button>
+          <button type="button" class="play-btn" data-play-num="${escapeHtml(row.num)}" ${row.hasCode ? '' : 'disabled'} title="Diese Challenge ausführen" aria-label="Challenge ${escapeHtml(row.num)} ausführen">▶</button>
           ${renderResultGlyph(row.playResult)}
         </span>
       </div>
@@ -113,6 +113,22 @@ export function mountChallengeList(root: HTMLElement, ctx: AppContext): Unsubscr
             return;
           }
 
+          selectChallenge(ctx, trackId, courseId, num);
+        });
+
+        // Keyboard equivalent of clicking a row. Scoped to keydown events whose
+        // target *is* the item (not a nested control like .play-btn, which
+        // already gets its own native Enter/Space→click behavior as a real
+        // <button> — handling it here too would fire both actions at once).
+        rootEl.addEventListener('keydown', (e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          const target = e.target as HTMLElement;
+          if (!target.classList.contains('challenge-item')) return;
+          e.preventDefault();
+          const trackId = target.dataset.track;
+          const courseId = target.dataset.course;
+          const num = target.dataset.num;
+          if (!trackId || !courseId || !num) return;
           selectChallenge(ctx, trackId, courseId, num);
         });
       },

@@ -1,6 +1,6 @@
 import type { Store, Unsubscribe } from './state/store';
 
-export interface ViewDef<TSlice, TCtx> {
+interface ViewDef<TSlice, TCtx> {
   render(state: TSlice): string;
   /** Called exactly once, at mount time — binds delegated event listeners. */
   bind?(root: HTMLElement, ctx: TCtx): void;

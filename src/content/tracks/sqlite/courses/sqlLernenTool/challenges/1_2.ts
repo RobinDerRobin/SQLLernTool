@@ -33,10 +33,29 @@ SELECT * FROM active_users;`,
       for (const row of rows) {
         if (String(row[2]) < '2025-01-10') return { ok: false, message: 'active_users enthält auch Zeilen vor 2025-01-10.' };
       }
+      const expectedCount = Number(
+        engine.exec("SELECT COUNT(*) FROM users WHERE signup_date >= '2025-01-10'")[0]?.values[0]?.[0],
+      );
+      if (rows.length !== expectedCount) {
+        return {
+          ok: false,
+          message: `active_users hat ${rows.length} Zeile(n), aber users enthält tatsächlich ${expectedCount} passende — es fehlen Zeilen (WHERE zu eng gefasst?).`,
+        };
+      }
       return { ok: true, message: `active_users enthält ${rows.length} passende Zeile(n).` };
     } catch (e) {
       if (!tableExists(engine, 'active_users')) return { ok: false, message: 'Tabelle active_users wurde noch nicht angelegt.' };
       return { ok: false, message: `Tabelle active_users existiert, aber die Prüfung schlug fehl: ${(e as Error).message}` };
     }
   },
+  distractors: [
+    {
+      code: `CREATE TABLE active_users AS
+SELECT * FROM users
+WHERE signup_date >= '2025-01-20';
+
+SELECT * FROM active_users;`,
+      reason: 'jede Zeile erfüllt die Bedingung, aber die WHERE-Grenze ist zu eng — echte Treffer zwischen 2025-01-10 und 2025-01-20 fehlen unbemerkt',
+    },
+  ],
 };

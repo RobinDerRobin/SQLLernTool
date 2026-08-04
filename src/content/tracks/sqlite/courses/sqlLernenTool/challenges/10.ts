@@ -40,18 +40,58 @@ LIMIT 10;`,
     try {
       const custCount = Number(engine.exec('SELECT COUNT(*) FROM customers')[0]?.values[0]?.[0]);
       const orderCount = Number(engine.exec('SELECT COUNT(*) FROM orders')[0]?.values[0]?.[0]);
-      const hasJoinResult = Boolean(lastResult && lastResult.values && lastResult.values.length > 0);
-      if (custCount === 100 && orderCount === 1000 && hasJoinResult) {
+      if (custCount !== 100 || orderCount !== 1000) {
+        return { ok: false, message: `customers: ${custCount}, orders: ${orderCount} — erwartet 100 bzw. 1000.` };
+      }
+      const invalidRefs = Number(
+        engine.exec('SELECT COUNT(*) FROM orders WHERE customer_id NOT IN (SELECT id FROM customers)')[0]?.values[0]?.[0],
+      );
+      if (invalidRefs > 0) {
         return {
-          ok: true,
-          message: `customers (100) und orders (1000) sind korrekt verknüpft, dein JOIN liefert ${lastResult?.values.length} Zeile(n).`,
+          ok: false,
+          message: `${invalidRefs} orders-Zeile(n) verweisen per customer_id auf keine existierende Kunden-ID — die Beziehung muss auf echte, existierende Kunden zeigen.`,
         };
       }
-      return { ok: false, message: `customers: ${custCount}, orders: ${orderCount} — erwartet 100 bzw. 1000, plus ein abschließendes JOIN-Ergebnis.` };
+      const rows = lastResult?.values ?? [];
+      if (rows.length === 0 || rows.length > 10) {
+        return {
+          ok: false,
+          message: `Das letzte SELECT-Ergebnis hat ${rows.length} Zeile(n) — erwartet werden 1 bis 10 (Top-10-Kunden per LIMIT 10).`,
+        };
+      }
+      const counts = rows.map((r) => Number(r[1]));
+      if (counts.some((n) => !Number.isFinite(n) || n <= 0) || counts.reduce((a, b) => a + b, 0) > orderCount) {
+        return {
+          ok: false,
+          message: 'Das letzte SELECT-Ergebnis sieht nicht wie ein echtes JOIN-Ranking aus (Bestellzahlen fehlen, sind 0/negativ, oder summieren sich auf mehr als es orders gibt).',
+        };
+      }
+      return {
+        ok: true,
+        message: `customers (100) und orders (1000) sind korrekt per FK verknüpft, dein JOIN liefert ${rows.length} plausible Top-Kunden-Zeile(n).`,
+      };
     } catch (e) {
       if (!tableExists(engine, 'customers')) return { ok: false, message: 'Tabelle customers wurde noch nicht angelegt.' };
       if (!tableExists(engine, 'orders')) return { ok: false, message: 'Tabelle orders wurde noch nicht angelegt.' };
       return { ok: false, message: `Prüfung schlug fehl: ${(e as Error).message}` };
     }
   },
+  distractors: [
+    {
+      code: `CREATE TABLE customers (id INTEGER, name TEXT);
+WITH RECURSIVE c(n) AS (
+  SELECT 1 UNION ALL SELECT n+1 FROM c WHERE n < 100
+)
+INSERT INTO customers SELECT n, 'Kunde ' || n FROM c;
+
+CREATE TABLE orders (id INTEGER, customer_id INTEGER);
+WITH RECURSIVE o(n) AS (
+  SELECT 1 UNION ALL SELECT n+1 FROM o WHERE n < 1000
+)
+INSERT INTO orders SELECT n, 99999 FROM o;
+
+SELECT 'Kunde 1' AS name, 5 AS anzahl_bestellungen;`,
+      reason: 'customers/orders haben die richtige Zeilenzahl, aber jede customer_id verweist auf eine nicht existierende Kunden-ID, und das letzte SELECT ist ein frei erfundenes Ergebnis statt eines echten JOIN',
+    },
+  ],
 };

@@ -34,11 +34,34 @@ SELECT * FROM numbers LIMIT 10;`,
       const count = nums.length;
       const min = Math.min(...nums);
       const max = Math.max(...nums);
-      if (count === 100 && min === 1 && max === 100) return { ok: true, message: 'numbers enthält genau die Zahlen 1–100.' };
-      return { ok: false, message: `numbers hat ${count} Zeile(n) (min ${min}, max ${max}) — erwartet 100 Zeilen von 1–100.` };
+      const distinct = new Set(nums).size;
+      if (count === 100 && min === 1 && max === 100 && distinct === 100) {
+        return { ok: true, message: 'numbers enthält genau die Zahlen 1–100.' };
+      }
+      return {
+        ok: false,
+        message: `numbers hat ${count} Zeile(n), ${distinct} davon unterschiedlich (min ${min}, max ${max}) — erwartet werden 100 unterschiedliche Zeilen von 1–100.`,
+      };
     } catch (e) {
       if (!tableExists(engine, 'numbers')) return { ok: false, message: 'Tabelle numbers wurde noch nicht angelegt.' };
       return { ok: false, message: `Tabelle numbers existiert, aber die Prüfung schlug fehl: ${(e as Error).message}` };
     }
   },
+  distractors: [
+    {
+      code: `CREATE TABLE numbers (n INTEGER);
+
+INSERT INTO numbers VALUES (1), (100);
+
+WITH RECURSIVE cnt(n) AS (
+  SELECT 1
+  UNION ALL
+  SELECT n + 1 FROM cnt WHERE n < 98
+)
+INSERT INTO numbers SELECT 50 FROM cnt;
+
+SELECT * FROM numbers LIMIT 10;`,
+      reason: '100 Zeilen, min=1 und max=100 stimmen zufällig, aber 98 davon sind Duplikate von 50 statt der Zahlen 2–99',
+    },
+  ],
 };

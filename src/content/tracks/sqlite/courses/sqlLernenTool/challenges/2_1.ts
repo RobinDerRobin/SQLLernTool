@@ -21,7 +21,7 @@ SELECT * FROM recent;`,
   extra: {
     pg: `Identisch in Postgres — CTEs sind Standard-SQL.`,
   },
-  validate: (_engine, lastResult) => {
+  validate: (engine, lastResult) => {
     if (!lastResult || !lastResult.columns) return { ok: false, message: 'Es gibt noch kein SELECT-Ergebnis.' };
     const cols = lastResult.columns.map((c) => c.toLowerCase());
     const dateIdx = cols.indexOf('signup_date');
@@ -31,6 +31,24 @@ SELECT * FROM recent;`,
     for (const row of values) {
       if (String(row[dateIdx]) < '2025-01-10') return { ok: false, message: 'Es sind auch Zeilen vor 2025-01-10 enthalten.' };
     }
+    const expectedCount = Number(
+      engine.exec("SELECT COUNT(*) FROM users_backup WHERE signup_date >= '2025-01-10'")[0]?.values[0]?.[0],
+    );
+    if (values.length !== expectedCount) {
+      return {
+        ok: false,
+        message: `Das Ergebnis hat ${values.length} Zeile(n), aber users_backup enthält tatsächlich ${expectedCount} passende — es fehlen Zeilen (WHERE zu eng gefasst?).`,
+      };
+    }
     return { ok: true, message: `Ergebnis korrekt über eine CTE gefiltert (${values.length} Zeile(n)).` };
   },
+  distractors: [
+    {
+      code: `WITH recent AS (
+  SELECT * FROM users_backup WHERE signup_date >= '2025-01-20'
+)
+SELECT * FROM recent;`,
+      reason: 'jede zurückgegebene Zeile erfüllt die Bedingung, aber die WHERE-Grenze ist zu eng — echte Treffer zwischen 2025-01-10 und 2025-01-20 fehlen unbemerkt',
+    },
+  ],
 };

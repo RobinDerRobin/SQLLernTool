@@ -1,10 +1,10 @@
-export interface TextSelectionState {
+interface TextSelectionState {
   text: string;
   selectionStart: number;
   selectionEnd: number;
 }
 
-export type TextOpResult = TextSelectionState;
+type TextOpResult = TextSelectionState;
 
 /**
  * Language-agnostic Tab/Shift+Tab handling — not part of any SQL-specific

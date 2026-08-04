@@ -40,6 +40,16 @@ SELECT * FROM mitarbeiter LIMIT 10;`,
       if (a !== 5) return { ok: false, message: `abteilungen hat ${a} Zeile(n), erwartet 5.` };
       if (mCount !== 20) return { ok: false, message: `mitarbeiter hat ${mCount} Zeile(n), erwartet 20.` };
       if (mMin < 1 || mMax > 5) return { ok: false, message: `abteilung_id reicht von ${mMin} bis ${mMax} — erlaubt ist nur 1 bis 5.` };
+      const invalidRefs = Number(
+        engine.exec('SELECT COUNT(*) FROM mitarbeiter WHERE abteilung_id NOT IN (SELECT id FROM abteilungen)')[0]
+          ?.values[0]?.[0],
+      );
+      if (invalidRefs > 0) {
+        return {
+          ok: false,
+          message: `${invalidRefs} mitarbeiter-Zeile(n) verweisen per abteilung_id auf keine existierende Abteilung — abteilung_id liegt zwar in 1–5, aber abteilungen.id hat andere Werte.`,
+        };
+      }
       return { ok: true, message: `5 Abteilungen und 20 Mitarbeiter mit gültigen Verweisen erzeugt.` };
     } catch (e) {
       if (!tableExists(engine, 'abteilungen')) return { ok: false, message: 'Tabelle abteilungen wurde noch nicht angelegt.' };
@@ -47,4 +57,19 @@ SELECT * FROM mitarbeiter LIMIT 10;`,
       return { ok: false, message: `Prüfung schlug fehl: ${(e as Error).message}` };
     }
   },
+  distractors: [
+    {
+      code: `CREATE TABLE abteilungen (id INTEGER, name TEXT);
+INSERT INTO abteilungen VALUES (10,'X'),(11,'X'),(12,'X'),(13,'X'),(14,'X');
+
+CREATE TABLE mitarbeiter (id INTEGER, abteilung_id INTEGER);
+WITH RECURSIVE m(n) AS (
+  SELECT 1 UNION ALL SELECT n+1 FROM m WHERE n < 20
+)
+INSERT INTO mitarbeiter SELECT n, ABS(RANDOM() % 5) + 1 FROM m;
+
+SELECT * FROM mitarbeiter LIMIT 10;`,
+      reason: 'abteilung_id liegt korrekt zwischen 1 und 5, aber abteilungen hat IDs 10–14 — jeder Verweis zeigt auf eine nicht existierende Abteilung',
+    },
+  ],
 };

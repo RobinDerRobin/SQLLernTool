@@ -47,4 +47,31 @@ describe('maybeUppercaseLastWord', () => {
     const result = maybeUppercaseLastWord(text, cursorPos);
     expect(result?.cursorPos).toBe(cursorPos);
   });
+
+  it('does not uppercase a keyword-lookalike word inside a string literal', () => {
+    // The string VALUE is "select ", not SQL syntax — must stay untouched.
+    const text = "SELECT 'select ";
+    expect(maybeUppercaseLastWord(text, text.length)).toBeNull();
+  });
+
+  it('does not uppercase inside a string literal even mid-statement, with real SQL after', () => {
+    const text = "WHERE status = 'all ";
+    expect(maybeUppercaseLastWord(text, text.length)).toBeNull();
+  });
+
+  it('does not uppercase a keyword-lookalike word inside a -- comment', () => {
+    const text = '-- select ';
+    expect(maybeUppercaseLastWord(text, text.length)).toBeNull();
+  });
+
+  it('does not uppercase a keyword-lookalike word inside a /* */ comment', () => {
+    const text = '/* select ';
+    expect(maybeUppercaseLastWord(text, text.length)).toBeNull();
+  });
+
+  it('still uppercases real SQL keywords that follow a string literal on the same line', () => {
+    const text = "WHERE name = 'select' and ";
+    const result = maybeUppercaseLastWord(text, text.length);
+    expect(result?.text).toBe("WHERE name = 'select' AND ");
+  });
 });

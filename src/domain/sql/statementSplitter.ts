@@ -1,4 +1,4 @@
-export interface SqlStatement {
+interface SqlStatement {
   text: string;
   startOffset: number;
 }

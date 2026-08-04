@@ -78,7 +78,7 @@ export interface AppContext {
   registry: Record<string, ContentTrack>;
 }
 
-export interface CreateAppContextDeps {
+interface CreateAppContextDeps {
   progressStore: ProgressStore;
   chatClient: ClaudeChatClient;
   registry: Record<string, ContentTrack>;

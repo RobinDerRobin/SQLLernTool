@@ -23,7 +23,27 @@ INSERT INTO saucen VALUES ('Tomate'),('Rahm');`,
   },
   validate: (_engine, lastResult) => {
     if (!lastResult || !lastResult.values) return { ok: false, message: 'Es gibt noch kein SELECT-Ergebnis.' };
-    if (lastResult.values.length !== 6) return { ok: false, message: `Es sind ${lastResult.values.length} Zeile(n) — erwartet werden genau 6.` };
+    const values = lastResult.values;
+    if (values.length !== 6) return { ok: false, message: `Es sind ${values.length} Zeile(n) — erwartet werden genau 6.` };
+    const zutaten = new Set(['Nudeln', 'Reis', 'Kartoffeln']);
+    const saucen = new Set(['Tomate', 'Rahm']);
+    const seenZutaten = new Set(values.map((r) => String(r[0])));
+    const seenSaucen = new Set(values.map((r) => String(r[1])));
+    const allFromZutaten = [...seenZutaten].every((v) => zutaten.has(v));
+    const allFromSaucen = [...seenSaucen].every((v) => saucen.has(v));
+    if (!allFromZutaten || !allFromSaucen || seenZutaten.size !== 3 || seenSaucen.size !== 2) {
+      return {
+        ok: false,
+        message: `6 Zeilen, aber die Werte stammen nicht (vollständig) aus zutaten/saucen — gefunden: ${[...seenZutaten].join(', ')} × ${[...seenSaucen].join(', ')}.`,
+      };
+    }
     return { ok: true, message: 'Alle 6 Kombinationen erzeugt.' };
   },
+  distractors: [
+    {
+      code: `SELECT 'x' AS zutat, 'y' AS sauce
+FROM (SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6);`,
+      reason: 'liefert genau 6 Zeilen, aber ohne jeden Bezug zu zutaten/saucen — kein kartesisches Produkt, nur 6 identische erfundene Zeilen',
+    },
+  ],
 };

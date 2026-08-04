@@ -98,6 +98,50 @@ describe('mountChallengeList', () => {
     expect(glyph?.classList.contains('ok')).toBe(true);
   });
 
+  it('is keyboard-focusable and marks the active row with aria-current', () => {
+    const ctx = makeCtx();
+    mountChallengeList(root, ctx);
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
+
+    const active = root.querySelector('[data-num="01"]') as HTMLElement;
+    const inactive = root.querySelector('[data-num="1.1"]') as HTMLElement;
+    expect(active.getAttribute('tabindex')).toBe('0');
+    expect(active.getAttribute('aria-current')).toBe('true');
+    expect(inactive.getAttribute('aria-current')).toBe('false');
+  });
+
+  it('pressing Enter on a focused row selects that challenge', () => {
+    const ctx = makeCtx();
+    mountChallengeList(root, ctx);
+    const item = root.querySelector('[data-num="1.1"]') as HTMLElement;
+
+    item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    expect(ctx.store.getState().session.selection?.challengeNum).toBe('1.1');
+  });
+
+  it('pressing Space on a focused row selects that challenge', () => {
+    const ctx = makeCtx();
+    mountChallengeList(root, ctx);
+    const item = root.querySelector('[data-num="1.1"]') as HTMLElement;
+
+    item.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+
+    expect(ctx.store.getState().session.selection?.challengeNum).toBe('1.1');
+  });
+
+  it('pressing Enter while focus is on the nested play button only plays, not selects', () => {
+    let progress = createDefaultProgressState();
+    progress = withChallengeProgress(progress, 'sqlite', 'sqlLernenTool', '01', { draftSql: c01.solution });
+    const ctx = makeCtx(progress);
+    mountChallengeList(root, ctx);
+    const playBtn = root.querySelector('[data-play-num="01"]') as HTMLElement;
+
+    playBtn.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    expect(ctx.store.getState().session.selection).toBeNull();
+  });
+
   it('re-renders when the underlying challenge-list signature changes, not on unrelated state changes', () => {
     const ctx = makeCtx();
     mountChallengeList(root, ctx);

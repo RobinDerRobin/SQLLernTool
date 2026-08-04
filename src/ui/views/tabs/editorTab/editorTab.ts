@@ -22,9 +22,9 @@ const SHELL_HTML = `
     <div class="editor-toolbar">
       <span class="label">SQL</span>
       <div class="toolbar-actions">
-        <button class="btn tables-toggle-btn">Tabellen</button>
+        <button type="button" class="btn tables-toggle-btn">Tabellen</button>
         <span class="hint">Strg/Cmd + Enter</span>
-        <button class="run-btn">▶ Ausführen</button>
+        <button type="button" class="run-btn">▶ Ausführen</button>
       </div>
     </div>
     <div class="tables-panel"></div>
@@ -41,7 +41,7 @@ const SHELL_HTML = `
     <div class="results-body"><div class="empty-state">Noch keine Query ausgeführt.</div></div>
   </div>`;
 
-export interface MountedEditorTab {
+interface MountedEditorTab {
   editor: DomEditor;
   unmount: Unsubscribe;
 }

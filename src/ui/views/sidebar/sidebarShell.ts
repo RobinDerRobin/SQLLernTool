@@ -7,11 +7,13 @@ import type { Unsubscribe } from '../../state/store';
 import { on } from '../../util/delegate';
 import { parseTrackCourseValue, renderTrackCourseHeader } from './trackCoursePicker';
 
-export interface SidebarShellElements {
+interface SidebarShellElements {
   /** The element that carries the `collapsed` class — an ancestor of both roots. */
   sidebarContainer: HTMLElement;
   headRoot: HTMLElement;
   footRoot: HTMLElement;
+  /** Mobile-only overlay backdrop, shown via CSS while the sidebar is expanded on a narrow viewport. */
+  backdrop: HTMLElement;
 }
 
 interface HeadSlice {
@@ -38,23 +40,23 @@ function sliceHead(state: AppState): HeadSlice {
 
 function renderHead(slice: HeadSlice, ctx: AppContext): string {
   return `
-    <button class="sidebar-toggle-btn" title="Seitenleiste ein-/ausklappen">${slice.collapsed ? '›' : '‹'}</button>
+    <button type="button" class="sidebar-toggle-btn" title="Seitenleiste ein-/ausklappen" aria-label="Seitenleiste ${slice.collapsed ? 'ausklappen' : 'einklappen'}">${slice.collapsed ? '›' : '‹'}</button>
     <div class="sidebar-head">
       ${renderTrackCourseHeader({ registry: ctx.registry, trackId: slice.trackId, courseId: slice.courseId })}
       <div class="mode-toggle">
-        <button class="mode-btn ${slice.mode === 'study' ? 'active' : ''}" data-mode="study">Study</button>
-        <button class="mode-btn ${slice.mode === 'exam' ? 'active' : ''}" data-mode="exam">Exam</button>
+        <button type="button" class="mode-btn ${slice.mode === 'study' ? 'active' : ''}" data-mode="study" aria-pressed="${slice.mode === 'study'}">Study</button>
+        <button type="button" class="mode-btn ${slice.mode === 'exam' ? 'active' : ''}" data-mode="exam" aria-pressed="${slice.mode === 'exam'}">Exam</button>
       </div>
     </div>`;
 }
 
 const FOOT_HTML = `
-  <button class="theme-btn">🎨 Design wechseln</button>
-  <button class="reset-btn">Schema komplett zurücksetzen</button>
+  <button type="button" class="theme-btn">🎨 Design wechseln</button>
+  <button type="button" class="reset-btn">Schema komplett zurücksetzen</button>
   <div class="reset-confirm-row">
     <span class="reset-confirm-text">Wirklich alles löschen?</span>
-    <button class="btn reset-confirm-yes">Ja, löschen</button>
-    <button class="btn reset-confirm-no">Abbrechen</button>
+    <button type="button" class="btn reset-confirm-yes">Ja, löschen</button>
+    <button type="button" class="btn reset-confirm-no">Abbrechen</button>
   </div>`;
 
 function firstChallengeNum(ctx: AppContext, trackId: string, courseId: string): string | null {
@@ -71,7 +73,7 @@ function firstChallengeNum(ctx: AppContext, trackId: string, courseId: string): 
  * to read it.
  */
 export function mountSidebarShell(elements: SidebarShellElements, ctx: AppContext): Unsubscribe {
-  const { sidebarContainer, headRoot, footRoot } = elements;
+  const { sidebarContainer, headRoot, footRoot, backdrop } = elements;
 
   const unmountHead = mountView(
     headRoot,
@@ -116,11 +118,19 @@ export function mountSidebarShell(elements: SidebarShellElements, ctx: AppContex
   });
   const offNo = on(footRoot, 'click', '.reset-confirm-no', () => confirmRow?.classList.remove('open'));
 
+  // The backdrop only renders (via CSS) on narrow viewports while the sidebar
+  // is expanded, so a click on it always means "close the drawer".
+  function onBackdropClick(): void {
+    if (!ctx.store.getState().progress.app.sidebarCollapsed) toggleSidebar(ctx);
+  }
+  backdrop.addEventListener('click', onBackdropClick);
+
   return () => {
     unmountHead();
     offTheme();
     offReset();
     offYes();
     offNo();
+    backdrop.removeEventListener('click', onBackdropClick);
   };
 }

@@ -22,9 +22,12 @@ export const baseChallengeSchema = z.object({
   prereqNums: z.array(z.string()).optional(),
   prereqNote: z.string().optional(),
   nondeterministic: z.boolean().optional(),
+  distractors: z
+    .array(z.object({ code: z.string().min(1), reason: z.string().min(1) }))
+    .optional(),
 });
 
-export const sqliteChallengeExtraSchema = z.object({
+const sqliteChallengeExtraSchema = z.object({
   /** Never a placeholder — see challenge-anforderungen.md section 9. */
   pg: z.string().min(1),
 });
@@ -34,7 +37,7 @@ export const sqliteChallengeSchema = baseChallengeSchema.extend({
 });
 
 /** No track-specific extra fields for Python yet. */
-export const pythonChallengeExtraSchema = z.object({});
+const pythonChallengeExtraSchema = z.object({});
 
 export const pythonChallengeSchema = baseChallengeSchema.extend({
   extra: pythonChallengeExtraSchema,

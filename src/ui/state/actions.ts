@@ -1,5 +1,4 @@
 import { buildContext } from '../../chat/buildContext';
-import type { AnyChallenge } from '../../domain/challenge.types';
 import {
   getChallengeProgress,
   getCourseSettings,
@@ -375,13 +374,6 @@ export function revealHint(ctx: AppContext, idx: number): void {
   );
 }
 
-/** Shared read-only lookup of the challenge the user currently has open (any track). */
-export function getCurrentChallenge(ctx: AppContext): AnyChallenge | null {
-  const selection = ctx.store.getState().session.selection;
-  if (!selection) return null;
-  return findChallengeInRegistry(ctx.registry, selection.trackId, selection.courseId, selection.challengeNum) ?? null;
-}
-
 /** Marks the solution as viewed and zeroes bestStars — only the first time (idempotent afterward). */
 export function markSolutionViewed(ctx: AppContext): void {
   const state = ctx.store.getState();
@@ -398,11 +390,6 @@ export function markSolutionViewed(ctx: AppContext): void {
     }),
   }));
   persist(ctx);
-}
-
-/** Query helper (not a mutation) for the editor's "insert solution" button. */
-export function getChallengeSolution(ctx: AppContext): string | null {
-  return getCurrentChallenge(ctx)?.solution ?? null;
 }
 
 /** Prefills the chat draft with a comparison prompt; the actual line-diff is a pure render helper the view calls directly. */

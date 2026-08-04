@@ -61,7 +61,7 @@ function renderHints(slice: HintsSlice): string {
           </div>`;
       }
       const locked = idx > slice.hintsUsed || poolEmpty;
-      return `<button class="btn hint-btn" data-hint-idx="${idx}" ${locked ? 'disabled' : ''}>Tipp ${idx + 1} anfordern</button>`;
+      return `<button type="button" class="btn hint-btn" data-hint-idx="${idx}" ${locked ? 'disabled' : ''}>Tipp ${idx + 1} anfordern</button>`;
     })
     .join('');
 

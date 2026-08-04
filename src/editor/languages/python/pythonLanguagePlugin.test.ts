@@ -38,6 +38,15 @@ describe('tokenizePython', () => {
     const tokens = tokenizePython('"""erste Zeile\nzweite Zeile"""');
     expect(tokens[0]).toEqual({ type: 'string', value: '"""erste Zeile\nzweite Zeile"""' });
   });
+
+  it.each(['==', '!=', '<=', '>=', '//', '**', '->', '+=', '-=', '*=', '/=', '%=', ':='])(
+    'tokenizes the two-character operator "%s" as a single operator token, not two',
+    (op) => {
+      const tokens = tokenizePython(`x ${op} y`);
+      const operatorTokens = tokens.filter((t) => t.type === 'operator');
+      expect(operatorTokens).toEqual([{ type: 'operator', value: op }]);
+    },
+  );
 });
 
 describe('highlightPython', () => {

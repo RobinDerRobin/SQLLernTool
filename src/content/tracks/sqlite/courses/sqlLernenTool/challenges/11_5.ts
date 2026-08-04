@@ -34,6 +34,22 @@ INSERT INTO kunden VALUES
     if (rows.some((row) => !String(row[emailCol]).endsWith('@gmail.com'))) {
       return { ok: false, message: 'Es sind auch Zeilen ohne @gmail.com-Adresse im Ergebnis.' };
     }
+    const seenEmails = new Set(rows.map((row) => String(row[emailCol])));
+    const expectedEmails = new Set(['anna@gmail.com', 'clara@gmail.com', 'emma@gmail.com']);
+    if (seenEmails.size !== 3 || ![...expectedEmails].every((e) => seenEmails.has(e))) {
+      return {
+        ok: false,
+        message: `3 Zeilen enden auf @gmail.com, aber es sind nicht alle drei echten Kunden (Anna, Clara, Emma) dabei — gefunden: ${[...seenEmails].join(', ')}.`,
+      };
+    }
     return { ok: true, message: 'LIKE korrekt: nur die 3 gmail.com-Kunden gefunden.' };
   },
+  distractors: [
+    {
+      code: `SELECT * FROM kunden WHERE email = 'anna@gmail.com'
+UNION ALL SELECT * FROM kunden WHERE email = 'anna@gmail.com'
+UNION ALL SELECT * FROM kunden WHERE email = 'anna@gmail.com';`,
+      reason: '3 Zeilen, alle enden auf @gmail.com, aber es ist dreimal dieselbe Kundin statt der drei echten gmail-Kunden',
+    },
+  ],
 };

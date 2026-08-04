@@ -32,12 +32,23 @@ SELECT * FROM users;`,
   },
   validate: (engine) => {
     try {
-      const count = Number(engine.exec('SELECT COUNT(*) FROM users')[0]?.values[0]?.[0]);
+      const count = Number(engine.exec('SELECT id, name, signup_date FROM users')[0]?.values.length ?? 0);
       if (count >= 5) return { ok: true, message: `users enthält ${count} Zeilen.` };
       return { ok: false, message: `users enthält nur ${count} Zeile(n) — erwartet mindestens 5.` };
     } catch (e) {
       if (!tableExists(engine, 'users')) return { ok: false, message: 'Tabelle users wurde noch nicht angelegt.' };
-      return { ok: false, message: `Tabelle users existiert, aber die Prüfung schlug fehl: ${(e as Error).message}` };
+      return {
+        ok: false,
+        message: `users existiert, aber es fehlt eine der erwarteten Spalten id, name, signup_date: ${(e as Error).message}`,
+      };
     }
   },
+  distractors: [
+    {
+      code: `CREATE TABLE users (x INTEGER);
+INSERT INTO users VALUES (1),(2),(3),(4),(5);
+SELECT * FROM users;`,
+      reason: 'hat 5 Zeilen, aber nicht die geforderten Spalten id/name/signup_date',
+    },
+  ],
 };

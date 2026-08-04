@@ -3,7 +3,7 @@ export interface DiffLine {
   differs: boolean;
 }
 
-export interface LineDiff {
+interface LineDiff {
   mine: DiffLine[];
   theirs: DiffLine[];
 }

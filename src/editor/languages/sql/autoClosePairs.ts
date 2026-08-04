@@ -1,16 +1,19 @@
-export interface EditorSelectionState {
+interface EditorSelectionState {
   text: string;
   selectionStart: number;
   selectionEnd: number;
 }
 
-export type AutoCloseOutcome = EditorSelectionState;
+type AutoCloseOutcome = EditorSelectionState;
 
-const OPEN_TO_CLOSE: Record<string, string> = { '(': ')', '[': ']', "'": "'", '"': '"' };
+const OPEN_TO_CLOSE: Record<string, string> = { '(': ')', '[': ']', '{': '}', "'": "'", '"': '"' };
 const CLOSE_CHARS = new Set(Object.values(OPEN_TO_CLOSE));
 
 /**
- * Pure port of the prototype's bracket/quote auto-closing (`PAIRS`). Returns
+ * Pure port of the prototype's bracket/quote auto-closing (`PAIRS`), plus
+ * `{`/`}` (missing from the original SQL-only prototype — SQL never uses
+ * curly braces, but Python's dict/set literals and f-string expressions
+ * do, and this list is shared verbatim by the Python plugin below). Returns
  * null when the typed character needs no special handling — the caller
  * should then fall back to inserting it normally.
  */

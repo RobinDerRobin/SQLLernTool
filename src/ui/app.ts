@@ -41,18 +41,19 @@ const SHELL_HTML = `
       <ul class="challenge-list"></ul>
       <div class="sidebar-foot"></div>
     </div>
+    <div class="sidebar-backdrop"></div>
     <div class="main">
       <div class="boot-banner-region"></div>
       <div class="main-header"></div>
       <div class="tab-content-area">
-        <div class="tab-content tab-content-task"></div>
-        <div class="tab-content tab-content-tutorial"></div>
-        <div class="tab-content tab-content-editor"></div>
-        <div class="tab-content tab-content-chat"></div>
+        <div class="tab-content tab-content-task" id="tabpanel-task" role="tabpanel" aria-labelledby="tab-task"></div>
+        <div class="tab-content tab-content-tutorial" id="tabpanel-tutorial" role="tabpanel" aria-labelledby="tab-tutorial"></div>
+        <div class="tab-content tab-content-editor" id="tabpanel-editor" role="tabpanel" aria-labelledby="tab-editor"></div>
+        <div class="tab-content tab-content-chat" id="tabpanel-chat" role="tabpanel" aria-labelledby="tab-chat"></div>
       </div>
     </div>
-  </div>
-  <div class="theme-picker-region"></div>`;
+    <div class="theme-picker-region"></div>
+  </div>`;
 
 const TAB_CLASS: Record<ActiveTab, string> = {
   task: 'tab-content-task',
@@ -61,7 +62,7 @@ const TAB_CLASS: Record<ActiveTab, string> = {
   chat: 'tab-content-chat',
 };
 
-export interface CreateAppDeps {
+interface CreateAppDeps {
   progressStore?: ProgressStore;
   chatClient?: ClaudeChatClient;
   registry?: Record<string, ContentTrack>;
@@ -70,7 +71,7 @@ export interface CreateAppDeps {
   engineFactory?: EngineFactory;
 }
 
-export interface MountedApp {
+interface MountedApp {
   ctx: AppContext;
   /** Resolves once the boot sequence has finished (successfully or not). */
   ready: Promise<void>;
@@ -112,6 +113,7 @@ export function createApp(root: HTMLElement, deps: CreateAppDeps = {}): MountedA
   const sidebar = root.querySelector<HTMLElement>('.sidebar')!;
   const sidebarHead = root.querySelector<HTMLElement>('.sidebar-head-region')!;
   const sidebarFoot = root.querySelector<HTMLElement>('.sidebar-foot')!;
+  const sidebarBackdrop = root.querySelector<HTMLElement>('.sidebar-backdrop')!;
   const challengeList = root.querySelector<HTMLElement>('.challenge-list')!;
   const bootRegion = root.querySelector<HTMLElement>('.boot-banner-region')!;
   const headerRegion = root.querySelector<HTMLElement>('.main-header')!;
@@ -136,7 +138,7 @@ export function createApp(root: HTMLElement, deps: CreateAppDeps = {}): MountedA
 
   const unmounts: Unsubscribe[] = [
     mountBootBanner(bootRegion, sqlApp, ctx),
-    mountSidebarShell({ sidebarContainer: sidebar, headRoot: sidebarHead, footRoot: sidebarFoot }, ctx),
+    mountSidebarShell({ sidebarContainer: sidebar, headRoot: sidebarHead, footRoot: sidebarFoot, backdrop: sidebarBackdrop }, ctx),
     mountChallengeList(challengeList, ctx),
     mountThemePicker(themeRegion, ctx),
     mountMainHeader(headerRegion, ctx),

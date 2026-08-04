@@ -95,4 +95,43 @@ describe('mountThemePicker', () => {
 
     expect(ctx.store.getState().session.themePickerOpen).toBe(true);
   });
+
+  it('pressing Escape closes the picker', () => {
+    const ctx = makeCtx();
+    mountThemePicker(root, ctx);
+    toggleThemePicker(ctx, true);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    expect(ctx.store.getState().session.themePickerOpen).toBe(false);
+  });
+
+  it('pressing Escape while already closed is a no-op', () => {
+    const ctx = makeCtx();
+    mountThemePicker(root, ctx);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    expect(ctx.store.getState().session.themePickerOpen).toBe(false);
+  });
+
+  it('stops listening for Escape after unmount', () => {
+    const ctx = makeCtx();
+    const unmount = mountThemePicker(root, ctx);
+    toggleThemePicker(ctx, true);
+    unmount();
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    expect(ctx.store.getState().session.themePickerOpen).toBe(true);
+  });
+
+  it('marks the active theme option with aria-pressed', () => {
+    const ctx = makeCtx(withAppSettings(createDefaultProgressState(), { theme: 'ocean-depth' }));
+    mountThemePicker(root, ctx);
+    toggleThemePicker(ctx, true);
+
+    expect(root.querySelector('[data-theme-id="ocean-depth"]')?.getAttribute('aria-pressed')).toBe('true');
+    expect(root.querySelector('[data-theme-id="retro-amber"]')?.getAttribute('aria-pressed')).toBe('false');
+  });
 });
