@@ -425,7 +425,10 @@ passende IDs, deklariert nie einen echten `FOREIGN KEY`), `alter-table`,
 **B3 DQL:** `logical-operators` als **eigenes** Thema (wird implizit
 verwendet, nie explizit erklärt), `coalesce-nullif`.
 
-**B4 Funktionen:** `math-functions` (`round()`, `abs()`), `cast-conversion`.
+**B4 Funktionen:** `math-functions` (`round()`, `abs()`), `cast-conversion`,
+und `string-functions` (`substr()`, `upper()`, `lower()`, `trim()`,
+`replace()` — der Kurs nutzt nur den `||`-Operator, keine dieser Funktionen
+taucht in einer der 41 Challenges auf).
 
 **B6 Joins:** `self-join`, `right-join`, `full-outer-join`.
 
@@ -444,11 +447,16 @@ Mitarbeiter unter einem Manager"). Das ist die zweitgrößte Lücke — beide
 sind SQL-Kernkompetenzen, die im Kurs bisher fehlen.
 
 **B10 Fensterfunktionen, B11 Transaktionen, B12 Views, B13 Indizes:**
-**komplett nicht abgedeckt.**
+**komplett nicht abgedeckt** (B13 zählt hier ohne `create-index`, das
+strukturell zu B1 gehört und dort separat gelistet ist).
 
 **Gut abgedeckt:** B0–B1-Basics, DML-Kern (ohne Upsert), DQL-Kern fast
 vollständig, Aggregation/Gruppierung, Joins bis `LEFT JOIN`, CTE/Rekursion
 (Erzeugungs-Variante).
+
+**Bilanz:** 43 von 82 Tags sind heute durch mindestens eine Challenge
+abgedeckt (≈ 52 %). Fünf Zweige (B7, B10, B11, B12, B13) sind zu 100 %
+Lücke.
 
 ## 7. Bewusst ausgeklammert
 
