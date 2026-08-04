@@ -28,12 +28,38 @@ SELECT COUNT(*) AS anzahl_tage FROM calendar;`,
   },
   validate: (engine) => {
     try {
-      const count = Number(engine.exec('SELECT COUNT(*) FROM calendar')[0]?.values[0]?.[0]);
-      if (count === 365) return { ok: true, message: 'calendar enthält alle 365 Tage.' };
-      return { ok: false, message: `calendar hat ${count} Zeile(n), erwartet 365.` };
+      const r = engine.exec('SELECT COUNT(*), MIN(d), MAX(d), COUNT(DISTINCT d) FROM calendar')[0]?.values[0];
+      const count = Number(r?.[0]);
+      const min = String(r?.[1]);
+      const max = String(r?.[2]);
+      const distinct = Number(r?.[3]);
+      if (count === 365 && distinct === 365 && min === '2025-01-01' && max === '2025-12-31') {
+        return { ok: true, message: 'calendar enthält alle 365 Tage.' };
+      }
+      return {
+        ok: false,
+        message: `calendar hat ${count} Zeile(n), ${distinct} davon unterschiedlich, von ${min} bis ${max} — erwartet werden 365 verschiedene Tage von 2025-01-01 bis 2025-12-31.`,
+      };
     } catch (e) {
       if (!tableExists(engine, 'calendar')) return { ok: false, message: 'Tabelle calendar wurde noch nicht angelegt.' };
       return { ok: false, message: `Tabelle calendar existiert, aber die Prüfung schlug fehl: ${(e as Error).message}` };
     }
   },
+  distractors: [
+    {
+      code: `CREATE TABLE calendar (d TEXT);
+
+INSERT INTO calendar VALUES ('2025-01-01'), ('2025-12-31');
+
+WITH RECURSIVE cnt(n) AS (
+  SELECT 1
+  UNION ALL
+  SELECT n + 1 FROM cnt WHERE n < 363
+)
+INSERT INTO calendar SELECT '2025-06-15' FROM cnt;
+
+SELECT COUNT(*) AS anzahl_tage FROM calendar;`,
+      reason: '365 Zeilen, min/max stimmen zufällig, aber 363 davon sind Duplikate desselben Tages statt echter fortlaufender Daten',
+    },
+  ],
 };

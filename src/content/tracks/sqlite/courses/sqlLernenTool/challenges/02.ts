@@ -35,14 +35,40 @@ SELECT * FROM users_backup;`,
     try {
       const usersCount = Number(engine.exec('SELECT COUNT(*) FROM users')[0]?.values[0]?.[0]);
       const backupCount = Number(engine.exec('SELECT COUNT(*) FROM users_backup')[0]?.values[0]?.[0]);
-      if (backupCount >= 5 && backupCount === usersCount) {
-        return { ok: true, message: `users_backup enthält ${backupCount} Zeilen, wie users.` };
+      if (backupCount < 5 || backupCount !== usersCount) {
+        return { ok: false, message: `users_backup hat ${backupCount} Zeilen, users hat ${usersCount} — sollte gleich sein.` };
       }
-      return { ok: false, message: `users_backup hat ${backupCount} Zeilen, users hat ${usersCount} — sollte gleich sein.` };
+      const mismatched = Number(
+        engine.exec(
+          'SELECT COUNT(*) FROM (SELECT id, name, signup_date FROM users EXCEPT SELECT id, name, signup_date FROM users_backup)',
+        )[0]?.values[0]?.[0],
+      );
+      if (mismatched > 0) {
+        return {
+          ok: false,
+          message: `users_backup hat gleich viele Zeilen wie users, aber ${mismatched} davon stimmen inhaltlich nicht überein — die Daten müssen tatsächlich aus users übernommen sein, nicht nur die Zeilenzahl passen.`,
+        };
+      }
+      return { ok: true, message: `users_backup enthält ${backupCount} Zeilen, inhaltlich identisch mit users.` };
     } catch (e) {
       if (!tableExists(engine, 'users_backup')) return { ok: false, message: 'Tabelle users_backup wurde noch nicht angelegt.' };
       if (!tableExists(engine, 'users')) return { ok: false, message: 'Tabelle users existiert nicht (mehr) — wird für den Vergleich benötigt.' };
       return { ok: false, message: `Prüfung schlug fehl: ${(e as Error).message}` };
     }
   },
+  distractors: [
+    {
+      code: `CREATE TABLE users_backup (
+  id INTEGER PRIMARY KEY,
+  name TEXT,
+  signup_date TEXT
+);
+
+INSERT INTO users_backup
+SELECT id, 'X', 'X' FROM users;
+
+SELECT * FROM users_backup;`,
+      reason: 'gleiche Zeilenzahl wie users, aber name/signup_date sind erfunden statt kopiert — INSERT INTO ... SELECT nie inhaltlich genutzt',
+    },
+  ],
 };
