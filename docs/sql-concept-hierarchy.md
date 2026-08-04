@@ -379,7 +379,7 @@ aber die Frage *warum/wann* ein Index nützt, nicht *wie* man ihn anlegt.
 
 ## 5. Detail-Graph (Kern-Zweige)
 
-Der vollständige Graph mit allen ~65 Tags ist als ein einziges Diagramm
+Der vollständige Graph mit allen 82 Tags ist als ein einziges Diagramm
 nicht mehr lesbar. Hier der Kern (B0–B3, B5, B9) exemplarisch — die übrigen
 Zweige folgen demselben Muster aus Abschnitt 4.
 
@@ -411,7 +411,7 @@ graph TD
 
 ## 6. Abgleich mit der aktuellen Implementierung
 
-Von den ~65 Tags in diesem Dokument deckt `sqlLernenTool` (41 Challenges)
+Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (41 Challenges)
 folgende **nicht** ab — das ist die eigentliche Planungs-Nutzlast dieses
 Dokuments:
 
