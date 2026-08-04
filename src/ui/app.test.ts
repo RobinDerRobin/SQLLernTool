@@ -48,6 +48,20 @@ describe('createApp', () => {
     expect(root.querySelector('.theme-picker-overlay')).not.toBeNull();
   });
 
+  it('nests the theme picker inside .sql-app so it inherits the active theme\'s CSS variables', async () => {
+    // Regression test: the theme picker used to be a DOM sibling of .sql-app,
+    // outside the [data-theme='X'] scope that overrides --panel etc. — so its
+    // modal always rendered in the default palette no matter which theme was
+    // actually selected. It's position:fixed, so nesting it doesn't change
+    // where it's painted, only which theme variables it resolves against.
+    const { root, app } = mountApp();
+    await app.ready;
+
+    const sqlApp = root.querySelector('.sql-app');
+    const themeRegion = root.querySelector('.theme-picker-region');
+    expect(sqlApp?.contains(themeRegion)).toBe(true);
+  });
+
   it('lists every challenge in the sidebar', async () => {
     const { root, app } = mountApp();
     await app.ready;

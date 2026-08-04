@@ -52,8 +52,8 @@ const SHELL_HTML = `
         <div class="tab-content tab-content-chat" id="tabpanel-chat" role="tabpanel" aria-labelledby="tab-chat"></div>
       </div>
     </div>
-  </div>
-  <div class="theme-picker-region"></div>`;
+    <div class="theme-picker-region"></div>
+  </div>`;
 
 const TAB_CLASS: Record<ActiveTab, string> = {
   task: 'tab-content-task',
