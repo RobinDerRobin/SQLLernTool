@@ -1,4 +1,4 @@
-export type Unsubscribe = () => void;
+import type { Unsubscribe } from '../state/store';
 
 /**
  * Binds one listener on a stable `root` at mount time and dispatches to

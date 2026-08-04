@@ -1,14 +1,14 @@
 import type { ContentTrack } from '../../../content/registry';
 import { escapeHtml } from '../../../domain/text/escapeHtml';
 
-export interface TrackCourseHeaderInput {
+interface TrackCourseHeaderInput {
   registry: Record<string, ContentTrack>;
   trackId: string | null;
   courseId: string | null;
 }
 
 /** Encodes a (track, course) pair into one `<option value>`; parsed back by `parseTrackCourseValue`. */
-export function makeTrackCourseValue(trackId: string, courseId: string): string {
+function makeTrackCourseValue(trackId: string, courseId: string): string {
   return `${trackId}::${courseId}`;
 }
 

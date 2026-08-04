@@ -28,7 +28,7 @@ const DEFAULT_DEADLINE_MS = 5000;
 /** Checking the wall clock on every single row would itself add overhead to a hot loop — check every Nth row instead. */
 const DEADLINE_CHECK_INTERVAL = 500;
 
-export interface CreateSqlJsEngineOptions {
+interface CreateSqlJsEngineOptions {
   /** Hard cap on rows read from a single statement — the last line of defense against a runaway query. */
   rowCap?: number;
   /** Wall-clock budget per statement, in milliseconds. */

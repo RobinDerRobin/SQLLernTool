@@ -39,12 +39,6 @@ export interface Course<TChallenge> {
   challenges: TChallenge[];
 }
 
-export interface Track<TChallenge> {
-  id: string;
-  label: string;
-  courses: Course<TChallenge>[];
-}
-
 /**
  * Loosely-typed view of a challenge from *any* track — everything display
  * code needs (title, task, hints, ...) is on `BaseChallenge` regardless of

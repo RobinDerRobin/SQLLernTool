@@ -9,7 +9,7 @@ export function renderStars(n: number): string {
   return '★'.repeat(clamped) + '☆'.repeat(MAX_STARS - clamped);
 }
 
-export type PlayResultGlyphInput = 'ok' | 'err' | undefined;
+type PlayResultGlyphInput = 'ok' | 'err' | undefined;
 
 /** The sidebar's per-challenge play-result glyph: ✓ / ✗ / blank (never played). */
 export function renderResultGlyph(result: PlayResultGlyphInput): string {

@@ -1,4 +1,4 @@
-export interface StarInput {
+interface StarInput {
   hintsUsed: number;
   solutionViewed: boolean;
 }

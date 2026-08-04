@@ -7,7 +7,7 @@ import type { Unsubscribe } from '../../state/store';
 import { on } from '../../util/delegate';
 import { parseTrackCourseValue, renderTrackCourseHeader } from './trackCoursePicker';
 
-export interface SidebarShellElements {
+interface SidebarShellElements {
   /** The element that carries the `collapsed` class — an ancestor of both roots. */
   sidebarContainer: HTMLElement;
   headRoot: HTMLElement;

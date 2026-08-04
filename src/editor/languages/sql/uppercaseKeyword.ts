@@ -2,7 +2,7 @@ import { SQL_KEYWORDS } from './keywords';
 
 const BOUNDARY_CHARS = new Set([' ', '\n', '\t', ',', '(', ')', ';']);
 
-export interface UppercaseResult {
+interface UppercaseResult {
   text: string;
   cursorPos: number;
 }

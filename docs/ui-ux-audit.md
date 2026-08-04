@@ -45,6 +45,7 @@ wie gut das jeweils testabgedeckt ist.
 | F-009 | Kontrast | Niedrig | WCAG-Kontrast-Check über alle 10 Themes (Skript, siehe unten) zeigt Grenzfälle: `solar-flare` fällt bei Button-Text auf 3.56–3.69:1 (Ziel 4.5:1), mehrere andere Themes liegen bei 4.1–4.4:1 für `muted`-Text auf `panel-2`. | 🟡 Deferred | Kein Test — Farbwahl ist eine Design-Entscheidung, nicht automatisch verändert. Nächster Schritt: bewusst pro Theme die `*-ink`-Farbwerte nachjustieren und mit Screenshot gegenprüfen. |
 | F-010 | Coverage-Lücke | Niedrig | `pyodideEngine.ts` (25%) kaum getestet — lädt Pyodide/WASM vom CDN, wirkte schwer isoliert zu testen. (Die ursprünglich mitgenannte „Python-Sprachplugin-Index (0%)" war beim Nachprüfen `LanguagePlugin.ts`, ein reines Interface — kein echtes Test-Loch, siehe Hinweis unten.) | ✅ Fixed | `pyodideEngine.test.ts` (10 Tests: `createPyodideEngine` inkl. Driver-Script, `loadPyodideFromCdn` inkl. Script-Tag-Simulation für Erfolg/Fehler/Retry/gleichzeitige Aufrufe); `runtime/python/executeAndValidate.test.ts` (4 Tests, Fehler- und Catch-Branch) |
 | F-011 | Coverage-Lücke | Niedrig | `loadSqlJsFromCdn` in `app.ts` (der SQL-Gegenpart zu F-010) ist der einzige verbliebene ungetestete CDN-Loader im Projekt — Tests injizieren immer einen Fake-`loadSqlJs`, der echte Ladepfad läuft nie. | 🔴 Open | Noch keine — `pyodideEngine.test.ts`s Script-Tag-Simulation ist die Vorlage für den analogen Test. |
+| F-012 | Toter Code | Niedrig | `knip`-Analyse (TS-Modulgraph, nicht Regex — manuell gegen False Positives geprüft, z. B. Prosa-Treffer auf das deutsche Wort „Track"): 2 nie aufgerufene Funktionen (`getCurrentChallenge`/`getChallengeSolution` in `actions.ts` — der „In den Editor übernehmen"-Button holt die Lösung längst über einen eigenen Selector), 1 vollständig ungenutztes Interface (`Track<TChallenge>`, superseded durch `ContentTrack`), 5 Funktionen/Konstanten + 25 Typen nur intern genutzt aber unnötig exportiert, ein dupliziertes `Unsubscribe`-Type (`delegate.ts` vs. `state/store.ts`), 2 unbenutzte devDependencies (`@testing-library/dom`, `linkedom`). | ✅ Fixed | `knip` danach: 0 Findings. Volle Testsuite (558 Tests) + `build:check` grün nach jeder Änderung. |
 
 **Hinweis zu 0%-Dateien in der Coverage:** `ProgressStore.ts`, `Runtime.ts`,
 `SqlEngine.ts`, `editorBridge.ts`, `LanguagePlugin.ts`, `PythonRuntime.ts`
@@ -60,6 +61,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 |---|---|---|---|---|---|
 | 2026-08-04 | ece5451 | 91.58 % | 80.31 % | 93.84 % | 91.58 % |
 | 2026-08-04 | HEAD (F-010-Fix) | 92.26 % | 80.67 % | 95.10 % | 92.26 % |
+| 2026-08-04 | HEAD (F-012-Cleanup) | 92.38 % | 80.58 % | 95.69 % | 92.38 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -101,3 +103,23 @@ sondern pro PR direkt in den Checks sichtbar.
   da nicht angefragt.
 - **Tests:** 543 → 558 (+15: 10 `pyodideEngine.test.ts`, 4
   `python/executeAndValidate.test.ts`, siehe Test-Dateien), `build:check` grün.
+
+### 2026-08-04 — Toter Code (F-012)
+
+- **Umfang:** Auf explizite Anfrage `knip` (TS-Modulgraph-Analyse) laufen
+  lassen und jeden Fund manuell gegen False Positives geprüft (z. B. Prosa-
+  Treffer auf "SQL-Track" vs. den TS-Typ `Track`, oder gleichnamige aber
+  unabhängige Typen in verschiedenen Dateien wie zwei separate
+  `Unsubscribe`-Deklarationen).
+- **Vorgehen:** Drei Kategorien unterschieden — (1) wirklich toter Code:
+  `getCurrentChallenge`/`getChallengeSolution` (nie aufgerufen) und
+  `Track<TChallenge>` (nicht mal intern referenziert) komplett gelöscht;
+  (2) nur intern genutzt, aber unnötig exportiert: `export` bei 5
+  Funktionen/Konstanten + 25 Typen entfernt, nichts gelöscht; (3)
+  `delegate.ts`s eigene `Unsubscribe`-Deklaration durch einen Import aus
+  `state/store.ts` ersetzt (Duplikat). Dazu 2 unbenutzte devDependencies
+  (`@testing-library/dom`, `linkedom`) entfernt.
+- **Ergebnis:** `knip` meldet danach 0 Findings. Keine Verhaltensänderung —
+  nur Löschungen/Sichtbarkeits-Downgrades, nichts Neues gebaut.
+- **Tests:** 558 unverändert (kein neuer Code, der Tests bräuchte),
+  `typecheck` + `build:check` grün nach jedem Schritt.

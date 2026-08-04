@@ -1,11 +1,11 @@
 import { stripHtml } from '../domain/text/stripHtml';
 
-export interface ChatChallengeSummary {
+interface ChatChallengeSummary {
   title: string;
   completed: boolean;
 }
 
-export interface BuildContextInput {
+interface BuildContextInput {
   toolDescription: string;
   trackLabel: string;
   courseTitle: string;

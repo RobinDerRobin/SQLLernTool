@@ -20,7 +20,7 @@ export interface CourseProgress extends CourseSettings {
   challenges: Record<string, ChallengeProgress>;
 }
 
-export interface ChallengeRef {
+interface ChallengeRef {
   trackId: string;
   courseId: string;
   num: string;
@@ -46,7 +46,7 @@ export function createDefaultChallengeProgress(): ChallengeProgress {
   return { hintsUsed: 0, bestStars: 0, solutionViewed: false, draftSql: '', chatHistory: [] };
 }
 
-export function createDefaultCourseSettings(): CourseSettings {
+function createDefaultCourseSettings(): CourseSettings {
   return { mode: DEFAULT_MODE, examTipsRemaining: DEFAULT_EXAM_TIPS };
 }
 
@@ -54,7 +54,7 @@ function createDefaultCourseProgress(): CourseProgress {
   return { ...createDefaultCourseSettings(), challenges: {} };
 }
 
-export function createDefaultAppSettings(): AppSettings {
+function createDefaultAppSettings(): AppSettings {
   return { theme: 'default', sidebarCollapsed: false };
 }
 

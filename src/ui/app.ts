@@ -62,7 +62,7 @@ const TAB_CLASS: Record<ActiveTab, string> = {
   chat: 'tab-content-chat',
 };
 
-export interface CreateAppDeps {
+interface CreateAppDeps {
   progressStore?: ProgressStore;
   chatClient?: ClaudeChatClient;
   registry?: Record<string, ContentTrack>;
@@ -71,7 +71,7 @@ export interface CreateAppDeps {
   engineFactory?: EngineFactory;
 }
 
-export interface MountedApp {
+interface MountedApp {
   ctx: AppContext;
   /** Resolves once the boot sequence has finished (successfully or not). */
   ready: Promise<void>;

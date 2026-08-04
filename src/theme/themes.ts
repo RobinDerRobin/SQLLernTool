@@ -1,4 +1,4 @@
-export interface ThemeDefinition {
+interface ThemeDefinition {
   id: string;
   name: string;
   /** Four representative colors shown as the picker's preview square. */

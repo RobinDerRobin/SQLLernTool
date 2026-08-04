@@ -41,7 +41,7 @@ const SHELL_HTML = `
     <div class="results-body"><div class="empty-state">Noch keine Query ausgeführt.</div></div>
   </div>`;
 
-export interface MountedEditorTab {
+interface MountedEditorTab {
   editor: DomEditor;
   unmount: Unsubscribe;
 }

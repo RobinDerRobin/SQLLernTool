@@ -13,7 +13,7 @@ export type SqlTokenType =
   | 'whitespace'
   | 'punctuation';
 
-export interface SqlToken {
+interface SqlToken {
   type: SqlTokenType;
   value: string;
 }

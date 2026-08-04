@@ -1,10 +1,10 @@
-export interface EditorSelectionState {
+interface EditorSelectionState {
   text: string;
   selectionStart: number;
   selectionEnd: number;
 }
 
-export type AutoCloseOutcome = EditorSelectionState;
+type AutoCloseOutcome = EditorSelectionState;
 
 const OPEN_TO_CLOSE: Record<string, string> = { '(': ')', '[': ']', "'": "'", '"': '"' };
 const CLOSE_CHARS = new Set(Object.values(OPEN_TO_CLOSE));

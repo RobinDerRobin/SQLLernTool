@@ -12,7 +12,7 @@ export type PythonTokenType =
   | 'whitespace'
   | 'punctuation';
 
-export interface PythonToken {
+interface PythonToken {
   type: PythonTokenType;
   value: string;
 }

@@ -2,13 +2,13 @@ import { debounce } from '../util/debounce';
 import type { LanguagePlugin } from './languages/LanguagePlugin';
 import { dedentLine, insertTab } from './textOps';
 
-export interface DomEditorElements {
+interface DomEditorElements {
   textarea: HTMLTextAreaElement;
   overlay: HTMLElement;
   gutter: HTMLElement;
 }
 
-export interface DomEditorCallbacks {
+interface DomEditorCallbacks {
   onChange?: (value: string) => void;
   onRun?: () => void;
 }
