@@ -23,11 +23,31 @@ WHERE bestellungen.kunde_id = kunden.id;`,
   extra: {
     pg: `Funktioniert in Postgres identisch. Guter Stil ist dort aber die JOIN-Schreibweise aus Kapitel 7, weil Verknüpfungs- und Filterbedingungen dann klar getrennt sind.`,
   },
-  validate: (_engine, lastResult) => {
+  validate: (engine, lastResult) => {
     if (!lastResult || !lastResult.values) return { ok: false, message: 'Es gibt noch kein SELECT-Ergebnis.' };
     const n = lastResult.values.length;
     if (n === 15) return { ok: false, message: 'Es sind 15 Zeilen — die WHERE-Bedingung zum Verknüpfen fehlt noch.' };
     if (n !== 5) return { ok: false, message: `Es sind ${n} Zeile(n) — erwartet werden genau 5.` };
+    const expectedPairs = new Set(
+      engine
+        .exec('SELECT kunden.name, bestellungen.id FROM kunden, bestellungen WHERE bestellungen.kunde_id = kunden.id')[0]
+        ?.values.map((r) => `${String(r[0])}|${String(r[1])}`) ?? [],
+    );
+    const gotPairs = new Set(lastResult.values.map((r) => `${String(r[0])}|${String(r[1])}`));
+    const allMatch = gotPairs.size === expectedPairs.size && [...gotPairs].every((p) => expectedPairs.has(p));
+    if (!allMatch) {
+      return {
+        ok: false,
+        message: '5 Zeilen, aber die Name/Bestellungs-ID-Paare stimmen nicht mit den echten Fremdschlüssel-Beziehungen überein.',
+      };
+    }
     return { ok: true, message: 'Nur die zusammengehörenden 5 Paare bleiben übrig.' };
   },
+  distractors: [
+    {
+      code: `SELECT 'Anna' AS name, n AS id
+FROM (SELECT 1 AS n UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5);`,
+      reason: 'liefert genau 5 Zeilen, aber ordnet jede Bestellung fälschlich Anna zu, statt den echten Fremdschlüssel kunde_id = id auszuwerten',
+    },
+  ],
 };

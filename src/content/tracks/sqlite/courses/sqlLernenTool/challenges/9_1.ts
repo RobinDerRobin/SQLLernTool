@@ -26,7 +26,7 @@ LIMIT 2;`,
   extra: {
     pg: `Identisch in Postgres — GROUP BY, ORDER BY und LIMIT sind Standard-SQL.`,
   },
-  validate: (_engine, lastResult) => {
+  validate: (engine, lastResult) => {
     if (!lastResult || !lastResult.values) return { ok: false, message: 'Es gibt noch kein SELECT-Ergebnis.' };
     const vals = lastResult.values;
     if (vals.length !== 2) return { ok: false, message: `Es sind ${vals.length} Zeile(n) — erwartet werden genau 2 (LIMIT 2).` };
@@ -35,6 +35,34 @@ LIMIT 2;`,
     }
     if (Number(vals[0]?.[1]) !== 3) return { ok: false, message: `Anna hat ${String(vals[0]?.[1])} Bestellungen im Ergebnis, erwartet werden 3.` };
     if (Number(vals[0]?.[1]) < Number(vals[1]?.[1])) return { ok: false, message: 'Die Sortierung ist nicht absteigend.' };
+    const trueRows =
+      engine.exec(
+        'SELECT k.name, COUNT(b.id) FROM kunden k JOIN bestellungen b ON b.kunde_id = k.id GROUP BY k.name ORDER BY COUNT(b.id) DESC',
+      )[0]?.values ?? [];
+    const trueMap = new Map(trueRows.map((r) => [String(r[0]), Number(r[1])]));
+    const trueCountsDesc = trueRows.map((r) => Number(r[1]));
+    for (const [name, count] of vals.map((r) => [String(r[0]), Number(r[1])] as const)) {
+      if (trueMap.get(name) !== count) {
+        return {
+          ok: false,
+          message: `"${name}" mit ${count} Bestellungen stimmt nicht mit den echten, per JOIN/GROUP BY ermittelten Zahlen überein.`,
+        };
+      }
+    }
+    if (Number(vals[1]?.[1]) !== trueCountsDesc[1]) {
+      return {
+        ok: false,
+        message: `Der zweite Platz hat ${String(vals[1]?.[1])} Bestellungen im Ergebnis, tatsächlich müsste der zweithöchste Wert ${trueCountsDesc[1]} sein.`,
+      };
+    }
     return { ok: true, message: 'Rangliste korrekt: Top 2 absteigend sortiert.' };
   },
+  distractors: [
+    {
+      code: `SELECT 'Anna' AS name, 3 AS anzahl
+UNION ALL
+SELECT 'Anna', 3;`,
+      reason: 'erste Zeile stimmt zufällig, aber Anna wird ein zweites Mal mit derselben Zahl wiederholt statt des echten zweitplatzierten Kunden — nie JOIN/GROUP BY benutzt',
+    },
+  ],
 };

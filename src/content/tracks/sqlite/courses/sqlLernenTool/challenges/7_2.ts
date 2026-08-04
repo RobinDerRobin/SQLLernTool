@@ -39,6 +39,21 @@ FROM seq;`,
       const expected = map[n] || 'viele';
       if (label !== expected) return { ok: false, message: `Für n=${n} steht "${label}", erwartet wird "${expected}".` };
     }
+    const distinctN = new Set(vals.map((r) => Number(r[0])));
+    if (distinctN.size !== 6 || ![1, 2, 3, 4, 5, 6].every((n) => distinctN.has(n))) {
+      return { ok: false, message: `Die erste Spalte sollte genau die Zahlen 1 bis 6 enthalten, ist aber ${[...distinctN].join(', ')}.` };
+    }
     return { ok: true, message: 'Alle 6 Zuordnungen korrekt.' };
   },
+  distractors: [
+    {
+      code: `WITH RECURSIVE seq(n) AS (
+  SELECT 1
+  UNION ALL
+  SELECT n + 1 FROM seq WHERE n < 6
+)
+SELECT 1 AS n, 'eins' AS wort FROM seq;`,
+      reason: 'jede Zeile erfüllt die Zuordnung (weil n konstant 1 ist), aber n deckt nie die Werte 2–6 ab',
+    },
+  ],
 };

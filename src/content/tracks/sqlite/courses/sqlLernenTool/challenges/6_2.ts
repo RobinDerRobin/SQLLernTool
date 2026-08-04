@@ -23,14 +23,36 @@ WHERE b.kunde_id = k.id;`,
   extra: {
     pg: `Identisch in Postgres — Tabellen-Aliase sind Standard-SQL und dort ebenfalls ohne AS üblich.`,
   },
-  validate: (_engine, lastResult) => {
+  validate: (engine, lastResult) => {
     if (!lastResult || !lastResult.columns) return { ok: false, message: 'Es gibt noch kein SELECT-Ergebnis.' };
     const cols = lastResult.columns.map((c) => c.toLowerCase());
-    if (!cols.includes('kunde') || !cols.includes('bestellnummer')) {
+    const kundeIdx = cols.indexOf('kunde');
+    const bestellIdx = cols.indexOf('bestellnummer');
+    if (kundeIdx === -1 || bestellIdx === -1) {
       return { ok: false, message: `Spalten sind ${cols.join(', ')} — erwartet werden kunde und bestellnummer.` };
     }
     const n = lastResult.values.length;
     if (n !== 5) return { ok: false, message: `Es sind ${n} Zeile(n) — erwartet werden genau 5.` };
+    const expectedPairs = new Set(
+      engine
+        .exec('SELECT k.name, b.id FROM kunden k, bestellungen b WHERE b.kunde_id = k.id')[0]
+        ?.values.map((r) => `${String(r[0])}|${String(r[1])}`) ?? [],
+    );
+    const gotPairs = new Set(lastResult.values.map((r) => `${String(r[kundeIdx])}|${String(r[bestellIdx])}`));
+    const allMatch = gotPairs.size === expectedPairs.size && [...gotPairs].every((p) => expectedPairs.has(p));
+    if (!allMatch) {
+      return {
+        ok: false,
+        message: '5 Zeilen mit den richtigen Spaltennamen, aber die kunde/bestellnummer-Paare stimmen nicht mit den echten Fremdschlüssel-Beziehungen überein.',
+      };
+    }
     return { ok: true, message: '5 verknüpfte Zeilen mit benannten Spalten.' };
   },
+  distractors: [
+    {
+      code: `SELECT 'Anna' AS kunde, n AS bestellnummer
+FROM (SELECT 1 AS n UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5);`,
+      reason: 'liefert 5 Zeilen mit den richtigen Spaltennamen, aber ordnet jede Bestellung fälschlich Anna zu, statt den echten Fremdschlüssel auszuwerten',
+    },
+  ],
 };

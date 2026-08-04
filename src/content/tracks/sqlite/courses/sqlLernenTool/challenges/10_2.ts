@@ -35,7 +35,7 @@ ORDER BY b.id;`,
   extra: {
     pg: `Identisch in Postgres — beliebig viele JOINs aneinanderzureihen ist Standard-SQL, dort genau wie hier ohne zusätzliche Klammern oder Sondersyntax.`,
   },
-  validate: (_engine, lastResult) => {
+  validate: (engine, lastResult) => {
     if (!lastResult || !lastResult.values) return { ok: false, message: 'Es gibt noch kein SELECT-Ergebnis.' };
     const vals = lastResult.values;
     if (vals.length !== 5) return { ok: false, message: `Es sind ${vals.length} Zeile(n) — erwartet werden genau 5 (eine je Bestellung).` };
@@ -51,6 +51,28 @@ ORDER BY b.id;`,
         message: `Erste Zeile ist Bestellung ${String(first?.[0])}, Kunde "${String(first?.[1])}", Artikel "${String(first?.[2])}" — erwartet wird Bestellung 1, Anna, Monitor.`,
       };
     }
+    const trueRows =
+      engine.exec(
+        'SELECT b.id AS bestellung, k.name AS kunde, a.name AS artikel FROM bestellungen b JOIN kunden k ON k.id = b.kunde_id JOIN artikel a ON a.id = b.artikel_id ORDER BY b.id',
+      )[0]?.values ?? [];
+    const gotTriples = vals.map((r) => `${String(r[0])}|${String(r[1])}|${String(r[2])}`);
+    const trueTriples = trueRows.map((r) => `${String(r[0])}|${String(r[1])}|${String(r[2])}`);
+    if (JSON.stringify(gotTriples) !== JSON.stringify(trueTriples)) {
+      return {
+        ok: false,
+        message: 'Die erste Zeile stimmt, aber mindestens eine der übrigen 4 Zeilen weicht von der echten Kunde/Artikel-Zuordnung ab.',
+      };
+    }
     return { ok: true, message: 'Drei-Tabellen-JOIN korrekt: alle 5 Bestellungen mit Kunden- und Artikelnamen.' };
   },
+  distractors: [
+    {
+      code: `SELECT 1 AS bestellung, 'Anna' AS kunde, 'Monitor' AS artikel
+UNION ALL SELECT 2, 'Anna', 'Monitor'
+UNION ALL SELECT 3, 'Anna', 'Monitor'
+UNION ALL SELECT 4, 'Anna', 'Monitor'
+UNION ALL SELECT 5, 'Anna', 'Monitor';`,
+      reason: 'erste Zeile stimmt, aber alle weiteren Zeilen wiederholen einfach Anna/Monitor statt der echten Kunde/Artikel-Zuordnung je Bestellung',
+    },
+  ],
 };

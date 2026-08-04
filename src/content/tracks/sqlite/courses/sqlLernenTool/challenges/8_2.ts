@@ -37,6 +37,22 @@ FROM seq;`,
       const expected = n < 8 ? 'niedrig' : n < 15 ? 'mittel' : 'hoch';
       if (label !== expected) return { ok: false, message: `Für n=${n} steht "${label}", erwartet wird "${expected}".` };
     }
+    const distinctN = new Set(vals.map((r) => Number(r[0])));
+    const expectedNs = Array.from({ length: 20 }, (_, i) => i + 1);
+    if (distinctN.size !== 20 || !expectedNs.every((n) => distinctN.has(n))) {
+      return { ok: false, message: `Die erste Spalte sollte genau die Zahlen 1 bis 20 enthalten, ist aber ${[...distinctN].sort((a, b) => a - b).join(', ')}.` };
+    }
     return { ok: true, message: 'Alle 20 Zeilen korrekt kategorisiert.' };
   },
+  distractors: [
+    {
+      code: `WITH RECURSIVE seq(n) AS (
+  SELECT 1
+  UNION ALL
+  SELECT n + 1 FROM seq WHERE n < 20
+)
+SELECT 3 AS n, 'niedrig' AS kategorie FROM seq;`,
+      reason: 'jede Zeile erfüllt die Kategorisierung (weil n konstant 3 ist), aber n deckt nie die Werte 1–2 und 4–20 ab',
+    },
+  ],
 };

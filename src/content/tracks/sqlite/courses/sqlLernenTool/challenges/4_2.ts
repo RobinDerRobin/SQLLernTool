@@ -30,6 +30,22 @@ SELECT n, n % 5 AS rest FROM seq;`,
       const rest = Number(row[1]);
       if (rest !== n % 5) return { ok: false, message: `Für n=${row[0]} sollte der Rest ${n % 5} sein, ist aber ${row[1]}.` };
     }
+    const firstCol = values.map((r) => Number(r[0])).sort((a, b) => a - b);
+    const expected = Array.from({ length: 20 }, (_, i) => i + 1);
+    if (!expected.every((v, i) => firstCol[i] === v)) {
+      return { ok: false, message: `Die erste Spalte sollte genau die Zahlen 1 bis 20 enthalten, ist aber ${firstCol.join(', ')}.` };
+    }
     return { ok: true, message: 'Modulo für alle 20 Zeilen korrekt berechnet.' };
   },
+  distractors: [
+    {
+      code: `WITH RECURSIVE seq(n) AS (
+  SELECT 1
+  UNION ALL
+  SELECT n + 1 FROM seq WHERE n < 20
+)
+SELECT 1 AS n, 1 % 5 AS rest FROM seq;`,
+      reason: 'jede Zeile erfüllt rest = n % 5 (weil n konstant 1 ist), aber n deckt nie die Werte 2–20 ab',
+    },
+  ],
 };
