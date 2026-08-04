@@ -534,12 +534,13 @@ DBA-Training) bewusst nicht Teil dieser Hierarchie:
 
 ## 9. Ausblick: Python, C#
 
-Für später, nicht Teil dieses Dokuments — aber schon jetzt eine
-Design-Überlegung wert: manche SQL-Tags sind SQL-*spezifische Realisierungen*
-sprachübergreifender Konzepte (`recursive-cte` ist SQLs Antwort auf
-"Wiederholung", `case-expression` auf "bedingte Verzweigung"). Ob ein
-gemeinsamer, sprachneutraler Ober-Layer sinnvoll ist (auf den SQL-, Python-
-und C#-Tags gleichermaßen verweisen) oder ob jede Sprache einen eigenen,
-unabhängigen Graphen bekommt, ist eine Entscheidung, die getroffen werden
-sollte, *bevor* die Python-Hierarchie entsteht — nicht danach, um ein
-nachträgliches Umbauen zu vermeiden.
+**Update:** Die hier aufgeworfene Frage ist inzwischen entschieden —
+[`docs/python-concept-hierarchy.md`](python-concept-hierarchy.md) existiert
+und begründet in Abschnitt 8, warum SQL und Python **unabhängige Graphen**
+bleiben (kein gemeinsamer sprachneutraler Ober-Layer): `recursive-cte`
+(SQL) und `for-loop`/`recursion` (Python) sind zwar dieselbe Grundidee
+("Wiederholung"), sitzen aber auf völlig unterschiedlicher Tiefe im
+jeweiligen Graphen (Level 6 vs. Level 3) — ein gemeinsamer Wurzelknoten
+hätte diese Tiefe für eine der beiden Seiten verfälscht. Die Verbindung
+bleibt eine Prosa-Referenz zwischen den Dokumenten, keine Graph-Kante.
+C# bleibt weiterhin offen.
