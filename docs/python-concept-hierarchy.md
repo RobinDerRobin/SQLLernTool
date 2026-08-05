@@ -335,7 +335,12 @@ graph TD
 
 ## 6. Abgleich mit der aktuellen Implementierung
 
-Von den 82 Tags deckt `pythonGrundlagen` (10 Challenges) folgende ab:
+*Update 2026-08-05: Challenges 11–11.5 wurden ergänzt und decken den
+kompletten Zweig B7 (Schleifen) ab. Der Rest dieses Abschnitts ist der
+historische Stand vor diesem Update; die Bilanz am Ende ist bereits
+aktualisiert.*
+
+Von den 82 Tags deckt `pythonGrundlagen` (16 Challenges) folgende ab:
 
 **Vollständig abgedeckt:** `program-execution-model`, `function-call-syntax`
 (implizit über `print`), `print-statement`, `comments`, `variable-
@@ -343,23 +348,26 @@ assignment`, `int-type`, `str-type`, `float-type`, `bool-type`, `multiple-
 assignment`, `variable-swap-idiom`, `arithmetic-operators`, `floor-div-
 modulo` (im Tutorial erklärt, in der Aufgabe selbst nicht zwingend
 gebraucht), `comparison-operators`, `augmented-assignment`, `f-strings`,
-`type-conversion`, `if-else`, `elif-chain`, `boolean-logic` — **20 von 82
-Tags (≈ 24 %).**
+`type-conversion`, `if-else`, `elif-chain`, `boolean-logic`, sowie **seit
+2026-08-05 B7 Schleifen komplett**: `iterable-concept` (im Tutorial von
+Challenge 11 eingeführt, durch die Zeichen-für-Zeichen-Iteration über einen
+String direkt angewendet), `for-loop` (11), `range-function` (11.1),
+`while-loop` (11.2), `break-continue` (11.3), `nested-loops` (11.4),
+`loop-else` (11.5) — **27 von 82 Tags (≈ 33 %).**
 
-**Nicht abgedeckt — praktisch alles ab Kontrollfluss-Verfeinerung:**
-`dynamic-typing` als **eigenes** Thema (wird durchgehend demonstriert, nie
-benannt — genau wie `logical-operators` im SQL-Kurs), `bool-conversion-
-truthiness`, `truthiness-in-conditions`, `ternary-expression`, und
-**komplett**: B7 Schleifen, B8 Funktionen, B9 Datenstrukturen, B10
-Comprehensions & Generatoren, B11 Fehlerbehandlung, B12 Module & Imports,
-B13 Dateizugriff, B14 Objektorientierung.
+**Nicht abgedeckt:** `dynamic-typing` als **eigenes** Thema (wird
+durchgehend demonstriert, nie benannt — genau wie `logical-operators` im
+SQL-Kurs), `bool-conversion-truthiness`, `truthiness-in-conditions`,
+`ternary-expression`, und **komplett**: B8 Funktionen, B9 Datenstrukturen,
+B10 Comprehensions & Generatoren, B11 Fehlerbehandlung, B12 Module &
+Imports, B13 Dateizugriff, B14 Objektorientierung.
 
-**Bilanz:** 20 von 82 Tags abgedeckt (≈ 24 %) — deutlich weniger als SQL
-(43/82, ≈ 52 %). Das ist konsistent mit dem Kursnamen: `pythonGrundlagen`
-deckt exakt das ab, was der Name verspricht (Variablen, Grundrechenarten,
-einfache Verzweigung), und hört genau dort auf, wo Schleifen und Funktionen
-anfangen würden — der Rest (12 von 15 Zweigen komplett, oder Teile davon)
-ist unbearbeiteter Planungsraum.
+**Bilanz:** 27 von 82 Tags abgedeckt (≈ 33 %) — weiterhin weniger als SQL
+(50/82, ≈ 61 %), aber die Lücke ist kleiner geworden. Der Kursname
+`pythonGrundlagen` deckt inzwischen etwas mehr als nur die absoluten
+Basics ab (Variablen, Grundrechenarten, Verzweigung, jetzt auch
+Schleifen) — der Rest (7 von 15 Zweigen komplett, oder Teile davon) ist
+weiterhin unbearbeiteter Planungsraum.
 
 ## 7. Bewusst ausgeklammert
 

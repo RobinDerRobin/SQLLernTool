@@ -457,7 +457,12 @@ graph TD
 
 ## 6. Abgleich mit der aktuellen Implementierung
 
-Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (41 Challenges)
+*Update 2026-08-05: Challenges 14–14.5 wurden ergänzt und decken den
+kompletten Zweig B7 (Subqueries) ab — die vorherige größte Einzellücke.
+Der Rest dieses Abschnitts ist der historische Stand vor diesem Update;
+die Bilanz am Ende ist bereits aktualisiert.*
+
+Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (47 Challenges)
 folgende **nicht** ab — das ist die eigentliche Planungs-Nutzlast dieses
 Dokuments:
 
@@ -478,9 +483,13 @@ taucht in einer der 41 Challenges auf).
 
 **B6 Joins:** `self-join`, `right-join`, `full-outer-join`.
 
-**B7 Subqueries:** **komplett nicht abgedeckt** — der Kurs löst alles über
-CTEs/Joins, nie über eine Subquery in `WHERE`/`FROM`/`SELECT`. Das ist die
-größte inhaltliche Lücke.
+**B7 Subqueries:** ~~komplett nicht abgedeckt~~ — **seit 2026-08-05
+vollständig abgedeckt** durch Challenges 14 (`scalar-subquery`), 14.1
+(`subquery-in-select`), 14.2 (`derived-table-subquery`), 14.3
+(`subquery-set` + `subquery-in-where-in`), 14.4 (`exists-subquery`) und
+14.5 (`correlated-subquery`). War zuvor die größte inhaltliche Lücke —
+der Kurs löste bis dahin alles über CTEs/Joins, nie über eine Subquery in
+`WHERE`/`FROM`/`SELECT`.
 
 **B8 Mengenoperationen:** `union-distinct`, `intersect`, `except-minus`
 (nur `UNION ALL` wird unterrichtet).
@@ -498,10 +507,10 @@ strukturell zu B1 gehört und dort separat gelistet ist).
 
 **Gut abgedeckt:** B0–B1-Basics, DML-Kern (ohne Upsert), DQL-Kern fast
 vollständig, Aggregation/Gruppierung, Joins bis `LEFT JOIN`, CTE/Rekursion
-(Erzeugungs-Variante).
+(Erzeugungs-Variante), **B7 Subqueries (seit 2026-08-05 vollständig)**.
 
-**Bilanz:** 43 von 82 Tags sind heute durch mindestens eine Challenge
-abgedeckt (≈ 52 %). Fünf Zweige (B7, B10, B11, B12, B13) sind zu 100 %
+**Bilanz:** 50 von 82 Tags sind heute durch mindestens eine Challenge
+abgedeckt (≈ 61 %). Vier Zweige (B10, B11, B12, B13) sind noch zu 100 %
 Lücke.
 
 ## 7. Bewusst ausgeklammert
