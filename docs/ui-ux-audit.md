@@ -44,7 +44,7 @@ wie gut das jeweils testabgedeckt ist.
 | F-008 | Accessibility | Niedrig | Theme-Picker-Modal ließ sich nicht per Escape schließen (nur Klick auf ✕ oder Backdrop). | ✅ Fixed | `themePicker.test.ts`: Escape schließt, Escape im geschlossenen Zustand ist No-op, Listener wird bei Unmount entfernt |
 | F-009 | Kontrast | Niedrig | WCAG-Kontrast-Check über alle 10 Themes (Skript, siehe unten) zeigt Grenzfälle: `solar-flare` fällt bei Button-Text auf 3.56–3.69:1 (Ziel 4.5:1), mehrere andere Themes liegen bei 4.1–4.4:1 für `muted`-Text auf `panel-2`. | 🟡 Deferred | Kein Test — Farbwahl ist eine Design-Entscheidung, nicht automatisch verändert. Nächster Schritt: bewusst pro Theme die `*-ink`-Farbwerte nachjustieren und mit Screenshot gegenprüfen. |
 | F-010 | Coverage-Lücke | Niedrig | `pyodideEngine.ts` (25%) kaum getestet — lädt Pyodide/WASM vom CDN, wirkte schwer isoliert zu testen. (Die ursprünglich mitgenannte „Python-Sprachplugin-Index (0%)" war beim Nachprüfen `LanguagePlugin.ts`, ein reines Interface — kein echtes Test-Loch, siehe Hinweis unten.) | ✅ Fixed | `pyodideEngine.test.ts` (10 Tests: `createPyodideEngine` inkl. Driver-Script, `loadPyodideFromCdn` inkl. Script-Tag-Simulation für Erfolg/Fehler/Retry/gleichzeitige Aufrufe); `runtime/python/executeAndValidate.test.ts` (4 Tests, Fehler- und Catch-Branch) |
-| F-011 | Coverage-Lücke | Niedrig | `loadSqlJsFromCdn` in `app.ts` (der SQL-Gegenpart zu F-010) ist der einzige verbliebene ungetestete CDN-Loader im Projekt — Tests injizieren immer einen Fake-`loadSqlJs`, der echte Ladepfad läuft nie. | 🔴 Open | Noch keine — `pyodideEngine.test.ts`s Script-Tag-Simulation ist die Vorlage für den analogen Test. |
+| F-011 | Coverage-Lücke | Niedrig | `loadSqlJsFromCdn` in `app.ts` (der SQL-Gegenpart zu F-010) ist der einzige verbliebene ungetestete CDN-Loader im Projekt — Tests injizieren immer einen Fake-`loadSqlJs`, der echte Ladepfad läuft nie. | ✅ Fixed | `app.test.ts`, neue `describe('default sql.js loader ...')`: 3 Tests (erfolgreicher Boot über echtes `window.initSqlJs` inkl. `locateFile`-Assertion, Fehlermeldung bei fehlendem `window.initSqlJs`, 10s-Timeout-Meldung via `vi.useFakeTimers`). Anders als bei F-010 kein `<script>`-Tag-Injection-Pfad zu testen — `loadSqlJsFromCdn` geht von einem bereits im HTML verdrahteten `<script>` aus, nicht von dynamischer Injektion. |
 | F-012 | Toter Code | Niedrig | `knip`-Analyse (TS-Modulgraph, nicht Regex — manuell gegen False Positives geprüft, z. B. Prosa-Treffer auf das deutsche Wort „Track"): 2 nie aufgerufene Funktionen (`getCurrentChallenge`/`getChallengeSolution` in `actions.ts` — der „In den Editor übernehmen"-Button holt die Lösung längst über einen eigenen Selector), 1 vollständig ungenutztes Interface (`Track<TChallenge>`, superseded durch `ContentTrack`), 5 Funktionen/Konstanten + 25 Typen nur intern genutzt aber unnötig exportiert, ein dupliziertes `Unsubscribe`-Type (`delegate.ts` vs. `state/store.ts`), 2 unbenutzte devDependencies (`@testing-library/dom`, `linkedom`). | ✅ Fixed | `knip` danach: 0 Findings. Volle Testsuite (558 Tests) + `build:check` grün nach jeder Änderung. |
 | F-013 | Bug | Hoch | SQL-Editor: `maybeUppercaseLastWord` (Auto-Uppercase für SQL-Keywords beim Tippen) hatte keine String-/Kommentar-Awareness, obwohl der Tokenizer sie für die Syntax-Hervorhebung längst korrekt berechnet. Ein Wort, das zufällig wie ein Keyword aussieht, wurde auch **innerhalb eines String-Literals oder Kommentars** großgeschrieben und damit der eigentliche Wert verfälscht — reproduziert live im Browser: `SELECT 'select ` wurde beim Tippen zu `SELECT 'SELECT '`. | ✅ Fixed | `uppercaseKeyword.test.ts`: 5 neue Tests (String-Literal, Kommentar `--` und `/* */`, sowie Bestätigung, dass echte Keywords *nach* einem geschlossenen String weiterhin großgeschrieben werden). Live in Playwright gegen den echten Dev-Server nachgestellt (vorher/nachher). |
 | F-014 | Bug | Mittel | SQL/Python-Editor: Auto-Close für Klammern/Anführungszeichen (`applyAutoClose`, von SQL für Python mitübernommen) kannte `{`/`}` nicht — 1:1 aus einem SQL-only-Prototyp portiert, der nie geschweifte Klammern braucht. Für Python (Dict-/Set-Literale, f-String-Ausdrücke `f"{x}"`) fehlt dadurch ein zentrales Auto-Close-Paar; `{` blieb beim Tippen einfach offen. | ✅ Fixed | `autoClosePairs.test.ts`: 2 neue Tests (Einfügen + Skip-over). Live in Playwright bestätigt: `d = {"a": 1` schließt jetzt korrekt zu `d = {"a": 1}`. |
@@ -65,6 +65,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-04 | HEAD (F-010-Fix) | 92.26 % | 80.67 % | 95.10 % | 92.26 % |
 | 2026-08-04 | HEAD (F-012-Cleanup) | 92.38 % | 80.58 % | 95.69 % | 92.38 % |
 | 2026-08-04 | HEAD (F-013/F-014-Fix) | 92.88 % | 80.85 % | 96.01 % | 92.88 % |
+| 2026-08-05 | HEAD (F-011-Fix + 12 neue Challenges) | 92.73 % | 79.12 % | 96.46 % | 92.73 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -163,3 +164,49 @@ sondern pro PR direkt in den Checks sichtbar.
   String-/Kommentar-Awareness-Tests für Auto-Uppercase, 13
   parametrisierte Tests für die bisher ungetesteten Python-
   Zwei-Zeichen-Operatoren), `typecheck` + volle Testsuite grün.
+
+### 2026-08-05 — F-011 geschlossen, 12 neue Challenges live im Browser verifiziert
+
+- **Umfang:** (1) F-011 (letzte offene Coverage-Lücke: `loadSqlJsFromCdn`
+  in `app.ts`) gezielt geschlossen. (2) Die in dieser Session neu
+  angelegten Challenges SQL 14–14.5 (Subqueries-Zweig) und Python
+  11–11.5 (Schleifen-Zweig) — bis dahin nur gegen den Node-Testmotor
+  (`node:sqlite`) geprüft — zusätzlich live im echten Browser gegen
+  echtes sql.js- bzw. Pyodide-WASM verifiziert, nicht nur die
+  Node-Testersatz-Engines.
+- **Vorgehen F-011:** Nach dem Vorbild von `pyodideEngine.test.ts`
+  (F-010) — aber `loadSqlJsFromCdn` unterscheidet sich strukturell: es
+  injiziert keinen `<script>`-Tag selbst (das `<script src="https://
+  cdnjs...">` steht schon statisch in `index.html`), sondern geht direkt
+  von einem bereits gesetzten `window.initSqlJs` aus und wrapped den
+  Aufruf in `withTimeout`. Drei neue Tests in `app.test.ts`, alle über
+  `createApp` **ohne** `deps.loadSqlJs`-Override (damit der echte
+  Default-Pfad läuft, nicht der in jedem anderen Test injizierte Fake):
+  erfolgreicher Boot inkl. Assertion auf die `locateFile`-URL-Zusammensetzung,
+  Fehlermeldung bei fehlendem `window.initSqlJs`, und die 10s-Timeout-Meldung
+  via `vi.useFakeTimers()` + `vi.advanceTimersByTimeAsync(10_000)`.
+- **Vorgehen Browser-Verifikation:** Dev-Server gestartet, `sql.js`
+  und `pyodide` als npm-Pakete lokal installiert (`--no-save`, nicht in
+  `package.json`) und per Playwright `context.route()` anstelle der in
+  dieser Sandbox blockierten CDN-Domains (`cdnjs.cloudflare.com`,
+  `cdn.jsdelivr.net`) ausgeliefert — echtes WASM, keine Mocks. Für jede
+  der 12 neuen Challenges: Sidebar-Auswahl, Tutorial-/Task-Tab-Rendering
+  geprüft (kein rohes HTML im Text sichtbar), die kanonische `solution`
+  in den Editor eingefügt, ausgeführt, `✓ Aufgabe erfüllt` bestätigt;
+  zusätzlich bei 4 Challenges (SQL 14, 14.1, 14.4; Python 11, 11.5) einen
+  `distractor` probeweise ausgeführt und die korrekte Ablehnung
+  (`status-warn`, kein `status-ok`) bestätigt. Alle 12/12 Lösungen und
+  4/4 stichprobenartig getesteten Distraktoren verhielten sich exakt wie
+  von der `challengeRunner.test.ts`-Suite vorhergesagt — keine
+  Diskrepanz zwischen Node-Testmotor und echtem Browser-WASM gefunden.
+- **Ergebnis:** F-011 auf Fixed gesetzt, keine offenen Findings mehr
+  außer dem bewusst zurückgestellten F-009 (Kontrast). Coverage-Snapshot
+  sinkt leicht (92.88 % → 92.73 % Statements, 80.85 % → 79.12 % Branches)
+  — kein Regressionssignal, sondern reiner Verdünnungseffekt durch 12
+  neue Challenge-Dateien: deren `validate()`-Fehlerzweige (z. B. "Tabelle
+  existiert noch nicht") werden von Gate 1/Gate 2 bewusst nicht alle
+  durchlaufen, genau wie bei den 41 bereits vorhandenen SQL-Challenges.
+- **Tests:** 621 → 624 (+3: F-011). `typecheck`, volle Testsuite und
+  `npm run build` grün. Browser-Verifikation lief separat via
+  Playwright-Skript (nicht Teil der CI-Suite, da echtes WASM + externe
+  CDN-Domains — lokal per `context.route()` umgangen, siehe oben).
