@@ -48,6 +48,7 @@ wie gut das jeweils testabgedeckt ist.
 | F-012 | Toter Code | Niedrig | `knip`-Analyse (TS-Modulgraph, nicht Regex — manuell gegen False Positives geprüft, z. B. Prosa-Treffer auf das deutsche Wort „Track"): 2 nie aufgerufene Funktionen (`getCurrentChallenge`/`getChallengeSolution` in `actions.ts` — der „In den Editor übernehmen"-Button holt die Lösung längst über einen eigenen Selector), 1 vollständig ungenutztes Interface (`Track<TChallenge>`, superseded durch `ContentTrack`), 5 Funktionen/Konstanten + 25 Typen nur intern genutzt aber unnötig exportiert, ein dupliziertes `Unsubscribe`-Type (`delegate.ts` vs. `state/store.ts`), 2 unbenutzte devDependencies (`@testing-library/dom`, `linkedom`). | ✅ Fixed | `knip` danach: 0 Findings. Volle Testsuite (558 Tests) + `build:check` grün nach jeder Änderung. |
 | F-013 | Bug | Hoch | SQL-Editor: `maybeUppercaseLastWord` (Auto-Uppercase für SQL-Keywords beim Tippen) hatte keine String-/Kommentar-Awareness, obwohl der Tokenizer sie für die Syntax-Hervorhebung längst korrekt berechnet. Ein Wort, das zufällig wie ein Keyword aussieht, wurde auch **innerhalb eines String-Literals oder Kommentars** großgeschrieben und damit der eigentliche Wert verfälscht — reproduziert live im Browser: `SELECT 'select ` wurde beim Tippen zu `SELECT 'SELECT '`. | ✅ Fixed | `uppercaseKeyword.test.ts`: 5 neue Tests (String-Literal, Kommentar `--` und `/* */`, sowie Bestätigung, dass echte Keywords *nach* einem geschlossenen String weiterhin großgeschrieben werden). Live in Playwright gegen den echten Dev-Server nachgestellt (vorher/nachher). |
 | F-014 | Bug | Mittel | SQL/Python-Editor: Auto-Close für Klammern/Anführungszeichen (`applyAutoClose`, von SQL für Python mitübernommen) kannte `{`/`}` nicht — 1:1 aus einem SQL-only-Prototyp portiert, der nie geschweifte Klammern braucht. Für Python (Dict-/Set-Literale, f-String-Ausdrücke `f"{x}"`) fehlt dadurch ein zentrales Auto-Close-Paar; `{` blieb beim Tippen einfach offen. | ✅ Fixed | `autoClosePairs.test.ts`: 2 neue Tests (Einfügen + Skip-over). Live in Playwright bestätigt: `d = {"a": 1` schließt jetzt korrekt zu `d = {"a": 1}`. |
+| F-015 | Coverage-Lücke | Mittel | `pythonResultsArea.ts` (10 % Statements, 0 % Functions) hatte überhaupt keine Testdatei — obwohl es der komplette Render-Pfad für jedes Python-Ergebnis ist (Status, stdout, Variablen-Tabelle) und mehrfach `escapeHtml` auf nutzergenerierten Inhalt anwendet (stdout, Variablennamen, JSON-stringifizierte Werte). Beim Nachprüfen: keine XSS-Lücke gefunden, alle Stellen escapen bereits korrekt — aber komplett unabgesichert gegen eine künftige Regression. | ✅ Fixed | `pythonResultsArea.test.ts` (11 neue Tests): Error/Success/Warn-Status, leere stdout/Variablen als Empty-State, `result: null` ohne Fehler, Escaping von stdout/Variablennamen/verschachtelten JSON-Werten, `renderPythonLoadingOutcome`. |
 
 **Hinweis zu 0%-Dateien in der Coverage:** `ProgressStore.ts`, `Runtime.ts`,
 `SqlEngine.ts`, `editorBridge.ts`, `LanguagePlugin.ts`, `PythonRuntime.ts`
@@ -66,6 +67,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-04 | HEAD (F-012-Cleanup) | 92.38 % | 80.58 % | 95.69 % | 92.38 % |
 | 2026-08-04 | HEAD (F-013/F-014-Fix) | 92.88 % | 80.85 % | 96.01 % | 92.88 % |
 | 2026-08-05 | HEAD (F-011-Fix + 12 neue Challenges) | 92.73 % | 79.12 % | 96.46 % | 92.73 % |
+| 2026-08-07 | HEAD (SQL-Fensterfunktionen + F-015-Fix) | 92.82 % | 78.15 % | 97.38 % | 92.82 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -210,3 +212,44 @@ sondern pro PR direkt in den Checks sichtbar.
   `npm run build` grün. Browser-Verifikation lief separat via
   Playwright-Skript (nicht Teil der CI-Suite, da echtes WASM + externe
   CDN-Domains — lokal per `context.route()` umgangen, siehe oben).
+
+### 2026-08-07 — SQL-Fensterfunktionen (B10) + F-015 geschlossen
+
+- **Umfang:** (1) Nächstgrößter komplett fehlender SQL-Zweig laut
+  `docs/sql-concept-hierarchy.md` — B10 Fensterfunktionen (5 Tags) — als
+  neue Challenges 15–15.4 ergänzt. (2) Coverage-Report nach dem üblichen
+  "schwächste Stelle zuerst"-Blick durchsucht: `pythonResultsArea.ts`
+  stach mit 10 % Statements / 0 % Functions heraus — der komplette
+  Render-Pfad für jedes Python-Ergebnis (Status, stdout, Variablen-
+  Tabelle), bis dahin ohne jede Testdatei.
+- **Vorgehen B10:** Neue Tabelle `mitarbeiter` (6 Zeilen, 2 Abteilungen,
+  bewusst mit einem Gehaltsgleichstand zwischen zwei Mitarbeitern) als
+  gemeinsame Grundlage für alle 5 Sub-Challenges. `window-function-basic`
+  (`AVG(...) OVER ()`), `partition-by`, `ranking-functions` (`RANK()`
+  gegen den Gleichstand getestet — der Distraktor tauscht auf
+  `ROW_NUMBER()`, das den Gleichstand fälschlich auflöst),
+  `offset-functions` (`LAG()`, Distraktor vertauscht auf `LEAD()`,
+  also die falsche Richtung) und `running-aggregates`
+  (`SUM(...) OVER (ORDER BY ...)`, Distraktor lässt das `ORDER BY`
+  im Fenster weg). Gleiches Validator-Muster wie den ganzen Rest der
+  Session: live gegen die echte Engine nachgerechnet, nichts
+  hartkodiert.
+- **Vorgehen F-015:** Beim Nachprüfen von `pythonResultsArea.ts` (nutzt
+  `escapeHtml` auf stdout, Variablennamen und JSON-stringifizierte
+  Werte) keine tatsächliche XSS-Lücke gefunden — alle Stellen escapen
+  bereits korrekt. Trotzdem komplett ungetestet und damit ungeschützt
+  gegen eine künftige Regression. 11 neue Tests decken Error-/Success-/
+  Warn-Status, leere stdout/Variablen als Empty-State, den defensiven
+  `result: null`-Zweig ohne Fehler, und Escaping bei verschachtelten
+  JSON-Werten (Listen, Objekte, `<script>`-artige Variablennamen) ab.
+- **Ergebnis:** `pythonResultsArea.ts` 10 % → faktisch vollständig
+  getestet (0 offene Functions mehr). Keine offenen Findings außer dem
+  bewusst zurückgestellten F-009. SQL-Konzept-Hierarchie-Bilanz: 50/82 →
+  55/82 Tags (≈ 67 %), nur noch drei Zweige komplett Lücke
+  (Transaktionen, Views, Indizes).
+- **Tests:** 624 → 645 (+21: 10 für die 5 neuen Window-Function-
+  Challenges via `challengeRunner.test.ts`, 11 für F-015). `typecheck`,
+  volle Testsuite und `npm run build` grün.
+- **Standing:** Ab jetzt läuft dieselbe Art Durchgang automatisch einmal
+  täglich weiter (Routine `SQLLernTool daily polish`, 08:00 UTC) — jeder
+  Durchgang bekommt wie bisher einen eigenen Abschnitt hier.

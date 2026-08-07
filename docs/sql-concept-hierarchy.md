@@ -462,7 +462,7 @@ kompletten Zweig B7 (Subqueries) ab — die vorherige größte Einzellücke.
 Der Rest dieses Abschnitts ist der historische Stand vor diesem Update;
 die Bilanz am Ende ist bereits aktualisiert.*
 
-Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (47 Challenges)
+Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (52 Challenges)
 folgende **nicht** ab — das ist die eigentliche Planungs-Nutzlast dieses
 Dokuments:
 
@@ -501,16 +501,22 @@ ausschließlich zur **Erzeugung** von Zahlen-/Datumsreihen, nie zur
 Mitarbeiter unter einem Manager"). Das ist die zweitgrößte Lücke — beide
 sind SQL-Kernkompetenzen, die im Kurs bisher fehlen.
 
-**B10 Fensterfunktionen, B11 Transaktionen, B12 Views, B13 Indizes:**
+**B10 Fensterfunktionen:** ~~komplett nicht abgedeckt~~ — **seit
+2026-08-07 vollständig abgedeckt** durch Challenges 15 (`window-function-basic`),
+15.1 (`partition-by`), 15.2 (`ranking-functions`), 15.3 (`offset-functions`)
+und 15.4 (`running-aggregates`).
+
+**B11 Transaktionen, B12 Views, B13 Indizes:**
 **komplett nicht abgedeckt** (B13 zählt hier ohne `create-index`, das
 strukturell zu B1 gehört und dort separat gelistet ist).
 
 **Gut abgedeckt:** B0–B1-Basics, DML-Kern (ohne Upsert), DQL-Kern fast
 vollständig, Aggregation/Gruppierung, Joins bis `LEFT JOIN`, CTE/Rekursion
-(Erzeugungs-Variante), **B7 Subqueries (seit 2026-08-05 vollständig)**.
+(Erzeugungs-Variante), **B7 Subqueries (seit 2026-08-05 vollständig)**,
+**B10 Fensterfunktionen (seit 2026-08-07 vollständig)**.
 
-**Bilanz:** 50 von 82 Tags sind heute durch mindestens eine Challenge
-abgedeckt (≈ 61 %). Vier Zweige (B10, B11, B12, B13) sind noch zu 100 %
+**Bilanz:** 55 von 82 Tags sind heute durch mindestens eine Challenge
+abgedeckt (≈ 67 %). Drei Zweige (B11, B12, B13) sind noch zu 100 %
 Lücke.
 
 ## 7. Bewusst ausgeklammert
