@@ -68,6 +68,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-04 | HEAD (F-013/F-014-Fix) | 92.88 % | 80.85 % | 96.01 % | 92.88 % |
 | 2026-08-05 | HEAD (F-011-Fix + 12 neue Challenges) | 92.73 % | 79.12 % | 96.46 % | 92.73 % |
 | 2026-08-07 | HEAD (SQL-Fensterfunktionen + F-015-Fix) | 92.82 % | 78.15 % | 97.38 % | 92.82 % |
+| 2026-08-07 | HEAD (Ende Tag: 4 weitere Coverage-Lücken) | 93.05 % | 78.48 % | 97.96 % | 93.05 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -258,3 +259,26 @@ sondern pro PR direkt in den Checks sichtbar.
   (dieselbe `context.route()`-Umgehung wie beim 2026-08-05-Durchgang) —
   5/5 Lösungen akzeptiert, 5/5 Distraktoren korrekt abgelehnt, keine
   Diskrepanz zum Node-Testmotor.
+- **Nachtrag 2, gleicher Tag — vier weitere echte Coverage-Lücken
+  geschlossen:** Nach demselben "schwächste Stelle zuerst"-Blick in den
+  Coverage-Report vier weitere live-relevante, aber ungetestete Stellen
+  gefunden und geschlossen: (1) der Track/Kurs-Umschalter im Sidebar-Header
+  (`<select data-track-course>`, live selbst im Playwright-Check dieser
+  Session benutzt) — Wechsel navigiert korrekt zur ersten Challenge des
+  neuen Kurses, plus beide defensiven No-op-Zweige (nicht parsbarer Wert,
+  Wert zeigt auf unbekannten Kurs); (2) `parseTrackCourseValue` selbst,
+  direkt als eigene Testdatei; (3) `challengeLookup.ts`
+  (`getCourseChallenges`, `findChallengeInRegistry`,
+  `getDefaultTrackAndCourse`) — trotz Verwendung in `state/actions.ts`
+  überhaupt keine eigene Testdatei, jetzt mit allen Fallback-Zweigen
+  (unbekannter Track/Kurs, komplett leeres Registry, Track ohne Kurse);
+  (4) `delegate.ts`s Schutzklausel gegen ein Event-Target, das kein
+  `Element` ist (z. B. ein reiner Textknoten). Alles rein additiv, keine
+  Bugs gefunden — reine Testschulden geschlossen.
+- **Standing-Ergebnis (Ende des Tages 2026-08-07):** Tests 624 → 664
+  (+40 insgesamt für diesen Tag), Statement-Abdeckung 92.73 % → 93.05 %,
+  Branch-Abdeckung 79.12 % → 78.48 % (netto niedriger trotz mehr Tests,
+  weil der Nenner durch neue Challenge-Dateien schneller wächst als
+  Content-Branches abgedeckt werden — reiner Verdünnungseffekt, siehe
+  oben), Function-Abdeckung 96.46 % → 97.96 %. `typecheck`,
+  volle Testsuite und `npm run build` grün nach jedem einzelnen Schritt.
