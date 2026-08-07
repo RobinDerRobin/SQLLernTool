@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ContentTrack } from '../../../content/registry';
 import { TRACKS } from '../../../content/registry';
-import { renderTrackCourseHeader } from './trackCoursePicker';
+import { parseTrackCourseValue, renderTrackCourseHeader } from './trackCoursePicker';
 
 function fakeTrack(id: string, courseIds: string[]): ContentTrack {
   return {
@@ -56,5 +56,27 @@ describe('renderTrackCourseHeader', () => {
     expect(renderTrackCourseHeader({ registry: TRACKS, trackId: 'sqlite', courseId: 'sqlLernenTool' })).toContain(
       'SQL Lernen Tool',
     );
+  });
+});
+
+describe('parseTrackCourseValue', () => {
+  it('splits a well-formed "trackId::courseId" option value', () => {
+    expect(parseTrackCourseValue('sqlite::sqlLernenTool')).toEqual({ trackId: 'sqlite', courseId: 'sqlLernenTool' });
+  });
+
+  it('returns null when there is no "::" separator at all', () => {
+    expect(parseTrackCourseValue('sqlite')).toBeNull();
+  });
+
+  it('returns null when the course half is missing', () => {
+    expect(parseTrackCourseValue('sqlite::')).toBeNull();
+  });
+
+  it('returns null when the track half is missing', () => {
+    expect(parseTrackCourseValue('::sqlLernenTool')).toBeNull();
+  });
+
+  it('returns null for an empty string', () => {
+    expect(parseTrackCourseValue('')).toBeNull();
   });
 });
