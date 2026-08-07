@@ -253,3 +253,8 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Standing:** Ab jetzt läuft dieselbe Art Durchgang automatisch einmal
   täglich weiter (Routine `SQLLernTool daily polish`, 08:00 UTC) — jeder
   Durchgang bekommt wie bisher einen eigenen Abschnitt hier.
+- **Nachtrag, gleicher Tag:** Die 5 neuen Fensterfunktionen-Challenges
+  zusätzlich live im echten Browser gegen echtes sql.js-WASM verifiziert
+  (dieselbe `context.route()`-Umgehung wie beim 2026-08-05-Durchgang) —
+  5/5 Lösungen akzeptiert, 5/5 Distraktoren korrekt abgelehnt, keine
+  Diskrepanz zum Node-Testmotor.
