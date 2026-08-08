@@ -73,6 +73,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-08 | HEAD (Python-Funktionen Teil 2: 12.6-12.8) | 93.33 % | 77.88 % | 98.86 % | 93.33 % |
 | 2026-08-08 | HEAD (Test-Lücken + B8 komplett: 12.9-12.10) | 93.48 % | 77.87 % | 98.87 % | 93.48 % |
 | 2026-08-08 | HEAD (Live-Verifikation + B9 Teil 1: 13-13.4) | 93.33 % | 77.45 % | 98.88 % | 93.33 % |
+| 2026-08-08 | HEAD (B9 komplett: 13.5-13.9) | 93.11 % | 76.87 % | 98.90 % | 93.11 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -530,3 +531,38 @@ sondern pro PR direkt in den Checks sichtbar.
   C#-Infrastruktur-Increment). `typecheck`, volle Testsuite (718 Tests)
   und `npm run build` grün — zusätzlich `dotnet build` und ein Live-Lauf
   für `csharp-engine/` grün.
+
+### 2026-08-08 — Stündliche Routine: B9 Datenstrukturen komplettiert
+
+- **Umfang:** Baseline geprüft (718/718 grün, unverändert). Coverage
+  erneut durchsucht — keine neuen Lücken seit der letzten Runde (alle
+  verbleibenden niedrigen Werte sind dieselben bereits mehrfach geprüften
+  reinen Interface-Dateien bzw. defensiven, unerreichbaren Zweige). Da
+  weder Bugs noch neue Coverage-Lücken zu finden waren, den in der
+  letzten Runde explizit benannten nächsten Content-Schritt umgesetzt:
+  die zweite Hälfte von Python B9 (Datenstrukturen) als Challenges
+  13.5–13.9 ergänzt.
+- **Vorgehen:** `dict-methods` (13.5, `.get()` mit Standardwert plus
+  `.items()`-Iteration in einer Schleife, Distraktor greift stattdessen
+  direkt mit `preise["Mango"]` zu → echter KeyError), `set-basics` (13.6,
+  Mengen-Literal mit bewusst doppeltem Element, Distraktor verwendet
+  eckige statt geschweifter Klammern → Liste statt Menge, Duplikat bleibt
+  erhalten), `nested-data-structures` (13.7, Liste aus Dicts mit
+  verkettetem Index+Schlüssel-Zugriff, Distraktor versucht
+  `personen[0, "alter"]` als kombinierten Zugriff → echter TypeError, da
+  Listen nicht mit einem Tupel indizierbar sind), `membership-operator`
+  (13.8, `in`/`not in` auf einer Liste, Distraktor vertauscht `in` und
+  `not in`), `len-function` (13.9, `len()` einheitlich über String,
+  Liste und Dict demonstriert, Distraktor vertauscht die Zuweisungen für
+  Liste und Dict). Alle fünf über Gate 1/Gate 2 und zusätzlich live im
+  Browser gegen echtes Pyodide bestätigt (5/5 Lösungen, 0
+  Konsolenfehler) — derselbe `context.route()`-Workaround wie in den
+  vorherigen Live-Läufen.
+- **Ergebnis:** Keine Bugs gefunden. Python-Konzept-Hierarchie-Bilanz:
+  44/82 → 49/82 Tags (≈ 60 %). **B9 Datenstrukturen ist damit komplett
+  (10/10) — der dritte vollständig geschlossene Python-Zweig nach B7
+  und B8.** Nächster naheliegender Content-Schritt: B10 Comprehensions
+  & Generatoren, das direkt auf den jetzt fertigen B7/B9 aufbaut.
+- **Tests:** 718 → 728 (+10, alle für die fünf neuen
+  Datenstrukturen-Challenges via `challengeRunner.test.ts`). `typecheck`,
+  volle Testsuite (728 Tests) und `npm run build` grün.

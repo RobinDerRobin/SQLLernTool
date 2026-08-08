@@ -348,10 +348,15 @@ aus B9 (Datenstrukturen) ab (`list-basics`, `list-slicing`, `list-
 mutation-methods`, `tuple-basics`, `dict-basics`) — die zweite Hälfte
 (`dict-methods`, `set-basics`, `nested-data-structures`, `membership-
 operator`, `len-function`) ist eine natürliche Restcharge für später.
-Der Rest dieses Abschnitts ist der historische Stand vor diesen Updates;
-die Bilanz am Ende ist bereits aktualisiert.*
+Update 2026-08-08 (stündliche Routine, Fortsetzung): Challenges 13.5–13.9
+ergänzt (`dict-methods`, `set-basics`, `nested-data-structures`,
+`membership-operator`, `len-function`) — **B9 Datenstrukturen ist damit
+komplett abgedeckt (10/10 Tags)**, der dritte vollständig geschlossene
+Python-Zweig nach B7 und B8. Der Rest dieses Abschnitts ist der
+historische Stand vor diesen Updates; die Bilanz am Ende ist bereits
+aktualisiert.*
 
-Von den 82 Tags deckt `pythonGrundlagen` (32 Challenges) folgende ab:
+Von den 82 Tags deckt `pythonGrundlagen` (37 Challenges) folgende ab:
 
 **Vollständig abgedeckt:** `program-execution-model`, `function-call-syntax`
 (implizit über `print`), `print-statement`, `comments`, `variable-
@@ -369,34 +374,32 @@ String direkt angewendet), `for-loop` (11), `range-function` (11.1),
 (12.1), `default-parameters` (12.2), `variable-scope` (12.3),
 `docstrings` (12.4), `recursion` (12.5), `args-kwargs` (12.6),
 `lambda-expressions` (12.7), `map-function` (12.8), `filter-function`
-(12.9), `sorted-with-key` (12.10), sowie **seit 2026-08-08 die erste
-Hälfte von B9 Datenstrukturen**: `list-basics` (13), `list-slicing`
-(13.1), `list-mutation-methods` (13.2), `tuple-basics` (13.3),
-`dict-basics` (13.4) —
-**44 von 82 Tags (≈ 54 %).**
+(12.9), `sorted-with-key` (12.10), sowie **seit 2026-08-08 B9
+Datenstrukturen komplett**: `list-basics` (13), `list-slicing` (13.1),
+`list-mutation-methods` (13.2), `tuple-basics` (13.3), `dict-basics`
+(13.4), `dict-methods` (13.5), `set-basics` (13.6), `nested-data-
+structures` (13.7), `membership-operator` (13.8), `len-function` (13.9) —
+**49 von 82 Tags (≈ 60 %).**
 
 **Nicht abgedeckt:** `dynamic-typing` als **eigenes** Thema (wird
 durchgehend demonstriert, nie benannt — genau wie `logical-operators` im
 SQL-Kurs), `bool-conversion-truthiness`, `truthiness-in-conditions`,
-`ternary-expression`, die zweite Hälfte von B9 (`dict-methods`, `set-
-basics`, `nested-data-structures`, `membership-operator`, `len-
-function`), und **komplett**: B10 Comprehensions & Generatoren, B11
-Fehlerbehandlung, B12 Module & Imports, B13 Dateizugriff, B14
+`ternary-expression`, und **komplett**: B10 Comprehensions & Generatoren,
+B11 Fehlerbehandlung, B12 Module & Imports, B13 Dateizugriff, B14
 Objektorientierung.
 
-**Bilanz:** 44 von 82 Tags abgedeckt (≈ 54 %) — zum ersten Mal über die
-Hälfte, und die Lücke zu SQL (55/82, ≈ 67 %) ist inzwischen recht klein.
-Der Kursname `pythonGrundlagen` deckt inzwischen deutlich mehr als nur
-die absoluten Basics ab (Variablen, Grundrechenarten, Verzweigung,
-Schleifen, ganz Funktionen inklusive *args/**kwargs, lambda,
-map()/filter()/sorted(), und die Hälfte der Datenstrukturen: Listen,
-Slicing, Listenmethoden, Tupel, Dicts) — B7 und B8 sind vollständig
-geschlossen, B9 zur Hälfte. Der Rest (5 von 15 Zweigen komplett
-unbearbeitet: B10–B14, plus die zweite Hälfte von B9 und Teile von
-B2/B5/B6) ist weiterhin unbearbeiteter Planungsraum; die zweite Hälfte
-von B9 (`dict-methods`, `set-basics`, `nested-data-structures`,
-`membership-operator`, `len-function`) ist der naheliegendste nächste
-Schritt, bevor ein neuer Zweig (B10 Comprehensions) begonnen wird.
+**Bilanz:** 49 von 82 Tags abgedeckt (≈ 60 %) — die Lücke zu SQL (55/82,
+≈ 67 %) ist inzwischen sehr klein. Der Kursname `pythonGrundlagen` deckt
+inzwischen deutlich mehr als nur die absoluten Basics ab (Variablen,
+Grundrechenarten, Verzweigung, Schleifen, ganz Funktionen inklusive
+*args/**kwargs, lambda, map()/filter()/sorted(), und ganz Datenstrukturen:
+Listen, Slicing, Listenmethoden, Tupel, Dicts, Dict-Methoden, Sets,
+Verschachtelung, `in`/`not in`, `len()`) — B7, B8 und B9 sind jetzt
+vollständig geschlossen, drei von fünfzehn Zweigen. Der Rest (5 von 15
+Zweigen komplett unbearbeitet: B10–B14, plus Teile von B2/B5/B6) ist
+weiterhin unbearbeiteter Planungsraum; B10 Comprehensions & Generatoren
+(baut direkt auf den jetzt komplett abgedeckten B7/B9 auf) ist der
+naheliegendste nächste Zweig.
 
 ## 7. Bewusst ausgeklammert
 
