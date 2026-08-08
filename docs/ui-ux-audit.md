@@ -79,6 +79,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-08 | HEAD (B11 Teil 1: 15-15.3) | 92.85 % | 76.03 % | 98.93 % | 92.85 % |
 | 2026-08-08 | HEAD (B12 Teil 1: 16-16.2) | 92.73 % | 75.68 % | 98.93 % | 92.73 % |
 | 2026-08-08 | HEAD (B13 komplett: 17-17.2) | 92.64 % | 75.39 % | 98.94 % | 92.64 % |
+| 2026-08-08 | HEAD (SQL B11 komplett: 16-16.2) | 92.51 % | 75.12 % | 98.95 % | 92.51 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -763,3 +764,52 @@ sondern pro PR direkt in den Checks sichtbar.
   via `challengeRunner.test.ts`, +1 Regressionstest für F-016 in
   `nodePythonEngine.test.ts`). `typecheck`, volle Testsuite (759 Tests)
   und `npm run build` grün.
+
+### 2026-08-08 — Stündliche Routine: SQL B11 Transaktionen komplett (nach mehreren reinen Python-Runden)
+
+- **Umfang:** Baseline geprüft (759/759 grün, unverändert). Python steht
+  inzwischen bei 66/82 (≈ 80 %) mit nur noch B14 (OOP, 8 Tags, großer
+  Brocken) komplett offen; SQL lag bei 55/82 (≈ 67 %) mit drei kleinen,
+  komplett offenen Zweigen (B11 Transaktionen 3 Tags, B12 Views 2 Tags,
+  B13 Indizes 2 Tags) — nach mehreren aufeinanderfolgenden reinen
+  Python-Runden diesmal SQL den Vorzug gegeben. B11 Transaktionen
+  komplett als Challenges 16–16.2 umgesetzt.
+- **Vorgehen (Recherche vor dem Schreiben):** Vor der ersten Challenge
+  empirisch (nicht angenommen) geprüft, dass `BEGIN`/`COMMIT`/
+  `ROLLBACK`/`SAVEPOINT`/`ROLLBACK TO` durch die eigene
+  `executeAndValidate`-Pipeline (Mehrfach-Statement-Splitting +
+  `node:sqlite`) korrekt funktionieren — per Kurzskript direkt gegen
+  `createNodeSqliteEngine`. Dabei auch geprüft, ob eine offene, nie
+  committete Transaktion auf derselben Verbindung sofort sichtbare
+  Änderungen zeigt (ja, "read your own writes") — das schließt "COMMIT
+  vergessen" als sauber testbaren Distraktor für `transaction-basic`
+  aus, da eine `validate()`-Prüfung auf derselben Verbindung den
+  Unterschied nicht sehen könnte. Stattdessen empirisch verifiziert,
+  dass ein doppeltes `BEGIN` innerhalb derselben Transaktion einen
+  echten SQLite-Fehler auslöst ("cannot start a transaction within a
+  transaction") — daraus einen tag-relevanten, tatsächlich
+  fehlschlagenden Distraktor gebaut, statt eine irreführende Prüfung zu
+  schreiben.
+- **Vorgehen (Content):** Alle drei Challenges erzählen ein
+  durchgehendes Überweisungs-Szenario (Konten Anna/Ben/Clara), jede
+  Rechnung vorab mit echtem `node:sqlite` durchgerechnet statt von Hand
+  geschätzt. `transaction-basic` (16, BEGIN/COMMIT für eine Überweisung,
+  Distraktor: doppeltes BEGIN → echter Fehler), `rollback` (16.1,
+  ROLLBACK macht beide UPDATEs vollständig rückgängig, Distraktor
+  verwechselt COMMIT mit ROLLBACK → Überweisung bleibt fälschlich
+  bestehen), `savepoint` (16.2, SAVEPOINT + ROLLBACK TO verwirft gezielt
+  nur die zweite von zwei Überweisungen innerhalb derselben Transaktion,
+  Distraktor vergisst ROLLBACK TO → beide Überweisungen werden
+  fälschlich übernommen). Alle drei über Gate 1/Gate 2 (`node:sqlite`)
+  und zusätzlich live im Browser gegen echtes sql.js-WASM bestätigt
+  (3/3 Lösungen korrekt, 0 Konsolenfehler) — inklusive eines gezielten
+  Live-Checks, dass der doppelte-BEGIN-Distraktor exakt dieselbe
+  Fehlermeldung liefert wie im Node-Testmotor.
+- **Ergebnis:** Keine Bugs gefunden — reine, saubere neue Inhalte.
+  SQL-Konzept-Hierarchie-Bilanz: 55/82 → 58/82 Tags (≈ 71 %). **B11 ist
+  der dritte komplett abgedeckte SQL-Zweig** (nach B7, B10). Nur noch
+  zwei kleine Zweige komplett offen: B12 Views (2 Tags), B13 Indizes
+  (2 Tags).
+- **Tests:** 759 → 765 (+6, alle für die drei neuen
+  Transaktions-Challenges via `challengeRunner.test.ts`). `typecheck`,
+  volle Testsuite (765 Tests) und `npm run build` grün.

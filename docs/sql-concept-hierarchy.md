@@ -459,10 +459,13 @@ graph TD
 
 *Update 2026-08-05: Challenges 14–14.5 wurden ergänzt und decken den
 kompletten Zweig B7 (Subqueries) ab — die vorherige größte Einzellücke.
-Der Rest dieses Abschnitts ist der historische Stand vor diesem Update;
-die Bilanz am Ende ist bereits aktualisiert.*
+Update 2026-08-08: Challenges 16–16.2 ergänzt und decken den kompletten
+Zweig B11 (Transaktionen) ab — der erste der drei bis dahin komplett
+offenen kleinen Zweige (B11/B12/B13). Der Rest dieses Abschnitts ist der
+historische Stand vor diesen Updates; die Bilanz am Ende ist bereits
+aktualisiert.*
 
-Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (52 Challenges)
+Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (55 Challenges)
 folgende **nicht** ab — das ist die eigentliche Planungs-Nutzlast dieses
 Dokuments:
 
@@ -506,17 +509,25 @@ sind SQL-Kernkompetenzen, die im Kurs bisher fehlen.
 15.1 (`partition-by`), 15.2 (`ranking-functions`), 15.3 (`offset-functions`)
 und 15.4 (`running-aggregates`).
 
-**B11 Transaktionen, B12 Views, B13 Indizes:**
+**B11 Transaktionen:** ~~komplett nicht abgedeckt~~ — **seit 2026-08-08
+vollständig abgedeckt** durch Challenges 16 (`transaction-basic`), 16.1
+(`rollback`) und 16.2 (`savepoint`) — alle drei als durchgehendes
+Überweisungs-Szenario (Anna/Ben/Clara) erzählt: 16 zeigt BEGIN/COMMIT,
+16.1 ROLLBACK als vollständiges Verwerfen, 16.2 SAVEPOINT/ROLLBACK TO als
+gezieltes Teil-Verwerfen innerhalb einer laufenden Transaktion.
+
+**B12 Views, B13 Indizes:**
 **komplett nicht abgedeckt** (B13 zählt hier ohne `create-index`, das
 strukturell zu B1 gehört und dort separat gelistet ist).
 
 **Gut abgedeckt:** B0–B1-Basics, DML-Kern (ohne Upsert), DQL-Kern fast
 vollständig, Aggregation/Gruppierung, Joins bis `LEFT JOIN`, CTE/Rekursion
 (Erzeugungs-Variante), **B7 Subqueries (seit 2026-08-05 vollständig)**,
-**B10 Fensterfunktionen (seit 2026-08-07 vollständig)**.
+**B10 Fensterfunktionen (seit 2026-08-07 vollständig)**, **B11
+Transaktionen (seit 2026-08-08 vollständig)**.
 
-**Bilanz:** 55 von 82 Tags sind heute durch mindestens eine Challenge
-abgedeckt (≈ 67 %). Drei Zweige (B11, B12, B13) sind noch zu 100 %
+**Bilanz:** 58 von 82 Tags sind heute durch mindestens eine Challenge
+abgedeckt (≈ 71 %). Zwei Zweige (B12, B13) sind noch zu 100 %
 Lücke.
 
 ## 7. Bewusst ausgeklammert
