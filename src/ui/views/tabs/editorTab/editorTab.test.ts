@@ -189,6 +189,17 @@ describe('mountEditorTab', () => {
     expect(root.querySelector('.results-body pre')).not.toBeNull();
   });
 
+  it('shows a track-appropriate empty-state before the first run — "Query" for SQL, "Code" for Python', () => {
+    const ctx = makeCtx();
+    mountEditorTab(root, ctx);
+
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
+    expect(root.querySelector('.results-body')?.textContent).toBe('Noch keine Query ausgeführt.');
+
+    selectChallenge(ctx, 'python', 'pythonGrundlagen', '01');
+    expect(root.querySelector('.results-body')?.textContent).toBe('Noch kein Code ausgeführt.');
+  });
+
   it('shows no Python-engine banner for the SQL track', () => {
     const ctx = makeCtx();
     mountEditorTab(root, ctx);
