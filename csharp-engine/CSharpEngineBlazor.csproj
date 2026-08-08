@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <WasmEnableThreads>true</WasmEnableThreads>
+    <PublishTrimmed>false</PublishTrimmed>
+    <RunAOTCompilation>false</RunAOTCompilation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.29" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.29" PrivateAssets="all" />
+    <!-- CSharpCompilation (Roslyn's non-scripting compiler API) only — the Scripting API package
+         was dropped, see docs/csharp-engine-poc.md's "Four real WASM-specific bugs" section for why. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.9.2" />
+  </ItemGroup>
+
+  <!-- CSharpEngine.RunCode compiles user code against real BCL reference assemblies, fetched at
+       runtime from wwwroot/refs/ (see CSharpEngine.cs). Those .dlls are metadata-only reference
+       assemblies from the installed SDK's own targeting pack, not build output of this project —
+       copied here at build time instead of committed to git, so they always match the SDK actually
+       building this project and never go stale. -->
+  <PropertyGroup>
+    <CSharpEngineRefPackDir Condition="'$(NetCoreTargetingPackRoot)' != '' and '$(BundledNETCoreAppPackageVersion)' != ''">$(NetCoreTargetingPackRoot)/Microsoft.NETCore.App.Ref/$(BundledNETCoreAppPackageVersion)/ref/net8.0/</CSharpEngineRefPackDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <CSharpEngineRefAssemblyName Include="System.Runtime" />
+    <CSharpEngineRefAssemblyName Include="System.Console" />
+    <CSharpEngineRefAssemblyName Include="System.Linq" />
+    <CSharpEngineRefAssemblyName Include="System.Linq.Expressions" />
+    <CSharpEngineRefAssemblyName Include="System.Collections" />
+    <CSharpEngineRefAssemblyName Include="System.ObjectModel" />
+    <CSharpEngineRefAssemblyName Include="System.Text.RegularExpressions" />
+    <CSharpEngineRefAssemblyName Include="System.Runtime.Extensions" />
+    <CSharpEngineRefAssemblyName Include="System.Threading" />
+    <CSharpEngineRefAssemblyName Include="System.Threading.Tasks" />
+    <CSharpEngineRefAssemblyName Include="netstandard" />
+  </ItemGroup>
+
+  <Target Name="CopyCSharpEngineRefAssemblies" BeforeTargets="Build" Condition="'$(CSharpEngineRefPackDir)' != ''">
+    <ItemGroup>
+      <_CSharpEngineRefDll Include="@(CSharpEngineRefAssemblyName -> '$(CSharpEngineRefPackDir)%(Identity).dll')" />
+    </ItemGroup>
+    <Error
+      Condition="!Exists('$(CSharpEngineRefPackDir)')"
+      Text="CSharpEngineRefPackDir ('$(CSharpEngineRefPackDir)') does not exist — the installed SDK's Microsoft.NETCore.App.Ref targeting pack could not be found. Install it (e.g. via 'dotnet workload install wasm-tools' or the apt dotnet-sdk package, see docs/csharp-engine-poc.md's Environment prerequisites) before building." />
+    <MakeDir Directories="$(MSBuildProjectDirectory)/wwwroot/refs" />
+    <Copy SourceFiles="@(_CSharpEngineRefDll)" DestinationFolder="$(MSBuildProjectDirectory)/wwwroot/refs" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

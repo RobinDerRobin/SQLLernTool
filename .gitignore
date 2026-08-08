@@ -3,3 +3,10 @@ dist/
 coverage/
 *.local
 .DS_Store
+
+# csharp-engine/ (Blazor WASM + Roslyn C# execution engine, see docs/csharp-engine-poc.md)
+csharp-engine/bin/
+csharp-engine/obj/
+# Reference-assembly DLLs are copied from the installed .NET SDK's targeting pack at build time
+# (CSharpEngineBlazor.csproj's CopyCSharpEngineRefAssemblies target) — never committed as binaries.
+csharp-engine/wwwroot/refs/

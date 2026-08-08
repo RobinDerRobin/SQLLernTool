@@ -447,6 +447,18 @@ zumindest teilweise an echten Challenges verifiziert werden konnten. Jede
 Aussage über C#-Struktur in diesem Dokument stammt aus Sprachwissen über
 C# selbst, nicht aus Code-Beobachtung im Repository.
 
+*Update 2026-08-08: Es gibt inzwischen einen ersten Implementierungs-Anker
+— allerdings Engine-Infrastruktur, keine Inhalte. `csharp-engine/` (neues
+Top-Level-Verzeichnis, kein `src/`) ist ein echtes, ins Git eingechecktes
+Blazor-WASM-Projekt, das über Roslyn (`CSharpCompilation`) echten C#-Code
+kompiliert und im Browser ausführt — verifiziert per `dotnet build` und
+einem echten `dotnet run` + Playwright-Smoke-Test. Das ist Schritt 2 der
+Restliste in `docs/csharp-engine-poc.md` ("Scaffold der Projektstruktur");
+`src/` selbst bleibt unverändert bei 0 Treffern, und die Tag-Bilanz bleibt
+bei 0/86, weil hier noch keine Challenges, kein `src/runtime/csharp/`-
+Loader und keine `CSharpChallenge`-Typen existieren — nur der Compiler
+läuft schon.*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt

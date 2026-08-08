@@ -476,3 +476,57 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Tests:** 708 → 718 (+10, alle für die fünf neuen
   Datenstrukturen-Challenges via `challengeRunner.test.ts`). `typecheck`,
   volle Testsuite (718 Tests) und `npm run build` grün.
+
+### 2026-08-08 — Stündliche Routine: C#-Engine-Projekt gescaffoldet (Schritt 2)
+
+- **Umfang:** Baseline geprüft (718/718 grün, unverändert). Da SQL/Python
+  in den letzten Runden viel Fortschritt gemacht haben und C# seit der
+  Hosting-Entscheidung keine Bewegung hatte, diese Runde auf **einen**
+  bewusst begrenzten C#-Schritt fokussiert: Schritt 2 der Restliste in
+  `docs/csharp-engine-poc.md` — die funktionierende Scratchpad-POC in ein
+  echtes, ins Git eingechecktes Projekt (`csharp-engine/` am Repo-Root,
+  außerhalb von `src/`) überführen.
+- **Vorgehen:** POC-Quellcode 1:1 übernommen (Blazor-WASM-Template +
+  `CSharpEngine.cs` mit `CSharpCompilation`-Pipeline), dabei drei echte
+  Verbesserungen gegenüber dem Wegwerf-POC vorgenommen: (1) das
+  ungenutzte `Microsoft.CodeAnalysis.CSharp.Scripting`-Package durch das
+  schlankere `Microsoft.CodeAnalysis.CSharp` ersetzt (die Scripting-API
+  wurde nie benutzt, siehe die vier dokumentierten WASM-Bugs). (2) Die
+  Referenz-Assembly-Abfrage lief im POC gegen einen hartcodierten
+  `http://localhost:8899/`-Wegwerf-Server — jetzt ein `BaseAddress`-Feld,
+  das `Program.cs` beim Start aus `HostEnvironment.BaseAddress` setzt, so
+  dass die DLLs same-origin aus `wwwroot/refs/` geladen werden, sowohl
+  unter `dotnet run` als auch später im echten Deployment, ohne
+  CORS-Sonderfall. (3) Die 11 benötigten Referenz-DLLs werden **nicht**
+  als Binärdateien committet, sondern von einem neuen MSBuild-Target
+  (`CopyCSharpEngineRefAssemblies`, `BeforeTargets="Build"`) bei jedem
+  Build direkt aus dem installierten SDK kopiert (`$(NetCoreTargetingPackRoot)`
+  + `$(BundledNETCoreAppPackageVersion)`) — kann nie veraltet sein, hält
+  das Repo frei von ~1 MB Binärdateien.
+- **Verifikation:** `dotnet build` läuft sauber durch, das Copy-Target
+  befüllt `wwwroot/refs/` tatsächlich mit allen 11 DLLs. Danach ein
+  echter Live-Test: `dotnet run` gestartet, per Playwright (echtes
+  headless Chromium) die Seite geladen und die Browser-Konsole geprüft —
+  der fest im Smoke-Test verdrahtete Codeschnipsel
+  (`int x = 2 + 2; Console.WriteLine($"x = {x}");`) kompiliert und läuft
+  tatsächlich: `{"stdout":"x = 4\n","result":null,"error":null}`. Damit
+  bestätigt: Portierung in die echte Projektstruktur, Paketwechsel und
+  same-origin-Referenzen funktionieren alle zusammen einwandfrei, nicht
+  nur "es kompiliert". `bin/`, `obj/` und `wwwroot/refs/` sind gitignored
+  (Build-Output bzw. build-zeit-generiert). Haupt-App (`npm`-Tests,
+  Typecheck, Build) währenddessen unverändert grün — das neue
+  Top-Level-Verzeichnis stört Vite/Vitest nicht.
+- **Ergebnis:** Keine Bugs in der Haupt-App. C#-Engine-Integration:
+  Schritt 1 (Hosting) und jetzt Schritt 2 (Projekt-Scaffold) der
+  Restliste sind erledigt. Noch **kein** CI/Deploy-Schritt für
+  `csharp-engine/` (bewusst zurückgestellt, um dieses Increment
+  begrenzt zu halten) und noch keinerlei Anbindung an `src/` — nächster
+  sinnvoller Schritt ist `src/runtime/csharp/csharpEngine.ts` (Schritt
+  3), sobald eine künftige Runde dafür Zeit hat. `docs/csharp-engine-poc.md`
+  und `docs/csharp-concept-hierarchy.md` entsprechend aktualisiert
+  (Letzteres bleibt bei 0/86 Tags — dies ist Engine-Infrastruktur, keine
+  Lerninhalte).
+- **Tests:** Unverändert 718 (kein TS-/Testcode geändert, reines
+  C#-Infrastruktur-Increment). `typecheck`, volle Testsuite (718 Tests)
+  und `npm run build` grün — zusätzlich `dotnet build` und ein Live-Lauf
+  für `csharp-engine/` grün.

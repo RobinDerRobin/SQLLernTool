@@ -333,9 +333,48 @@ Roughly in dependency order:
 
 1. ~~Resolve the COOP/COEP hosting question~~ — **done, see decision
    above: `coi-serviceworker`, scoped to the C# engine's own route.**
-2. **Scaffold the actual project directory** (e.g. `csharp-engine/` at
-   the repo root, a real Blazor WASM project checked into git, built via
-   a new CI/deploy step) instead of the ephemeral scratchpad copy.
+2. ~~Scaffold the actual project directory~~ — **done (2026-08-08):
+   `csharp-engine/` at the repo root, checked into git (source only —
+   `bin/`, `obj/`, and `wwwroot/refs/*.dll` are gitignored, see below).
+   Promoted straight from the scratchpad POC with three real fixes along
+   the way, verified with a fresh `dotnet build` + a live `dotnet run` +
+   Playwright smoke test (not just "it compiles"):**
+   - Swapped the `Microsoft.CodeAnalysis.CSharp.Scripting` package for
+     plain `Microsoft.CodeAnalysis.CSharp` — the Scripting API was never
+     used (abandoned per the bugs section above), only `CSharpCompilation`
+     is, so the extra package was dead weight.
+   - `CSharpEngine.GetReferencesAsync()` fetched its reference DLLs from a
+     hardcoded `http://localhost:8899/` — a throwaway dev-only file server
+     that only existed on the machine that built the original POC. Fixed
+     to fetch from a same-origin relative path (`wwwroot/refs/`, via a
+     `BaseAddress` static field set once from `Program.cs`'s
+     `WebAssemblyHostBuilder.HostEnvironment.BaseAddress`), so it works
+     under both `dotnet run` and a real static-hosted deployment without
+     any separate server or CORS configuration.
+   - The reference-assembly `.dll`s themselves are **not** committed as
+     binaries. `CSharpEngineBlazor.csproj` has a
+     `CopyCSharpEngineRefAssemblies` MSBuild target (`BeforeTargets="Build"`)
+     that copies the exact set `CSharpEngine.cs` needs straight out of the
+     installed SDK's own `Microsoft.NETCore.App.Ref` targeting pack
+     (resolved via the `$(NetCoreTargetingPackRoot)` /
+     `$(BundledNETCoreAppPackageVersion)` MSBuild properties, confirmed to
+     resolve correctly on this sandbox's apt-installed SDK) — so they can
+     never go stale relative to whichever SDK actually builds the project,
+     and the repo stays free of ~1MB of binary blobs that a build step can
+     regenerate on demand.
+
+   Verified end-to-end: `dotnet build` succeeds cleanly, the ref-copy
+   target populates `wwwroot/refs/` with all 11 needed DLLs, and
+   `dotnet run` + a real headless-Chromium Playwright check confirms the
+   page still boots and `CSharpEngine.RunCode` still compiles and runs
+   real C# — `console.log`'d result: `{"stdout":"x = 4\n","result":null,
+   "error":null}` for `int x = 2 + 2; Console.WriteLine($"x = {x}");`.
+   See `csharp-engine/README.md` for the build/run recipe and the
+   rationale for keeping this a separate top-level project rather than
+   folding two build toolchains together. **No CI/deploy step wiring yet**
+   — this only builds and runs locally so far, deliberately deferred to
+   keep this increment bounded; that's a natural next step once the
+   browser-side loader (step 3) needs it.
 3. **`src/runtime/csharp/csharpEngine.ts`** — the browser-side loader,
    mirroring `pyodideEngine.ts`: dynamically load the Blazor boot
    sequence, expose an `exec(code): CSharpExecResult` function matching
