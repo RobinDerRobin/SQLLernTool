@@ -274,20 +274,65 @@ http.server.test(HandlerClass=Handler, port=int(sys.argv[1]), bind='127.0.0.1')
 
 Real end-user deployment (GitHub Pages, per this project's existing
 `deploy-pages.yml`) needs the same two headers — GitHub Pages does not
-let you set custom response headers directly, so this needs either a
-`<meta>`-tag-based COOP/COEP workaround (works in some browsers, not
-guaranteed — check current spec support) or serving the C# engine's
-static assets from a host that does support custom headers (e.g.
-Cloudflare Pages, Netlify, or a `_headers` file if the eventual host
-supports it). **This is an open question for the integration path below,
-not yet resolved.**
+let you set custom response headers directly. **Note there is in fact no
+`<meta>`-tag equivalent for `Cross-Origin-Embedder-Policy`** — unlike CSP,
+COEP is HTTP-header-only per spec, so that workaround (mentioned as an
+open option in an earlier draft of this doc) does not actually exist and
+should be discarded.
+
+### Decision: use the `coi-serviceworker` technique (resolved 2026-08-08)
+
+Researched the actual prior art for "SharedArrayBuffer on GitHub Pages"
+(a well-trodden problem for WASM projects — Wasmer, Godot web exports,
+several HuggingFace Spaces, etc. all hit it). The established solution is
+[`coi-serviceworker`](https://github.com/gzuidhof/coi-serviceworker): a
+small service-worker script that intercepts the page's own navigation
+request and re-serves it with `Cross-Origin-Opener-Policy: same-origin`
+and `Cross-Origin-Embedder-Policy: require-corp` injected, since a service
+worker *can* set response headers on requests it intercepts even when the
+origin server (GitHub Pages) can't be configured to. This is exactly the
+same mechanism `docs.wasmer.io` documents for its own GH-Pages-hosted WASM
+SDK, and is what most GH-Pages-hosted threaded-WASM demos in the wild
+actually use (see also `tomayac`'s 2025 write-up on the same pattern).
+
+**Chosen over the alternatives** because it requires no change to this
+project's hosting (stays on GitHub Pages, no new host/DNS/cert to manage)
+and no change to `deploy-pages.yml`'s deployment target — only static
+files added to the built output. Moving the C# assets to a
+header-capable host (Cloudflare Pages/Netlify) was the fallback if this
+didn't pan out; it doesn't need to be pursued now.
+
+**Known trade-offs to carry into implementation (step 3 below):**
+- The service worker reloads the page once on first visit to activate
+  itself (standard SW-registration-then-reload pattern) — acceptable for
+  a learning tool, but means the C# engine's own loading UI needs to
+  tolerate one extra reload before it starts fetching Blazor assets, and
+  this should not affect the SQL/Python tracks at all if the service
+  worker's scope is limited to only the page/route that hosts the C#
+  engine (avoid registering it site-wide).
+- COEP `require-corp` only requires `Cross-Origin-Resource-Policy` headers
+  on genuinely cross-origin subresources; everything the Blazor boot
+  sequence fetches (`.wasm`, `.dll`, `blazor.boot.json`, etc.) will be
+  same-origin GitHub Pages assets, so no per-file CORP header wrangling
+  is expected to be needed — worth a real Playwright check once step 3 is
+  built, not just assumed.
+- A newer header, `Document-Isolation-Policy: isolate-and-credentialless`,
+  is emerging (W3C TAG review as of 2026) as a lower-friction alternative
+  that doesn't require COEP on the *page itself* — not yet broadly
+  supported enough to depend on, but worth re-checking browser support
+  before shipping in case it lets the service-worker hack be dropped
+  later.
+
+**This question is now resolved for planning purposes.** Step 3 below
+(the browser-side loader) should build on this decision rather than
+re-litigate it.
 
 ## What's left to actually integrate this (not done yet)
 
 Roughly in dependency order:
 
-1. **Resolve the COOP/COEP hosting question** above — determines where
-   the built C# engine assets can actually be served from for real users.
+1. ~~Resolve the COOP/COEP hosting question~~ — **done, see decision
+   above: `coi-serviceworker`, scoped to the C# engine's own route.**
 2. **Scaffold the actual project directory** (e.g. `csharp-engine/` at
    the repo root, a real Blazor WASM project checked into git, built via
    a new CI/deploy step) instead of the ephemeral scratchpad copy.
@@ -320,10 +365,11 @@ Roughly in dependency order:
    validators, at least one verified-failing distractor per challenge).
 
 This is genuinely several more sessions of real engineering work — steps
-1–4 in particular involve architecture decisions worth deliberate
-attention rather than being rushed through opportunistically. Treat each
-routine firing that touches this as making **one bounded, committed
-increment** (e.g. "resolve the hosting question and document the
-decision," not "finish the whole engine") — never leave the repo in a
-broken intermediate state, and always run `npm run build:check` before
-committing.
+2–4 in particular (project scaffolding, the browser loader, and the
+`validate()` design) still involve architecture decisions worth
+deliberate attention rather than being rushed through opportunistically.
+Treat each routine firing that touches this as making **one bounded,
+committed increment** (e.g. "scaffold the project directory and get a
+minimal Blazor boot working," not "finish the whole engine") — never
+leave the repo in a broken intermediate state, and always run
+`npm run build:check` before committing.
