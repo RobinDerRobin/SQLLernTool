@@ -25,6 +25,8 @@ import { challenge12_5 } from './challenges/12_5';
 import { challenge12_6 } from './challenges/12_6';
 import { challenge12_7 } from './challenges/12_7';
 import { challenge12_8 } from './challenges/12_8';
+import { challenge12_9 } from './challenges/12_9';
+import { challenge12_10 } from './challenges/12_10';
 
 const challenges: PythonChallenge[] = [
   challenge01,
@@ -52,6 +54,8 @@ const challenges: PythonChallenge[] = [
   challenge12_6,
   challenge12_7,
   challenge12_8,
+  challenge12_9,
+  challenge12_10,
 ];
 
 export const pythonGrundlagenCourse: Course<PythonChallenge> = {

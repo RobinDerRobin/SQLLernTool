@@ -339,13 +339,14 @@ graph TD
 kompletten Zweig B7 (Schleifen) ab. Update 2026-08-08 (vormittags):
 Challenges 12–12.5 ergänzt, decken 7 der 12 Tags aus B8 (Funktionen) ab.
 Update 2026-08-08 (Fortsetzung): Challenges 12.6–12.8 ergänzt
-(`args-kwargs`, `lambda-expressions`, `map-function`) — 10 von 12 B8-Tags
-jetzt abgedeckt, nur noch `filter-function` und `sorted-with-key` offen
-(beide hängen ebenfalls an `lambda-expressions`, kleine Restcharge für
-später). Der Rest dieses Abschnitts ist der historische Stand vor diesen
-Updates; die Bilanz am Ende ist bereits aktualisiert.*
+(`args-kwargs`, `lambda-expressions`, `map-function`). Update 2026-08-08
+(weitere Runde): Challenges 12.9–12.10 ergänzt (`filter-function`,
+`sorted-with-key`) — **B8 Funktionen ist damit komplett abgedeckt (12/12
+Tags)**, der zweitgrößte fertige Zweig nach B7. Der Rest dieses
+Abschnitts ist der historische Stand vor diesen Updates; die Bilanz am
+Ende ist bereits aktualisiert.*
 
-Von den 82 Tags deckt `pythonGrundlagen` (25 Challenges) folgende ab:
+Von den 82 Tags deckt `pythonGrundlagen` (27 Challenges) folgende ab:
 
 **Vollständig abgedeckt:** `program-execution-model`, `function-call-syntax`
 (implizit über `print`), `print-statement`, `comments`, `variable-
@@ -358,28 +359,31 @@ gebraucht), `comparison-operators`, `augmented-assignment`, `f-strings`,
 Challenge 11 eingeführt, durch die Zeichen-für-Zeichen-Iteration über einen
 String direkt angewendet), `for-loop` (11), `range-function` (11.1),
 `while-loop` (11.2), `break-continue` (11.3), `nested-loops` (11.4),
-`loop-else` (11.5), sowie **seit 2026-08-08 fast ganz B8 Funktionen**:
+`loop-else` (11.5), sowie **seit 2026-08-08 B8 Funktionen komplett**:
 `function-definition` + `return-statement` (12), `function-parameters`
 (12.1), `default-parameters` (12.2), `variable-scope` (12.3),
 `docstrings` (12.4), `recursion` (12.5), `args-kwargs` (12.6),
-`lambda-expressions` (12.7), `map-function` (12.8) —
-**37 von 82 Tags (≈ 45 %).**
+`lambda-expressions` (12.7), `map-function` (12.8), `filter-function`
+(12.9), `sorted-with-key` (12.10) —
+**39 von 82 Tags (≈ 48 %).**
 
 **Nicht abgedeckt:** `dynamic-typing` als **eigenes** Thema (wird
 durchgehend demonstriert, nie benannt — genau wie `logical-operators` im
 SQL-Kurs), `bool-conversion-truthiness`, `truthiness-in-conditions`,
-`ternary-expression`, die letzten beiden Tags von B8 (`filter-function`,
-`sorted-with-key`), und **komplett**: B9 Datenstrukturen, B10
+`ternary-expression`, und **komplett**: B9 Datenstrukturen, B10
 Comprehensions & Generatoren, B11 Fehlerbehandlung, B12 Module &
 Imports, B13 Dateizugriff, B14 Objektorientierung.
 
-**Bilanz:** 37 von 82 Tags abgedeckt (≈ 45 %) — weiterhin weniger als SQL
+**Bilanz:** 39 von 82 Tags abgedeckt (≈ 48 %) — weiterhin weniger als SQL
 (55/82, ≈ 67 %), aber die Lücke ist weiter geschrumpft. Der Kursname
 `pythonGrundlagen` deckt inzwischen deutlich mehr als nur die absoluten
-Basics ab (Variablen, Grundrechenarten, Verzweigung, Schleifen, praktisch
-ganz Funktionen inklusive *args/**kwargs, lambda und map()) — der Rest
-(6 von 15 Zweigen komplett, plus Teile von B8/B2/B5/B6) ist weiterhin
-unbearbeiteter Planungsraum.
+Basics ab (Variablen, Grundrechenarten, Verzweigung, Schleifen, ganz
+Funktionen inklusive *args/**kwargs, lambda, map()/filter()/sorted())
+— B7 und B8 sind jetzt die ersten beiden vollständig geschlossenen
+Zweige. Der Rest (6 von 15 Zweigen komplett unbearbeitet: B9–B14, plus
+Teile von B2/B5/B6) ist weiterhin unbearbeiteter Planungsraum; B9
+Datenstrukturen (10 Tags) ist jetzt der größte zusammenhängende
+Kandidat für die nächste Runde.
 
 ## 7. Bewusst ausgeklammert
 

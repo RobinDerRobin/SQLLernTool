@@ -71,6 +71,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-07 | HEAD (Ende Tag: 4 weitere Coverage-Lücken) | 93.05 % | 78.48 % | 97.96 % | 93.05 % |
 | 2026-08-08 | HEAD (sqlJsEngine + actions.ts + Python-Funktionen) | 93.52 % | 78.25 % | 98.85 % | 93.52 % |
 | 2026-08-08 | HEAD (Python-Funktionen Teil 2: 12.6-12.8) | 93.33 % | 77.88 % | 98.86 % | 93.33 % |
+| 2026-08-08 | HEAD (Test-Lücken + B8 komplett: 12.9-12.10) | 93.48 % | 77.87 % | 98.87 % | 93.48 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -389,3 +390,45 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Tests:** 689 → 695 (+6, alle für die drei neuen
   Python-Funktionen-Challenges via `challengeRunner.test.ts`).
   `typecheck`, volle Testsuite (695 Tests) und `npm run build` grün.
+
+### 2026-08-08 — Stündliche Routine: drei echte Test-Lücken geschlossen + B8 komplettiert
+
+- **Umfang:** (1) Baseline geprüft (695/695 grün). (2) Coverage-Report
+  nach echten, erreichbaren Lücken durchsucht statt nach reiner
+  Prozentzahl — drei gefunden und geschlossen: `tableExists.ts` (0 %,
+  keine eigene Testdatei existierte), `chatTab.ts`s Strg/Cmd+Enter-
+  Sendekürzel und die pendingInput-Erhaltung über Re-Renders hinweg, und
+  `editorTab.ts`s "Ausführen"-Button für die Python-Zweige (`python` /
+  `python-loading`), die bis dahin nur auf State-Ebene
+  (`actions.test.ts`), nie auf UI-Ebene getestet waren. (3) Python B8
+  (Funktionen) mit den letzten beiden Tags komplettiert: `filter-
+  function` (12.9) und `sorted-with-key` (12.10).
+- **Vorgehen (2) Test-Lücken:** `tableExists.ts` wird von praktisch jeder
+  SQL-Challenge-`validate()` genutzt, hatte aber 0 % Abdeckung — 4 Tests
+  ergänzt (existiert/existiert nie/wurde gelöscht/Try-Catch-Pfad über
+  einen Tabellennamen, der die interne Query syntaktisch bricht). Für
+  `chatTab.ts`: 3 Tests ergänzt (Text bleibt bei einem fremden Re-Render
+  erhalten, Strg/Cmd+Enter sendet wie der Button, einfaches Enter sendet
+  nicht). Für `editorTab.ts`: 2 Tests ergänzt (Python-Challenge klicken,
+  während die Engine noch lädt → Lade-Platzhalter; Python-Challenge mit
+  echter Node-Subprozess-Engine lösen → Erfolgsstatus mit stdout). Keine
+  echten Bugs gefunden — reine, aber reale Testschulden auf tatsächlich
+  erreichbarem Code (nicht auf den verbleibenden defensiven
+  "Challenge nicht gefunden"-Zweigen, die mit einer gültigen Auswahl nie
+  erreichbar sind).
+- **Vorgehen (3) Python B8 fertigstellen:** `filter-function` (12.9,
+  gerade Zahlen aus einer Liste aussieben, Distraktor vergisst
+  `list(...)` — bleibt ein lazy filter-Objekt) und `sorted-with-key`
+  (12.10, Wörter nach Länge statt alphabetisch sortieren via
+  `sorted(x, key=len)`, Distraktor vergisst `key=len` — sortiert
+  alphabetisch statt nach Länge, falsches Ergebnis). Beide über Gate
+  1/Gate 2 verifiziert. **B8 Funktionen ist damit der zweite komplett
+  abgedeckte Python-Zweig nach B7 Schleifen.**
+- **Ergebnis:** Keine echten Bugs gefunden. Python-Konzept-Hierarchie-
+  Bilanz: 37/82 → 39/82 Tags (≈ 48 %), B8 komplett (12/12). Größter
+  offener Kandidat für die nächste inhaltliche Runde: B9 Datenstrukturen
+  (10 Tags, komplett offen).
+- **Tests:** 695 → 708 (+13: 4 tableExists, 3 chatTab, 2 editorTab-
+  Python, 4 für die neuen 12.9/12.10-Challenges via
+  `challengeRunner.test.ts`). `typecheck`, volle Testsuite (708 Tests)
+  und `npm run build` grün nach jedem Schritt.
