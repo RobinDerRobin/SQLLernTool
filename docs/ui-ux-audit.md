@@ -74,6 +74,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-08 | HEAD (Test-Lücken + B8 komplett: 12.9-12.10) | 93.48 % | 77.87 % | 98.87 % | 93.48 % |
 | 2026-08-08 | HEAD (Live-Verifikation + B9 Teil 1: 13-13.4) | 93.33 % | 77.45 % | 98.88 % | 93.33 % |
 | 2026-08-08 | HEAD (B9 komplett: 13.5-13.9) | 93.11 % | 76.87 % | 98.90 % | 93.11 % |
+| 2026-08-08 | HEAD (B10 Teil 1: 14-14.4) | 93.02 % | 76.52 % | 98.91 % | 93.02 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -566,3 +567,45 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Tests:** 718 → 728 (+10, alle für die fünf neuen
   Datenstrukturen-Challenges via `challengeRunner.test.ts`). `typecheck`,
   volle Testsuite (728 Tests) und `npm run build` grün.
+
+### 2026-08-08 — Stündliche Routine: B10 Comprehensions & Generatoren (Teil 1)
+
+- **Umfang:** Baseline geprüft (728/728 grün, unverändert). C# stand als
+  nächster möglicher Schritt an (`src/runtime/csharp/csharpEngine.ts`),
+  aber dieser Schritt verzahnt sich mit der bewusst zurückgestellten
+  CI/Deploy-Frage aus der letzten C#-Runde — kein sauber begrenzter
+  Schritt gerade. Stattdessen den zuletzt benannten Content-Schritt
+  umgesetzt: 5 der 7 Tags aus B10 (Comprehensions & Generatoren) als
+  Challenges 14–14.4 ergänzt.
+- **Vorgehen:** `list-comprehension` (14, `[x**2 for x in zahlen]`,
+  Distraktor verdoppelt statt zu quadrieren), `comprehension-with-
+  condition` (14.1, zusätzliches `if x % 2 == 0`, Distraktor vergisst
+  die Bedingung komplett), `dict-comprehension` (14.2, `{wort: len(wort)
+  for wort in woerter}`, Distraktor vertauscht Schlüssel und Wert),
+  `set-comprehension` (14.3, `{len(wort) for wort in woerter}` mit
+  bewusst wortlängengleichen Einträgen zur Demonstration von Duplikat-
+  Entfernung, Validator zählt bewusst nur `len(...)` statt konkrete
+  Set-Werte zu vergleichen, um keine Python-Set-Iterationsreihenfolge
+  vorauszusetzen — Distraktor nutzt eine Liste statt eines Sets, Duplikat
+  bleibt erhalten), `generator-expression` (14.4, demonstriert die
+  Ein-mal-verbrauchbarkeit eines Generators: derselbe Generator zweimal
+  mit `sum(...)` aufgerufen liefert beim zweiten Mal `0`, weil er bereits
+  erschöpft ist — ein echter, oft überraschender Python-Effekt;
+  Distraktor nutzt eine List Comprehension statt einer Generator
+  Expression, wodurch beide `sum()`-Aufrufe 55 statt 55/0 liefern). Die
+  letzten beiden B10-Tags (`iterator-protocol`, `generator-functions`)
+  hängen laut Voraussetzungsgraph an `dunder-methods` (B14
+  Objektorientierung, noch komplett offen) und wurden bewusst
+  zurückgestellt statt vorgezogen. Alle fünf über Gate 1/Gate 2 und
+  zusätzlich live im Browser gegen echtes Pyodide bestätigt (5/5
+  Lösungen, 0 Konsolenfehler) — insbesondere die Generator-Erschöpfung
+  (14.4) live verifiziert, da das ein Verhalten ist, bei dem es sich
+  lohnt, sich nicht nur auf CPython-Subprozess-Äquivalenz zu verlassen.
+- **Ergebnis:** Keine Bugs gefunden. Python-Konzept-Hierarchie-Bilanz:
+  49/82 → 54/82 Tags (≈ 66 %) — praktisch gleichauf mit SQL (55/82,
+  ≈ 67 %). B10 zu 5/7 abgedeckt, der Rest wartet bewusst auf B14.
+  Nächster vollständig angehbarer Zweig (keine Abhängigkeit von noch
+  fehlendem Material): B11 Fehlerbehandlung (6 Tags).
+- **Tests:** 728 → 738 (+10, alle für die fünf neuen Comprehension-
+  Challenges via `challengeRunner.test.ts`). `typecheck`, volle
+  Testsuite (738 Tests) und `npm run build` grün.

@@ -352,11 +352,18 @@ Update 2026-08-08 (stündliche Routine, Fortsetzung): Challenges 13.5–13.9
 ergänzt (`dict-methods`, `set-basics`, `nested-data-structures`,
 `membership-operator`, `len-function`) — **B9 Datenstrukturen ist damit
 komplett abgedeckt (10/10 Tags)**, der dritte vollständig geschlossene
-Python-Zweig nach B7 und B8. Der Rest dieses Abschnitts ist der
-historische Stand vor diesen Updates; die Bilanz am Ende ist bereits
-aktualisiert.*
+Python-Zweig nach B7 und B8. Update 2026-08-08 (stündliche Routine,
+Fortsetzung): Challenges 14–14.4 ergänzt, decken 5 der 7 Tags aus B10
+(Comprehensions & Generatoren) ab (`list-comprehension`,
+`comprehension-with-condition`, `dict-comprehension`, `set-comprehension`,
+`generator-expression`) — die verbleibenden 2 Tags (`iterator-protocol`,
+`generator-functions`) hängen laut Voraussetzungsgraph an
+`dunder-methods` (B14 Objektorientierung), das noch komplett offen ist,
+und werden deshalb bewusst zurückgestellt statt vorgezogen, bis die
+OOP-Grundlage existiert. Der Rest dieses Abschnitts ist der historische
+Stand vor diesen Updates; die Bilanz am Ende ist bereits aktualisiert.*
 
-Von den 82 Tags deckt `pythonGrundlagen` (37 Challenges) folgende ab:
+Von den 82 Tags deckt `pythonGrundlagen` (42 Challenges) folgende ab:
 
 **Vollständig abgedeckt:** `program-execution-model`, `function-call-syntax`
 (implizit über `print`), `print-statement`, `comments`, `variable-
@@ -378,28 +385,34 @@ String direkt angewendet), `for-loop` (11), `range-function` (11.1),
 Datenstrukturen komplett**: `list-basics` (13), `list-slicing` (13.1),
 `list-mutation-methods` (13.2), `tuple-basics` (13.3), `dict-basics`
 (13.4), `dict-methods` (13.5), `set-basics` (13.6), `nested-data-
-structures` (13.7), `membership-operator` (13.8), `len-function` (13.9) —
-**49 von 82 Tags (≈ 60 %).**
+structures` (13.7), `membership-operator` (13.8), `len-function` (13.9),
+sowie **seit 2026-08-08 der Großteil von B10 Comprehensions &
+Generatoren**: `list-comprehension` (14), `comprehension-with-condition`
+(14.1), `dict-comprehension` (14.2), `set-comprehension` (14.3),
+`generator-expression` (14.4) —
+**54 von 82 Tags (≈ 66 %).**
 
 **Nicht abgedeckt:** `dynamic-typing` als **eigenes** Thema (wird
 durchgehend demonstriert, nie benannt — genau wie `logical-operators` im
 SQL-Kurs), `bool-conversion-truthiness`, `truthiness-in-conditions`,
-`ternary-expression`, und **komplett**: B10 Comprehensions & Generatoren,
-B11 Fehlerbehandlung, B12 Module & Imports, B13 Dateizugriff, B14
-Objektorientierung.
+`ternary-expression`, die letzten beiden Tags von B10 (`iterator-
+protocol`, `generator-functions` — beide hängen an `dunder-methods` aus
+B14, siehe oben), und **komplett**: B11 Fehlerbehandlung, B12 Module &
+Imports, B13 Dateizugriff, B14 Objektorientierung.
 
-**Bilanz:** 49 von 82 Tags abgedeckt (≈ 60 %) — die Lücke zu SQL (55/82,
-≈ 67 %) ist inzwischen sehr klein. Der Kursname `pythonGrundlagen` deckt
-inzwischen deutlich mehr als nur die absoluten Basics ab (Variablen,
+**Bilanz:** 54 von 82 Tags abgedeckt (≈ 66 %) — praktisch gleichauf mit
+SQL (55/82, ≈ 67 %). Der Kursname `pythonGrundlagen` deckt inzwischen
+deutlich mehr als nur die absoluten Basics ab (Variablen,
 Grundrechenarten, Verzweigung, Schleifen, ganz Funktionen inklusive
-*args/**kwargs, lambda, map()/filter()/sorted(), und ganz Datenstrukturen:
-Listen, Slicing, Listenmethoden, Tupel, Dicts, Dict-Methoden, Sets,
-Verschachtelung, `in`/`not in`, `len()`) — B7, B8 und B9 sind jetzt
-vollständig geschlossen, drei von fünfzehn Zweigen. Der Rest (5 von 15
-Zweigen komplett unbearbeitet: B10–B14, plus Teile von B2/B5/B6) ist
-weiterhin unbearbeiteter Planungsraum; B10 Comprehensions & Generatoren
-(baut direkt auf den jetzt komplett abgedeckten B7/B9 auf) ist der
-naheliegendste nächste Zweig.
+*args/**kwargs, lambda, map()/filter()/sorted(), ganz Datenstrukturen,
+und die List-/Dict-/Set-Comprehension- sowie Generator-Expression-
+Kurzschreibweisen) — B7, B8 und B9 sind vollständig geschlossen, B10 fast
+komplett (5/7, der Rest wartet bewusst auf B14). Der Rest (4 von 15
+Zweigen komplett unbearbeitet: B11–B14, plus Teile von B2/B5/B6, B10) ist
+weiterhin unbearbeiteter Planungsraum; B11 Fehlerbehandlung (6 Tags,
+baut auf dem längst abgedeckten `program-execution-model` auf, keine
+Abhängigkeit von B14) ist der naheliegendste nächste vollständig
+angehbare Zweig.
 
 ## 7. Bewusst ausgeklammert
 
