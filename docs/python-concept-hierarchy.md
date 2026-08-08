@@ -360,10 +360,17 @@ Fortsetzung): Challenges 14–14.4 ergänzt, decken 5 der 7 Tags aus B10
 `generator-functions`) hängen laut Voraussetzungsgraph an
 `dunder-methods` (B14 Objektorientierung), das noch komplett offen ist,
 und werden deshalb bewusst zurückgestellt statt vorgezogen, bis die
-OOP-Grundlage existiert. Der Rest dieses Abschnitts ist der historische
-Stand vor diesen Updates; die Bilanz am Ende ist bereits aktualisiert.*
+OOP-Grundlage existiert. Update 2026-08-08 (stündliche Routine,
+Fortsetzung): Challenges 15–15.3 ergänzt, decken 5 der 6 Tags aus B11
+(Fehlerbehandlung) ab (`runtime-errors-concept` als Einleitung in 15
+gebündelt, `try-except`, `specific-exception-types`, `finally-else-
+clauses`, `raise-statement`) — der letzte Tag (`custom-exceptions`) hängt
+wie schon bei B10 an `class-definition` (B14 Objektorientierung) und
+bleibt aus demselben Grund offen. Der Rest dieses Abschnitts ist der
+historische Stand vor diesen Updates; die Bilanz am Ende ist bereits
+aktualisiert.*
 
-Von den 82 Tags deckt `pythonGrundlagen` (42 Challenges) folgende ab:
+Von den 82 Tags deckt `pythonGrundlagen` (46 Challenges) folgende ab:
 
 **Vollständig abgedeckt:** `program-execution-model`, `function-call-syntax`
 (implizit über `print`), `print-statement`, `comments`, `variable-
@@ -389,30 +396,37 @@ structures` (13.7), `membership-operator` (13.8), `len-function` (13.9),
 sowie **seit 2026-08-08 der Großteil von B10 Comprehensions &
 Generatoren**: `list-comprehension` (14), `comprehension-with-condition`
 (14.1), `dict-comprehension` (14.2), `set-comprehension` (14.3),
-`generator-expression` (14.4) —
-**54 von 82 Tags (≈ 66 %).**
+`generator-expression` (14.4), sowie **seit 2026-08-08 der Großteil von
+B11 Fehlerbehandlung**: `runtime-errors-concept` + `try-except` (15,
+bewusst gebündelt — ohne den Laufzeitfehler-Begriff wäre try/except
+kontextlos), `specific-exception-types` (15.1), `finally-else-clauses`
+(15.2), `raise-statement` (15.3) —
+**59 von 82 Tags (≈ 72 %).**
 
 **Nicht abgedeckt:** `dynamic-typing` als **eigenes** Thema (wird
 durchgehend demonstriert, nie benannt — genau wie `logical-operators` im
 SQL-Kurs), `bool-conversion-truthiness`, `truthiness-in-conditions`,
 `ternary-expression`, die letzten beiden Tags von B10 (`iterator-
-protocol`, `generator-functions` — beide hängen an `dunder-methods` aus
-B14, siehe oben), und **komplett**: B11 Fehlerbehandlung, B12 Module &
+protocol`, `generator-functions`), der letzte Tag von B11 (`custom-
+exceptions`) — alle drei hängen an B14-Voraussetzungen
+(`dunder-methods`/`class-definition`), und **komplett**: B12 Module &
 Imports, B13 Dateizugriff, B14 Objektorientierung.
 
-**Bilanz:** 54 von 82 Tags abgedeckt (≈ 66 %) — praktisch gleichauf mit
-SQL (55/82, ≈ 67 %). Der Kursname `pythonGrundlagen` deckt inzwischen
-deutlich mehr als nur die absoluten Basics ab (Variablen,
-Grundrechenarten, Verzweigung, Schleifen, ganz Funktionen inklusive
-*args/**kwargs, lambda, map()/filter()/sorted(), ganz Datenstrukturen,
-und die List-/Dict-/Set-Comprehension- sowie Generator-Expression-
-Kurzschreibweisen) — B7, B8 und B9 sind vollständig geschlossen, B10 fast
-komplett (5/7, der Rest wartet bewusst auf B14). Der Rest (4 von 15
-Zweigen komplett unbearbeitet: B11–B14, plus Teile von B2/B5/B6, B10) ist
-weiterhin unbearbeiteter Planungsraum; B11 Fehlerbehandlung (6 Tags,
-baut auf dem längst abgedeckten `program-execution-model` auf, keine
-Abhängigkeit von B14) ist der naheliegendste nächste vollständig
-angehbare Zweig.
+**Bilanz:** 59 von 82 Tags abgedeckt (≈ 72 %) — Python liegt damit zum
+ersten Mal **vor** SQL (55/82, ≈ 67 %). Der Kursname `pythonGrundlagen`
+deckt inzwischen deutlich mehr als nur die absoluten Basics ab
+(Variablen, Grundrechenarten, Verzweigung, Schleifen, ganz Funktionen
+inklusive *args/**kwargs, lambda, map()/filter()/sorted(), ganz
+Datenstrukturen, List-/Dict-/Set-Comprehensions, Generator Expressions,
+und den Großteil der Fehlerbehandlung inklusive eigener raise-Fehler) —
+B7, B8 und B9 sind vollständig geschlossen, B10 und B11 beide fast
+komplett (5/7 bzw. 5/6, jeweils nur noch durch B14-Abhängigkeiten
+blockiert). Der Rest (3 von 15 Zweigen komplett unbearbeitet: B12–B14,
+plus die drei B14-abhängigen Restzweige) ist weiterhin unbearbeiteter
+Planungsraum; B12 Module & Imports (4 Tags, keine B14-Abhängigkeit) ist
+der naheliegendste nächste vollständig angehbare Zweig — danach bliebe
+nur noch B13 Dateizugriff und B14 selbst, dessen Bearbeitung dann auch
+die sechs bislang zurückgestellten Tags aus B10/B11 freischalten würde.
 
 ## 7. Bewusst ausgeklammert
 

@@ -75,6 +75,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-08 | HEAD (Live-Verifikation + B9 Teil 1: 13-13.4) | 93.33 % | 77.45 % | 98.88 % | 93.33 % |
 | 2026-08-08 | HEAD (B9 komplett: 13.5-13.9) | 93.11 % | 76.87 % | 98.90 % | 93.11 % |
 | 2026-08-08 | HEAD (B10 Teil 1: 14-14.4) | 93.02 % | 76.52 % | 98.91 % | 93.02 % |
+| 2026-08-08 | HEAD (B11 Teil 1: 15-15.3) | 92.85 % | 76.03 % | 98.93 % | 92.85 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -609,3 +610,37 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Tests:** 728 → 738 (+10, alle für die fünf neuen Comprehension-
   Challenges via `challengeRunner.test.ts`). `typecheck`, volle
   Testsuite (738 Tests) und `npm run build` grün.
+
+### 2026-08-08 — Stündliche Routine: B11 Fehlerbehandlung (Teil 1) — Python zieht an SQL vorbei
+
+- **Umfang:** Baseline geprüft (738/738 grün, unverändert). C# weiterhin
+  ohne sauber begrenzten nächsten Schritt (siehe letzte Runde). B11
+  Fehlerbehandlung wie in der letzten Runde angekündigt umgesetzt: 5 der
+  6 Tags als Challenges 15–15.3.
+- **Vorgehen:** `runtime-errors-concept` + `try-except` (15, bewusst
+  gebündelt — Laufzeitfehler als Konzept ohne try/except als Werkzeug
+  wäre inhaltsleer; Division durch 0 abgefangen, Distraktor lässt den
+  Fehler unabgefangen durchschlagen), `specific-exception-types` (15.1,
+  zwei verschiedene `except`-Blöcke für `KeyError` und `ValueError` in
+  derselben Schleife, Distraktor lässt einen davon weg → echter,
+  unabgefangener Fehler mittendrin), `finally-else-clauses` (15.2,
+  `else` läuft nur bei Erfolg, `finally` immer — Distraktor lässt den
+  `finally`-Block ganz weg → die Variable, die nur dort gesetzt wird,
+  fehlt beim `print()`, echter NameError), `raise-statement` (15.3,
+  eigene Funktion löst `ValueError` mit eigener Nachricht aus, wird
+  abgefangen und die Nachricht ausgelesen, Distraktor lässt das `raise`
+  im Bedingungszweig einfach weg → falscher Rückgabewert statt der
+  erwarteten Fehlermeldung). Der letzte Tag (`custom-exceptions`) hängt
+  wie zuvor schon zwei B10-Tags an `class-definition` aus B14
+  (Objektorientierung) und bleibt aus demselben Grund offen. Alle vier
+  über Gate 1/Gate 2 und zusätzlich live im Browser gegen echtes
+  Pyodide bestätigt (4/4 Lösungen, 0 Konsolenfehler).
+- **Ergebnis:** Keine Bugs gefunden. Python-Konzept-Hierarchie-Bilanz:
+  54/82 → 59/82 Tags (≈ 72 %) — **Python liegt damit zum ersten Mal vor
+  SQL** (55/82, ≈ 67 %). B10 und B11 beide zu 5/7 bzw. 5/6 abgedeckt,
+  jeweils nur noch durch B14-Abhängigkeiten blockiert. Nächster
+  vollständig angehbarer Zweig ohne Abhängigkeiten: B12 Module &
+  Imports (4 Tags).
+- **Tests:** 738 → 746 (+8, alle für die vier neuen
+  Fehlerbehandlungs-Challenges via `challengeRunner.test.ts`).
+  `typecheck`, volle Testsuite (746 Tests) und `npm run build` grün.
