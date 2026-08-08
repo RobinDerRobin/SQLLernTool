@@ -69,6 +69,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-05 | HEAD (F-011-Fix + 12 neue Challenges) | 92.73 % | 79.12 % | 96.46 % | 92.73 % |
 | 2026-08-07 | HEAD (SQL-Fensterfunktionen + F-015-Fix) | 92.82 % | 78.15 % | 97.38 % | 92.82 % |
 | 2026-08-07 | HEAD (Ende Tag: 4 weitere Coverage-Lücken) | 93.05 % | 78.48 % | 97.96 % | 93.05 % |
+| 2026-08-08 | HEAD (sqlJsEngine + actions.ts + Python-Funktionen) | 93.52 % | 78.25 % | 98.85 % | 93.52 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -282,3 +283,62 @@ sondern pro PR direkt in den Checks sichtbar.
   Content-Branches abgedeckt werden — reiner Verdünnungseffekt, siehe
   oben), Function-Abdeckung 96.46 % → 97.96 %. `typecheck`,
   volle Testsuite und `npm run build` grün nach jedem einzelnen Schritt.
+
+### 2026-08-08 — Zwei echte blinde Flecken geschlossen, Python-Funktionen (B8, Teil 1)
+
+- **Umfang:** (1) Coverage-Report erneut nach der schwächsten Stelle
+  durchsucht — diesmal stach `sqlJsEngine.ts` heraus (71 % Statements,
+  57 % Functions, mit Abstand die schwächste Live-Code-Datei im ganzen
+  Projekt). (2) Beim Nachziehen auf `actions.ts` (76.7 % Branches, die
+  größte und zentralste State-Datei) fielen zwei **komplette**, bis dahin
+  gänzlich ungetestete Python-Zweige auf. (3) Live-Smoke-Test gegen den
+  echten Dev-Server (SQL-Lauf, Tabellen-Panel, Track-Umschalter,
+  Python-Lauf, Schema-Reset) — 0 Konsolenfehler. (4) Erste Hälfte von
+  Python B8 (Funktionen) als neue Challenges 12–12.5 ergänzt.
+- **Vorgehen (1) sqlJsEngine.ts:** `getTablesInfo()` (die Datenquelle des
+  "Tabellen"-Panels) und `reset()` (der Engine-seitige Effekt des
+  "Schema komplett zurücksetzen"-Buttons) hatten 0 % Abdeckung. Das
+  Fake-sql.js in der Testdatei um `sqlite_master`-, `PRAGMA table_info`-
+  und `COUNT(*)`-Simulation erweitert. Keine Bugs gefunden, beide
+  Funktionen arbeiteten schon korrekt — aber zwei echte, häufig genutzte
+  Features hatten bis dahin keinerlei Regressionsschutz. Danach 100 % in
+  allen vier Metriken.
+- **Vorgehen (2) actions.ts:** `runQuery()` und `playChallenge()` hatten
+  je einen kompletten `if (trackId === 'python')`-Zweig, den keine
+  einzige bestehende Testzeile je erreichte — jeder Test im gesamten
+  Projekt lief bis dahin nur gegen den SQL-Zweig. Mit dem echten
+  Node-Subprozess-Python-Engine (`test/helpers/nodePythonEngine.ts`,
+  bereits von der Content-Suite genutzt) beide Pfade nachgezogen: Erfolg,
+  ein Skript, das eine Exception wirft, und der "Engine noch nicht
+  geladen"-Zweig. Nebenbei auch `revealHint`s dritte (weitreichendste)
+  Hinweisstufe und den Fall "Hinweis-Index jenseits der letzten
+  Original-Hinweise" (keine Grounding-Text mehr) mitgeschlossen.
+- **Vorgehen (3) Live-Smoke-Test:** Kompletter Durchlauf gegen den
+  echten Dev-Server (sql.js/Pyodide lokal per `context.route()` statt
+  der in dieser Sandbox blockierten CDNs) — SQL-Challenge lösen,
+  Tabellen-Panel öffnen und den Tabelleninhalt prüfen, per
+  Track-Umschalter zu Python wechseln, eine Python-Challenge lösen,
+  zurück zu SQL wechseln, Schema zurücksetzen. 0 Browser-/Seitenfehler.
+- **Vorgehen (4) Python B8 Funktionen:** 7 der 12 Tags aus dem größten
+  verbliebenen Zweig (SQL oder Python) als Challenges 12–12.5:
+  `function-definition`+`return-statement` (12, bewusst gebündelt — eine
+  Funktion ohne return ist kaum sinnvoll unterrichtbar), `function-
+  parameters` (12.1, Distraktor vertauscht die Argumentreihenfolge beim
+  Aufruf), `default-parameters` (12.2, Distraktor vergisst den
+  Standardwert → TypeError), `variable-scope` (12.3, Distraktor nutzt
+  `global` und demonstriert damit genau das Gegenteil der Lektion),
+  `docstrings` (12.4, Distraktor nutzt einen `#`-Kommentar statt eines
+  echten Docstrings → `__doc__` bleibt None), `recursion` (12.5,
+  Distraktor vergisst den Basisfall → RecursionError). Die restlichen 5
+  B8-Tags (`args-kwargs`, `lambda-expressions`, `map-function`,
+  `filter-function`, `sorted-with-key`) hängen im Graphen alle an
+  `lambda-expressions` und bilden eine natürliche zweite Teilcharge.
+  6/6 Lösungen und 5/5 stichprobenartig getestete Distraktoren live im
+  Browser gegen echtes Pyodide bestätigt.
+- **Ergebnis:** Keine echten Bugs gefunden in (1)/(2)/(3) — reine
+  Testschulden geschlossen, aber an zwei der zentralsten Dateien im
+  Projekt. Python-Konzept-Hierarchie-Bilanz: 27/82 → 34/82 Tags (≈ 41 %).
+- **Tests:** 664 → 689 (+25: 10 für sqlJsEngine, 9 für actions.ts, 6 für
+  die neuen Python-Funktionen-Challenges via `challengeRunner.test.ts`).
+  `typecheck`, volle Testsuite und `npm run build` grün nach jedem
+  Schritt.
