@@ -431,8 +431,11 @@ graph TD
 
 ## 6. Abgleich mit der aktuellen Implementierung
 
-Anders als SQL (43/82) und Python (20/82) gibt es für C# **keine
-Implementierung, die abgeglichen werden könnte** — bestätigt per
+Anders als SQL (damals 43/82, Stand inzwischen 59/82) und Python (damals
+20/82, Stand inzwischen 66/82 — siehe die jeweiligen Dokumente für den
+aktuellen Stand, hier absichtlich als historischer Vergleichswert zum
+Zeitpunkt der Ersterhebung belassen) gab es für C# zu diesem Zeitpunkt
+**keine Implementierung, die abgeglichen werden könnte** — bestätigt per
 `grep -rn "csharp\|C#\|CSharp" src --include="*.ts"`: die einzigen vier
 Treffer sind reine Kommentar-Erwähnungen als Zukunfts-Platzhalter in
 `LanguagePlugin.ts`, `Runtime.ts`, `challenge.types.ts` und `stars.ts` —
@@ -458,6 +461,20 @@ Restliste in `docs/csharp-engine-poc.md` ("Scaffold der Projektstruktur");
 bei 0/86, weil hier noch keine Challenges, kein `src/runtime/csharp/`-
 Loader und keine `CSharpChallenge`-Typen existieren — nur der Compiler
 läuft schon.*
+
+*Update 2026-08-08 (stündliche Routine, Fortsetzung): Schritt 3 der
+Restliste ist jetzt ebenfalls abgeschlossen —
+`src/runtime/csharp/csharpEngine.ts` existiert und lädt/bootet den
+Blazor-Motor im Browser (`loadCSharpEngineFromServer` + `exec()`/`reset()`
+über `createCSharpEngine`), live gegen den echten kompilierten
+Blazor+Roslyn-Bundle verifiziert (Erfolg, Compiler-Fehler und
+Laufzeit-Exception kommen alle korrekt durch). Die Tag-Bilanz bleibt
+trotzdem bei 0/86: ein Ausführungs-Loader ist noch kein Inhalts-Track —
+es existieren weiterhin keine `CSharpChallenge`-Typen, kein
+`csharp`-Content-Verzeichnis unter `src/content/tracks/` und keine einzige
+Challenge. Nächster Schritt laut `docs/csharp-engine-poc.md`: die
+`validate()`-Design-Entscheidung (Schritt 4) — erst danach kann die
+Tag-Bilanz hier überhaupt anfangen sich zu bewegen.*
 
 ## 7. Bewusst ausgeklammert
 

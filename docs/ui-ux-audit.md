@@ -81,6 +81,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-08 | HEAD (B13 komplett: 17-17.2) | 92.64 % | 75.39 % | 98.94 % | 92.64 % |
 | 2026-08-08 | HEAD (SQL B11 komplett: 16-16.2) | 92.51 % | 75.12 % | 98.95 % | 92.51 % |
 | 2026-08-08 | HEAD (SQL B12 abgeschlossen: 17, `create-view`) | 92.47 % | 74.98 % | 98.95 % | 92.47 % |
+| 2026-08-08 | HEAD (C# Schritt 3: csharpEngine.ts Browser-Loader) | 92.51 % | 75.16 % | 98.97 % | 92.51 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -875,3 +876,57 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Tests:** 765 → 767 (+2, Gate 1/Gate 2 für Challenge 17 via
   `challengeRunner.test.ts`). `typecheck`, volle Testsuite (767 Tests)
   und `npm run build` grün.
+
+### 2026-08-08 — Stündliche Routine: C#-Engine Schritt 3 (Browser-Loader `csharpEngine.ts`)
+
+- **Umfang:** Baseline geprüft (767/767 grün, `typecheck`/`build` sauber,
+  sauberer Git-Stand). `docs/csharp-engine-poc.md` gelesen: Schritte 1
+  (COOP/COEP-Hosting-Entscheidung: `coi-serviceworker`) und 2
+  (`csharp-engine/`-Projekt gescaffoldet, baut lokal, live per Playwright
+  gegen echtes `dotnet run` bestätigt) waren bereits in einer früheren
+  Routine abgeschlossen. Schritt 3 (Browser-seitiger Loader) war der
+  nächste, klar umrissene Schritt in der eigenen Abhängigkeits-Reihenfolge
+  des Dokuments — SQL/Python waren beide grün und ohne offensichtlichen
+  nächsten kleinen Schritt in B13 (Indizes) über das übliche Maß hinaus,
+  daher diesmal C# den Vorzug gegeben, wie der Standing-Auftrag es für
+  Runden mit klarer C#-Dynamik vorsieht.
+- **Vorgehen:** `src/runtime/csharp/CSharpRuntime.ts` (Vertrag, analog zu
+  `PythonRuntime.ts`: `exec`/`reset`, `CSharpExecResult` mit
+  `stdout`/`result`/`error`) und `csharpEngine.ts`
+  (`loadCSharpEngineFromServer(baseUrl)` + `createCSharpEngine(exports)`)
+  ergänzt — spiegelt exakt das Skript-Injection-Muster von
+  `loadPyodideFromCdn` (geteiltes In-Flight-Laden, Retry nach
+  Fehlschlag), aber für Blazors `Blazor.start()` /
+  `Blazor.runtime.getAssemblyExports(...)`-Bootsequenz statt einer
+  einzelnen globalen Funktion. 9 neue Unit-Tests gegen ein Fake-`window
+  .Blazor` (gleiches Muster wie `pyodideEngine.test.ts`), neuer
+  `environmentMatchGlobs`-Eintrag in `vitest.config.ts` für `jsdom` auf
+  diesem Modul.
+
+  Zusätzlich **live gegen den echten kompilierten Blazor+Roslyn-Bundle**
+  verifiziert, nicht nur gegen Mocks: `dotnet publish -c Release`, Output
+  über einen minimalen Python-COOP/COEP-Server serviert (Pflicht wegen
+  `WasmEnableThreads`, exakt das Rezept aus `docs/csharp-engine-poc.md`),
+  `csharpEngine.ts` per `esbuild` in dasselbe servierte Verzeichnis
+  gebündelt, per Playwright eine Testseite angesteuert, die
+  `loadCSharpEngineFromServer` + `engine.exec(...)` tatsächlich aufruft.
+  Drei Pfade bestätigt: erfolgreicher Lauf (`stdout` korrekt), ein echter
+  Compiler-Fehler (`CS0029` bei einer ungültigen impliziten Konvertierung)
+  und eine echte Laufzeit-Exception (`IndexOutOfRangeException`,
+  vollständiger .NET-Stacktrace) — alle drei kommen unverändert durch den
+  Loader durch. Eine harmlose Konsolen-Warnung beobachtet (`ManagedError:
+  ... Could not find any element matching selector '#app'` — Blazors
+  eigene Suche nach der Root-Komponente; irrelevant hier, da nur die
+  `[JSExport]`-Methode genutzt wird, keine Razor-Komponente gerendert
+  wird) — notiert, kein Defekt.
+- **Ergebnis:** Keine Bugs gefunden. C#-Engine-Fortschritt: Schritte 1–3
+  von 7 aus `docs/csharp-engine-poc.md` jetzt abgeschlossen. Wo die
+  Blazor-Assets in der echten App (Dev-Server + GitHub-Pages-Deploy)
+  serviert werden, bleibt bewusst offen — `loadCSharpEngineFromServer`
+  nimmt `baseUrl` deshalb als Parameter statt eines fest verdrahteten
+  Pfads, dieselbe bewusste Verzögerung wie beim „noch kein CI/Deploy-
+  Wiring" aus Schritt 2. `src/runtime/csharp/README.md` von „Architektur
+  ungeklärt" auf den tatsächlichen Stand aktualisiert. Nächster Schritt:
+  die `validate()`-Design-Entscheidung für C# (Schritt 4).
+- **Tests:** 767 → 776 (+9, alle für `csharpEngine.test.ts`). `typecheck`,
+  volle Testsuite (776 Tests) und `npm run build` grün.
