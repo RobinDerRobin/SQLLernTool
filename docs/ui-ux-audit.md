@@ -76,6 +76,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-08 | HEAD (B9 komplett: 13.5-13.9) | 93.11 % | 76.87 % | 98.90 % | 93.11 % |
 | 2026-08-08 | HEAD (B10 Teil 1: 14-14.4) | 93.02 % | 76.52 % | 98.91 % | 93.02 % |
 | 2026-08-08 | HEAD (B11 Teil 1: 15-15.3) | 92.85 % | 76.03 % | 98.93 % | 92.85 % |
+| 2026-08-08 | HEAD (B12 Teil 1: 16-16.2) | 92.73 % | 75.68 % | 98.93 % | 92.73 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -644,3 +645,44 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Tests:** 738 → 746 (+8, alle für die vier neuen
   Fehlerbehandlungs-Challenges via `challengeRunner.test.ts`).
   `typecheck`, volle Testsuite (746 Tests) und `npm run build` grün.
+
+### 2026-08-08 — Stündliche Routine: B12 Module & Imports (Teil 1)
+
+- **Umfang:** Baseline geprüft (746/746 grün, unverändert). C# weiterhin
+  ohne sauber begrenzten nächsten Schritt. B12 Module & Imports wie
+  angekündigt umgesetzt: 3 der 4 Tags als Challenges 16–16.2 — die
+  ersten Challenges im ganzen Kurs, die `import` überhaupt benutzen.
+- **Vorgehen:** `import-statement` (16, `import math` + `math.sqrt(16)`,
+  Distraktor vergisst den Import → echter NameError, weil `math` ohne
+  Import gar nicht existiert), `from-import` (16.1, `from math import
+  sqrt` + direkter Aufruf `sqrt(25)` ohne Modul-Präfix, Distraktor ruft
+  trotzdem `math.sqrt(...)` auf — ein sehr verbreiteter echter
+  Einsteigerfehler, der ebenfalls einen NameError auslöst, weil `math`
+  selbst nie importiert wurde), `standard-library-awareness` (16.2, zeigt
+  `datetime.date` als zweites Standardbibliotheks-Modul neben `math`,
+  berechnet die Tage zwischen zwei festen Daten über `(d2 - d1).days`;
+  `random` wird im Tutorial nur erwähnt, nicht im Graded-Task benutzt,
+  weil Zufallswerte sich nicht deterministisch validieren lassen — der
+  exakte Tage-Wert (5898) wurde nicht von Hand ausgerechnet, sondern mit
+  echtem `python3` im Sandbox-Terminal berechnet, bevor er in den
+  TS-Validator übernommen wurde). Der vierte Tag (`own-modules`) bleibt
+  offen — anders als die bisherigen B14-Wartefälle ist das eine
+  **architektonische** Grenze: Der Editor führt ein einzelnes Skript in
+  einem Namensraum aus, es gibt keine echte Mehrdatei-Umgebung, in der
+  Lernende eigene, separat importierbare `.py`-Dateien anlegen könnten.
+  In `docs/python-concept-hierarchy.md` explizit als eigene, dauerhafte
+  Ausnahme dokumentiert (nicht als "wartet auf X"). Alle drei über Gate
+  1/Gate 2 und zusätzlich live im Browser gegen echtes Pyodide bestätigt
+  (3/3 Lösungen, 0 Konsolenfehler) — insbesondere relevant, weil `import`
+  in Pyodides WASM-Sandbox theoretisch andere Stolpersteine haben könnte
+  als im Node-Testmotor; gab es hier nicht, beide Module funktionieren
+  identisch.
+- **Ergebnis:** Keine Bugs gefunden. Python-Konzept-Hierarchie-Bilanz:
+  59/82 → 62/82 Tags (≈ 76 %). B10, B11 und B12 jetzt alle fast komplett
+  (5/7, 5/6, 3/4) — jeweils nur noch durch entweder die B14-Abhängigkeit
+  oder (nur bei `own-modules`) die Sandbox-Architektur blockiert.
+  Einziger noch komplett offener Zweig ohne B14-Abhängigkeit: B13
+  Dateizugriff.
+- **Tests:** 746 → 752 (+6, alle für die drei neuen Modul-Challenges via
+  `challengeRunner.test.ts`). `typecheck`, volle Testsuite (752 Tests)
+  und `npm run build` grün.

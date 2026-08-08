@@ -366,11 +366,19 @@ Fortsetzung): Challenges 15–15.3 ergänzt, decken 5 der 6 Tags aus B11
 gebündelt, `try-except`, `specific-exception-types`, `finally-else-
 clauses`, `raise-statement`) — der letzte Tag (`custom-exceptions`) hängt
 wie schon bei B10 an `class-definition` (B14 Objektorientierung) und
-bleibt aus demselben Grund offen. Der Rest dieses Abschnitts ist der
-historische Stand vor diesen Updates; die Bilanz am Ende ist bereits
-aktualisiert.*
+bleibt aus demselben Grund offen. Update 2026-08-08 (stündliche Routine,
+Fortsetzung): Challenges 16–16.2 ergänzt, decken 3 der 4 Tags aus B12
+(Module & Imports) ab (`import-statement`, `from-import`,
+`standard-library-awareness` via `math` und `datetime`) — der vierte Tag
+(`own-modules`) bleibt offen, aber aus einem **anderen** Grund als die
+bisherigen B14-Abhängigkeiten: Der Editor führt genau ein Skript in genau
+einem Namensraum aus, es gibt keine echte Mehrdatei-Umgebung, in der
+Lernende eigene, separat importierbare `.py`-Dateien anlegen könnten —
+eine architektonische Grenze der Sandbox, keine Frage der
+Aufgaben-Reihenfolge. Der Rest dieses Abschnitts ist der historische
+Stand vor diesen Updates; die Bilanz am Ende ist bereits aktualisiert.*
 
-Von den 82 Tags deckt `pythonGrundlagen` (46 Challenges) folgende ab:
+Von den 82 Tags deckt `pythonGrundlagen` (49 Challenges) folgende ab:
 
 **Vollständig abgedeckt:** `program-execution-model`, `function-call-syntax`
 (implizit über `print`), `print-statement`, `comments`, `variable-
@@ -400,8 +408,10 @@ Generatoren**: `list-comprehension` (14), `comprehension-with-condition`
 B11 Fehlerbehandlung**: `runtime-errors-concept` + `try-except` (15,
 bewusst gebündelt — ohne den Laufzeitfehler-Begriff wäre try/except
 kontextlos), `specific-exception-types` (15.1), `finally-else-clauses`
-(15.2), `raise-statement` (15.3) —
-**59 von 82 Tags (≈ 72 %).**
+(15.2), `raise-statement` (15.3), sowie **seit 2026-08-08 der Großteil
+von B12 Module & Imports**: `import-statement` (16), `from-import`
+(16.1), `standard-library-awareness` (16.2) —
+**62 von 82 Tags (≈ 76 %).**
 
 **Nicht abgedeckt:** `dynamic-typing` als **eigenes** Thema (wird
 durchgehend demonstriert, nie benannt — genau wie `logical-operators` im
@@ -409,24 +419,29 @@ SQL-Kurs), `bool-conversion-truthiness`, `truthiness-in-conditions`,
 `ternary-expression`, die letzten beiden Tags von B10 (`iterator-
 protocol`, `generator-functions`), der letzte Tag von B11 (`custom-
 exceptions`) — alle drei hängen an B14-Voraussetzungen
-(`dunder-methods`/`class-definition`), und **komplett**: B12 Module &
-Imports, B13 Dateizugriff, B14 Objektorientierung.
+(`dunder-methods`/`class-definition`), `own-modules` aus B12 (siehe
+architektonische Begründung oben), und **komplett**: B13 Dateizugriff,
+B14 Objektorientierung.
 
-**Bilanz:** 59 von 82 Tags abgedeckt (≈ 72 %) — Python liegt damit zum
-ersten Mal **vor** SQL (55/82, ≈ 67 %). Der Kursname `pythonGrundlagen`
-deckt inzwischen deutlich mehr als nur die absoluten Basics ab
-(Variablen, Grundrechenarten, Verzweigung, Schleifen, ganz Funktionen
-inklusive *args/**kwargs, lambda, map()/filter()/sorted(), ganz
-Datenstrukturen, List-/Dict-/Set-Comprehensions, Generator Expressions,
-und den Großteil der Fehlerbehandlung inklusive eigener raise-Fehler) —
-B7, B8 und B9 sind vollständig geschlossen, B10 und B11 beide fast
-komplett (5/7 bzw. 5/6, jeweils nur noch durch B14-Abhängigkeiten
-blockiert). Der Rest (3 von 15 Zweigen komplett unbearbeitet: B12–B14,
-plus die drei B14-abhängigen Restzweige) ist weiterhin unbearbeiteter
-Planungsraum; B12 Module & Imports (4 Tags, keine B14-Abhängigkeit) ist
-der naheliegendste nächste vollständig angehbare Zweig — danach bliebe
-nur noch B13 Dateizugriff und B14 selbst, dessen Bearbeitung dann auch
-die sechs bislang zurückgestellten Tags aus B10/B11 freischalten würde.
+**Bilanz:** 62 von 82 Tags abgedeckt (≈ 76 %) — Python liegt weiterhin
+**vor** SQL (55/82, ≈ 67 %). Der Kursname `pythonGrundlagen` deckt
+inzwischen deutlich mehr als nur die absoluten Basics ab (Variablen,
+Grundrechenarten, Verzweigung, Schleifen, ganz Funktionen inklusive
+*args/**kwargs, lambda, map()/filter()/sorted(), ganz Datenstrukturen,
+List-/Dict-/Set-Comprehensions, Generator Expressions, den Großteil der
+Fehlerbehandlung inklusive eigener raise-Fehler, und die Kernsyntax von
+Imports/Standardbibliothek) — B7, B8 und B9 sind vollständig
+geschlossen, B10, B11 und B12 alle fast komplett (5/7, 5/6 bzw. 3/4,
+jeweils nur noch durch dieselben zwei Arten von Grenzen blockiert:
+B14-Abhängigkeit oder die Einzeldatei-Sandbox). Der Rest (2 von 15
+Zweigen komplett unbearbeitet: B13–B14, plus die vier zurückgestellten
+Einzeltags) ist weiterhin unbearbeiteter Planungsraum; B13 Dateizugriff
+ist jetzt der einzige noch komplett offene Zweig ohne B14-Abhängigkeit.
+Danach bliebe nur noch B14 selbst — dessen Bearbeitung würde zugleich
+die sechs bislang zurückgestellten Einzeltags aus B10/B11/B12
+freischalten (`iterator-protocol`, `generator-functions`,
+`custom-exceptions` — `own-modules` bliebe als Sandbox-Grenze weiterhin
+offen, unabhängig von B14).
 
 ## 7. Bewusst ausgeklammert
 
