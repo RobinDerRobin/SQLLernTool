@@ -50,6 +50,7 @@ wie gut das jeweils testabgedeckt ist.
 | F-014 | Bug | Mittel | SQL/Python-Editor: Auto-Close für Klammern/Anführungszeichen (`applyAutoClose`, von SQL für Python mitübernommen) kannte `{`/`}` nicht — 1:1 aus einem SQL-only-Prototyp portiert, der nie geschweifte Klammern braucht. Für Python (Dict-/Set-Literale, f-String-Ausdrücke `f"{x}"`) fehlt dadurch ein zentrales Auto-Close-Paar; `{` blieb beim Tippen einfach offen. | ✅ Fixed | `autoClosePairs.test.ts`: 2 neue Tests (Einfügen + Skip-over). Live in Playwright bestätigt: `d = {"a": 1` schließt jetzt korrekt zu `d = {"a": 1}`. |
 | F-015 | Coverage-Lücke | Mittel | `pythonResultsArea.ts` (10 % Statements, 0 % Functions) hatte überhaupt keine Testdatei — obwohl es der komplette Render-Pfad für jedes Python-Ergebnis ist (Status, stdout, Variablen-Tabelle) und mehrfach `escapeHtml` auf nutzergenerierten Inhalt anwendet (stdout, Variablennamen, JSON-stringifizierte Werte). Beim Nachprüfen: keine XSS-Lücke gefunden, alle Stellen escapen bereits korrekt — aber komplett unabgesichert gegen eine künftige Regression. | ✅ Fixed | `pythonResultsArea.test.ts` (11 neue Tests): Error/Success/Warn-Status, leere stdout/Variablen als Empty-State, `result: null` ohne Fehler, Escaping von stdout/Variablennamen/verschachtelten JSON-Werten, `renderPythonLoadingOutcome`. |
 | F-016 | Bug | Mittel | `test/helpers/nodePythonEngine.ts` (der Node-Testmotor für Python-Content, benutzt von `challengeRunner.test.ts` für Gate 1/Gate 2) spawnte den `python3`-Subprozess ohne `cwd` — der Subprozess erbte das cwd des Test-Runners selbst (das Repo-Root), statt im isolierten Temp-Verzeichnis zu laufen, das für die Treiber-/User-Code-Dateien bereits verwendet wurde. Jede Challenge, deren Python-Code eine relative Datei öffnet (`open("notizen.txt", "w")`), schrieb dadurch echte Dateien ins Repo-Arbeitsverzeichnis statt in den isolierten Temp-Ordner — entdeckt live beim ersten Testlauf der neuen B13-Dateizugriff-Challenges (17–17.2): `liste.txt`, `log.txt`, `notizen.txt` tauchten als unversionierte Dateien im Repo-Root auf, inhaltlich sogar über mehrere Testläufe hinweg akkumuliert (kein Reset zwischen Läufen, weil `rmSync` nur den eigentlich ungenutzten Temp-Ordner löschte). | ✅ Fixed | `spawnSync(..., { cwd: dir })` gesetzt, damit relative Dateipfade im Testcode in den bereits vorhandenen, per `rmSync` aufgeräumten Temp-Ordner zeigen. Neuer Regressionstest in `nodePythonEngine.test.ts` (`isolates relative-path file I/O to a temp dir instead of the process cwd`) — schreibt eine Datei per Python-Code und prüft explizit `existsSync(join(process.cwd(), "notizen.txt")) === false`; vor dem Fix rot reproduziert (per `git stash` auf die alte Implementierung), nach dem Fix grün. Leere Dateien aus dem Repo-Root entfernt, nie committet. |
+| F-017 | Bug | Niedrig | `editorTab.ts`: der Leerzustand vor dem ersten „Ausführen" zeigte auf **beiden** Tracks immer den SQL-Text „Noch keine Query ausgeführt." — obwohl Toolbar-Label und die Python-spezifische Ergebnis-Darstellung an anderer Stelle bereits track-bewusst sind. Gefunden bei einem gezielten Live-Playwright-Durchlauf, der zwischen SQL- und Python-Kurs wechselt und den DOM vor dem ersten Run vergleicht. | ✅ Fixed | Neue Funktion `emptyResultsPlaceholder(trackId)`; ein neuer Test in `editorTab.test.ts` (vor dem Fix rot reproduziert, danach grün) prüft für beide Tracks den korrekten Text. Live im Browser gegen beide Tracks bestätigt. |
 
 **Hinweis zu 0%-Dateien in der Coverage:** `ProgressStore.ts`, `Runtime.ts`,
 `SqlEngine.ts`, `editorBridge.ts`, `LanguagePlugin.ts`, `PythonRuntime.ts`
@@ -82,6 +83,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-08 | HEAD (SQL B11 komplett: 16-16.2) | 92.51 % | 75.12 % | 98.95 % | 92.51 % |
 | 2026-08-08 | HEAD (SQL B12 abgeschlossen: 17, `create-view`) | 92.47 % | 74.98 % | 98.95 % | 92.47 % |
 | 2026-08-08 | HEAD (C# Schritt 3: csharpEngine.ts Browser-Loader) | 92.51 % | 75.16 % | 98.97 % | 92.51 % |
+| 2026-08-08 | HEAD (F-017-Fix + SQL B13 komplett: 18-18.2) | 92.50 % | 74.96 % | 98.98 % | 92.50 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -930,3 +932,60 @@ sondern pro PR direkt in den Checks sichtbar.
   die `validate()`-Design-Entscheidung für C# (Schritt 4).
 - **Tests:** 767 → 776 (+9, alle für `csharpEngine.test.ts`). `typecheck`,
   volle Testsuite (776 Tests) und `npm run build` grün.
+
+### 2026-08-08 — Stündliche Routine: F-017-Fix (Live-Bug-Hunt) + SQL B13 Indizes komplett
+
+- **Umfang:** Baseline geprüft (776/776 grün). Statt direkt in Content
+  einzusteigen, zuerst gezielt nach echten Bugs gesucht (Priorität 2 vor
+  Priorität 3): Coverage-Report nach echten (nicht-Challenge-Catch-Branch)
+  Lücken durchsucht, dann ein Live-Playwright-Durchlauf gegen den echten
+  Dev-Server mit lokal servierten sql.js/Pyodide-Assets — leerer/
+  Whitespace-Editor beim Ausführen, Track-Wechsel SQL↔Python, Mobile-
+  Viewport-Sidebar. Dabei F-017 gefunden (siehe Findings-Tabelle oben).
+  Danach SQL B13 (Indizes) als nächster, klar umrissener Content-Schritt
+  gewählt — der letzte komplett offene SQL-Zweig.
+- **F-017-Fix:** `emptyResultsPlaceholder(trackId)` ergänzt, Aufruf in
+  `syncEditorToSelection` von einem hartcodierten String auf die neue
+  Funktion umgestellt. Regressionstest vor dem Fix rot reproduziert
+  (Zeile testweise zurückgesetzt, Test schlug mit der falschen SQL-
+  Meldung fehl), nach dem Fix grün. Live im Browser gegen beide Tracks
+  bestätigt (Python zeigt jetzt „Noch kein Code ausgeführt.").
+- **Vorgehen (SQL B13, Recherche vor dem Schreiben):** Vor dem Entwurf
+  empirisch (nicht angenommen) geprüft, wie `EXPLAIN QUERY PLAN` in
+  diesem SQLite tatsächlich aussieht — per Kurzskript gegen
+  `createNodeSqliteEngine`: ohne Index liefert die `detail`-Spalte
+  `"SCAN <tabelle>"`, mit passendem Index `"SEARCH <tabelle> USING INDEX
+  <name> (...)"`. Ebenso `PRAGMA index_info(<name>)` geprüft (liefert
+  `seqno/cid/name`-Zeilen — Spalte 2 ist der indizierte Spaltenname),
+  um bei Challenge 18 einen Index-Namen von der tatsächlich indizierten
+  Spalte strukturell zu unterscheiden (ein Distraktor mit richtigem Namen
+  aber falscher Spalte muss aktiv erkannt werden, nicht nur "Index mit
+  diesem Namen existiert").
+- **Vorgehen (Content):** Auch `create-index` selbst (strukturell B1,
+  aber bis dahin durch keine einzige Challenge unterrichtet) diesmal
+  mitgenommen, da es sich organisch aus B13 ergibt. Challenge 18
+  (`create-index`): Index auf `mitarbeiter(name)` anlegen, validiert über
+  `sqlite_master` + `PRAGMA index_info`. Challenge 18.1
+  (`index-performance-concept`): zweites Szenario (`bestellungen`),
+  Index muss auf die tatsächlich gefilterte Spalte (`kunde_id`) zeigen,
+  damit `EXPLAIN QUERY PLAN` von SCAN auf SEARCH wechselt — Distraktor
+  indiziert die falsche Spalte (`betrag`), Plan bleibt bei SCAN.
+  Challenge 18.2 (`explain-query-plan`): Index bereits im Setup vorhanden,
+  Aufgabe ist, `EXPLAIN QUERY PLAN` selbst vor die Abfrage zu schreiben;
+  Distraktor vergisst das Präfix und führt die Abfrage stattdessen wirk-
+  lich aus — `lastResult` hat dann die Spalten id/kunde_id/betrag statt
+  id/parent/notused/detail, was `validate()` strukturell erkennt (keine
+  Spalte „detail"), nicht über einen hartcodierten Text-Vergleich. Alle
+  drei über Gate 1/Gate 2 (`node:sqlite`) und zusätzlich live im Browser
+  gegen echtes sql.js-WASM bestätigt (3/3 Lösungen korrekt mit den
+  erwarteten Erfolgsmeldungen, 3/3 Distraktoren mit den erwarteten
+  Fehlermeldungen auf frisch zurückgesetztem Zustand, 0 Konsolenfehler).
+- **Ergebnis:** F-017 (echter, wenn auch kleiner UI-Bug) gefunden und
+  behoben. SQL-Konzept-Hierarchie-Bilanz: 59/82 → 62/82 Tags (≈ 76 %).
+  **B13 ist der vierte komplett abgedeckte SQL-Zweig** (nach B7, B10,
+  B12) — und dank `create-index` ist damit kein SQL-Zweig mehr zu 100 %
+  Lücke. Einzige verbleibende Struktur-Lücke: `updatable-view` als
+  dauerhafte Scope-Ausnahme (kein offener Punkt mehr).
+- **Tests:** 776 → 783 (+7: 1 Regressionstest für F-017, 6 für die drei
+  neuen Indizes-Challenges via `challengeRunner.test.ts`). `typecheck`,
+  volle Testsuite (783 Tests) und `npm run build` grün.

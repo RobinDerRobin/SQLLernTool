@@ -470,17 +470,21 @@ heraus, weil SQLite dafür `INSTEAD OF`-Trigger voraussetzt, die bereits
 zuvor bewusst ausgeklammert wurden. `updatable-view` ist damit als
 dauerhafte Scope-Ausnahme dokumentiert (analog zu `own-modules` im
 Python-Dokument), nicht als offene Aufgabe. B12 gilt damit als
-abgeschlossen. Der Rest dieses Abschnitts ist der historische Stand vor
+abgeschlossen. Update 2026-08-08 (stündliche Routine, Fortsetzung):
+Challenges 18–18.2 ergänzt und decken B13 (Indizes) komplett ab —
+zusätzlich auch `create-index` selbst (strukturell B1, aber bis dahin
+ebenfalls ungenutzt), womit der letzte komplett offene SQL-Zweig
+geschlossen ist. Der Rest dieses Abschnitts ist der historische Stand vor
 diesen Updates; die Bilanz am Ende ist bereits aktualisiert.*
 
-Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (55 Challenges)
+Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (58 Challenges)
 folgende **nicht** ab — das ist die eigentliche Planungs-Nutzlast dieses
 Dokuments:
 
 **B1 Schema:** `default-value-constraint`, `check-constraint`,
 `foreign-key-constraint` (der Kurs verknüpft Tabellen nur über zufällig
 passende IDs, deklariert nie einen echten `FOREIGN KEY`), `alter-table`,
-`drop-table`, `create-index`.
+`drop-table`.
 
 **B2 DML:** `upsert-on-conflict`.
 
@@ -529,22 +533,28 @@ abgeschlossen** durch Challenge 17 (`create-view`); der zweite Tag
 (`updatable-view`) ist keine offene Lücke mehr, sondern eine dauerhafte
 Scope-Ausnahme (siehe Abschnitt 7).
 
-**B13 Indizes:** **komplett nicht abgedeckt** (zählt hier ohne
-`create-index`, das strukturell zu B1 gehört und dort separat gelistet
-ist).
+**B13 Indizes:** ~~komplett nicht abgedeckt~~ — **seit 2026-08-08
+vollständig abgedeckt** durch Challenges 18 (`create-index`, strukturell
+B1, aber hier zum ersten Mal tatsächlich unterrichtet), 18.1
+(`index-performance-concept`) und 18.2 (`explain-query-plan`) — ein
+durchgehendes Szenario: 18 legt einen Index an, 18.1 zeigt anhand einer
+zweiten Tabelle, dass der Index gezielt auf die `WHERE`-Spalte zeigen
+muss, damit `EXPLAIN QUERY PLAN` von `SCAN` auf `SEARCH ... USING INDEX`
+wechselt, 18.2 lässt den Query-Plan selbst schreiben und lesen.
 
-**Gut abgedeckt:** B0–B1-Basics, DML-Kern (ohne Upsert), DQL-Kern fast
-vollständig, Aggregation/Gruppierung, Joins bis `LEFT JOIN`, CTE/Rekursion
-(Erzeugungs-Variante), **B7 Subqueries (seit 2026-08-05 vollständig)**,
-**B10 Fensterfunktionen (seit 2026-08-07 vollständig)**, **B11
-Transaktionen (seit 2026-08-08 vollständig)**, **B12 Views (seit
-2026-08-08 abgeschlossen, `create-view` abgedeckt, `updatable-view` als
-dauerhafte Ausnahme)**.
+**Gut abgedeckt:** B0–B1-Basics (jetzt inklusive `create-index`), DML-Kern
+(ohne Upsert), DQL-Kern fast vollständig, Aggregation/Gruppierung, Joins
+bis `LEFT JOIN`, CTE/Rekursion (Erzeugungs-Variante), **B7 Subqueries
+(seit 2026-08-05 vollständig)**, **B10 Fensterfunktionen (seit
+2026-08-07 vollständig)**, **B11 Transaktionen (seit 2026-08-08
+vollständig)**, **B12 Views (seit 2026-08-08 abgeschlossen, `create-view`
+abgedeckt, `updatable-view` als dauerhafte Ausnahme)**, **B13 Indizes
+(seit 2026-08-08 vollständig)**.
 
-**Bilanz:** 59 von 82 Tags sind heute durch mindestens eine Challenge
-abgedeckt (≈ 72 %). Ein Zweig (B13) ist noch zu 100 % Lücke, ein Tag
-(`updatable-view`) ist als dauerhafte Scope-Ausnahme dokumentiert statt
-als offene Lücke.
+**Bilanz:** 62 von 82 Tags sind heute durch mindestens eine Challenge
+abgedeckt (≈ 76 %). Kein Zweig ist mehr zu 100 % Lücke — die einzige
+verbleibende Struktur-Lücke ist `updatable-view`, das als dauerhafte
+Scope-Ausnahme dokumentiert ist (nicht als offene Aufgabe).
 
 ## 7. Bewusst ausgeklammert
 
