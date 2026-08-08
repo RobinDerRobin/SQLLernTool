@@ -80,6 +80,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-08 | HEAD (B12 Teil 1: 16-16.2) | 92.73 % | 75.68 % | 98.93 % | 92.73 % |
 | 2026-08-08 | HEAD (B13 komplett: 17-17.2) | 92.64 % | 75.39 % | 98.94 % | 92.64 % |
 | 2026-08-08 | HEAD (SQL B11 komplett: 16-16.2) | 92.51 % | 75.12 % | 98.95 % | 92.51 % |
+| 2026-08-08 | HEAD (SQL B12 abgeschlossen: 17, `create-view`) | 92.47 % | 74.98 % | 98.95 % | 92.47 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -813,3 +814,64 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Tests:** 759 → 765 (+6, alle für die drei neuen
   Transaktions-Challenges via `challengeRunner.test.ts`). `typecheck`,
   volle Testsuite (765 Tests) und `npm run build` grün.
+
+### 2026-08-08 — Stündliche Routine: SQL B12 Views abgeschlossen + `updatable-view` als dauerhafte Scope-Ausnahme dokumentiert
+
+- **Umfang:** Baseline geprüft (765/765 grün, `typecheck`/`build`
+  sauber, sauberer Git-Stand). SQL lag bei 58/82 (≈ 71 %) mit zwei
+  kleinen, komplett offenen Zweigen (B12 Views 2 Tags, B13 Indizes
+  2 Tags). B12 als nächster Zweig gewählt.
+- **Vorgehen (Recherche vor dem Schreiben):** Vor dem Entwurf von
+  `updatable-view` empirisch (nicht angenommen) geprüft, ob SQLite
+  `UPDATE`/`INSERT` durch eine einfache View hindurch überhaupt
+  zulässt. Per Kurzskript gegen `createNodeSqliteEngine`: eine View
+  `it_mitarbeiter AS SELECT ... FROM mitarbeiter WHERE abteilung='IT'`
+  angelegt, lesend funktioniert sie korrekt, aber
+  `UPDATE it_mitarbeiter SET gehalt = gehalt + 500 WHERE name='Ben'`
+  löst den echten Fehler `cannot modify it_mitarbeiter because it is a
+  view` aus. Zusätzlich geprüft, dass das kein Artefakt einer veralteten
+  SQLite-Version ist (`node:sqlite` meldet 3.51.2, eine aktuelle
+  Version). SQLite macht Views nur über `INSTEAD OF`-Trigger
+  beschreibbar — Trigger stehen in `docs/sql-concept-hierarchy.md`
+  Abschnitt 7 aber bereits als bewusst ausgeklammert. Damit ist
+  `updatable-view` innerhalb dieses Curriculums grundsätzlich nicht
+  erreichbar, nicht nur "noch nicht geschrieben" — ein struktureller
+  Konflikt zwischen zwei bereits getroffenen Scope-Entscheidungen des
+  Dokuments, nicht ein neuer Einzelfall. Als Auflösung: `updatable-view`
+  bleibt als Tag im Graph stehen (beschreibt ein echtes SQL-Konzept),
+  wird aber wie `own-modules` im Python-Dokument als dauerhafte
+  Scope-Ausnahme dokumentiert statt als offene Lücke gezählt — mit dem
+  Unterschied, dass es hier kein Sandbox-Limit ist, sondern eine direkte
+  Folge der Trigger-Ausklammerung.
+- **Vorgehen (Content):** Nur `create-view` als Challenge 17 umgesetzt
+  (der einzige innerhalb des Scopes erreichbare der beiden B12-Tags).
+  Szenario: Tabelle `mitarbeiter` (id, name, abteilung, gehalt), View
+  `it_mitarbeiter` filtert auf `abteilung = 'IT'`. `validate()` fragt
+  wie immer nach Hausstil live die erwarteten Zeilen direkt aus der
+  Basistabelle ab (kein hartcodiertes Literal) und vergleicht sie mit
+  dem, was die View liefert. Distraktor lässt `CREATE VIEW ... AS`
+  komplett weg und führt nur die nackte `SELECT`-Abfrage aus — die
+  anschließende Abfrage der (nie angelegten) View löst den echten Fehler
+  `no such table: it_mitarbeiter` aus. Über Gate 1/Gate 2 (`node:sqlite`)
+  und zusätzlich live im Browser gegen echtes sql.js-WASM bestätigt,
+  inklusive eines gezielten zweiten Live-Laufs des Distraktors auf
+  frisch zurückgesetztem Zustand (View wurde in einem vorherigen Lauf
+  noch nicht angelegt), um eine irreführende Grünmeldung durch
+  Zustands-Überlappung zwischen zwei Editor-Läufen auszuschließen.
+- **Nebenbefund (kein Bug, dokumentiert statt gefixt):** Beim
+  Live-Testen bestätigt, dass ein `CREATE VIEW` (wie jedes andere
+  `CREATE ...`) beim zweimaligen Klicken auf "Ausführen" innerhalb
+  derselben Challenge-Sitzung (ohne erneute Auswahl der Challenge, die
+  `prepareChallenge`/`setup` neu abspielt) mit "view ... already exists"
+  fehlschlägt. Das ist identisches, bereits bestehendes Verhalten wie
+  bei jeder `CREATE TABLE`-Challenge und entspricht echter
+  SQL-Semantik — keine Regression durch Challenge 17, keine
+  Sonderbehandlung nötig.
+- **Ergebnis:** Keine Bugs gefunden. SQL-Konzept-Hierarchie-Bilanz:
+  58/82 → 59/82 Tags (≈ 72 %). **B12 gilt als abgeschlossen**
+  (`create-view` abgedeckt, `updatable-view` als dauerhafte
+  Scope-Ausnahme dokumentiert, analog zu `own-modules` bei Python). Nur
+  noch B13 Indizes (2 Tags) komplett offen.
+- **Tests:** 765 → 767 (+2, Gate 1/Gate 2 für Challenge 17 via
+  `challengeRunner.test.ts`). `typecheck`, volle Testsuite (767 Tests)
+  und `npm run build` grün.

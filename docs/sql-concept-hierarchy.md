@@ -410,7 +410,7 @@ geschehen, nicht erneut von Hand.
 | Tag | Label | Voraussetzungen | Level |
 |---|---|---|---|
 | `create-view` | `CREATE VIEW` | `select-basic` (B3) | 3 |
-| `updatable-view` | Durch eine View hindurch `INSERT`/`UPDATE` | `create-view`, `update-statement` (B2) | 7 |
+| `updatable-view` | Durch eine View hindurch `INSERT`/`UPDATE` — **bewusst ausgeklammert, siehe Abschnitt 7** | `create-view`, `update-statement` (B2) | 7 |
 
 ### B13 — Indizes (konzeptionell)
 
@@ -461,9 +461,17 @@ graph TD
 kompletten Zweig B7 (Subqueries) ab — die vorherige größte Einzellücke.
 Update 2026-08-08: Challenges 16–16.2 ergänzt und decken den kompletten
 Zweig B11 (Transaktionen) ab — der erste der drei bis dahin komplett
-offenen kleinen Zweige (B11/B12/B13). Der Rest dieses Abschnitts ist der
-historische Stand vor diesen Updates; die Bilanz am Ende ist bereits
-aktualisiert.*
+offenen kleinen Zweige (B11/B12/B13). Update 2026-08-08 (stündliche
+Routine, Fortsetzung): Challenge 17 ergänzt und deckt `create-view` ab,
+den ersten der beiden B12-Tags. Der zweite Tag (`updatable-view`) wurde
+vor dem Schreiben empirisch geprüft (nicht angenommen) — siehe Abschnitt
+7 — und stellte sich als über dieses Curriculum hinweg unerreichbar
+heraus, weil SQLite dafür `INSTEAD OF`-Trigger voraussetzt, die bereits
+zuvor bewusst ausgeklammert wurden. `updatable-view` ist damit als
+dauerhafte Scope-Ausnahme dokumentiert (analog zu `own-modules` im
+Python-Dokument), nicht als offene Aufgabe. B12 gilt damit als
+abgeschlossen. Der Rest dieses Abschnitts ist der historische Stand vor
+diesen Updates; die Bilanz am Ende ist bereits aktualisiert.*
 
 Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (55 Challenges)
 folgende **nicht** ab — das ist die eigentliche Planungs-Nutzlast dieses
@@ -516,19 +524,27 @@ vollständig abgedeckt** durch Challenges 16 (`transaction-basic`), 16.1
 16.1 ROLLBACK als vollständiges Verwerfen, 16.2 SAVEPOINT/ROLLBACK TO als
 gezieltes Teil-Verwerfen innerhalb einer laufenden Transaktion.
 
-**B12 Views, B13 Indizes:**
-**komplett nicht abgedeckt** (B13 zählt hier ohne `create-index`, das
-strukturell zu B1 gehört und dort separat gelistet ist).
+**B12 Views:** ~~komplett nicht abgedeckt~~ — **seit 2026-08-08
+abgeschlossen** durch Challenge 17 (`create-view`); der zweite Tag
+(`updatable-view`) ist keine offene Lücke mehr, sondern eine dauerhafte
+Scope-Ausnahme (siehe Abschnitt 7).
+
+**B13 Indizes:** **komplett nicht abgedeckt** (zählt hier ohne
+`create-index`, das strukturell zu B1 gehört und dort separat gelistet
+ist).
 
 **Gut abgedeckt:** B0–B1-Basics, DML-Kern (ohne Upsert), DQL-Kern fast
 vollständig, Aggregation/Gruppierung, Joins bis `LEFT JOIN`, CTE/Rekursion
 (Erzeugungs-Variante), **B7 Subqueries (seit 2026-08-05 vollständig)**,
 **B10 Fensterfunktionen (seit 2026-08-07 vollständig)**, **B11
-Transaktionen (seit 2026-08-08 vollständig)**.
+Transaktionen (seit 2026-08-08 vollständig)**, **B12 Views (seit
+2026-08-08 abgeschlossen, `create-view` abgedeckt, `updatable-view` als
+dauerhafte Ausnahme)**.
 
-**Bilanz:** 58 von 82 Tags sind heute durch mindestens eine Challenge
-abgedeckt (≈ 71 %). Zwei Zweige (B12, B13) sind noch zu 100 %
-Lücke.
+**Bilanz:** 59 von 82 Tags sind heute durch mindestens eine Challenge
+abgedeckt (≈ 72 %). Ein Zweig (B13) ist noch zu 100 % Lücke, ein Tag
+(`updatable-view`) ist als dauerhafte Scope-Ausnahme dokumentiert statt
+als offene Lücke.
 
 ## 7. Bewusst ausgeklammert
 
@@ -540,6 +556,19 @@ DBA-Training) bewusst nicht Teil dieser Hierarchie:
 - **Trigger, gespeicherte Prozeduren** — stark dialektabhängig (SQLite
   unterstützt nur einfache Trigger, kein PL/pgSQL-Äquivalent), und eher
   fortgeschrittenes Anwendungsdesign als SQL-Grundverständnis.
+- **`updatable-view` (Tag aus B12)** — empirisch geprüft (2026-08-08, via
+  `node:sqlite` 3.51.2, also keine veraltete Version): SQLite verweigert
+  `UPDATE`/`INSERT`/`DELETE` durch eine normale View hindurch mit dem
+  echten Fehler `cannot modify <view> because it is a view`, **außer** die
+  View hat eigene `INSTEAD OF`-Trigger — und Trigger stehen bereits oben
+  auf dieser Liste als bewusst ausgeklammert. Anders als bei
+  `own-modules` im Python-Dokument ist das hier kein Sandbox-Limit,
+  sondern eine direkte Folge einer anderen bereits getroffenen
+  Scope-Entscheidung dieses Dokuments: Der Tag bliebe nur erreichbar,
+  wenn zuerst Trigger ins Curriculum aufgenommen würden. Der Tag bleibt
+  im Graph stehen (er beschreibt ein echtes SQL-Konzept), zählt aber wie
+  die anderen Einträge dieser Liste **nicht** als planbare Lücke in
+  Abschnitt 6.
 - **JSON-Funktionen, Volltextsuche, Geodaten** — dialekt-/erweiterungsspezifisch.
 - **Materialized Views** — Postgres-spezifisch, kein SQLite-Konzept.
 - **Replikation, Partitionierung, Backup** — Betriebs-, kein Sprachthema.
