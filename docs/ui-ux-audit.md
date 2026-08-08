@@ -49,6 +49,7 @@ wie gut das jeweils testabgedeckt ist.
 | F-013 | Bug | Hoch | SQL-Editor: `maybeUppercaseLastWord` (Auto-Uppercase für SQL-Keywords beim Tippen) hatte keine String-/Kommentar-Awareness, obwohl der Tokenizer sie für die Syntax-Hervorhebung längst korrekt berechnet. Ein Wort, das zufällig wie ein Keyword aussieht, wurde auch **innerhalb eines String-Literals oder Kommentars** großgeschrieben und damit der eigentliche Wert verfälscht — reproduziert live im Browser: `SELECT 'select ` wurde beim Tippen zu `SELECT 'SELECT '`. | ✅ Fixed | `uppercaseKeyword.test.ts`: 5 neue Tests (String-Literal, Kommentar `--` und `/* */`, sowie Bestätigung, dass echte Keywords *nach* einem geschlossenen String weiterhin großgeschrieben werden). Live in Playwright gegen den echten Dev-Server nachgestellt (vorher/nachher). |
 | F-014 | Bug | Mittel | SQL/Python-Editor: Auto-Close für Klammern/Anführungszeichen (`applyAutoClose`, von SQL für Python mitübernommen) kannte `{`/`}` nicht — 1:1 aus einem SQL-only-Prototyp portiert, der nie geschweifte Klammern braucht. Für Python (Dict-/Set-Literale, f-String-Ausdrücke `f"{x}"`) fehlt dadurch ein zentrales Auto-Close-Paar; `{` blieb beim Tippen einfach offen. | ✅ Fixed | `autoClosePairs.test.ts`: 2 neue Tests (Einfügen + Skip-over). Live in Playwright bestätigt: `d = {"a": 1` schließt jetzt korrekt zu `d = {"a": 1}`. |
 | F-015 | Coverage-Lücke | Mittel | `pythonResultsArea.ts` (10 % Statements, 0 % Functions) hatte überhaupt keine Testdatei — obwohl es der komplette Render-Pfad für jedes Python-Ergebnis ist (Status, stdout, Variablen-Tabelle) und mehrfach `escapeHtml` auf nutzergenerierten Inhalt anwendet (stdout, Variablennamen, JSON-stringifizierte Werte). Beim Nachprüfen: keine XSS-Lücke gefunden, alle Stellen escapen bereits korrekt — aber komplett unabgesichert gegen eine künftige Regression. | ✅ Fixed | `pythonResultsArea.test.ts` (11 neue Tests): Error/Success/Warn-Status, leere stdout/Variablen als Empty-State, `result: null` ohne Fehler, Escaping von stdout/Variablennamen/verschachtelten JSON-Werten, `renderPythonLoadingOutcome`. |
+| F-016 | Bug | Mittel | `test/helpers/nodePythonEngine.ts` (der Node-Testmotor für Python-Content, benutzt von `challengeRunner.test.ts` für Gate 1/Gate 2) spawnte den `python3`-Subprozess ohne `cwd` — der Subprozess erbte das cwd des Test-Runners selbst (das Repo-Root), statt im isolierten Temp-Verzeichnis zu laufen, das für die Treiber-/User-Code-Dateien bereits verwendet wurde. Jede Challenge, deren Python-Code eine relative Datei öffnet (`open("notizen.txt", "w")`), schrieb dadurch echte Dateien ins Repo-Arbeitsverzeichnis statt in den isolierten Temp-Ordner — entdeckt live beim ersten Testlauf der neuen B13-Dateizugriff-Challenges (17–17.2): `liste.txt`, `log.txt`, `notizen.txt` tauchten als unversionierte Dateien im Repo-Root auf, inhaltlich sogar über mehrere Testläufe hinweg akkumuliert (kein Reset zwischen Läufen, weil `rmSync` nur den eigentlich ungenutzten Temp-Ordner löschte). | ✅ Fixed | `spawnSync(..., { cwd: dir })` gesetzt, damit relative Dateipfade im Testcode in den bereits vorhandenen, per `rmSync` aufgeräumten Temp-Ordner zeigen. Neuer Regressionstest in `nodePythonEngine.test.ts` (`isolates relative-path file I/O to a temp dir instead of the process cwd`) — schreibt eine Datei per Python-Code und prüft explizit `existsSync(join(process.cwd(), "notizen.txt")) === false`; vor dem Fix rot reproduziert (per `git stash` auf die alte Implementierung), nach dem Fix grün. Leere Dateien aus dem Repo-Root entfernt, nie committet. |
 
 **Hinweis zu 0%-Dateien in der Coverage:** `ProgressStore.ts`, `Runtime.ts`,
 `SqlEngine.ts`, `editorBridge.ts`, `LanguagePlugin.ts`, `PythonRuntime.ts`
@@ -77,6 +78,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-08 | HEAD (B10 Teil 1: 14-14.4) | 93.02 % | 76.52 % | 98.91 % | 93.02 % |
 | 2026-08-08 | HEAD (B11 Teil 1: 15-15.3) | 92.85 % | 76.03 % | 98.93 % | 92.85 % |
 | 2026-08-08 | HEAD (B12 Teil 1: 16-16.2) | 92.73 % | 75.68 % | 98.93 % | 92.73 % |
+| 2026-08-08 | HEAD (B13 komplett: 17-17.2) | 92.64 % | 75.39 % | 98.94 % | 92.64 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -685,4 +687,79 @@ sondern pro PR direkt in den Checks sichtbar.
   Dateizugriff.
 - **Tests:** 746 → 752 (+6, alle für die drei neuen Modul-Challenges via
   `challengeRunner.test.ts`). `typecheck`, volle Testsuite (752 Tests)
+  und `npm run build` grün.
+
+### 2026-08-08 — Stündliche Routine: B13 Dateizugriff komplett — F-016 (Test-Isolations-Bug) gefunden und behoben
+
+- **Umfang:** Baseline geprüft (752/752 grün, unverändert). B13
+  Dateizugriff wie angekündigt umgesetzt — anders als bei `own-modules`
+  in der letzten Runde stellte sich heraus, dass Dateizugriff (im
+  Gegensatz zu Mehrdatei-Imports) **innerhalb eines einzelnen Skripts**
+  vollständig möglich ist (öffnen, schreiben, schließen, wieder öffnen,
+  lesen — alles in derselben Editor-Box), also keine Sandbox-Ausnahme
+  nötig. Alle 4 Tags aus B13 als Challenges 17–17.2 ergänzt.
+- **Vorgehen (Recherche vor dem Schreiben):** Vor der ersten Challenge
+  empirisch geprüft (nicht angenommen), wie sich Pyodides virtuelles
+  Dateisystem über mehrere `exec()`-Aufrufe hinweg verhält — per
+  Kurzskript direkt gegen das npm-`pyodide`-Paket (dieselbe Version
+  `0.26.4` wie der Browser-CDN-Load). Ergebnis: Eine Datei, die in einem
+  `runPython()`-Aufruf geschrieben wird, **bleibt für alle folgenden
+  Aufrufe auf derselben Pyodide-Instanz sichtbar** — das virtuelle
+  Dateisystem ist nicht pro Ausführung isoliert, sondern lebt so lange
+  wie die WASM-Instanz selbst (die laut `src/ui/context.ts` einmal pro
+  Session geladen und für alle weiteren Läufe wiederverwendet wird,
+  `ensurePythonEngine` memoized `mainPython`). Das steht im Kontrast zum
+  Node-Testmotor (`nodePythonEngine.ts`), der pro `exec()` ein frisches
+  Temp-Verzeichnis anlegt und danach löscht — dort ist jeder Lauf
+  vollständig isoliert. Diese Asymmetrie ist bisher folgenlos (es gab
+  noch keine dateibasierten Challenges), wird aber ab jetzt relevant und
+  ist entsprechend in `docs/python-concept-hierarchy.md`s B13-Abschnitt
+  dokumentiert.
+- **Vorgehen (Content):** Alle drei Lösungen deshalb bewusst so entworfen,
+  dass sie unabhängig von eventuell aus früheren Läufen vorhandenem
+  Dateiinhalt korrekt funktionieren — jede öffnet zuerst im Modus `"w"`
+  (überschreibt garantiert den kompletten Inhalt), bevor irgendetwas
+  gelesen wird. `file-open-read` + `context-manager-with` (17, bewusst
+  gebündelt — `with open(...) as f:` ist der einzig noch zeitgemäße Weg,
+  eine Datei zu öffnen, sie separat von einem rohen `open()`/`close()`
+  zu lehren wäre künstlich; Distraktor liest eine nie geschriebene Datei
+  → echter FileNotFoundError), `file-write` (17.1, drei `.write()`-
+  Aufrufe mit `\n` bauen eine mehrzeilige Datei auf, Distraktor vergisst
+  die Zeilenumbrüche → Wörter kleben zusammen), `file-modes` (17.2, der
+  Unterschied zwischen `"w"` (überschreibt) und `"a"` (hängt an) — der
+  Distraktor verwendet fälschlich zweimal `"w"`, wodurch der erste
+  Eintrag durch den zweiten `open()`-Aufruf sofort gelöscht wird, bevor
+  überhaupt geschrieben wird: genau der Kernpunkt der Lektion als echter,
+  beobachtbarer Unterschied). Alle drei über Gate 1/Gate 2 bestätigt.
+- **Vorgehen (Verifikation über das Übliche hinaus):** Zusätzlich zur
+  üblichen Live-Pyodide-Verifikation wurde jede der drei Lösungen live im
+  Browser **zweimal unmittelbar hintereinander** ausgeführt (ohne
+  Seitenneuladung, wie ein Lernender es täte, der zweimal auf "Ausführen"
+  klickt), um die oben gefundene Persistenz-Eigenschaft gezielt zu
+  provozieren statt sie nur zu vermuten. Alle drei liefern bei beiden
+  Läufen identisch korrekte Ergebnisse — die `"w"`-zuerst-Bauweise hält,
+  was sie verspricht. 0 Konsolenfehler in beiden Durchläufen.
+- **F-016 (echter Bug, gefunden beim ersten Testlauf dieser Charge):**
+  `git status` zeigte nach dem ersten `challengeRunner.test.ts`-Lauf
+  plötzlich drei unversionierte Dateien im Repo-Root
+  (`liste.txt`, `log.txt`, `notizen.txt`) — der Node-Testmotor
+  (`nodePythonEngine.ts`) spawnte `python3` ohne `cwd`, wodurch relative
+  Dateipfade im Testcode ins Repo-Arbeitsverzeichnis statt in den dafür
+  vorgesehenen, per `rmSync` aufgeräumten Temp-Ordner schrieben. Fix:
+  `cwd: dir` bei `spawnSync` gesetzt. Neuer Regressionstest schreibt
+  gezielt eine Datei und prüft `existsSync(cwd + "/notizen.txt") ===
+  false`; vor dem Fix per `git stash` auf die alte Implementierung rot
+  reproduziert, danach grün. Siehe Findings-Tabelle oben.
+- **Ergebnis:** Ein echter Bug gefunden und behoben (F-016, im
+  Test-Tooling, nicht in der Live-App selbst) — die Dateisystem-
+  Persistenz in Pyodide ist dagegen reales, korrektes Verhalten der
+  Engine, keine App-seitige Fehlfunktion, und die neue Content-Charge ist
+  gezielt robust dagegen gebaut. Python-Konzept-Hierarchie-Bilanz:
+  62/82 → 66/82 Tags (≈ 80 %). **B13 ist der vierte komplett abgedeckte
+  Python-Zweig** (nach B7, B8, B9). Einziger noch komplett offener
+  Zweig: B14 Objektorientierung — dessen Bearbeitung würde zugleich drei
+  zurückgestellte Einzeltags aus B10/B11 freischalten.
+- **Tests:** 752 → 759 (+7: 6 für die drei neuen Dateizugriff-Challenges
+  via `challengeRunner.test.ts`, +1 Regressionstest für F-016 in
+  `nodePythonEngine.test.ts`). `typecheck`, volle Testsuite (759 Tests)
   und `npm run build` grün.
