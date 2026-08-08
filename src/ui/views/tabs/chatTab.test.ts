@@ -135,6 +135,54 @@ describe('mountChatTab', () => {
     expect(root.textContent).not.toContain('nur bei 01');
   });
 
+  it('typing into the input survives an unrelated re-render (pendingInput tracking)', () => {
+    const { ctx } = makeCtx();
+    mountChatTab(root, ctx);
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
+
+    const input = root.querySelector<HTMLTextAreaElement>('.chat-input')!;
+    input.value = 'Halb fertiger Text';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    ctx.store.update((s) => ({
+      ...s,
+      progress: withChallengeProgress(s.progress, 'sqlite', 'sqlLernenTool', '01', {
+        chatHistory: [{ role: 'user', content: 'von außen hinzugefügt' }],
+      }),
+    }));
+
+    expect(root.querySelector<HTMLTextAreaElement>('.chat-input')!.value).toBe('Halb fertiger Text');
+  });
+
+  it('Strg/Cmd+Enter sends the message like the Senden-Button', async () => {
+    const { ctx, sendMessage } = makeCtx();
+    mountChatTab(root, ctx);
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
+
+    const input = root.querySelector<HTMLTextAreaElement>('.chat-input')!;
+    input.value = 'Frage per Tastenkürzel';
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true }),
+    );
+    await flush();
+
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(input.value).toBe('');
+  });
+
+  it('plain Enter (without Strg/Cmd) does not send the message', async () => {
+    const { ctx, sendMessage } = makeCtx();
+    mountChatTab(root, ctx);
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
+
+    const input = root.querySelector<HTMLTextAreaElement>('.chat-input')!;
+    input.value = 'Kein Tastenkürzel';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    await flush();
+
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
   it('ignores an empty message', async () => {
     const { ctx, sendMessage } = makeCtx();
     mountChatTab(root, ctx);

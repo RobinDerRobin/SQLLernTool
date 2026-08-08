@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createNodePythonEngine } from '../../../../../test/helpers/nodePythonEngine';
 import { createNodeSqliteEngine } from '../../../../../test/helpers/nodeSqliteEngine';
 import type { ClaudeChatClient } from '../../../../chat/claudeChatClient';
 import { TRACKS } from '../../../../content/registry';
+import { pythonGrundlagenCourse } from '../../../../content/tracks/python/courses/pythonGrundlagen/course';
 import { sqlLernenToolCourse } from '../../../../content/tracks/sqlite/courses/sqlLernenTool/course';
 import {
   createDefaultProgressState,
@@ -15,10 +17,23 @@ import { selectChallenge } from '../../../state/actions';
 import { mountEditorTab } from './editorTab';
 
 const c01 = sqlLernenToolCourse.challenges.find((c) => c.num === '01')!;
+const py01 = pythonGrundlagenCourse.challenges.find((c) => c.num === '01')!;
 
 function testEngineFactory(): EngineFactory {
   const main = createNodeSqliteEngine();
   return { getMain: () => main, setMainFromSqlJs: () => {}, createDisposable: () => createNodeSqliteEngine(), getMainPython: () => null, ensurePythonEngine: () => Promise.reject(new Error("python engine not available in this test fixture")) };
+}
+
+function testEngineFactoryWithPython(): EngineFactory {
+  const main = createNodeSqliteEngine();
+  const py = createNodePythonEngine();
+  return {
+    getMain: () => main,
+    setMainFromSqlJs: () => {},
+    createDisposable: () => createNodeSqliteEngine(),
+    getMainPython: () => py,
+    ensurePythonEngine: () => Promise.resolve(py),
+  };
 }
 
 function makeCtx(progress: ProgressState = createDefaultProgressState()): AppContext {
@@ -26,6 +41,14 @@ function makeCtx(progress: ProgressState = createDefaultProgressState()): AppCon
   const chatClient: ClaudeChatClient = { sendMessage: vi.fn().mockResolvedValue('ok') };
   const ctx = createAppContext({ progressStore, chatClient, registry: TRACKS });
   ctx.engines = testEngineFactory();
+  return ctx;
+}
+
+function makeCtxWithPython(progress: ProgressState = createDefaultProgressState()): AppContext {
+  const progressStore: ProgressStore = { load: () => progress, save: () => {} };
+  const chatClient: ClaudeChatClient = { sendMessage: vi.fn().mockResolvedValue('ok') };
+  const ctx = createAppContext({ progressStore, chatClient, registry: TRACKS });
+  ctx.engines = testEngineFactoryWithPython();
   return ctx;
 }
 
@@ -141,6 +164,29 @@ describe('mountEditorTab', () => {
 
     const banner = root.querySelector('.python-engine-status')!;
     expect(banner.textContent).toContain('Python-Umgebung konnte nicht geladen werden');
+  });
+
+  it('running a Python challenge while the engine is still loading shows the loading placeholder', () => {
+    const ctx = makeCtx();
+    const { editor } = mountEditorTab(root, ctx);
+    selectChallenge(ctx, 'python', 'pythonGrundlagen', '01');
+    editor.setValue(py01.solution);
+
+    root.querySelector('.run-btn')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(root.querySelector('.results-body')?.textContent).toContain('Python-Umgebung wird geladen');
+  });
+
+  it('running a correct Python solution shows a success status with stdout', () => {
+    const ctx = makeCtxWithPython();
+    const { editor } = mountEditorTab(root, ctx);
+    selectChallenge(ctx, 'python', 'pythonGrundlagen', '01');
+    editor.setValue(py01.solution);
+
+    root.querySelector('.run-btn')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(root.querySelector('.status-ok')).not.toBeNull();
+    expect(root.querySelector('.results-body pre')).not.toBeNull();
   });
 
   it('shows no Python-engine banner for the SQL track', () => {
