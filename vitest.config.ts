@@ -8,6 +8,7 @@ export default defineConfig({
       ['src/editor/domEditor.{ts,test.ts}', 'jsdom'],
       ['src/editor/domEditor.test.ts', 'jsdom'],
       ['src/runtime/python/pyodideEngine.{ts,test.ts}', 'jsdom'],
+      ['src/runtime/csharp/csharpEngine.{ts,test.ts}', 'jsdom'],
       ['src/persistence/**', 'jsdom'],
       ['src/ui/**', 'jsdom'],
       ['src/theme/**', 'jsdom'],

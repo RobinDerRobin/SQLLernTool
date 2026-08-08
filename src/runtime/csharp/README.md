@@ -1,10 +1,30 @@
-# C# track — not built yet, and the approach is genuinely undecided
+# C# track — architecture decided, integration in progress
 
-Placeholder. Unlike the Python track, this one has **no obvious answer** — the
-point of this file is to say so clearly rather than let someone discover it
-mid-implementation.
+**Update:** the question this file originally posed ("is the C# track
+allowed to require a backend?") is resolved: **no** — Blazor WebAssembly +
+Roslyn, running fully client-side, same as sql.js/Pyodide. See
+`docs/csharp-engine-poc.md` for the full feasibility proof (a working
+compile-and-run pipeline verified in a real browser, four real WASM-specific
+bugs found and fixed, the COOP/COEP hosting decision for GitHub Pages via
+`coi-serviceworker`) and its "What's left" section for the current
+integration status. `csharpEngine.ts` in this folder is the browser-side
+loader (step 3 of that plan) — it wraps the Blazor boot sequence and the
+`[JSExport]`-ed `RunCode` entry point (`csharp-engine/CSharpEngine.cs`)
+behind the same `Runtime`-style `exec()`/`reset()` shape `pyodideEngine.ts`
+uses for Python. Verified end-to-end against the real compiled Blazor+Roslyn
+bundle (not just mocks): successful runs, compiler-diagnostic errors
+(`CS0029`), and runtime exceptions (`IndexOutOfRangeException`) all surface
+correctly through the loader when served with the required COOP/COEP
+headers.
 
-## The problem
+Not yet done: wiring a served location for the Blazor assets into the main
+app's dev server / GitHub Pages deploy, the `validate()` design for C#
+content (see the POC doc's step 4), the content track itself, and a
+Node-side test engine for CI. The rest of this file is the original
+pre-decision framing, kept for context on *why* Blazor WASM was the right
+call rather than a backend sandbox or a hand-written subset interpreter.
+
+## The problem (historical — see update above for the resolution)
 
 Every other part of this app is built on one property: **the whole thing is a
 single HTML file with no backend**, because that is the only way the Claude chat

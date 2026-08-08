@@ -375,10 +375,40 @@ Roughly in dependency order:
    — this only builds and runs locally so far, deliberately deferred to
    keep this increment bounded; that's a natural next step once the
    browser-side loader (step 3) needs it.
-3. **`src/runtime/csharp/csharpEngine.ts`** — the browser-side loader,
-   mirroring `pyodideEngine.ts`: dynamically load the Blazor boot
-   sequence, expose an `exec(code): CSharpExecResult` function matching
-   the `Runtime` interface pattern (`src/runtime/Runtime.ts`).
+3. ~~`src/runtime/csharp/csharpEngine.ts` — the browser-side loader~~ —
+   **done (2026-08-08):** `loadCSharpEngineFromServer(baseUrl)` injects
+   the `blazor.webassembly.js` script tag (mirroring
+   `loadPyodideFromCdn`'s script-injection pattern, including shared
+   in-flight-load and retry-after-failure behavior), calls
+   `Blazor.start()`, resolves `Blazor.runtime.getAssemblyExports(...)`,
+   and returns the raw `RunCode` entry point; `createCSharpEngine(exports)`
+   wraps it into the `CSharpRuntime` shape (`exec`/`reset`,
+   `src/runtime/csharp/CSharpRuntime.ts`) the same way `createPyodideEngine`
+   does for Python. 9 unit tests with a fake `Blazor` global (no real WASM
+   needed for these, same pattern as `pyodideEngine.test.ts`).
+
+   Also verified live against the **real** compiled Blazor+Roslyn bundle,
+   not just mocks: `dotnet publish -c Release`, served the output through
+   a minimal Python COOP/COEP static server (the exact recipe earlier in
+   this doc — required because of `WasmEnableThreads`), esbuild-bundled
+   `csharpEngine.ts` into the served directory, and drove a small test
+   page through Playwright that calls `loadCSharpEngineFromServer` +
+   `engine.exec(...)` for real. Confirmed all three paths return correctly
+   through the loader: a successful run (`stdout` with the right output),
+   a compiler-diagnostic failure (`CS0029` on a bad implicit conversion),
+   and a runtime exception (`IndexOutOfRangeException`, full .NET stack
+   trace). One harmless console warning observed (`ManagedError: ... Could
+   not find any element matching selector '#app'` — Blazor's own root
+   component search; irrelevant here since only the `[JSExport]` static
+   method is used, no Razor component is rendered) — noted for awareness,
+   not a defect in the loader.
+
+   Serving location for the Blazor assets in the real app (dev server +
+   GitHub Pages deploy) is intentionally still undecided — same
+   deliberate-deferral reasoning as step 2's "no CI/deploy wiring yet."
+   `loadCSharpEngineFromServer` takes `baseUrl` as a parameter rather than
+   a hardcoded path specifically so that decision can be made later
+   without changing this module.
 4. **Decide the `validate()` story for C#.** Python's `variables` capture
    works because Pyodide's driver inspects the script's final namespace
    dict. C# has no equivalent "namespace dict" — a compiled Program's
@@ -403,10 +433,11 @@ Roughly in dependency order:
    as the SQL/Python content (3 hints, live-recomputed or state-inspected
    validators, at least one verified-failing distractor per challenge).
 
-This is genuinely several more sessions of real engineering work — steps
-2–4 in particular (project scaffolding, the browser loader, and the
-`validate()` design) still involve architecture decisions worth
-deliberate attention rather than being rushed through opportunistically.
+This is genuinely several more sessions of real engineering work — step 4
+in particular (the `validate()` design) still involves an architecture
+decision worth deliberate attention rather than being rushed through
+opportunistically. Steps 1–3 (hosting decision, project scaffold, browser
+loader) are now done.
 Treat each routine firing that touches this as making **one bounded,
 committed increment** (e.g. "scaffold the project directory and get a
 minimal Blazor boot working," not "finish the whole engine") — never
