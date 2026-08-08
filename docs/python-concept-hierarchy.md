@@ -389,11 +389,40 @@ bekommt. Alle drei Lösungen öffnen deshalb bewusst zuerst im Modus `"w"`
 (überschreibt garantiert), bevor irgendetwas gelesen wird, und wurden
 zusätzlich live **zweimal hintereinander** ausgeführt (simuliert erneutes
 Anklicken von "Ausführen"), um diese Robustheit tatsächlich zu bestätigen
-statt sie nur zu behaupten. Der Rest dieses Abschnitts ist der
-historische Stand vor diesen Updates; die Bilanz am Ende ist bereits
-aktualisiert.*
+statt sie nur zu behaupten. Update 2026-08-08 (stündliche Routine,
+Fortsetzung): Challenges 18–18.7 ergänzt, decken **alle 8 Tags aus B14**
+(Objektorientierung) ab — der letzte komplett offene Python-Zweig ist
+damit geschlossen: `class-definition` (18, eine Klasse mit Methode ohne
+eigenen Zustand — bewusst ohne `__init__`, um Klassen-Syntax von
+Instanzattributen sauber zu trennen), `instance-attributes-init` (18.1),
+`instance-methods` (18.2, eine Methode, die tatsächlich mit
+`self.attribut` rechnet statt nur zu delegieren), `class-vs-instance-
+attributes` (18.3, ein geteiltes Klassenattribut als Zähler über mehrere
+Objekte hinweg — der Distraktor demonstriert eine echte, subtile Python-
+Falle: `self.x += 1` legt bei einem Klassenattribut ein neues,
+objekteigenes Attribut an statt das geteilte zu ändern), `inheritance`
+(18.4), `method-overriding` (18.5), `dunder-methods` (18.6, `__str__`),
+`encapsulation-convention` (18.7, doppelter Unterstrich löst echtes Name
+Mangling aus — geprüft über `vars(objekt)`, nicht nur behauptet). Jeder
+Distraktor wurde vor dem Schreiben mit echtem `python3` verifiziert, nicht
+angenommen (u. a. `self.anzahl += 1` vs. `Hund.anzahl += 1`, `vars()`-
+Schlüssel `_saldo` vs. `_Konto__saldo`). Alle acht Lösungen und
+Distraktoren zusätzlich live gegen echtes Pyodide bestätigt — dabei ein
+Artefakt der eigenen Testmethodik gefunden und korrigiert: das
+Playwright-Skript tippte Code über simulierte Tastendrücke, was mit dem
+Editor-eigenen Auto-Indent bei mehrfach verschachteltem Code (Klasse →
+Methode → Rumpf) kollidierte und kumulativ falsch eingerückten Code
+erzeugte — kein Produktbug, denn der reale "In den Editor
+übernehmen"-Button setzt den Wert direkt (`editor.setValue(...)`), ohne
+über die Tastatur-Auto-Indent-Logik zu laufen. Live-Skript entsprechend
+auf direktes Setzen des Textarea-Werts umgestellt. Da B14 jetzt existiert,
+sind die zuvor zurückgestellten Tags `iterator-protocol`/`generator-
+functions` (B10) und `custom-exceptions` (B11) nicht mehr blockiert —
+noch nicht geschrieben, aber jetzt ein klarer, kleiner nächster Schritt.
+Der Rest dieses Abschnitts ist der historische Stand vor diesen Updates;
+die Bilanz am Ende ist bereits aktualisiert.*
 
-Von den 82 Tags deckt `pythonGrundlagen` (52 Challenges) folgende ab:
+Von den 82 Tags deckt `pythonGrundlagen` (60 Challenges) folgende ab:
 
 **Vollständig abgedeckt:** `program-execution-model`, `function-call-syntax`
 (implizit über `print`), `print-statement`, `comments`, `variable-
@@ -427,35 +456,41 @@ kontextlos), `specific-exception-types` (15.1), `finally-else-clauses`
 von B12 Module & Imports**: `import-statement` (16), `from-import`
 (16.1), `standard-library-awareness` (16.2), sowie **seit 2026-08-08 B13
 Dateizugriff komplett**: `file-open-read` + `context-manager-with` (17),
-`file-write` (17.1), `file-modes` (17.2) —
-**66 von 82 Tags (≈ 80 %).**
+`file-write` (17.1), `file-modes` (17.2), sowie **seit 2026-08-08 B14
+Objektorientierung komplett**: `class-definition` (18),
+`instance-attributes-init` (18.1), `instance-methods` (18.2),
+`class-vs-instance-attributes` (18.3), `inheritance` (18.4),
+`method-overriding` (18.5), `dunder-methods` (18.6),
+`encapsulation-convention` (18.7) —
+**74 von 82 Tags (≈ 90 %).**
 
 **Nicht abgedeckt:** `dynamic-typing` als **eigenes** Thema (wird
 durchgehend demonstriert, nie benannt — genau wie `logical-operators` im
 SQL-Kurs), `bool-conversion-truthiness`, `truthiness-in-conditions`,
 `ternary-expression`, die letzten beiden Tags von B10 (`iterator-
 protocol`, `generator-functions`), der letzte Tag von B11 (`custom-
-exceptions`) — alle drei hängen an B14-Voraussetzungen
-(`dunder-methods`/`class-definition`), `own-modules` aus B12 (siehe
-architektonische Begründung oben), und **komplett**: B14
-Objektorientierung.
+exceptions`) — alle drei waren an B14-Voraussetzungen
+(`dunder-methods`/`class-definition`) blockiert; B14 existiert jetzt
+vollständig, die drei Tags sind also entsperrt, aber noch nicht
+geschrieben, und `own-modules` aus B12 (siehe architektonische Begründung
+oben).
 
-**Bilanz:** 66 von 82 Tags abgedeckt (≈ 80 %) — Python liegt weiterhin
-**deutlich vor** SQL (55/82, ≈ 67 %). Der Kursname `pythonGrundlagen`
+**Bilanz:** 74 von 82 Tags abgedeckt (≈ 90 %) — Python liegt weiterhin
+**deutlich vor** SQL (62/82, ≈ 76 %). Der Kursname `pythonGrundlagen`
 deckt inzwischen deutlich mehr als nur die absoluten Basics ab (Variablen,
 Grundrechenarten, Verzweigung, Schleifen, ganz Funktionen inklusive
 *args/**kwargs, lambda, map()/filter()/sorted(), ganz Datenstrukturen,
 List-/Dict-/Set-Comprehensions, Generator Expressions, den Großteil der
 Fehlerbehandlung inklusive eigener raise-Fehler, die Kernsyntax von
-Imports/Standardbibliothek, und ganz Dateizugriff) — B7, B8, B9 und B13
-sind vollständig geschlossen, B10, B11 und B12 alle fast komplett (5/7,
-5/6 bzw. 3/4, jeweils nur noch durch dieselben zwei Arten von Grenzen
-blockiert: B14-Abhängigkeit oder die Einzeldatei-Sandbox). **B14
-Objektorientierung ist damit der einzige noch komplett offene Zweig** —
-seine Bearbeitung würde zugleich die drei bislang zurückgestellten
-Einzeltags aus B10/B11 freischalten (`iterator-protocol`,
-`generator-functions`, `custom-exceptions`); `own-modules` aus B12 bliebe
-als Sandbox-Grenze davon unabhängig weiterhin offen.
+Imports/Standardbibliothek, ganz Dateizugriff, und jetzt auch ganz
+Objektorientierung) — B7, B8, B9, B13 und B14 sind vollständig
+geschlossen, B10 und B11 fast komplett (5/7 bzw. 5/6, beide nur noch durch
+die drei jetzt entsperrten, aber noch ungeschriebenen Einzeltags offen).
+**Kein Zweig ist mehr komplett Lücke** — der Kurs hat jetzt in jedem der
+14 Zweige mindestens einen abgedeckten Tag. Die verbleibenden Lücken sind
+drei jetzt entsperrte Einzeltags (`iterator-protocol`,
+`generator-functions`, `custom-exceptions`) und `own-modules` aus B12,
+das unabhängig davon als dauerhafte Sandbox-Grenze offen bleibt.
 
 ## 7. Bewusst ausgeklammert
 

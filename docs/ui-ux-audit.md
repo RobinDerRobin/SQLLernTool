@@ -84,6 +84,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-08 | HEAD (SQL B12 abgeschlossen: 17, `create-view`) | 92.47 % | 74.98 % | 98.95 % | 92.47 % |
 | 2026-08-08 | HEAD (C# Schritt 3: csharpEngine.ts Browser-Loader) | 92.51 % | 75.16 % | 98.97 % | 92.51 % |
 | 2026-08-08 | HEAD (F-017-Fix + SQL B13 komplett: 18-18.2) | 92.50 % | 74.96 % | 98.98 % | 92.50 % |
+| 2026-08-08 | HEAD (Python B14 Objektorientierung komplett: 18-18.7) | 92.26 % | 74.16 % | 99.00 % | 92.26 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -989,3 +990,76 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Tests:** 776 → 783 (+7: 1 Regressionstest für F-017, 6 für die drei
   neuen Indizes-Challenges via `challengeRunner.test.ts`). `typecheck`,
   volle Testsuite (783 Tests) und `npm run build` grün.
+
+### 2026-08-08 — Stündliche Routine: Python B14 Objektorientierung komplett
+
+- **Umfang:** Baseline geprüft (783/783 grün). SQL hat inzwischen keinen
+  komplett offenen Zweig mehr (nur noch die dokumentierte
+  `updatable-view`-Ausnahme); Python hatte mit B14 Objektorientierung
+  (8 Tags) den letzten, größten komplett offenen Zweig in beiden
+  Sprachen — als nächstes, klar umrissenes Content-Ziel gewählt.
+- **Vorgehen (Design):** Alle 8 Tags mit je einer Challenge umgesetzt,
+  jede um ein eigenständiges, in sich abgeschlossenes Mini-Szenario
+  gebaut statt eine durchgehende Klasse über alle 8 Aufgaben zu
+  verschleppen (bewusst anders als bei den SQL-Transaktions-/View-
+  Zweigen, weil hier jeder Tag ein eigenes, klar abgrenzbares
+  Sprachfeature ist, keine Fortsetzung eines Szenarios). Wichtige
+  Design-Randbedingung vorab geprüft: der Python-Treiber (sowohl
+  `pyodideEngine.ts` als auch `nodePythonEngine.ts`) filtert
+  `variables` auf JSON-sichere Typen — ein Objekt einer eigenen Klasse
+  taucht dort nie auf. Jede Challenge musste deshalb ihr Ergebnis über
+  eine Zahl/einen Text/eine Liste (aus einem Attribut oder
+  Methodenaufruf extrahiert) oder stdout zurückgeben, nie über die
+  Objektreferenz selbst.
+- **Vorgehen (Distraktoren, vor dem Schreiben mit echtem `python3`
+  verifiziert):** `class-definition` (18) — Methode ohne `self` löst
+  `TypeError: takes 0 positional arguments but 1 was given` aus.
+  `instance-attributes-init` (18.1) — Zuweisung ohne `self.`-Präfix in
+  `__init__` löst `AttributeError` bei jedem Attributzugriff aus.
+  `instance-methods` (18.2) — Methode ohne `self.`-Präfix löst
+  `NameError` aus. `class-vs-instance-attributes` (18.3) — die
+  subtilste der acht: `self.anzahl += 1` statt `Hund.anzahl += 1`
+  erzeugt kein Fehler, sondern legt pro Objekt ein neues,
+  verdeckendes Instanzattribut an; das geteilte Klassenattribut bleibt
+  bei 0 stehen statt auf 2 zu zählen — empirisch bestätigt, nicht nur
+  aus der Python-Doku übernommen. `inheritance` (18.4) — fehlende
+  Basisklasse löst `TypeError: takes no arguments` aus.
+  `method-overriding` (18.5) — fehlendes Override liefert die geerbte
+  Version statt der eigenen (kein Fehler, nur falscher Wert).
+  `dunder-methods` (18.6) — falscher Methodenname (`to_string` statt
+  `__str__`) lässt `str()` auf die technische Standarddarstellung
+  zurückfallen. `encapsulation-convention` (18.7) — einfacher statt
+  doppelter Unterstrich verhindert das Name Mangling; geprüft über
+  `vars(objekt)`, das bei doppeltem Unterstrich `_Konto__saldo` statt
+  `_saldo` zeigt — eine echte, überprüfbare Verhaltensdifferenz, keine
+  reine Konvention.
+- **Live-Verifikation (mit Methodik-Korrektur):** Alle 8 Lösungen und
+  Distraktoren zunächst per simuliertem Tippen (`page.keyboard.type`)
+  gegen echtes Pyodide getestet — dabei durchgehend falsche
+  `IndentationError`s beobachtet. Nachforschung ergab: kein Produktbug,
+  sondern ein Artefakt der eigenen Testmethodik. Der Editor fügt beim
+  Drücken von Enter automatisch Einrückung hinzu (`computeEnterInsertion`
+  in `src/editor/languages/python/autoIndent.ts`) — bei simuliertem
+  Tippen eines bereits vollständig eingerückten mehrzeiligen Strings
+  addiert sich diese Auto-Einrückung mit der im Testcode bereits
+  vorhandenen, was bei zwei verschachtelten Ebenen (Klasse → Methode →
+  Rumpf) zu inkonsistenter, kumulierter Einrückung führt. Der echte
+  "In den Editor übernehmen"-Button (`solutionSection.ts`) setzt den
+  Wert dagegen direkt (`editor.setValue(...)`), ohne über die
+  Tastatur-Logik zu laufen — genau wie ein Nutzer, der fertigen Code
+  einfügt. Live-Skript entsprechend auf direktes Setzen des
+  Textarea-Werts + `input`-Event umgestellt, damit es denselben Pfad
+  wie der echte Button nimmt. Danach: alle 8 Lösungen korrekt mit ★★★,
+  alle 8 Distraktoren korrekt mit den erwarteten Fehlermeldungen bzw.
+  falschen Werten, 0 echte Konsolenfehler.
+- **Ergebnis:** Keine Produkt-Bugs gefunden (nur die eigene
+  Testmethodik korrigiert). Python-Konzept-Hierarchie-Bilanz: 66/82 →
+  74/82 Tags (≈ 90 %). **B14 ist der fünfte komplett abgedeckte
+  Python-Zweig** (nach B7, B8, B9, B13) — kein Python-Zweig ist mehr
+  komplett Lücke. Die drei zuvor an B14 blockierten Einzeltags
+  (`iterator-protocol`, `generator-functions` aus B10,
+  `custom-exceptions` aus B11) sind jetzt entsperrt, aber noch nicht
+  geschrieben — klarer nächster Schritt für eine künftige Routine.
+- **Tests:** 783 → 799 (+16, alle für die acht neuen
+  Objektorientierungs-Challenges via `challengeRunner.test.ts`).
+  `typecheck`, volle Testsuite (799 Tests) und `npm run build` grün.
