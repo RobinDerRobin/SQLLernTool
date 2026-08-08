@@ -342,11 +342,16 @@ Update 2026-08-08 (Fortsetzung): Challenges 12.6–12.8 ergänzt
 (`args-kwargs`, `lambda-expressions`, `map-function`). Update 2026-08-08
 (weitere Runde): Challenges 12.9–12.10 ergänzt (`filter-function`,
 `sorted-with-key`) — **B8 Funktionen ist damit komplett abgedeckt (12/12
-Tags)**, der zweitgrößte fertige Zweig nach B7. Der Rest dieses
-Abschnitts ist der historische Stand vor diesen Updates; die Bilanz am
-Ende ist bereits aktualisiert.*
+Tags)**, der zweitgrößte fertige Zweig nach B7. Update 2026-08-08
+(stündliche Routine): Challenges 13–13.4 ergänzt, decken 5 der 10 Tags
+aus B9 (Datenstrukturen) ab (`list-basics`, `list-slicing`, `list-
+mutation-methods`, `tuple-basics`, `dict-basics`) — die zweite Hälfte
+(`dict-methods`, `set-basics`, `nested-data-structures`, `membership-
+operator`, `len-function`) ist eine natürliche Restcharge für später.
+Der Rest dieses Abschnitts ist der historische Stand vor diesen Updates;
+die Bilanz am Ende ist bereits aktualisiert.*
 
-Von den 82 Tags deckt `pythonGrundlagen` (27 Challenges) folgende ab:
+Von den 82 Tags deckt `pythonGrundlagen` (32 Challenges) folgende ab:
 
 **Vollständig abgedeckt:** `program-execution-model`, `function-call-syntax`
 (implizit über `print`), `print-statement`, `comments`, `variable-
@@ -364,26 +369,34 @@ String direkt angewendet), `for-loop` (11), `range-function` (11.1),
 (12.1), `default-parameters` (12.2), `variable-scope` (12.3),
 `docstrings` (12.4), `recursion` (12.5), `args-kwargs` (12.6),
 `lambda-expressions` (12.7), `map-function` (12.8), `filter-function`
-(12.9), `sorted-with-key` (12.10) —
-**39 von 82 Tags (≈ 48 %).**
+(12.9), `sorted-with-key` (12.10), sowie **seit 2026-08-08 die erste
+Hälfte von B9 Datenstrukturen**: `list-basics` (13), `list-slicing`
+(13.1), `list-mutation-methods` (13.2), `tuple-basics` (13.3),
+`dict-basics` (13.4) —
+**44 von 82 Tags (≈ 54 %).**
 
 **Nicht abgedeckt:** `dynamic-typing` als **eigenes** Thema (wird
 durchgehend demonstriert, nie benannt — genau wie `logical-operators` im
 SQL-Kurs), `bool-conversion-truthiness`, `truthiness-in-conditions`,
-`ternary-expression`, und **komplett**: B9 Datenstrukturen, B10
-Comprehensions & Generatoren, B11 Fehlerbehandlung, B12 Module &
-Imports, B13 Dateizugriff, B14 Objektorientierung.
+`ternary-expression`, die zweite Hälfte von B9 (`dict-methods`, `set-
+basics`, `nested-data-structures`, `membership-operator`, `len-
+function`), und **komplett**: B10 Comprehensions & Generatoren, B11
+Fehlerbehandlung, B12 Module & Imports, B13 Dateizugriff, B14
+Objektorientierung.
 
-**Bilanz:** 39 von 82 Tags abgedeckt (≈ 48 %) — weiterhin weniger als SQL
-(55/82, ≈ 67 %), aber die Lücke ist weiter geschrumpft. Der Kursname
-`pythonGrundlagen` deckt inzwischen deutlich mehr als nur die absoluten
-Basics ab (Variablen, Grundrechenarten, Verzweigung, Schleifen, ganz
-Funktionen inklusive *args/**kwargs, lambda, map()/filter()/sorted())
-— B7 und B8 sind jetzt die ersten beiden vollständig geschlossenen
-Zweige. Der Rest (6 von 15 Zweigen komplett unbearbeitet: B9–B14, plus
-Teile von B2/B5/B6) ist weiterhin unbearbeiteter Planungsraum; B9
-Datenstrukturen (10 Tags) ist jetzt der größte zusammenhängende
-Kandidat für die nächste Runde.
+**Bilanz:** 44 von 82 Tags abgedeckt (≈ 54 %) — zum ersten Mal über die
+Hälfte, und die Lücke zu SQL (55/82, ≈ 67 %) ist inzwischen recht klein.
+Der Kursname `pythonGrundlagen` deckt inzwischen deutlich mehr als nur
+die absoluten Basics ab (Variablen, Grundrechenarten, Verzweigung,
+Schleifen, ganz Funktionen inklusive *args/**kwargs, lambda,
+map()/filter()/sorted(), und die Hälfte der Datenstrukturen: Listen,
+Slicing, Listenmethoden, Tupel, Dicts) — B7 und B8 sind vollständig
+geschlossen, B9 zur Hälfte. Der Rest (5 von 15 Zweigen komplett
+unbearbeitet: B10–B14, plus die zweite Hälfte von B9 und Teile von
+B2/B5/B6) ist weiterhin unbearbeiteter Planungsraum; die zweite Hälfte
+von B9 (`dict-methods`, `set-basics`, `nested-data-structures`,
+`membership-operator`, `len-function`) ist der naheliegendste nächste
+Schritt, bevor ein neuer Zweig (B10 Comprehensions) begonnen wird.
 
 ## 7. Bewusst ausgeklammert
 

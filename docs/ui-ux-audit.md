@@ -72,6 +72,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-08 | HEAD (sqlJsEngine + actions.ts + Python-Funktionen) | 93.52 % | 78.25 % | 98.85 % | 93.52 % |
 | 2026-08-08 | HEAD (Python-Funktionen Teil 2: 12.6-12.8) | 93.33 % | 77.88 % | 98.86 % | 93.33 % |
 | 2026-08-08 | HEAD (Test-Lücken + B8 komplett: 12.9-12.10) | 93.48 % | 77.87 % | 98.87 % | 93.48 % |
+| 2026-08-08 | HEAD (Live-Verifikation + B9 Teil 1: 13-13.4) | 93.33 % | 77.45 % | 98.88 % | 93.33 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -432,3 +433,46 @@ sondern pro PR direkt in den Checks sichtbar.
   Python, 4 für die neuen 12.9/12.10-Challenges via
   `challengeRunner.test.ts`). `typecheck`, volle Testsuite (708 Tests)
   und `npm run build` grün nach jedem Schritt.
+
+### 2026-08-08 — Stündliche Routine: Live-Verifikation + B9 Datenstrukturen (Teil 1)
+
+- **Umfang:** (1) Baseline geprüft (708/708 grün). (2) Live-Playwright-
+  Lauf gegen den echten Dev-Server (lokale sql.js/Pyodide-Kopien statt
+  der in dieser Sandbox blockierten CDNs, siehe Runbook oben) — gezielt
+  die fünf Python-Funktionen-Challenges 12.6–12.10 aus der letzten
+  Routine, die bis dahin nur gegen den Node-`python3`-Subprozess
+  verifiziert waren, nie gegen echtes Browser-Pyodide. (3) Erste Hälfte
+  von Python B9 (Datenstrukturen) als neue Challenges 13–13.4 ergänzt,
+  ebenfalls sofort live gegen echtes Pyodide verifiziert statt nur gegen
+  den Node-Testmotor.
+- **Vorgehen (2) Live-Verifikation 12.6–12.10:** Alle fünf Lösungen über
+  den echten "Lösung anzeigen" → "In den Editor übernehmen" → "Ausführen"-
+  Weg im Browser bestätigt: `*args`/`**kwargs` (12.6), lambda (12.7),
+  `map()` (12.8), `filter()` (12.9), `sorted(..., key=len)` (12.10) —
+  alle mit korrektem Status, korrekter Ausgabe und 0 Konsolenfehlern.
+  Bestätigt damit empirisch die in der letzten Routine nur angenommene
+  Äquivalenz von CPython-Subprozess und Browser-Pyodide für diese
+  Sprachfeatures.
+- **Vorgehen (3) Python B9 Teil 1:** `list-basics` (13, Index-Zugriff +
+  `len()`, Distraktor verwechselt Index 2 mit dem zweiten Element —
+  klassischer Off-by-one), `list-slicing` (13.1, `liste[1:4]`, Distraktor
+  setzt `stop` einen zu niedrig), `list-mutation-methods` (13.2,
+  `.append()`/`.remove()`/`.sort()` verkettet, Distraktor vergisst
+  `.sort()` → falsche Reihenfolge), `tuple-basics` (13.3, Unpacking +
+  Summe, Distraktor versucht eine Tupel-Zuweisung → echter `TypeError`
+  demonstriert genau die Unveränderlichkeit), `dict-basics` (13.4, neuer
+  Schlüssel + Update eines bestehenden, Distraktor tippt einen
+  Schlüsselnamen klein → legt versehentlich einen neuen vierten Schlüssel
+  an statt den bestehenden zu überschreiben). Alle fünf über Gate 1/Gate 2
+  und zusätzlich live im Browser gegen echtes Pyodide bestätigt (5/5
+  Lösungen, 0 Konsolenfehler).
+- **Ergebnis:** Keine Bugs gefunden — alle Lösungen und Distraktoren
+  verhalten sich wie erwartet, sowohl im Node-Testmotor als auch live im
+  Browser. Python-Konzept-Hierarchie-Bilanz: 39/82 → 44/82 Tags (≈ 54 %,
+  erstmals über die Hälfte). B9 zur Hälfte abgedeckt (5/10); die zweite
+  Hälfte (`dict-methods`, `set-basics`, `nested-data-structures`,
+  `membership-operator`, `len-function`) ist der naheliegende nächste
+  Schritt vor einem neuen Zweig.
+- **Tests:** 708 → 718 (+10, alle für die fünf neuen
+  Datenstrukturen-Challenges via `challengeRunner.test.ts`). `typecheck`,
+  volle Testsuite (718 Tests) und `npm run build` grün.
