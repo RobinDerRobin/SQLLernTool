@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createNodePythonEngine } from '../../../test/helpers/nodePythonEngine';
 import { createNodeSqliteEngine } from '../../../test/helpers/nodeSqliteEngine';
 import type { ClaudeChatClient } from '../../chat/claudeChatClient';
+import { pythonGrundlagenCourse } from '../../content/tracks/python/courses/pythonGrundlagen/course';
 import { sqlLernenToolCourse } from '../../content/tracks/sqlite/courses/sqlLernenTool/course';
 import {
   createDefaultProgressState,
@@ -35,6 +37,7 @@ import {
 
 const c01 = sqlLernenToolCourse.challenges.find((c) => c.num === '01')!;
 const c1_1 = sqlLernenToolCourse.challenges.find((c) => c.num === '1.1')!;
+const py01 = pythonGrundlagenCourse.challenges.find((c) => c.num === '01')!;
 
 function createTestEngineFactory(): EngineFactory {
   const main = createNodeSqliteEngine();
@@ -185,6 +188,27 @@ describe('playChallenge', () => {
     // The main engine must be completely unaffected by the play-check.
     expect(tableNames(ctx)).toEqual(mainTablesBefore);
   });
+
+  it("marks a Python challenge's saved draft 'ok' when it passes its own validate()", () => {
+    let progress = createDefaultProgressState();
+    progress = withChallengeProgress(progress, 'python', 'pythonGrundlagen', '01', { draftSql: py01.solution });
+    const { ctx } = makeCtx(progress);
+    ctx.engines = { ...createTestEngineFactory(), getMainPython: () => createNodePythonEngine() };
+
+    playChallenge(ctx, 'python', 'pythonGrundlagen', '01');
+
+    expect(ctx.store.getState().session.playResults['python:pythonGrundlagen:01']).toBe('ok');
+  });
+
+  it('marks a Python challenge "err" (not throwing) when the Python engine has not loaded yet', () => {
+    let progress = createDefaultProgressState();
+    progress = withChallengeProgress(progress, 'python', 'pythonGrundlagen', '01', { draftSql: py01.solution });
+    const { ctx } = makeCtx(progress);
+
+    playChallenge(ctx, 'python', 'pythonGrundlagen', '01');
+
+    expect(ctx.store.getState().session.playResults['python:pythonGrundlagen:01']).toBe('err');
+  });
 });
 
 describe('resetSchema', () => {
@@ -248,6 +272,48 @@ describe('runQuery', () => {
     runQuery(ctx, c01.solution);
     const names = ctx.store.getState().session.tablesInfo?.map((t) => t.name) ?? [];
     expect(names).toContain('users');
+  });
+
+  it('runs Python against the Python engine and awards stars on success', () => {
+    const { ctx } = makeCtx();
+    ctx.engines = {
+      ...createTestEngineFactory(),
+      getMainPython: () => createNodePythonEngine(),
+    };
+    selectChallenge(ctx, 'python', 'pythonGrundlagen', '01');
+
+    const outcome = runQuery(ctx, py01.solution);
+    if (outcome.kind !== 'python') throw new Error('expected a python outcome');
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.error).toBeNull();
+    const progress = getChallengeProgress(ctx.store.getState().progress, 'python', 'pythonGrundlagen', '01');
+    expect(progress.bestStars).toBeGreaterThan(0);
+    expect(ctx.store.getState().session.playResults['python:pythonGrundlagen:01']).toBe('ok');
+  });
+
+  it('returns "python-loading" when the Python engine has not finished loading yet', () => {
+    const { ctx } = makeCtx();
+    selectChallenge(ctx, 'python', 'pythonGrundlagen', '01');
+
+    const outcome = runQuery(ctx, py01.solution);
+
+    expect(outcome.kind).toBe('python-loading');
+  });
+
+  it('marks a failing Python script\'s play result "err" without throwing', () => {
+    const { ctx } = makeCtx();
+    ctx.engines = {
+      ...createTestEngineFactory(),
+      getMainPython: () => createNodePythonEngine(),
+    };
+    selectChallenge(ctx, 'python', 'pythonGrundlagen', '01');
+
+    const outcome = runQuery(ctx, 'raise ValueError("boom")');
+    if (outcome.kind !== 'python') throw new Error('expected a python outcome');
+
+    expect(outcome.error).toContain('ValueError');
+    expect(ctx.store.getState().session.playResults['python:pythonGrundlagen:01']).toBe('err');
   });
 });
 
@@ -318,6 +384,35 @@ describe('revealHint', () => {
     revealHint(ctx, 1); // hintsUsed is 0, so index 1 is not next
 
     expect(getChallengeProgress(ctx.store.getState().progress, 'sqlite', 'sqlLernenTool', '01').hintsUsed).toBe(0);
+  });
+
+  it('grounds the third (most revealing) hint level in its own authored text', () => {
+    const { ctx } = makeCtx();
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
+
+    revealHint(ctx, 0);
+    revealHint(ctx, 1);
+    revealHint(ctx, 2);
+
+    const history = getChallengeProgress(ctx.store.getState().progress, 'sqlite', 'sqlLernenTool', '01').chatHistory;
+    const thirdPrompt = history.filter((m) => m.role === 'user')[2]?.content ?? '';
+    expect(thirdPrompt).toContain(stripHtml(c01.hints[2]));
+    expect(thirdPrompt).toContain('Der vorgesehene Tipp 3 lautet');
+  });
+
+  it('asks for a hint without grounding text once past the last authored hint (idx out of hints range)', () => {
+    const { ctx, sendMessage } = makeCtx();
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
+    revealHint(ctx, 0);
+    revealHint(ctx, 1);
+    revealHint(ctx, 2);
+    sendMessage.mockClear();
+
+    revealHint(ctx, 3);
+
+    expect(getChallengeProgress(ctx.store.getState().progress, 'sqlite', 'sqlLernenTool', '01').hintsUsed).toBe(4);
+    const call = sendMessage.mock.calls[0]?.[0] as { userText: string };
+    expect(call.userText).not.toContain('Der vorgesehene Tipp');
   });
 });
 
