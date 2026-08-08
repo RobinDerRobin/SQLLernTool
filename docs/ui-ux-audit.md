@@ -70,6 +70,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-07 | HEAD (SQL-Fensterfunktionen + F-015-Fix) | 92.82 % | 78.15 % | 97.38 % | 92.82 % |
 | 2026-08-07 | HEAD (Ende Tag: 4 weitere Coverage-Lücken) | 93.05 % | 78.48 % | 97.96 % | 93.05 % |
 | 2026-08-08 | HEAD (sqlJsEngine + actions.ts + Python-Funktionen) | 93.52 % | 78.25 % | 98.85 % | 93.52 % |
+| 2026-08-08 | HEAD (Python-Funktionen Teil 2: 12.6-12.8) | 93.33 % | 77.88 % | 98.86 % | 93.33 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -342,3 +343,49 @@ sondern pro PR direkt in den Checks sichtbar.
   die neuen Python-Funktionen-Challenges via `challengeRunner.test.ts`).
   `typecheck`, volle Testsuite und `npm run build` grün nach jedem
   Schritt.
+
+#### Nachtrag (selbe Datum, Routine manuell nachgefeuert) — C#-Hosting-Entscheidung + Python-Funktionen Teil 2
+
+- **Umfang:** (1) C# stand jetzt explizit im Scope (User-Anweisung
+  "let's include c#"). Erster offener Punkt aus
+  `docs/csharp-engine-poc.md`s Restliste bearbeitet: die
+  COOP/COEP-Hosting-Frage für GitHub Pages recherchiert und entschieden.
+  (2) Zweite Teilcharge von Python B8 (Funktionen): die restlichen 5
+  Tags minus 2 als Challenges 12.6–12.8 ergänzt.
+- **Vorgehen (1) COOP/COEP:** Recherchiert, wie andere WASM-Projekte
+  (Wasmer, Godot-Web-Exports, diverse HuggingFace Spaces) SharedArrayBuffer
+  auf Hosts ohne Custom-Header-Kontrolle (wie GitHub Pages) zum Laufen
+  bringen. Etablierte Lösung: `coi-serviceworker` — ein kleiner Service
+  Worker, der die eigene Navigations-Response um COOP/COEP-Header
+  ergänzt, weil ein Service Worker Header auf abgefangene Requests setzen
+  darf, auch wenn der Origin-Server (GitHub Pages) das nicht kann. Dabei
+  auch eine falsche Annahme aus einer früheren Doku-Version korrigiert:
+  es gibt **keinen** `<meta>`-Tag-Ersatz für `Cross-Origin-Embedder-Policy`
+  — COEP ist laut Spezifikation reiner HTTP-Header, kein Meta-Tag-Feature.
+  Entscheidung, Trade-offs (ein Reload beim ersten Besuch, Scope auf die
+  C#-Route beschränken, `Document-Isolation-Policy` als möglicher
+  zukünftiger Ersatz) in `docs/csharp-engine-poc.md` festgehalten. Reines
+  Doku-/Recherche-Increment, kein Code geändert — folgt der eigenen
+  Vorgabe im Dokument, jede Runde als **ein** abgeschlossenes Increment zu
+  behandeln statt die Architektur-Entscheidungen zu überstürzen.
+- **Vorgehen (2) Python B8 Teil 2:** `args-kwargs` (12.6, Funktion
+  `bestellung(*artikel, **extras)`, Distraktor vergisst den doppelten
+  Stern vor `extras` → `TypeError: unexpected keyword argument`),
+  `lambda-expressions` (12.7, `quadrat = lambda x: x ** 2`, Distraktor
+  ruft das Lambda nie auf — `ergebnis` bleibt eine Funktion statt einer
+  Zahl), `map-function` (12.8, `list(map(lambda x: x * 2, zahlen))`,
+  Distraktor vergisst `list(...)` — `verdoppelt` bleibt ein lazy
+  map-Objekt). Alle drei über Gate 1/Gate 2 (`challengeRunner.test.ts`,
+  läuft gegen einen echten `python3`-Subprozess) verifiziert; da Pyodide
+  echtes CPython zu WASM kompiliert, ist das Verhalten von `*args`,
+  `**kwargs`, `lambda` und `map()` zwischen Node-Subprozess und
+  Browser-Pyodide identisch, ein zusätzlicher Playwright-Lauf war für
+  diese drei Sprachfeatures nicht nötig. Nur noch `filter-function` und
+  `sorted-with-key` offen für B8 — kleine Restcharge.
+- **Ergebnis:** Python-Konzept-Hierarchie-Bilanz: 34/82 → 37/82 Tags
+  (≈ 45 %). C#-Engine-Integration: Schritt 1 der Restliste
+  (Hosting-Frage) abgeschlossen, Schritt 2 (Projekt-Scaffold) ist der
+  nächste sinnvolle Schritt für eine künftige Runde.
+- **Tests:** 689 → 695 (+6, alle für die drei neuen
+  Python-Funktionen-Challenges via `challengeRunner.test.ts`).
+  `typecheck`, volle Testsuite (695 Tests) und `npm run build` grün.
