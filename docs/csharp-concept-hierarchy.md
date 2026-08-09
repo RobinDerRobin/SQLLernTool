@@ -431,8 +431,11 @@ graph TD
 
 ## 6. Abgleich mit der aktuellen Implementierung
 
-Anders als SQL (43/82) und Python (20/82) gibt es für C# **keine
-Implementierung, die abgeglichen werden könnte** — bestätigt per
+Anders als SQL (damals 43/82, Stand inzwischen 59/82) und Python (damals
+20/82, Stand inzwischen 66/82 — siehe die jeweiligen Dokumente für den
+aktuellen Stand, hier absichtlich als historischer Vergleichswert zum
+Zeitpunkt der Ersterhebung belassen) gab es für C# zu diesem Zeitpunkt
+**keine Implementierung, die abgeglichen werden könnte** — bestätigt per
 `grep -rn "csharp\|C#\|CSharp" src --include="*.ts"`: die einzigen vier
 Treffer sind reine Kommentar-Erwähnungen als Zukunfts-Platzhalter in
 `LanguagePlugin.ts`, `Runtime.ts`, `challenge.types.ts` und `stars.ts` —
@@ -446,6 +449,91 @@ Implementierungs-Anker**, anders als die ersten beiden Dokumente, die
 zumindest teilweise an echten Challenges verifiziert werden konnten. Jede
 Aussage über C#-Struktur in diesem Dokument stammt aus Sprachwissen über
 C# selbst, nicht aus Code-Beobachtung im Repository.
+
+*Update 2026-08-08: Es gibt inzwischen einen ersten Implementierungs-Anker
+— allerdings Engine-Infrastruktur, keine Inhalte. `csharp-engine/` (neues
+Top-Level-Verzeichnis, kein `src/`) ist ein echtes, ins Git eingechecktes
+Blazor-WASM-Projekt, das über Roslyn (`CSharpCompilation`) echten C#-Code
+kompiliert und im Browser ausführt — verifiziert per `dotnet build` und
+einem echten `dotnet run` + Playwright-Smoke-Test. Das ist Schritt 2 der
+Restliste in `docs/csharp-engine-poc.md` ("Scaffold der Projektstruktur");
+`src/` selbst bleibt unverändert bei 0 Treffern, und die Tag-Bilanz bleibt
+bei 0/86, weil hier noch keine Challenges, kein `src/runtime/csharp/`-
+Loader und keine `CSharpChallenge`-Typen existieren — nur der Compiler
+läuft schon.*
+
+*Update 2026-08-08 (stündliche Routine, Fortsetzung): Schritt 3 der
+Restliste ist jetzt ebenfalls abgeschlossen —
+`src/runtime/csharp/csharpEngine.ts` existiert und lädt/bootet den
+Blazor-Motor im Browser (`loadCSharpEngineFromServer` + `exec()`/`reset()`
+über `createCSharpEngine`), live gegen den echten kompilierten
+Blazor+Roslyn-Bundle verifiziert (Erfolg, Compiler-Fehler und
+Laufzeit-Exception kommen alle korrekt durch). Die Tag-Bilanz bleibt
+trotzdem bei 0/86: ein Ausführungs-Loader ist noch kein Inhalts-Track —
+es existieren weiterhin keine `CSharpChallenge`-Typen, kein
+`csharp`-Content-Verzeichnis unter `src/content/tracks/` und keine einzige
+Challenge. Nächster Schritt laut `docs/csharp-engine-poc.md`: die
+`validate()`-Design-Entscheidung (Schritt 4) — erst danach kann die
+Tag-Bilanz hier überhaupt anfangen sich zu bewegen.*
+
+*Update 2026-08-09 (stündliche Routine, Fortsetzung): Schritt 4 ist jetzt
+ebenfalls entschieden — **stdout-only**. `Console.WriteLine` ist der
+natürliche Weg für Einsteiger-C#, Ausgabe zu erzeugen (genaue Parallele zu
+Pythons `print()`), und dieses Projekt nutzt `stdout`-Prüfungen in
+Python-Validatoren bereits als etabliertes Muster. Die Alternative
+(Ergebnisse über `public static`-Felder einer bekannten Klasse
+zurückmelden, per Reflection ausgelesen) wurde bewusst verworfen — sie
+hätte schon die allererste Lektion gezwungen, `static` zu benutzen, obwohl
+`static-members` laut Tag-Katalog oben ein Level-6-Tag in B10 ist, den der
+Kurs an dieser Stelle noch gar nicht erklärt hätte. Als direkte Folge:
+Das seit Schritt 3 nur als Platzhalter vorhandene, nie befüllte
+`result`-Feld wurde aus `CSharpExecResult` (`src/runtime/csharp/
+CSharpRuntime.ts`) und aus dem C#-Treiber selbst (`csharp-engine/
+CSharpEngine.cs`) entfernt und die Änderung live gegen den echten
+kompilierten Bundle erneut bestätigt (Erfolgs- und Compiler-Fehler-Pfad).
+Tag-Bilanz bleibt bei 0/86 — eine Design-Entscheidung ist noch kein
+Content-Track. Nächster Schritt: Schritt 5, das mechanische Scaffolding
+des `csharp`-Content-Tracks (keine offenen Design-Fragen mehr).*
+
+*Update 2026-08-09 (stündliche Routine, Fortsetzung): Schritt 5 zum Teil
+erledigt — `src/content/tracks/csharp/types.ts` (`CSharpChallenge`-Typ)
+und `src/content/tracks/csharp/courses/csharpGrundlagen/course.ts` (noch
+`challenges: []`, exakt nach dem Vorbild von `pythonGrundlagenCourse`)
+existieren jetzt, ebenso `csharpChallengeSchema` in
+`src/content/schema.ts`. Bewusst NICHT in `src/content/registry.ts`s
+`TRACKS` eingetragen — das würde „C#" sofort als echten, wählbaren Kurs
+in der Live-Kurs-Auswahl erscheinen lassen (die UI iteriert `TRACKS`
+generisch, keine weitere Code-Änderung nötig), obwohl vier Lücken noch
+offen sind, bevor ein ausgewählter C#-Kurs tatsächlich funktionieren
+würde: kein C#-Fall in der Engine-Fabrik (`ctx.engines`), kein
+C#-`LanguagePlugin` für den Editor, keine servierte Blazor-Bundle-Quelle
+in Dev/Prod, und (logisch vorausgesetzt) noch keine einzige Challenge.
+Tag-Bilanz bleibt bei 0/86 — ein leerer, unregistrierter Kurs ist noch
+kein Content. Nächster Schritt: Schritt 6 (Node-Testmotor für CI) kann
+unabhängig von den vier oben genannten Live-UI-Lücken weitergehen, da er
+nur die jetzt existierenden Typen braucht, nicht die Live-Registrierung.*
+
+*Update 2026-08-09 (stündliche Routine, Fortsetzung): Schritt 6 jetzt
+fertig — `test/helpers/nodeCSharpEngine.ts` plus ein eigenes, separat
+eingechecktes Desktop-.NET-Treiberprojekt (`csharp-engine/driver/`,
+`CSharpDriver.csproj`), das dieselbe `CSharpCompilation`-Pipeline wie
+`CSharpEngine.cs` implementiert, aber über `AppContext.GetData(
+"TRUSTED_PLATFORM_ASSEMBLIES")` statt über `HttpClient`-Fetches gegen
+`wwwroot/refs/` an Referenz-Assemblies kommt (auf Desktop-.NET funktioniert
+`Assembly.Location` normal, anders als unter Mono/WASM). Ein `dotnet run`
+gegen ein frisches Temp-Projekt pro `exec()`-Aufruf wurde verworfen (NuGet-
+Restore + vollständiger Build bei jedem Aufruf, zu langsam für eine
+Testsuite mit einem Prozess pro Challenge/Distraktor); stattdessen wird der
+Treiber einmalig gebaut und pro `exec()` nur noch per `dotnet exec
+<Driver.dll> <Pfad>` aufgerufen (~1,0–2,4 s pro Aufruf, gemessen). Fünf
+Smoke-Tests (`nodeCSharpEngine.test.ts`) bestätigen Erfolg, Compiler-Fehler,
+Laufzeit-Exception, frischer Namensraum pro Aufruf, und LINQ — alle grün
+gegen den echten `dotnet`-Toolchain (kein Mock). Tag-Bilanz bleibt bei
+0/86 — ein Testmotor ist noch kein Content. Nächster Schritt: Schritt 7
+(echte Challenges), sobald zusätzlich ein `describeCSharpCourse` in
+`test/content/challengeRunner.test.ts` ergänzt wurde (diese Datei iteriert
+`TRACKS` bisher nicht generisch, sondern ruft `describeSqlCourse`/
+`describePythonCourse` fest verdrahtet auf).*
 
 ## 7. Bewusst ausgeklammert
 

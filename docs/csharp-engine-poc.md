@@ -1,0 +1,550 @@
+# C# Execution Engine — Proof-of-Concept Findings
+
+Status as of 2026-08-08: **feasibility proven, not yet integrated into the
+repo.** This document exists so the knowledge survives independently of
+the session/scratchpad it was built in — the working POC currently lives
+only in an ephemeral sandbox scratchpad directory, which does not persist
+across sessions/containers. Read this doc first before redoing any of the
+exploration below.
+
+## The question
+
+`docs/csharp-concept-hierarchy.md` documents a full C# concept space (86
+tags, 17 branches) but the tool has **zero** C# challenges, because unlike
+SQL (`sql.js`) and Python (`Pyodide`), there is no lightweight,
+npm-installable, prebuilt WASM blob for C#. Building a real engine means
+compiling and running actual Roslyn (the C# compiler) inside the browser —
+a fundamentally bigger undertaking than dropping in a CDN script.
+
+## What was proven
+
+A real, working pipeline: **Blazor WebAssembly + Roslyn**, using `[JSExport]`
+to bridge JS↔C#, mirroring the exact driver-script pattern this project
+already uses for `pyodideEngine.ts` and `sqlJsEngine.ts` — take a source
+string, compile it, run it, return `{stdout, error}` as JSON.
+
+Verified working end-to-end in a real headless browser (Playwright,
+not simulated): variables/arithmetic, `foreach`/`List<T>`, classes with
+auto-properties and methods, `try`/`catch` with real .NET exception
+messages, LINQ (`Where`/`Select`/`Range`), and correct compiler
+diagnostics on bad code (e.g. `CS0029`).
+
+**Bundle size: ~9 MB brotli-compressed** (~55 MB uncompressed, but real
+browsers get the compressed transfer) — comparable to Pyodide, a
+reasonable one-time load for a learning tool.
+
+## Environment prerequisites (already done in this sandbox, redo if starting fresh)
+
+The .NET SDK is not preinstalled. It installs cleanly via apt in this
+sandbox (the apt mirror already carries `dotnet-sdk-8.0` and the
+`Microsoft.NETCore.App.Ref` reference-assembly pack — no need to reach
+Microsoft's own CDN, which is blocked here):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y dotnet-sdk-8.0
+export DOTNET_CLI_TELEMETRY_OPTOUT=1
+dotnet workload install wasm-tools --skip-manifest-update
+```
+
+NuGet.org itself **is** reachable from this sandbox (unlike the blocked
+CDN domains), so `dotnet restore`/`dotnet publish` work normally once the
+SDK + wasm-tools workload are in place.
+
+## Four real WASM-specific bugs found, and their fixes
+
+These are not implementation mistakes to avoid — they're genuine
+platform constraints anyone attempting this will hit:
+
+1. **Roslyn's `CSharpScript`/Scripting API cannot run under
+   Mono/WASM at all.** It calls `MetadataReference.CreateFromAssemblyInternal`
+   on the calling assembly, which needs `Assembly.Location` — a real file
+   path — but assemblies loaded under the WASM/Mono runtime have no such
+   path. This isn't fixable by passing `ScriptOptions.WithReferences(...)`;
+   Roslyn's scripting layer *always* additionally tries to auto-reference
+   the "language runtime assembly" via `typeof(object).Assembly`, which hits
+   the same failure regardless. **Fix: don't use the Scripting API at all.**
+   Use the lower-level `CSharpCompilation.Create(...)` + `.Emit(stream)` +
+   `Assembly.Load(bytes)` + reflection-invoke the entry point instead — the
+   same pipeline `dotnet run` itself uses, just driven from a source string
+   instead of a `.cs` file on disk. This is arguably the *more* correct
+   architecture for this tool anyway (handles full programs — classes,
+   multiple methods — not just script-style snippets).
+
+2. **`MetadataReference`s must be built from real reference-assembly
+   bytes, explicitly.** There's no way to just "use the assemblies already
+   loaded" (see #1). Fix: copy a curated subset of
+   `.dll` files from `/usr/lib/dotnet/packs/Microsoft.NETCore.App.Ref/<ver>/ref/net8.0/`
+   into `wwwroot/refs/`, fetch them via `HttpClient` at runtime, and build
+   `MetadataReference.CreateFromImage(bytes)` for each. A curated set
+   (`System.Runtime`, `System.Console`, `System.Linq`,
+   `System.Linq.Expressions`, `System.Collections`, `System.ObjectModel`,
+   `System.Text.RegularExpressions`, `System.Runtime.Extensions`,
+   `System.Threading`, `System.Threading.Tasks`, `netstandard`) is only
+   ~1.1 MB and covers everything used in this POC's test snippets. Expand
+   as real challenge content demands more of the BCL surface.
+
+3. **`CSharpCompilation.Emit(...)` throws
+   `PlatformNotSupportedException: Cannot wait on monitors on this
+   runtime`.** Roslyn's own CLS-compliance checker (`ClsComplianceChecker`)
+   parallelizes internally using blocking `Task.Wait()` calls, which the
+   default *single-threaded* WASM runtime cannot support (no real OS
+   threads, so no true blocking wait). Fix: opt into **multithreaded WASM**
+   (`<WasmEnableThreads>true</WasmEnableThreads>` — an official, supported
+   .NET 8 feature, just not the default). This in turn requires the page
+   be served with `Cross-Origin-Opener-Policy: same-origin` and
+   `Cross-Origin-Embedder-Policy: require-corp` headers (needed for
+   `SharedArrayBuffer`, which multithreaded WASM depends on) — a real
+   production deployment consideration, not just a test-server quirk.
+
+4. **IL trimming silently deletes runtime methods that only the user's
+   dynamically-compiled code calls.** Blazor's default publish pipeline
+   trims unused API surface based on static analysis of *this app's own*
+   code — but since arbitrary user C# is only known at runtime, the
+   trimmer has no way to know e.g. `Console.WriteLine(int)` will be
+   needed, and removes it. Symptom:
+   `MissingMethodException: Method not found: void System.Console.WriteLine(int)`
+   even though the code compiled fine. Fix:
+   `<PublishTrimmed>false</PublishTrimmed>` — a correctness requirement
+   for this specific use case, not an optional size optimization to skip.
+   (Also set `<RunAOTCompilation>false</RunAOTCompilation>` — AOT doesn't
+   help here since the compiled-at-runtime user assembly can't be AOT'd
+   ahead of time anyway.)
+
+Also needed: `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>` (required by
+the `[JSExport]` source generator itself, unrelated to user code).
+
+A fifth, mundane pitfall: **incremental `dotnet publish` can leave
+`blazor.boot.json`'s SHA-256 integrity hashes stale** relative to the
+actual `dotnet.native.wasm` bytes after a config change (e.g. toggling
+`WasmEnableThreads`), causing the browser's Subresource Integrity check to
+reject the file with "Failed to fetch" / "SRI's integrity checks failed".
+Fix: delete `bin/`/`obj/` and do a clean publish after any
+`<PropertyGroup>` change.
+
+## The working files (as of this POC)
+
+`CSharpEngineBlazor.csproj` property group:
+
+```xml
+<PropertyGroup>
+  <TargetFramework>net8.0</TargetFramework>
+  <Nullable>enable</Nullable>
+  <ImplicitUsings>enable</ImplicitUsings>
+  <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  <WasmEnableThreads>true</WasmEnableThreads>
+  <PublishTrimmed>false</PublishTrimmed>
+  <RunAOTCompilation>false</RunAOTCompilation>
+</PropertyGroup>
+<ItemGroup>
+  <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.29" />
+  <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.29" PrivateAssets="all" />
+  <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.9.2" />
+</ItemGroup>
+```
+
+(The `Microsoft.CodeAnalysis.CSharp.Scripting` package pulls in
+`Microsoft.CodeAnalysis.CSharp` transitively, which is what's actually
+used — see finding #1 above for why the Scripting API itself is unused.)
+
+`CSharpEngine.cs` (the `[JSExport]` driver, the C# analogue of
+`pyodideEngine.ts`'s `DRIVER_SCRIPT`):
+
+```csharp
+using System.Reflection;
+using System.Runtime.InteropServices.JavaScript;
+using System.Text.Json;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+
+namespace CSharpEngineBlazor;
+
+public partial class CSharpEngine
+{
+    private static readonly string[] RefAssemblyNames =
+    {
+        "System.Runtime", "System.Console", "System.Linq", "System.Linq.Expressions",
+        "System.Collections", "System.ObjectModel", "System.Text.RegularExpressions",
+        "System.Runtime.Extensions", "System.Threading", "System.Threading.Tasks", "netstandard",
+    };
+
+    private static MetadataReference[]? _cachedRefs;
+
+    private static async Task<MetadataReference[]> GetReferencesAsync()
+    {
+        if (_cachedRefs is not null) return _cachedRefs;
+
+        using var http = new HttpClient { BaseAddress = new Uri("http://localhost:8899/") }; // fix: relative to actual deploy origin
+        var refs = new List<MetadataReference>();
+        foreach (var name in RefAssemblyNames)
+        {
+            var bytes = await http.GetByteArrayAsync($"refs/{name}.dll");
+            refs.Add(MetadataReference.CreateFromImage(bytes));
+        }
+        _cachedRefs = refs.ToArray();
+        return _cachedRefs;
+    }
+
+    [JSExport]
+    public static async Task<string> RunCode(string userCode)
+    {
+        var sw = new StringWriter();
+        var originalOut = Console.Out;
+        object? result = null;
+        string? error = null;
+        try
+        {
+            var refs = await GetReferencesAsync();
+            var parseOptions = new CSharpParseOptions(LanguageVersion.Latest);
+            var tree = CSharpSyntaxTree.ParseText(userCode, parseOptions);
+            var usingsTree = CSharpSyntaxTree.ParseText(
+                "global using System;\nglobal using System.Linq;\nglobal using System.Collections.Generic;\nglobal using System.Threading.Tasks;\n",
+                parseOptions);
+            var compilation = CSharpCompilation.Create(
+                "UserSubmission",
+                new[] { tree, usingsTree },
+                refs,
+                new CSharpCompilationOptions(OutputKind.ConsoleApplication, optimizationLevel: OptimizationLevel.Debug));
+
+            using var peStream = new MemoryStream();
+            var emitResult = compilation.Emit(peStream);
+            if (!emitResult.Success)
+            {
+                error = string.Join("\n", emitResult.Diagnostics
+                    .Where(d => d.Severity == DiagnosticSeverity.Error)
+                    .Select(d => d.ToString()));
+            }
+            else
+            {
+                peStream.Seek(0, SeekOrigin.Begin);
+                var assembly = Assembly.Load(peStream.ToArray());
+                var entryPoint = assembly.EntryPoint!;
+                Console.SetOut(sw);
+                try
+                {
+                    var parameters = entryPoint.GetParameters().Length == 0 ? null : new object?[] { Array.Empty<string>() };
+                    var invokeResult = entryPoint.Invoke(null, parameters);
+                    if (invokeResult is Task task) await task;
+                }
+                finally { Console.SetOut(originalOut); }
+            }
+        }
+        catch (Exception ex) { error = ex.ToString(); }
+        finally { Console.SetOut(originalOut); }
+
+        return JsonSerializer.Serialize(new { stdout = sw.ToString(), result = result?.ToString(), error });
+    }
+}
+```
+
+`index.html` boot snippet (Blazor-specific JS↔C# bridge access pattern):
+
+```html
+<script src="_framework/blazor.webassembly.js" autostart="false"></script>
+<script>
+  Blazor.start().then(async () => {
+    const exports = await Blazor.runtime.getAssemblyExports('CSharpEngineBlazor');
+    const json = await exports.CSharpEngineBlazor.CSharpEngine.RunCode(userCode);
+    // JSON.parse(json) -> { stdout, result, error }
+  });
+</script>
+```
+
+Build/run recipe used for verification:
+
+```bash
+export DOTNET_CLI_TELEMETRY_OPTOUT=1
+dotnet publish -c Release            # produces bin/Release/net8.0/publish/wwwroot
+# serve wwwroot with a static server that sets COOP/COEP headers (see below),
+# then drive it with Playwright like any other page in this project's UI checks.
+```
+
+A minimal COOP/COEP-aware static server (Python's `http.server` doesn't
+send these by default):
+
+```python
+import http.server, sys
+class Handler(http.server.SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_header('Cross-Origin-Opener-Policy', 'same-origin')
+        self.send_header('Cross-Origin-Embedder-Policy', 'require-corp')
+        super().end_headers()
+http.server.test(HandlerClass=Handler, port=int(sys.argv[1]), bind='127.0.0.1')
+```
+
+Real end-user deployment (GitHub Pages, per this project's existing
+`deploy-pages.yml`) needs the same two headers — GitHub Pages does not
+let you set custom response headers directly. **Note there is in fact no
+`<meta>`-tag equivalent for `Cross-Origin-Embedder-Policy`** — unlike CSP,
+COEP is HTTP-header-only per spec, so that workaround (mentioned as an
+open option in an earlier draft of this doc) does not actually exist and
+should be discarded.
+
+### Decision: use the `coi-serviceworker` technique (resolved 2026-08-08)
+
+Researched the actual prior art for "SharedArrayBuffer on GitHub Pages"
+(a well-trodden problem for WASM projects — Wasmer, Godot web exports,
+several HuggingFace Spaces, etc. all hit it). The established solution is
+[`coi-serviceworker`](https://github.com/gzuidhof/coi-serviceworker): a
+small service-worker script that intercepts the page's own navigation
+request and re-serves it with `Cross-Origin-Opener-Policy: same-origin`
+and `Cross-Origin-Embedder-Policy: require-corp` injected, since a service
+worker *can* set response headers on requests it intercepts even when the
+origin server (GitHub Pages) can't be configured to. This is exactly the
+same mechanism `docs.wasmer.io` documents for its own GH-Pages-hosted WASM
+SDK, and is what most GH-Pages-hosted threaded-WASM demos in the wild
+actually use (see also `tomayac`'s 2025 write-up on the same pattern).
+
+**Chosen over the alternatives** because it requires no change to this
+project's hosting (stays on GitHub Pages, no new host/DNS/cert to manage)
+and no change to `deploy-pages.yml`'s deployment target — only static
+files added to the built output. Moving the C# assets to a
+header-capable host (Cloudflare Pages/Netlify) was the fallback if this
+didn't pan out; it doesn't need to be pursued now.
+
+**Known trade-offs to carry into implementation (step 3 below):**
+- The service worker reloads the page once on first visit to activate
+  itself (standard SW-registration-then-reload pattern) — acceptable for
+  a learning tool, but means the C# engine's own loading UI needs to
+  tolerate one extra reload before it starts fetching Blazor assets, and
+  this should not affect the SQL/Python tracks at all if the service
+  worker's scope is limited to only the page/route that hosts the C#
+  engine (avoid registering it site-wide).
+- COEP `require-corp` only requires `Cross-Origin-Resource-Policy` headers
+  on genuinely cross-origin subresources; everything the Blazor boot
+  sequence fetches (`.wasm`, `.dll`, `blazor.boot.json`, etc.) will be
+  same-origin GitHub Pages assets, so no per-file CORP header wrangling
+  is expected to be needed — worth a real Playwright check once step 3 is
+  built, not just assumed.
+- A newer header, `Document-Isolation-Policy: isolate-and-credentialless`,
+  is emerging (W3C TAG review as of 2026) as a lower-friction alternative
+  that doesn't require COEP on the *page itself* — not yet broadly
+  supported enough to depend on, but worth re-checking browser support
+  before shipping in case it lets the service-worker hack be dropped
+  later.
+
+**This question is now resolved for planning purposes.** Step 3 below
+(the browser-side loader) should build on this decision rather than
+re-litigate it.
+
+## What's left to actually integrate this (not done yet)
+
+Roughly in dependency order:
+
+1. ~~Resolve the COOP/COEP hosting question~~ — **done, see decision
+   above: `coi-serviceworker`, scoped to the C# engine's own route.**
+2. ~~Scaffold the actual project directory~~ — **done (2026-08-08):
+   `csharp-engine/` at the repo root, checked into git (source only —
+   `bin/`, `obj/`, and `wwwroot/refs/*.dll` are gitignored, see below).
+   Promoted straight from the scratchpad POC with three real fixes along
+   the way, verified with a fresh `dotnet build` + a live `dotnet run` +
+   Playwright smoke test (not just "it compiles"):**
+   - Swapped the `Microsoft.CodeAnalysis.CSharp.Scripting` package for
+     plain `Microsoft.CodeAnalysis.CSharp` — the Scripting API was never
+     used (abandoned per the bugs section above), only `CSharpCompilation`
+     is, so the extra package was dead weight.
+   - `CSharpEngine.GetReferencesAsync()` fetched its reference DLLs from a
+     hardcoded `http://localhost:8899/` — a throwaway dev-only file server
+     that only existed on the machine that built the original POC. Fixed
+     to fetch from a same-origin relative path (`wwwroot/refs/`, via a
+     `BaseAddress` static field set once from `Program.cs`'s
+     `WebAssemblyHostBuilder.HostEnvironment.BaseAddress`), so it works
+     under both `dotnet run` and a real static-hosted deployment without
+     any separate server or CORS configuration.
+   - The reference-assembly `.dll`s themselves are **not** committed as
+     binaries. `CSharpEngineBlazor.csproj` has a
+     `CopyCSharpEngineRefAssemblies` MSBuild target (`BeforeTargets="Build"`)
+     that copies the exact set `CSharpEngine.cs` needs straight out of the
+     installed SDK's own `Microsoft.NETCore.App.Ref` targeting pack
+     (resolved via the `$(NetCoreTargetingPackRoot)` /
+     `$(BundledNETCoreAppPackageVersion)` MSBuild properties, confirmed to
+     resolve correctly on this sandbox's apt-installed SDK) — so they can
+     never go stale relative to whichever SDK actually builds the project,
+     and the repo stays free of ~1MB of binary blobs that a build step can
+     regenerate on demand.
+
+   Verified end-to-end: `dotnet build` succeeds cleanly, the ref-copy
+   target populates `wwwroot/refs/` with all 11 needed DLLs, and
+   `dotnet run` + a real headless-Chromium Playwright check confirms the
+   page still boots and `CSharpEngine.RunCode` still compiles and runs
+   real C# — `console.log`'d result: `{"stdout":"x = 4\n","result":null,
+   "error":null}` for `int x = 2 + 2; Console.WriteLine($"x = {x}");`.
+   See `csharp-engine/README.md` for the build/run recipe and the
+   rationale for keeping this a separate top-level project rather than
+   folding two build toolchains together. **No CI/deploy step wiring yet**
+   — this only builds and runs locally so far, deliberately deferred to
+   keep this increment bounded; that's a natural next step once the
+   browser-side loader (step 3) needs it.
+3. ~~`src/runtime/csharp/csharpEngine.ts` — the browser-side loader~~ —
+   **done (2026-08-08):** `loadCSharpEngineFromServer(baseUrl)` injects
+   the `blazor.webassembly.js` script tag (mirroring
+   `loadPyodideFromCdn`'s script-injection pattern, including shared
+   in-flight-load and retry-after-failure behavior), calls
+   `Blazor.start()`, resolves `Blazor.runtime.getAssemblyExports(...)`,
+   and returns the raw `RunCode` entry point; `createCSharpEngine(exports)`
+   wraps it into the `CSharpRuntime` shape (`exec`/`reset`,
+   `src/runtime/csharp/CSharpRuntime.ts`) the same way `createPyodideEngine`
+   does for Python. 9 unit tests with a fake `Blazor` global (no real WASM
+   needed for these, same pattern as `pyodideEngine.test.ts`).
+
+   Also verified live against the **real** compiled Blazor+Roslyn bundle,
+   not just mocks: `dotnet publish -c Release`, served the output through
+   a minimal Python COOP/COEP static server (the exact recipe earlier in
+   this doc — required because of `WasmEnableThreads`), esbuild-bundled
+   `csharpEngine.ts` into the served directory, and drove a small test
+   page through Playwright that calls `loadCSharpEngineFromServer` +
+   `engine.exec(...)` for real. Confirmed all three paths return correctly
+   through the loader: a successful run (`stdout` with the right output),
+   a compiler-diagnostic failure (`CS0029` on a bad implicit conversion),
+   and a runtime exception (`IndexOutOfRangeException`, full .NET stack
+   trace). One harmless console warning observed (`ManagedError: ... Could
+   not find any element matching selector '#app'` — Blazor's own root
+   component search; irrelevant here since only the `[JSExport]` static
+   method is used, no Razor component is rendered) — noted for awareness,
+   not a defect in the loader.
+
+   Serving location for the Blazor assets in the real app (dev server +
+   GitHub Pages deploy) is intentionally still undecided — same
+   deliberate-deferral reasoning as step 2's "no CI/deploy wiring yet."
+   `loadCSharpEngineFromServer` takes `baseUrl` as a parameter rather than
+   a hardcoded path specifically so that decision can be made later
+   without changing this module.
+4. ~~Decide the `validate()` story for C#~~ — **decided (2026-08-09):
+   stdout-only.** `CSharpExecResult` is now exactly `{ stdout, error }` —
+   the dead `result` field (always `null`, reserved for this decision)
+   was removed from both `CSharpRuntime.ts` and the C# driver's JSON
+   payload (`csharp-engine/CSharpEngine.cs`), verified live against the
+   real compiled bundle afterward (COOP/COEP server + esbuild-bundled
+   loader, same technique as step 3) to confirm the payload shape changed
+   correctly on both the success and compiler-error paths.
+
+   Reasoning, weighing the three options this section originally posed:
+   - **(a) stdout-only** — chosen. `Console.WriteLine` is the natural way
+     a beginner produces output in a console app, exactly parallel to
+     Python's `print()`. This project's own Python validators already
+     lean on `lastResult.stdout.includes(...)` as a secondary check
+     alongside `variables` — so stdout-based assertions are an
+     already-proven, already-idiomatic pattern in this codebase, not a
+     novel one being introduced for C#. It requires **zero** engine
+     changes: `RunCode` has captured stdout faithfully since the original
+     POC.
+   - **(b) `public static` fields, reflected out** — rejected for the
+     early curriculum. It's more C#-idiomatic in the abstract, but it
+     would force every challenge — including the very first "print
+     something" lesson — to declare `public static` fields on a
+     well-known class before the curriculum has taught what `static`
+     means (`static-members` is a level-6 B10 tag in
+     `docs/csharp-concept-hierarchy.md`, not something a lesson-1
+     challenge should need). Teaching a syntax the learner hasn't reached
+     yet just to satisfy the test harness is exactly the kind of
+     tutorial-imposed artificiality this project avoids elsewhere.
+   - **(c) hybrid** — not adopted now, but not foreclosed either. If a
+     specific later challenge (e.g. something OOP-heavy that genuinely
+     needs to inspect object state, not just printed text) turns out to
+     need structured-value introspection, that is the point to revisit a
+     static-field-reflection escape hatch for *that* content — not
+     something to build speculatively ahead of a concrete need.
+
+   Practical consequence for future content: validators will pattern-
+   match/parse `stdout` (regex or substring, same as several existing
+   Python validators already do) rather than reading typed values out of
+   a `variables`-style dict. Slightly more manual to author than Python's
+   validators, but a known, already-used shape in this project.
+5. ~~New `csharp` content track scaffold~~ — **done (2026-08-09), partially:
+   `src/content/tracks/csharp/types.ts`** (`CSharpChallengeExtra` +
+   `CSharpChallenge = BaseChallenge<CSharpRuntime, CSharpExecResult,
+   CSharpChallengeExtra>` — `BaseChallenge` itself needed no changes, it
+   was already generic enough) and **`src/content/tracks/csharp/courses/
+   csharpGrundlagen/course.ts`** (empty `challenges: []`, mirroring
+   `pythonGrundlagenCourse`'s shape exactly) both exist and typecheck.
+   `csharpChallengeSchema` added to `src/content/schema.ts` too, same
+   empty-extra shape as Python's, with matching tests in
+   `src/content/schema.test.ts`.
+
+   **Deliberately NOT wired into `src/content/registry.ts`'s `TRACKS`
+   yet** — that is the part of this step intentionally left undone, and
+   why it's "partially" rather than fully done. Registering an empty
+   course would make "C#" appear as a real, selectable option in the live
+   course picker (`src/ui/views/sidebar/trackCoursePicker.ts` already
+   iterates `TRACKS` generically, so it would pick this up immediately,
+   no further UI code changes needed) — but selecting it would try to run
+   a challenge that doesn't exist, against an engine
+   (`ctx.engines`/`AppContext`) that has no C#-track case yet, using an
+   editor with no C# `LanguagePlugin` (syntax highlighting/auto-indent)
+   yet, loading a Blazor bundle from a `baseUrl` nothing currently serves
+   in dev or production. None of those four gaps are this step's job to
+   close (they belong to wiring the engine into the live app, a step this
+   plan hasn't named yet — needed before step 7's content can actually be
+   *played*, as opposed to merely authored and Gate-1/2-verified). Shipping
+   a track that's selectable but non-functional would be worse than not
+   shipping it yet, so the registry line is the one deliberately-withheld
+   piece here — added the moment those four gaps are closed, not before.
+6. ~~**Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
+   mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
+   feasible now that `dotnet` works in this sandbox; likely just
+   `dotnet run` against a temp project, or a small persistent compiler
+   host process for speed.~~ **done (2026-08-09):** `dotnet run` against a
+   fresh temp project was rejected — it pays for a NuGet restore and full
+   build on every single `exec()` call, far too slow for a test suite
+   that will eventually run one process per challenge/distractor. Went
+   with the "pre-built driver, fast per-call `dotnet exec`" option
+   instead: `csharp-engine/driver/` is a small, separately checked-in
+   desktop-.NET console project (`CSharpDriver.csproj`, referencing
+   `Microsoft.CodeAnalysis.CSharp` directly, **not** part of the Blazor
+   WASM project) whose `Program.cs` is a twin of
+   `CSharpEngine.cs`'s `RunCode`: same `CSharpCompilation`-based
+   parse/emit/`Assembly.Load`/reflection-invoke/stdout-capture pipeline,
+   same JSON `{stdout, error}` output shape. The one real difference is
+   how reference assemblies are obtained — the WASM engine fetches
+   `.dll`s over `HttpClient` from `wwwroot/refs/` because `Assembly.Location`
+   doesn't work under Mono/WASM, but on desktop .NET
+   `AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")` lists every BCL
+   assembly's real file path directly, so the driver just filters that
+   list by filename instead (a `ToDictionary` naively deduping that list
+   throws — `System.Private.CoreLib` appears twice in it in practice — a
+   plain last-wins loop over a `Dictionary` fixed it).
+   `test/helpers/nodeCSharpEngine.ts` mirrors `nodePythonEngine.ts`
+   exactly (temp dir per `exec()`, user code written to its own file,
+   never string-interpolated, subprocess spawned with that dir as `cwd`,
+   JSON stdout parsed into `CSharpExecResult`), except it drives the
+   driver via `dotnet exec <DriverDll> <path>` — no restore, no rebuild,
+   only compiling the *user's* snippet — instead of shelling out to an
+   already-installed interpreter the way Python does. The driver `.dll`
+   is built lazily on first use (`ensureDriverBuilt()`, a plain
+   `dotnet build -c Release` if the `.dll` isn't already there) rather
+   than as a separate CI step, so `npm test` alone is still sufficient
+   to exercise it. Measured: ~1.0–2.4s per `exec()` after the one-time
+   build (vs. an unmeasured but clearly much slower cold `dotnet run`
+   path with restore). `test/helpers/nodeCSharpEngine.test.ts` proves
+   the success/compiler-error/runtime-exception/fresh-namespace-per-call/
+   LINQ round trip against the real `dotnet` toolchain (not mocked) — all
+   5 pass. `csharp-engine/driver/{bin,obj}/` added to `.gitignore`
+   (mirroring the existing `csharp-engine/{bin,obj}/` entries, which
+   didn't cover this new nested project directory).
+7. **Actual challenge content**, once 1–6 are settled — start from
+   `docs/csharp-concept-hierarchy.md`'s branch overview, same house style
+   as the SQL/Python content (3 hints, live-recomputed or state-inspected
+   validators, at least one verified-failing distractor per challenge).
+
+This is genuinely several more sessions of real engineering work. Steps
+1–4 (hosting decision, project scaffold, browser loader, `validate()`
+design) are now done. Step 5 (the `csharp` content track scaffold) is
+mostly done — types, schema, and an empty course exist, deliberately not
+yet wired into the live `TRACKS` registry (see step 5's own entry above
+for exactly which four gaps block that safely). Step 6 (Node-side test
+engine) is now done — `test/helpers/nodeCSharpEngine.ts` and its driver
+project exist and are verified against the real `dotnet` toolchain. Step
+7 (real content) needs a `describeCSharpCourse` added to
+`test/content/challengeRunner.test.ts` (that file currently hardcodes
+`describeSqlCourse`/`describePythonCourse` calls rather than iterating
+`TRACKS` generically, so a C# course isn't picked up automatically) plus
+actual challenges written against `csharpGrundlagenCourse`, following the
+same house style as SQL/Python (3 hints, verified-failing distractors).
+The live app additionally still needs the four wiring gaps from step 5
+closed before any of it is actually playable in the browser, not just
+authored and Gate-1/2-verified in Node.
+Treat each routine firing that touches this as making **one bounded,
+committed increment** (e.g. "scaffold the project directory and get a
+minimal Blazor boot working," not "finish the whole engine") — never
+leave the repo in a broken intermediate state, and always run
+`npm run build:check` before committing.

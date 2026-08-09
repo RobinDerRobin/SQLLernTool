@@ -69,6 +69,20 @@ describe('on (event delegation)', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  it('ignores an event whose target is not an Element (e.g. a bare text node)', () => {
+    const root = document.createElement('div');
+    root.innerHTML = '<button class="btn">go</button>';
+    document.body.append(root);
+    const handler = vi.fn();
+    on(root, 'click', '.btn', handler);
+
+    const textNode = root.querySelector('.btn')!.firstChild!;
+    expect(textNode.nodeType).toBe(Node.TEXT_NODE);
+    textNode.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(handler).not.toHaveBeenCalled();
+  });
+
   it('the returned unsubscribe function stops future notifications', () => {
     const root = document.createElement('div');
     root.innerHTML = '<button class="btn">go</button>';

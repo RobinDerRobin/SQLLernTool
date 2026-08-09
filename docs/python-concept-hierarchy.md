@@ -335,7 +335,110 @@ graph TD
 
 ## 6. Abgleich mit der aktuellen Implementierung
 
-Von den 82 Tags deckt `pythonGrundlagen` (10 Challenges) folgende ab:
+*Update 2026-08-05: Challenges 11–11.5 wurden ergänzt und decken den
+kompletten Zweig B7 (Schleifen) ab. Update 2026-08-08 (vormittags):
+Challenges 12–12.5 ergänzt, decken 7 der 12 Tags aus B8 (Funktionen) ab.
+Update 2026-08-08 (Fortsetzung): Challenges 12.6–12.8 ergänzt
+(`args-kwargs`, `lambda-expressions`, `map-function`). Update 2026-08-08
+(weitere Runde): Challenges 12.9–12.10 ergänzt (`filter-function`,
+`sorted-with-key`) — **B8 Funktionen ist damit komplett abgedeckt (12/12
+Tags)**, der zweitgrößte fertige Zweig nach B7. Update 2026-08-08
+(stündliche Routine): Challenges 13–13.4 ergänzt, decken 5 der 10 Tags
+aus B9 (Datenstrukturen) ab (`list-basics`, `list-slicing`, `list-
+mutation-methods`, `tuple-basics`, `dict-basics`) — die zweite Hälfte
+(`dict-methods`, `set-basics`, `nested-data-structures`, `membership-
+operator`, `len-function`) ist eine natürliche Restcharge für später.
+Update 2026-08-08 (stündliche Routine, Fortsetzung): Challenges 13.5–13.9
+ergänzt (`dict-methods`, `set-basics`, `nested-data-structures`,
+`membership-operator`, `len-function`) — **B9 Datenstrukturen ist damit
+komplett abgedeckt (10/10 Tags)**, der dritte vollständig geschlossene
+Python-Zweig nach B7 und B8. Update 2026-08-08 (stündliche Routine,
+Fortsetzung): Challenges 14–14.4 ergänzt, decken 5 der 7 Tags aus B10
+(Comprehensions & Generatoren) ab (`list-comprehension`,
+`comprehension-with-condition`, `dict-comprehension`, `set-comprehension`,
+`generator-expression`) — die verbleibenden 2 Tags (`iterator-protocol`,
+`generator-functions`) hängen laut Voraussetzungsgraph an
+`dunder-methods` (B14 Objektorientierung), das noch komplett offen ist,
+und werden deshalb bewusst zurückgestellt statt vorgezogen, bis die
+OOP-Grundlage existiert. Update 2026-08-08 (stündliche Routine,
+Fortsetzung): Challenges 15–15.3 ergänzt, decken 5 der 6 Tags aus B11
+(Fehlerbehandlung) ab (`runtime-errors-concept` als Einleitung in 15
+gebündelt, `try-except`, `specific-exception-types`, `finally-else-
+clauses`, `raise-statement`) — der letzte Tag (`custom-exceptions`) hängt
+wie schon bei B10 an `class-definition` (B14 Objektorientierung) und
+bleibt aus demselben Grund offen. Update 2026-08-08 (stündliche Routine,
+Fortsetzung): Challenges 16–16.2 ergänzt, decken 3 der 4 Tags aus B12
+(Module & Imports) ab (`import-statement`, `from-import`,
+`standard-library-awareness` via `math` und `datetime`) — der vierte Tag
+(`own-modules`) bleibt offen, aber aus einem **anderen** Grund als die
+bisherigen B14-Abhängigkeiten: Der Editor führt genau ein Skript in genau
+einem Namensraum aus, es gibt keine echte Mehrdatei-Umgebung, in der
+Lernende eigene, separat importierbare `.py`-Dateien anlegen könnten —
+eine architektonische Grenze der Sandbox, keine Frage der
+Aufgaben-Reihenfolge. Update 2026-08-08 (stündliche Routine,
+Fortsetzung): Challenges 17–17.2 ergänzt, decken **alle 4 Tags aus B13**
+(Dateizugriff) ab (`file-open-read` + `context-manager-with` in 17
+gebündelt — `with open(...) as f:` ist der einzig sinnvolle Weg, das
+getrennt zu lehren wäre künstlich, `file-write` in 17.1, `file-modes` in
+17.2) — **B13 ist damit der vierte komplett abgedeckte Python-Zweig**.
+Vor dem Schreiben empirisch geprüft (nicht angenommen): Pyodides
+virtuelles Dateisystem ist **nicht** pro Ausführung isoliert, sondern
+lebt über die gesamte Session hinweg auf derselben WASM-Instanz — anders
+als der Node-Testmotor, der pro `exec()` ein frisches Temp-Verzeichnis
+bekommt. Alle drei Lösungen öffnen deshalb bewusst zuerst im Modus `"w"`
+(überschreibt garantiert), bevor irgendetwas gelesen wird, und wurden
+zusätzlich live **zweimal hintereinander** ausgeführt (simuliert erneutes
+Anklicken von "Ausführen"), um diese Robustheit tatsächlich zu bestätigen
+statt sie nur zu behaupten. Update 2026-08-08 (stündliche Routine,
+Fortsetzung): Challenges 18–18.7 ergänzt, decken **alle 8 Tags aus B14**
+(Objektorientierung) ab — der letzte komplett offene Python-Zweig ist
+damit geschlossen: `class-definition` (18, eine Klasse mit Methode ohne
+eigenen Zustand — bewusst ohne `__init__`, um Klassen-Syntax von
+Instanzattributen sauber zu trennen), `instance-attributes-init` (18.1),
+`instance-methods` (18.2, eine Methode, die tatsächlich mit
+`self.attribut` rechnet statt nur zu delegieren), `class-vs-instance-
+attributes` (18.3, ein geteiltes Klassenattribut als Zähler über mehrere
+Objekte hinweg — der Distraktor demonstriert eine echte, subtile Python-
+Falle: `self.x += 1` legt bei einem Klassenattribut ein neues,
+objekteigenes Attribut an statt das geteilte zu ändern), `inheritance`
+(18.4), `method-overriding` (18.5), `dunder-methods` (18.6, `__str__`),
+`encapsulation-convention` (18.7, doppelter Unterstrich löst echtes Name
+Mangling aus — geprüft über `vars(objekt)`, nicht nur behauptet). Jeder
+Distraktor wurde vor dem Schreiben mit echtem `python3` verifiziert, nicht
+angenommen (u. a. `self.anzahl += 1` vs. `Hund.anzahl += 1`, `vars()`-
+Schlüssel `_saldo` vs. `_Konto__saldo`). Alle acht Lösungen und
+Distraktoren zusätzlich live gegen echtes Pyodide bestätigt — dabei ein
+Artefakt der eigenen Testmethodik gefunden und korrigiert: das
+Playwright-Skript tippte Code über simulierte Tastendrücke, was mit dem
+Editor-eigenen Auto-Indent bei mehrfach verschachteltem Code (Klasse →
+Methode → Rumpf) kollidierte und kumulativ falsch eingerückten Code
+erzeugte — kein Produktbug, denn der reale "In den Editor
+übernehmen"-Button setzt den Wert direkt (`editor.setValue(...)`), ohne
+über die Tastatur-Auto-Indent-Logik zu laufen. Live-Skript entsprechend
+auf direktes Setzen des Textarea-Werts umgestellt. Da B14 jetzt existiert,
+sind die zuvor zurückgestellten Tags `iterator-protocol`/`generator-
+functions` (B10) und `custom-exceptions` (B11) nicht mehr blockiert —
+noch nicht geschrieben, aber jetzt ein klarer, kleiner nächster Schritt.
+Update 2026-08-09 (stündliche Routine, Fortsetzung): genau diese drei
+entsperrten Tags mit Challenges 19–19.2 ergänzt — `iterator-protocol`
+(19, eine `Countdown`-Klasse mit `__iter__`/`__next__` von Hand),
+`generator-functions` (19.1, dieselbe Idee als `yield`-Generatorfunktion,
+bewusst als direkte Fortsetzung von 19 erzählt, um den Kontrast
+"von Hand" vs. "mit yield" spürbar zu machen), `custom-exceptions` (19.2,
+eine eigene `NichtGenugGeldError(Exception)`-Klasse). Alle drei
+Distraktoren vor dem Schreiben mit echtem `python3` verifiziert: fehlendes
+`return self` in `__iter__` löst `TypeError: iter() returned
+non-iterator of type 'NoneType'` aus, `return` statt `yield` macht die
+Funktion zu keiner Generatorfunktion mehr (`TypeError: 'int' object is
+not iterable`), ein eingebautes `ValueError` statt der eigenen
+Exception-Klasse wird vom `except NichtGenugGeldError` nicht abgefangen
+und bleibt unbehandelt. Alle drei zusätzlich live gegen echtes Pyodide
+bestätigt. **Damit sind alle drei zuvor durch B14 blockierten Tags
+geschrieben — B10 und B11 sind jetzt ebenfalls vollständig abgedeckt.**
+Der Rest dieses Abschnitts ist der historische Stand vor diesen Updates;
+die Bilanz am Ende ist bereits aktualisiert.*
+
+Von den 82 Tags deckt `pythonGrundlagen` (63 Challenges) folgende ab:
 
 **Vollständig abgedeckt:** `program-execution-model`, `function-call-syntax`
 (implizit über `print`), `print-statement`, `comments`, `variable-
@@ -343,23 +446,66 @@ assignment`, `int-type`, `str-type`, `float-type`, `bool-type`, `multiple-
 assignment`, `variable-swap-idiom`, `arithmetic-operators`, `floor-div-
 modulo` (im Tutorial erklärt, in der Aufgabe selbst nicht zwingend
 gebraucht), `comparison-operators`, `augmented-assignment`, `f-strings`,
-`type-conversion`, `if-else`, `elif-chain`, `boolean-logic` — **20 von 82
-Tags (≈ 24 %).**
+`type-conversion`, `if-else`, `elif-chain`, `boolean-logic`, sowie **seit
+2026-08-05 B7 Schleifen komplett**: `iterable-concept` (im Tutorial von
+Challenge 11 eingeführt, durch die Zeichen-für-Zeichen-Iteration über einen
+String direkt angewendet), `for-loop` (11), `range-function` (11.1),
+`while-loop` (11.2), `break-continue` (11.3), `nested-loops` (11.4),
+`loop-else` (11.5), sowie **seit 2026-08-08 B8 Funktionen komplett**:
+`function-definition` + `return-statement` (12), `function-parameters`
+(12.1), `default-parameters` (12.2), `variable-scope` (12.3),
+`docstrings` (12.4), `recursion` (12.5), `args-kwargs` (12.6),
+`lambda-expressions` (12.7), `map-function` (12.8), `filter-function`
+(12.9), `sorted-with-key` (12.10), sowie **seit 2026-08-08 B9
+Datenstrukturen komplett**: `list-basics` (13), `list-slicing` (13.1),
+`list-mutation-methods` (13.2), `tuple-basics` (13.3), `dict-basics`
+(13.4), `dict-methods` (13.5), `set-basics` (13.6), `nested-data-
+structures` (13.7), `membership-operator` (13.8), `len-function` (13.9),
+sowie **seit 2026-08-08 der Großteil von B10 Comprehensions &
+Generatoren**: `list-comprehension` (14), `comprehension-with-condition`
+(14.1), `dict-comprehension` (14.2), `set-comprehension` (14.3),
+`generator-expression` (14.4), sowie **seit 2026-08-08 der Großteil von
+B11 Fehlerbehandlung**: `runtime-errors-concept` + `try-except` (15,
+bewusst gebündelt — ohne den Laufzeitfehler-Begriff wäre try/except
+kontextlos), `specific-exception-types` (15.1), `finally-else-clauses`
+(15.2), `raise-statement` (15.3), sowie **seit 2026-08-08 der Großteil
+von B12 Module & Imports**: `import-statement` (16), `from-import`
+(16.1), `standard-library-awareness` (16.2), sowie **seit 2026-08-08 B13
+Dateizugriff komplett**: `file-open-read` + `context-manager-with` (17),
+`file-write` (17.1), `file-modes` (17.2), sowie **seit 2026-08-08 B14
+Objektorientierung komplett**: `class-definition` (18),
+`instance-attributes-init` (18.1), `instance-methods` (18.2),
+`class-vs-instance-attributes` (18.3), `inheritance` (18.4),
+`method-overriding` (18.5), `dunder-methods` (18.6),
+`encapsulation-convention` (18.7), sowie **seit 2026-08-09 die
+verbleibenden Tags aus B10 und B11**: `iterator-protocol` (19),
+`generator-functions` (19.1), `custom-exceptions` (19.2) —
+**77 von 82 Tags (≈ 94 %).**
 
-**Nicht abgedeckt — praktisch alles ab Kontrollfluss-Verfeinerung:**
-`dynamic-typing` als **eigenes** Thema (wird durchgehend demonstriert, nie
-benannt — genau wie `logical-operators` im SQL-Kurs), `bool-conversion-
-truthiness`, `truthiness-in-conditions`, `ternary-expression`, und
-**komplett**: B7 Schleifen, B8 Funktionen, B9 Datenstrukturen, B10
-Comprehensions & Generatoren, B11 Fehlerbehandlung, B12 Module & Imports,
-B13 Dateizugriff, B14 Objektorientierung.
+**Nicht abgedeckt:** `dynamic-typing` als **eigenes** Thema (wird
+durchgehend demonstriert, nie benannt — genau wie `logical-operators` im
+SQL-Kurs), `bool-conversion-truthiness`, `truthiness-in-conditions`,
+`ternary-expression`, und `own-modules` aus B12 (siehe architektonische
+Begründung oben) — die einzige verbleibende Lücke, die keine
+Einzeltag-Frage, sondern eine dauerhafte Sandbox-Grenze ist.
 
-**Bilanz:** 20 von 82 Tags abgedeckt (≈ 24 %) — deutlich weniger als SQL
-(43/82, ≈ 52 %). Das ist konsistent mit dem Kursnamen: `pythonGrundlagen`
-deckt exakt das ab, was der Name verspricht (Variablen, Grundrechenarten,
-einfache Verzweigung), und hört genau dort auf, wo Schleifen und Funktionen
-anfangen würden — der Rest (12 von 15 Zweigen komplett, oder Teile davon)
-ist unbearbeiteter Planungsraum.
+**Bilanz:** 77 von 82 Tags abgedeckt (≈ 94 %) — Python liegt weiterhin
+**deutlich vor** SQL (62/82, ≈ 76 %). Der Kursname `pythonGrundlagen`
+deckt inzwischen deutlich mehr als nur die absoluten Basics ab (Variablen,
+Grundrechenarten, Verzweigung, Schleifen, ganz Funktionen inklusive
+*args/**kwargs, lambda, map()/filter()/sorted(), ganz Datenstrukturen,
+List-/Dict-/Set-Comprehensions, Generator Expressions, ganz
+Fehlerbehandlung inklusive eigener Exception-Klassen, die Kernsyntax von
+Imports/Standardbibliothek, ganz Dateizugriff, und ganz
+Objektorientierung inklusive des Iterator-Protokolls und
+Generatorfunktionen) — B7, B8, B9, B10, B11, B13 und B14 sind vollständig
+geschlossen. **Kein Zweig ist mehr komplett Lücke, und bis auf B12 (das
+own-modules-Sandbox-Limit) ist kein Zweig mehr überhaupt teilweise
+offen** — B2, B5 und B6 bleiben bei den drei kleinen, bewusst nicht
+vorgezogenen "Nicht abgedeckt"-Tags oben (`dynamic-typing`,
+`bool-conversion-truthiness`, `truthiness-in-conditions`,
+`ternary-expression`), die keiner B14-Abhängigkeit unterlagen, sondern
+schlicht noch nicht an der Reihe waren.
 
 ## 7. Bewusst ausgeklammert
 

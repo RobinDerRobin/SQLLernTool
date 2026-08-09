@@ -48,6 +48,11 @@ print(json.dumps({"stdout": _buf.getvalue(), "variables": _variables, "error": _
  * this machine already has Python installed; see src/runtime/python/README.md
  * for the tradeoff this accepts (a machine dependency `npm test` did not
  * previously have).
+ *
+ * `cwd` is pinned to the per-exec temp dir so relative-path file I/O in a
+ * challenge's Python code (open("notizen.txt", ...), etc.) lands there
+ * instead of wherever the test runner itself was invoked from — otherwise
+ * it would silently write files into the repo working directory.
  */
 export function createNodePythonEngine(): PythonRuntime {
   function exec(code: string): PythonExecResult {
@@ -58,7 +63,7 @@ export function createNodePythonEngine(): PythonRuntime {
       writeFileSync(userCodePath, code, 'utf-8');
       writeFileSync(driverPath, buildDriverScript(userCodePath), 'utf-8');
 
-      const result = spawnSync(PYTHON_BIN, [driverPath], { encoding: 'utf-8' });
+      const result = spawnSync(PYTHON_BIN, [driverPath], { encoding: 'utf-8', cwd: dir });
       if (result.error) {
         throw new Error(
           `Konnte "${PYTHON_BIN}" nicht ausführen (${result.error.message}). Ist Python installiert und im PATH?`,

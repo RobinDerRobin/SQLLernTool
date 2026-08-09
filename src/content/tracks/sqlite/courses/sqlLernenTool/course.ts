@@ -47,6 +47,30 @@ import { challenge14_2 } from './challenges/14_2';
 import { challenge14_3 } from './challenges/14_3';
 import { challenge14_4 } from './challenges/14_4';
 import { challenge14_5 } from './challenges/14_5';
+import { challenge15 } from './challenges/15';
+import { challenge15_1 } from './challenges/15_1';
+import { challenge15_2 } from './challenges/15_2';
+import { challenge15_3 } from './challenges/15_3';
+import { challenge15_4 } from './challenges/15_4';
+import { challenge16 } from './challenges/16';
+import { challenge16_1 } from './challenges/16_1';
+import { challenge16_2 } from './challenges/16_2';
+import { challenge17 } from './challenges/17';
+import { challenge18 } from './challenges/18';
+import { challenge18_1 } from './challenges/18_1';
+import { challenge18_2 } from './challenges/18_2';
+import { challenge19 } from './challenges/19';
+import { challenge19_1 } from './challenges/19_1';
+import { challenge20 } from './challenges/20';
+import { challenge20_1 } from './challenges/20_1';
+import { challenge20_2 } from './challenges/20_2';
+import { challenge20_3 } from './challenges/20_3';
+import { challenge20_4 } from './challenges/20_4';
+import { challenge21 } from './challenges/21';
+import { challenge21_1 } from './challenges/21_1';
+import { challenge21_2 } from './challenges/21_2';
+import { challenge22 } from './challenges/22';
+import { challenge22_1 } from './challenges/22_1';
 
 const challenges: SqlChallenge[] = [
   challenge01,
@@ -96,6 +120,30 @@ const challenges: SqlChallenge[] = [
   challenge14_3,
   challenge14_4,
   challenge14_5,
+  challenge15,
+  challenge15_1,
+  challenge15_2,
+  challenge15_3,
+  challenge15_4,
+  challenge16,
+  challenge16_1,
+  challenge16_2,
+  challenge17,
+  challenge18,
+  challenge18_1,
+  challenge18_2,
+  challenge19,
+  challenge19_1,
+  challenge20,
+  challenge20_1,
+  challenge20_2,
+  challenge20_3,
+  challenge20_4,
+  challenge21,
+  challenge21_1,
+  challenge21_2,
+  challenge22,
+  challenge22_1,
 ];
 
 export const sqlLernenToolCourse: Course<SqlChallenge> = {

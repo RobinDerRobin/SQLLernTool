@@ -34,8 +34,12 @@ function mountApp(progress: ProgressState = createDefaultProgressState(), loadSq
 }
 
 describe('createApp', () => {
+  const originalInitSqlJs = window.initSqlJs;
+
   afterEach(() => {
     document.body.innerHTML = '';
+    window.initSqlJs = originalInitSqlJs;
+    vi.useRealTimers();
   });
 
   it('renders the full shell: sidebar, header and all four tab panels', async () => {
@@ -167,5 +171,55 @@ describe('createApp', () => {
     app.unmount();
 
     expect(root.innerHTML).toBe('');
+  });
+
+  describe('default sql.js loader (loadSqlJsFromCdn, no deps.loadSqlJs override)', () => {
+    // F-011: every other test in this file injects deps.loadSqlJs, so the real
+    // default loader (window.initSqlJs + withTimeout) never actually ran.
+    // These exercise it directly, the way pyodideEngine.test.ts already does
+    // for the analogous Python-side CDN loader.
+    function mountAppWithoutLoadSqlJsOverride(progress: ProgressState = createDefaultProgressState()) {
+      const root = document.createElement('div');
+      document.body.append(root);
+      const progressStore: ProgressStore = { load: () => progress, save: () => {} };
+      const chatClient: ClaudeChatClient = { sendMessage: vi.fn().mockResolvedValue('ok') };
+      const app = createApp(root, { progressStore, chatClient, engineFactory: testEngineFactory() });
+      return { root, app };
+    }
+
+    it('boots successfully via window.initSqlJs, passing a locateFile pointed at the cdnjs sql.js base', async () => {
+      const init = vi.fn().mockResolvedValue({} as SqlJsStatic);
+      window.initSqlJs = init;
+
+      const { root, app } = mountAppWithoutLoadSqlJsOverride();
+      await app.ready;
+
+      expect(app.ctx.store.getState().session.initStatus).toBe('ready');
+      expect(root.querySelector('.sql-app')).not.toBeNull();
+      expect(init).toHaveBeenCalledTimes(1);
+      const { locateFile } = init.mock.calls[0]![0] as { locateFile: (file: string) => string };
+      expect(locateFile('sql-wasm.wasm')).toBe('https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.wasm');
+    });
+
+    it('surfaces a clear error when window.initSqlJs was never set (CDN script blocked)', async () => {
+      delete window.initSqlJs;
+
+      const { root, app } = mountAppWithoutLoadSqlJsOverride();
+      await app.ready;
+
+      expect(root.textContent).toContain('sql.js wurde nicht geladen');
+      expect(app.ctx.store.getState().session.initStatus).toEqual({ error: expect.stringContaining('sql.js wurde nicht geladen') });
+    });
+
+    it('surfaces the 10s timeout message when window.initSqlJs never resolves', async () => {
+      vi.useFakeTimers();
+      window.initSqlJs = vi.fn(() => new Promise<SqlJsStatic>(() => {}));
+
+      const { root, app } = mountAppWithoutLoadSqlJsOverride();
+      await vi.advanceTimersByTimeAsync(10_000);
+      await app.ready;
+
+      expect(root.textContent).toContain('nach 10 Sekunden nicht geantwortet');
+    });
   });
 });

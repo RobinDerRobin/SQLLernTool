@@ -3,3 +3,14 @@ dist/
 coverage/
 *.local
 .DS_Store
+
+# csharp-engine/ (Blazor WASM + Roslyn C# execution engine, see docs/csharp-engine-poc.md)
+# csharp-engine/driver/ (desktop-.NET twin used by test/helpers/nodeCSharpEngine.ts) has its own
+# bin/obj one level down, covered by the same recursive-ish patterns below.
+csharp-engine/bin/
+csharp-engine/obj/
+csharp-engine/driver/bin/
+csharp-engine/driver/obj/
+# Reference-assembly DLLs are copied from the installed .NET SDK's targeting pack at build time
+# (CSharpEngineBlazor.csproj's CopyCSharpEngineRefAssemblies target) — never committed as binaries.
+csharp-engine/wwwroot/refs/

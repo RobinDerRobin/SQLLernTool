@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createNodePythonEngine } from './nodePythonEngine';
 
@@ -29,6 +31,16 @@ describe('createNodePythonEngine', () => {
     engine.exec('x = 1');
     const result = engine.exec('print(x)');
     expect(result.error).toContain('NameError');
+  });
+
+  it('isolates relative-path file I/O to a temp dir instead of the process cwd', () => {
+    const engine = createNodePythonEngine();
+    const result = engine.exec(
+      'with open("notizen.txt", "w") as f:\n    f.write("Hallo")\nwith open("notizen.txt") as f:\n    inhalt = f.read()',
+    );
+    expect(result.error).toBeNull();
+    expect(result.variables).toEqual({ inhalt: 'Hallo' });
+    expect(existsSync(join(process.cwd(), 'notizen.txt'))).toBe(false);
   });
 
   it('serializes ints, floats, bools, lists, dicts, and None correctly', () => {

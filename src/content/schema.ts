@@ -42,3 +42,10 @@ const pythonChallengeExtraSchema = z.object({});
 export const pythonChallengeSchema = baseChallengeSchema.extend({
   extra: pythonChallengeExtraSchema,
 });
+
+/** No track-specific extra fields for C# yet — same reasoning as Python's. */
+const csharpChallengeExtraSchema = z.object({});
+
+export const csharpChallengeSchema = baseChallengeSchema.extend({
+  extra: csharpChallengeExtraSchema,
+});

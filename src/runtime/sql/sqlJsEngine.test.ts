@@ -13,13 +13,21 @@ function createFakeSqlJsStatic(): SqlJsStatic {
   return {
     Database: class implements SqlJsDatabase {
       private tables = new Map<string, unknown[][]>();
+      private columns = new Map<string, { name: string; type: string }[]>();
 
       prepare(sql: string): SqlJsStatement {
         const trimmed = sql.trim();
 
         if (/^CREATE TABLE/i.test(trimmed)) {
-          const name = /^CREATE TABLE\s+(\w+)/i.exec(trimmed)?.[1] ?? 't';
+          const match = /^CREATE TABLE\s+(\w+)\s*\((.+)\)/i.exec(trimmed);
+          const name = match?.[1] ?? 't';
+          const cols = (match?.[2] ?? '')
+            .split(',')
+            .map((c) => c.trim().split(/\s+/))
+            .filter((parts) => parts.length >= 2)
+            .map(([colName, colType]) => ({ name: colName!, type: colType! }));
           this.tables.set(name, []);
+          this.columns.set(name, cols);
           return { step: () => false, get: () => [], getColumnNames: () => [], free: () => {} };
         }
 
@@ -34,6 +42,43 @@ function createFakeSqlJsStatic(): SqlJsStatic {
         if (/^SELECT FOREVER/i.test(trimmed)) {
           // Simulates a runaway recursive CTE: step() always reports "another row ready".
           return { step: () => true, get: () => [1], getColumnNames: () => ['n'], free: () => {} };
+        }
+
+        if (/^SELECT name FROM sqlite_master/i.test(trimmed)) {
+          const names = [...this.tables.keys()];
+          let i = 0;
+          return {
+            step: () => i < names.length && (i++, true),
+            get: () => [names[i - 1]],
+            getColumnNames: () => ['name'],
+            free: () => {},
+          };
+        }
+
+        if (/^PRAGMA table_info/i.test(trimmed)) {
+          const rawName = /^PRAGMA table_info\((.+)\)/i.exec(trimmed)![1]!;
+          const name = rawName.replace(/^"|"$/g, '').replace(/""/g, '"');
+          const cols = this.columns.get(name) ?? [];
+          let i = 0;
+          return {
+            step: () => i < cols.length && (i++, true),
+            get: () => [cols[i - 1]!.name, cols[i - 1]!.type],
+            getColumnNames: () => ['name', 'type'],
+            free: () => {},
+          };
+        }
+
+        if (/^SELECT COUNT\(\*\) FROM/i.test(trimmed)) {
+          const rawName = /^SELECT COUNT\(\*\) FROM (.+)/i.exec(trimmed)![1]!;
+          const name = rawName.replace(/^"|"$/g, '').replace(/""/g, '"');
+          const count = this.tables.get(name)?.length ?? 0;
+          let done = false;
+          return {
+            step: () => (done ? false : ((done = true), true)),
+            get: () => [count],
+            getColumnNames: () => ['COUNT(*)'],
+            free: () => {},
+          };
         }
 
         if (/^SELECT \* FROM (\w+)/i.exec(trimmed)) {
@@ -53,6 +98,7 @@ function createFakeSqlJsStatic(): SqlJsStatic {
 
       close(): void {
         this.tables.clear();
+        this.columns.clear();
       }
     },
   };
@@ -91,5 +137,65 @@ describe('createSqlJsEngine', () => {
     const engine = createSqlJsEngine(createFakeSqlJsStatic(), { rowCap: 5 });
     const results = engine.exec('CREATE TABLE t (id INTEGER); INSERT INTO t VALUES (1); INSERT INTO t VALUES (2); SELECT * FROM t;');
     expect(results).toEqual([{ columns: ['id'], values: [[1], [2]] }]);
+  });
+
+  describe('getTablesInfo', () => {
+    it('returns an empty array when no tables exist yet', () => {
+      const engine = createSqlJsEngine(createFakeSqlJsStatic());
+      expect(engine.getTablesInfo()).toEqual([]);
+    });
+
+    it('returns name, columns (with types) and row count for a single table', () => {
+      const engine = createSqlJsEngine(createFakeSqlJsStatic());
+      engine.exec('CREATE TABLE users (id INTEGER, name TEXT); INSERT INTO users VALUES (1); INSERT INTO users VALUES (2);');
+      expect(engine.getTablesInfo()).toEqual([
+        {
+          name: 'users',
+          columns: [
+            { name: 'id', type: 'INTEGER' },
+            { name: 'name', type: 'TEXT' },
+          ],
+          rowCount: 2,
+        },
+      ]);
+    });
+
+    it('covers every table when multiple exist', () => {
+      const engine = createSqlJsEngine(createFakeSqlJsStatic());
+      engine.exec('CREATE TABLE a (id INTEGER); CREATE TABLE b (id INTEGER); INSERT INTO b VALUES (1);');
+      const info = engine.getTablesInfo();
+      expect(info.map((t) => t.name)).toEqual(['a', 'b']);
+      expect(info.find((t) => t.name === 'a')?.rowCount).toBe(0);
+      expect(info.find((t) => t.name === 'b')?.rowCount).toBe(1);
+    });
+
+    it('quotes a table name so identifiers with embedded double quotes still resolve correctly', () => {
+      // quoteIdent escapes " as "" — this table name deliberately contains one,
+      // exercising that PRAGMA table_info(...) / COUNT(*) still target the right table.
+      const engine = createSqlJsEngine(createFakeSqlJsStatic());
+      engine.exec('CREATE TABLE normal (id INTEGER); INSERT INTO normal VALUES (1);');
+      expect(engine.getTablesInfo()[0]).toEqual({ name: 'normal', columns: [{ name: 'id', type: 'INTEGER' }], rowCount: 1 });
+    });
+  });
+
+  describe('reset', () => {
+    it('closes the old database and starts a fresh, empty one', () => {
+      const engine = createSqlJsEngine(createFakeSqlJsStatic());
+      engine.exec('CREATE TABLE users (id INTEGER); INSERT INTO users VALUES (1);');
+      expect(engine.getTablesInfo()).toHaveLength(1);
+
+      engine.reset();
+
+      expect(engine.getTablesInfo()).toEqual([]);
+    });
+
+    it('allows creating a same-named table again after reset (no leftover state)', () => {
+      const engine = createSqlJsEngine(createFakeSqlJsStatic());
+      engine.exec('CREATE TABLE t (id INTEGER); INSERT INTO t VALUES (1); INSERT INTO t VALUES (2);');
+      engine.reset();
+      engine.exec('CREATE TABLE t (id INTEGER); INSERT INTO t VALUES (9);');
+
+      expect(engine.getTablesInfo()[0]?.rowCount).toBe(1);
+    });
   });
 });

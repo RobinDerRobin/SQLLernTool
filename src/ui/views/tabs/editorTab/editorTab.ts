@@ -46,6 +46,12 @@ interface MountedEditorTab {
   unmount: Unsubscribe;
 }
 
+/** SQL runs a "Query" (feminine); Python runs "Code" (neuter) — the empty-state placeholder before the first run should say the right one, not always "Query". */
+function emptyResultsPlaceholder(trackId: string): string {
+  const text = trackId === 'sqlite' ? 'Noch keine Query ausgeführt.' : 'Noch kein Code ausgeführt.';
+  return `<div class="empty-state">${text}</div>`;
+}
+
 /**
  * Restates the challenge's successCriteria directly above the editor —
  * previously this was only visible on the Aufgabe tab, so writing the
@@ -208,7 +214,7 @@ export function mountEditorTab(root: HTMLElement, ctx: AppContext): MountedEdito
 
     editorFacade.setValue(saved || placeholderFor(challenge?.title ?? selection.challengeNum, selection.trackId));
     expectedResultBanner.innerHTML = renderExpectedResult(challenge?.successCriteria);
-    showResults('<div class="empty-state">Noch keine Query ausgeführt.</div>');
+    showResults(emptyResultsPlaceholder(selection.trackId));
   }
 
   let lastRenderedPythonStatus: PythonEngineStatus | null = null;

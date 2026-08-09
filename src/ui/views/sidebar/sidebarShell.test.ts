@@ -122,4 +122,51 @@ describe('mountSidebarShell', () => {
 
     expect(ctx.store.getState().progress.app.sidebarCollapsed).toBe(true);
   });
+
+  it('switching track/course via the header select jumps to the new course\'s first challenge', () => {
+    const elements = buildElements();
+    const ctx = makeCtx();
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '05');
+    mountSidebarShell(elements, ctx);
+
+    const select = elements.headRoot.querySelector<HTMLSelectElement>('[data-track-course]')!;
+    select.value = 'python::pythonGrundlagen';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+
+    const selection = ctx.store.getState().session.selection;
+    expect(selection?.trackId).toBe('python');
+    expect(selection?.courseId).toBe('pythonGrundlagen');
+    expect(selection?.challengeNum).toBe('01');
+  });
+
+  it('an unparseable track/course select value is ignored (no navigation)', () => {
+    const elements = buildElements();
+    const ctx = makeCtx();
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '05');
+    mountSidebarShell(elements, ctx);
+
+    const select = elements.headRoot.querySelector<HTMLSelectElement>('[data-track-course]')!;
+    select.value = 'garbage-without-separator';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+
+    const selection = ctx.store.getState().session.selection;
+    expect(selection?.trackId).toBe('sqlite');
+    expect(selection?.challengeNum).toBe('05');
+  });
+
+  it('a track/course value pointing at an unknown course is ignored (no navigation)', () => {
+    const elements = buildElements();
+    const ctx = makeCtx();
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '05');
+    mountSidebarShell(elements, ctx);
+
+    const select = elements.headRoot.querySelector<HTMLSelectElement>('[data-track-course]')!;
+    select.value = 'sqlite::nichtVorhandenerKurs';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+
+    const selection = ctx.store.getState().session.selection;
+    expect(selection?.trackId).toBe('sqlite');
+    expect(selection?.courseId).toBe('sqlLernenTool');
+    expect(selection?.challengeNum).toBe('05');
+  });
 });

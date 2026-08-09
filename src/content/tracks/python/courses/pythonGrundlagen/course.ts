@@ -16,6 +16,53 @@ import { challenge11_2 } from './challenges/11_2';
 import { challenge11_3 } from './challenges/11_3';
 import { challenge11_4 } from './challenges/11_4';
 import { challenge11_5 } from './challenges/11_5';
+import { challenge12 } from './challenges/12';
+import { challenge12_1 } from './challenges/12_1';
+import { challenge12_2 } from './challenges/12_2';
+import { challenge12_3 } from './challenges/12_3';
+import { challenge12_4 } from './challenges/12_4';
+import { challenge12_5 } from './challenges/12_5';
+import { challenge12_6 } from './challenges/12_6';
+import { challenge12_7 } from './challenges/12_7';
+import { challenge12_8 } from './challenges/12_8';
+import { challenge12_9 } from './challenges/12_9';
+import { challenge12_10 } from './challenges/12_10';
+import { challenge13 } from './challenges/13';
+import { challenge13_1 } from './challenges/13_1';
+import { challenge13_2 } from './challenges/13_2';
+import { challenge13_3 } from './challenges/13_3';
+import { challenge13_4 } from './challenges/13_4';
+import { challenge13_5 } from './challenges/13_5';
+import { challenge13_6 } from './challenges/13_6';
+import { challenge13_7 } from './challenges/13_7';
+import { challenge13_8 } from './challenges/13_8';
+import { challenge13_9 } from './challenges/13_9';
+import { challenge14 } from './challenges/14';
+import { challenge14_1 } from './challenges/14_1';
+import { challenge14_2 } from './challenges/14_2';
+import { challenge14_3 } from './challenges/14_3';
+import { challenge14_4 } from './challenges/14_4';
+import { challenge15 } from './challenges/15';
+import { challenge15_1 } from './challenges/15_1';
+import { challenge15_2 } from './challenges/15_2';
+import { challenge15_3 } from './challenges/15_3';
+import { challenge16 } from './challenges/16';
+import { challenge16_1 } from './challenges/16_1';
+import { challenge16_2 } from './challenges/16_2';
+import { challenge17 } from './challenges/17';
+import { challenge17_1 } from './challenges/17_1';
+import { challenge17_2 } from './challenges/17_2';
+import { challenge18 } from './challenges/18';
+import { challenge18_1 } from './challenges/18_1';
+import { challenge18_2 } from './challenges/18_2';
+import { challenge18_3 } from './challenges/18_3';
+import { challenge18_4 } from './challenges/18_4';
+import { challenge18_5 } from './challenges/18_5';
+import { challenge18_6 } from './challenges/18_6';
+import { challenge18_7 } from './challenges/18_7';
+import { challenge19 } from './challenges/19';
+import { challenge19_1 } from './challenges/19_1';
+import { challenge19_2 } from './challenges/19_2';
 
 const challenges: PythonChallenge[] = [
   challenge01,
@@ -34,6 +81,53 @@ const challenges: PythonChallenge[] = [
   challenge11_3,
   challenge11_4,
   challenge11_5,
+  challenge12,
+  challenge12_1,
+  challenge12_2,
+  challenge12_3,
+  challenge12_4,
+  challenge12_5,
+  challenge12_6,
+  challenge12_7,
+  challenge12_8,
+  challenge12_9,
+  challenge12_10,
+  challenge13,
+  challenge13_1,
+  challenge13_2,
+  challenge13_3,
+  challenge13_4,
+  challenge13_5,
+  challenge13_6,
+  challenge13_7,
+  challenge13_8,
+  challenge13_9,
+  challenge14,
+  challenge14_1,
+  challenge14_2,
+  challenge14_3,
+  challenge14_4,
+  challenge15,
+  challenge15_1,
+  challenge15_2,
+  challenge15_3,
+  challenge16,
+  challenge16_1,
+  challenge16_2,
+  challenge17,
+  challenge17_1,
+  challenge17_2,
+  challenge18,
+  challenge18_1,
+  challenge18_2,
+  challenge18_3,
+  challenge18_4,
+  challenge18_5,
+  challenge18_6,
+  challenge18_7,
+  challenge19,
+  challenge19_1,
+  challenge19_2,
 ];
 
 export const pythonGrundlagenCourse: Course<PythonChallenge> = {

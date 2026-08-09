@@ -410,7 +410,7 @@ geschehen, nicht erneut von Hand.
 | Tag | Label | Voraussetzungen | Level |
 |---|---|---|---|
 | `create-view` | `CREATE VIEW` | `select-basic` (B3) | 3 |
-| `updatable-view` | Durch eine View hindurch `INSERT`/`UPDATE` | `create-view`, `update-statement` (B2) | 7 |
+| `updatable-view` | Durch eine View hindurch `INSERT`/`UPDATE` — **bewusst ausgeklammert, siehe Abschnitt 7** | `create-view`, `update-statement` (B2) | 7 |
 
 ### B13 — Indizes (konzeptionell)
 
@@ -457,52 +457,166 @@ graph TD
 
 ## 6. Abgleich mit der aktuellen Implementierung
 
-Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (41 Challenges)
+*Update 2026-08-05: Challenges 14–14.5 wurden ergänzt und decken den
+kompletten Zweig B7 (Subqueries) ab — die vorherige größte Einzellücke.
+Update 2026-08-08: Challenges 16–16.2 ergänzt und decken den kompletten
+Zweig B11 (Transaktionen) ab — der erste der drei bis dahin komplett
+offenen kleinen Zweige (B11/B12/B13). Update 2026-08-08 (stündliche
+Routine, Fortsetzung): Challenge 17 ergänzt und deckt `create-view` ab,
+den ersten der beiden B12-Tags. Der zweite Tag (`updatable-view`) wurde
+vor dem Schreiben empirisch geprüft (nicht angenommen) — siehe Abschnitt
+7 — und stellte sich als über dieses Curriculum hinweg unerreichbar
+heraus, weil SQLite dafür `INSTEAD OF`-Trigger voraussetzt, die bereits
+zuvor bewusst ausgeklammert wurden. `updatable-view` ist damit als
+dauerhafte Scope-Ausnahme dokumentiert (analog zu `own-modules` im
+Python-Dokument), nicht als offene Aufgabe. B12 gilt damit als
+abgeschlossen. Update 2026-08-08 (stündliche Routine, Fortsetzung):
+Challenges 18–18.2 ergänzt und decken B13 (Indizes) komplett ab —
+zusätzlich auch `create-index` selbst (strukturell B1, aber bis dahin
+ebenfalls ungenutzt), womit der letzte komplett offene SQL-Zweig
+geschlossen ist. Update 2026-08-09 (stündliche Routine, Fortsetzung):
+Challenges 19–19.1 ergänzt und decken B9 (CTE & Rekursion) komplett ab —
+die vom Dokument selbst als zweitgrößte Lücke benannten Tags
+`multiple-ctes-chained` und `recursive-cte-traversal`. 19 verkettet zwei
+CTEs (Abteilungsdurchschnitt → Mitarbeiter darüber), 19.1 ist die erste
+Challenge im Kurs, die `WITH RECURSIVE` über echte hierarchische Daten
+traversiert (ein Organigramm) statt nur Zahlen-/Datumsreihen zu erzeugen
+— inklusive einer mitgezählten Rekursionstiefe als Sicherheitsnetz gegen
+zyklische Daten, da die App selbst eine `WITH RECURSIVE` ohne `WHERE`
+oder `LIMIT` im rekursiven Teil vorab blockiert (`findUnboundedRecursion`)
+und ein reiner Join-basierter Abbruch dafür nicht erkannt wird. Update
+2026-08-09 (stündliche Routine, Fortsetzung): Challenges 20–20.4 ergänzt
+und decken B1 (Schema/DDL) komplett ab — die letzten fünf offenen Tags
+(`default-value-constraint`, `check-constraint`,
+`foreign-key-constraint`, `alter-table`, `drop-table`), zu diesem
+Zeitpunkt der größte offene Zweig im gesamten Projekt (SQL und Python
+zusammen). Dabei einen echten Test-Engine-Bug gefunden und behoben (siehe
+`docs/ui-ux-audit.md`, F-018): `node:sqlite` defaultet
+`PRAGMA foreign_keys` auf ON, `sql.js`/echtes SQLite auf OFF — ohne Fix
+hätte ein Distraktor, der `PRAGMA foreign_keys = ON;` vergisst, in Node
+fälschlich als blockiert gegolten. Update 2026-08-09 (stündliche
+Routine, Fortsetzung): Challenges 21–21.2 ergänzt und decken B6 (Joins)
+komplett ab — `self-join`, `right-join`, `full-outer-join`, vorab in
+beiden Motoren (`sql.js` 3.45.0, `node:sqlite` 3.51.2) empirisch
+verifiziert. Dabei einen zweiten echten Test-Engine-Bug in derselben
+Datei gefunden und behoben (siehe `docs/ui-ux-audit.md`, F-019):
+`node:sqlite`s `prepared.all()` liefert Zeilen ohne
+`setReturnArrays(true)` namensbasiert statt positionsbasiert — zwei
+gleichnamige Spalten aus verschiedenen Tabellen (z. B. ein unaliaster
+Self-Join) kollabierten dadurch stillschweigend auf einen Wert, obwohl
+`sql.js` (der echte Browser-Motor) davon nie betroffen war. Update
+2026-08-09 (stündliche Routine, Fortsetzung): Erst ein Live-Playwright-
+Durchlauf gegen den echten Dev-Server (alle 10 seit der letzten
+Browser-Verifikation neuen Challenges 19–21.2, live gegen echtes
+sql.js-WASM) — keine Diskrepanz zu `node:sqlite` gefunden, sauber.
+Danach Challenges 22–22.1 ergänzt und decken B3 (DQL-Kern) komplett ab —
+`logical-operators` als eigenes Thema (eine Bonusregel mit AND/OR/NOT
+in einer geklammerten Bedingung) und `coalesce-nullif`
+(`COALESCE(NULLIF(...), ...)` gegen zwei Arten von "fehlend": echtes
+NULL und einen Platzhalter-Text). Der Rest dieses Abschnitts ist der
+historische Stand vor diesen Updates; die Bilanz am Ende ist bereits
+aktualisiert.*
+
+Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (71 Challenges)
 folgende **nicht** ab — das ist die eigentliche Planungs-Nutzlast dieses
 Dokuments:
 
-**B1 Schema:** `default-value-constraint`, `check-constraint`,
+**B1 Schema:** ~~`default-value-constraint`, `check-constraint`,
 `foreign-key-constraint` (der Kurs verknüpft Tabellen nur über zufällig
 passende IDs, deklariert nie einen echten `FOREIGN KEY`), `alter-table`,
-`drop-table`, `create-index`.
+`drop-table`.~~ — **seit 2026-08-09 vollständig abgedeckt** durch
+Challenges 20 (`default-value-constraint`), 20.1 (`check-constraint`),
+20.2 (`foreign-key-constraint`, inklusive `PRAGMA foreign_keys = ON;`
+— SQLite prüft Fremdschlüssel standardmäßig gar nicht), 20.3
+(`alter-table`, gegen "Tabelle löschen und neu anlegen" abgegrenzt) und
+20.4 (`drop-table`, gegen `DELETE FROM` abgegrenzt). War zu diesem
+Zeitpunkt der größte offene Zweig im gesamten Projekt.
 
 **B2 DML:** `upsert-on-conflict`.
 
-**B3 DQL:** `logical-operators` als **eigenes** Thema (wird implizit
-verwendet, nie explizit erklärt), `coalesce-nullif`.
+**B3 DQL:** ~~`logical-operators` als **eigenes** Thema (wird implizit
+verwendet, nie explizit erklärt), `coalesce-nullif`.~~ — **seit
+2026-08-09 vollständig abgedeckt** durch Challenge 22
+(`logical-operators`: AND/OR/NOT explizit erklärt und mit einer
+geklammerten Bonusregel geübt) und 22.1 (`coalesce-nullif`:
+`COALESCE(NULLIF(...), ...)` gegen zwei Arten von "fehlend").
 
 **B4 Funktionen:** `math-functions` (`round()`, `abs()`), `cast-conversion`,
 und `string-functions` (`substr()`, `upper()`, `lower()`, `trim()`,
 `replace()` — der Kurs nutzt nur den `||`-Operator, keine dieser Funktionen
 taucht in einer der 41 Challenges auf).
 
-**B6 Joins:** `self-join`, `right-join`, `full-outer-join`.
+**B6 Joins:** ~~`self-join`, `right-join`, `full-outer-join`.~~ —
+**seit 2026-08-09 vollständig abgedeckt** durch Challenge 21
+(`self-join`, ein Organigramm mit zwei Aliassen derselben Tabelle),
+21.1 (`right-join`, direkte Fortsetzung von Kapitel 10.1 mit
+vertauschter Blickrichtung) und 21.2 (`full-outer-join`, kombiniert
+unmatched Zeilen von beiden Seiten anhand einer verwaisten Bestellung).
 
-**B7 Subqueries:** **komplett nicht abgedeckt** — der Kurs löst alles über
-CTEs/Joins, nie über eine Subquery in `WHERE`/`FROM`/`SELECT`. Das ist die
-größte inhaltliche Lücke.
+**B7 Subqueries:** ~~komplett nicht abgedeckt~~ — **seit 2026-08-05
+vollständig abgedeckt** durch Challenges 14 (`scalar-subquery`), 14.1
+(`subquery-in-select`), 14.2 (`derived-table-subquery`), 14.3
+(`subquery-set` + `subquery-in-where-in`), 14.4 (`exists-subquery`) und
+14.5 (`correlated-subquery`). War zuvor die größte inhaltliche Lücke —
+der Kurs löste bis dahin alles über CTEs/Joins, nie über eine Subquery in
+`WHERE`/`FROM`/`SELECT`.
 
 **B8 Mengenoperationen:** `union-distinct`, `intersect`, `except-minus`
 (nur `UNION ALL` wird unterrichtet).
 
-**B9 CTE:** `multiple-ctes-chained`, und vor allem
+**B9 CTE:** ~~`multiple-ctes-chained`, und vor allem
 `recursive-cte-traversal` — die vorhandenen Challenges nutzen Rekursion
 ausschließlich zur **Erzeugung** von Zahlen-/Datumsreihen, nie zur
 **Traversierung** existierender hierarchischer Daten (z. B. "finde alle
 Mitarbeiter unter einem Manager"). Das ist die zweitgrößte Lücke — beide
-sind SQL-Kernkompetenzen, die im Kurs bisher fehlen.
+sind SQL-Kernkompetenzen, die im Kurs bisher fehlen.~~ — **seit
+2026-08-09 vollständig abgedeckt** durch Challenge 19 (`multiple-ctes-chained`:
+zwei verkettete CTEs, Abteilungsdurchschnitt gefolgt von den Mitarbeitern
+darüber) und 19.1 (`recursive-cte-traversal`: die erste Rekursion im Kurs
+über eine echte hierarchische Tabelle statt einer erzeugten Zahlenreihe —
+ein Organigramm, mit mitgezählter Tiefe als Abbruchbedingung).
 
-**B10 Fensterfunktionen, B11 Transaktionen, B12 Views, B13 Indizes:**
-**komplett nicht abgedeckt** (B13 zählt hier ohne `create-index`, das
-strukturell zu B1 gehört und dort separat gelistet ist).
+**B10 Fensterfunktionen:** ~~komplett nicht abgedeckt~~ — **seit
+2026-08-07 vollständig abgedeckt** durch Challenges 15 (`window-function-basic`),
+15.1 (`partition-by`), 15.2 (`ranking-functions`), 15.3 (`offset-functions`)
+und 15.4 (`running-aggregates`).
 
-**Gut abgedeckt:** B0–B1-Basics, DML-Kern (ohne Upsert), DQL-Kern fast
-vollständig, Aggregation/Gruppierung, Joins bis `LEFT JOIN`, CTE/Rekursion
-(Erzeugungs-Variante).
+**B11 Transaktionen:** ~~komplett nicht abgedeckt~~ — **seit 2026-08-08
+vollständig abgedeckt** durch Challenges 16 (`transaction-basic`), 16.1
+(`rollback`) und 16.2 (`savepoint`) — alle drei als durchgehendes
+Überweisungs-Szenario (Anna/Ben/Clara) erzählt: 16 zeigt BEGIN/COMMIT,
+16.1 ROLLBACK als vollständiges Verwerfen, 16.2 SAVEPOINT/ROLLBACK TO als
+gezieltes Teil-Verwerfen innerhalb einer laufenden Transaktion.
 
-**Bilanz:** 43 von 82 Tags sind heute durch mindestens eine Challenge
-abgedeckt (≈ 52 %). Fünf Zweige (B7, B10, B11, B12, B13) sind zu 100 %
-Lücke.
+**B12 Views:** ~~komplett nicht abgedeckt~~ — **seit 2026-08-08
+abgeschlossen** durch Challenge 17 (`create-view`); der zweite Tag
+(`updatable-view`) ist keine offene Lücke mehr, sondern eine dauerhafte
+Scope-Ausnahme (siehe Abschnitt 7).
+
+**B13 Indizes:** ~~komplett nicht abgedeckt~~ — **seit 2026-08-08
+vollständig abgedeckt** durch Challenges 18 (`create-index`, strukturell
+B1, aber hier zum ersten Mal tatsächlich unterrichtet), 18.1
+(`index-performance-concept`) und 18.2 (`explain-query-plan`) — ein
+durchgehendes Szenario: 18 legt einen Index an, 18.1 zeigt anhand einer
+zweiten Tabelle, dass der Index gezielt auf die `WHERE`-Spalte zeigen
+muss, damit `EXPLAIN QUERY PLAN` von `SCAN` auf `SEARCH ... USING INDEX`
+wechselt, 18.2 lässt den Query-Plan selbst schreiben und lesen.
+
+**Gut abgedeckt:** **B0/B1 Grundlagen & Schema (seit 2026-08-09
+vollständig)**, DML-Kern (ohne Upsert), **B3 DQL-Kern (seit 2026-08-09
+vollständig)**, Aggregation/Gruppierung, **B6 Joins (seit 2026-08-09
+vollständig, inklusive SELF/RIGHT/FULL OUTER JOIN)**, **B7 Subqueries
+(seit 2026-08-05 vollständig)**, **B9 CTE & Rekursion (seit 2026-08-09
+vollständig, jetzt inklusive Traversierung echter Hierarchien)**,
+**B10 Fensterfunktionen (seit 2026-08-07 vollständig)**, **B11
+Transaktionen (seit 2026-08-08 vollständig)**, **B12 Views (seit
+2026-08-08 abgeschlossen, `create-view` abgedeckt, `updatable-view` als
+dauerhafte Ausnahme)**, **B13 Indizes (seit 2026-08-08 vollständig)**.
+
+**Bilanz:** 74 von 82 Tags sind heute durch mindestens eine Challenge
+abgedeckt (≈ 90 %). Kein Zweig ist mehr zu 100 % Lücke — die einzige
+verbleibende Struktur-Lücke ist `updatable-view`, das als dauerhafte
+Scope-Ausnahme dokumentiert ist (nicht als offene Aufgabe).
 
 ## 7. Bewusst ausgeklammert
 
@@ -514,6 +628,19 @@ DBA-Training) bewusst nicht Teil dieser Hierarchie:
 - **Trigger, gespeicherte Prozeduren** — stark dialektabhängig (SQLite
   unterstützt nur einfache Trigger, kein PL/pgSQL-Äquivalent), und eher
   fortgeschrittenes Anwendungsdesign als SQL-Grundverständnis.
+- **`updatable-view` (Tag aus B12)** — empirisch geprüft (2026-08-08, via
+  `node:sqlite` 3.51.2, also keine veraltete Version): SQLite verweigert
+  `UPDATE`/`INSERT`/`DELETE` durch eine normale View hindurch mit dem
+  echten Fehler `cannot modify <view> because it is a view`, **außer** die
+  View hat eigene `INSTEAD OF`-Trigger — und Trigger stehen bereits oben
+  auf dieser Liste als bewusst ausgeklammert. Anders als bei
+  `own-modules` im Python-Dokument ist das hier kein Sandbox-Limit,
+  sondern eine direkte Folge einer anderen bereits getroffenen
+  Scope-Entscheidung dieses Dokuments: Der Tag bliebe nur erreichbar,
+  wenn zuerst Trigger ins Curriculum aufgenommen würden. Der Tag bleibt
+  im Graph stehen (er beschreibt ein echtes SQL-Konzept), zählt aber wie
+  die anderen Einträge dieser Liste **nicht** als planbare Lücke in
+  Abschnitt 6.
 - **JSON-Funktionen, Volltextsuche, Geodaten** — dialekt-/erweiterungsspezifisch.
 - **Materialized Views** — Postgres-spezifisch, kein SQLite-Konzept.
 - **Replikation, Partitionierung, Backup** — Betriebs-, kein Sprachthema.
