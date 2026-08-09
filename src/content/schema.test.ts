@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { baseChallengeSchema, pythonChallengeSchema, sqliteChallengeSchema } from './schema';
+import { baseChallengeSchema, csharpChallengeSchema, pythonChallengeSchema, sqliteChallengeSchema } from './schema';
 
 function validBaseFields() {
   return {
@@ -78,5 +78,17 @@ describe('pythonChallengeSchema', () => {
   it('still enforces the base Pflichtfelder (e.g. exactly 3 hints)', () => {
     const fields = { ...validBaseFields(), extra: {}, hints: ['only one'] };
     expect(pythonChallengeSchema.safeParse(fields).success).toBe(false);
+  });
+});
+
+describe('csharpChallengeSchema', () => {
+  it('accepts a valid challenge with an empty extra object (no track-specific extras yet, same as Python)', () => {
+    const fields = { ...validBaseFields(), extra: {} };
+    expect(csharpChallengeSchema.safeParse(fields).success).toBe(true);
+  });
+
+  it('still enforces the base Pflichtfelder (e.g. exactly 3 hints)', () => {
+    const fields = { ...validBaseFields(), extra: {}, hints: ['only one'] };
+    expect(csharpChallengeSchema.safeParse(fields).success).toBe(false);
   });
 });

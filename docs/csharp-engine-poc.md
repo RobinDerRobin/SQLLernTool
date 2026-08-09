@@ -450,10 +450,35 @@ Roughly in dependency order:
    Python validators already do) rather than reading typed values out of
    a `variables`-style dict. Slightly more manual to author than Python's
    validators, but a known, already-used shape in this project.
-5. **New `csharp` content track**: `src/content/tracks/csharp/` (registry
-   entry, `types.ts`, a course, following the exact SQL/Python
-   scaffolding pattern), plus a `CSharpChallenge` type in
-   `src/domain/challenge.types.ts`.
+5. ~~New `csharp` content track scaffold~~ — **done (2026-08-09), partially:
+   `src/content/tracks/csharp/types.ts`** (`CSharpChallengeExtra` +
+   `CSharpChallenge = BaseChallenge<CSharpRuntime, CSharpExecResult,
+   CSharpChallengeExtra>` — `BaseChallenge` itself needed no changes, it
+   was already generic enough) and **`src/content/tracks/csharp/courses/
+   csharpGrundlagen/course.ts`** (empty `challenges: []`, mirroring
+   `pythonGrundlagenCourse`'s shape exactly) both exist and typecheck.
+   `csharpChallengeSchema` added to `src/content/schema.ts` too, same
+   empty-extra shape as Python's, with matching tests in
+   `src/content/schema.test.ts`.
+
+   **Deliberately NOT wired into `src/content/registry.ts`'s `TRACKS`
+   yet** — that is the part of this step intentionally left undone, and
+   why it's "partially" rather than fully done. Registering an empty
+   course would make "C#" appear as a real, selectable option in the live
+   course picker (`src/ui/views/sidebar/trackCoursePicker.ts` already
+   iterates `TRACKS` generically, so it would pick this up immediately,
+   no further UI code changes needed) — but selecting it would try to run
+   a challenge that doesn't exist, against an engine
+   (`ctx.engines`/`AppContext`) that has no C#-track case yet, using an
+   editor with no C# `LanguagePlugin` (syntax highlighting/auto-indent)
+   yet, loading a Blazor bundle from a `baseUrl` nothing currently serves
+   in dev or production. None of those four gaps are this step's job to
+   close (they belong to wiring the engine into the live app, a step this
+   plan hasn't named yet — needed before step 7's content can actually be
+   *played*, as opposed to merely authored and Gate-1/2-verified). Shipping
+   a track that's selectable but non-functional would be worse than not
+   shipping it yet, so the registry line is the one deliberately-withheld
+   piece here — added the moment those four gaps are closed, not before.
 6. **Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
    mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
    feasible now that `dotnet` works in this sandbox; likely just
@@ -466,10 +491,15 @@ Roughly in dependency order:
 
 This is genuinely several more sessions of real engineering work. Steps
 1–4 (hosting decision, project scaffold, browser loader, `validate()`
-design) are now done. Step 5 (the `csharp` content track scaffold) is the
-next concrete piece — mechanical work mirroring the existing SQL/Python
-track structure, no open design questions. Step 6 (Node-side test engine)
-can follow independently. Real content (step 7) needs both in place.
+design) are now done. Step 5 (the `csharp` content track scaffold) is
+mostly done — types, schema, and an empty course exist, deliberately not
+yet wired into the live `TRACKS` registry (see step 5's own entry above
+for exactly which four gaps block that safely). Step 6 (Node-side test
+engine) can proceed independently of closing those four gaps — it only
+needs the types this step already added. Real content (step 7) needs
+step 6 for Gate 1/2 verification, and the live app additionally needs
+those four wiring gaps closed before it's actually playable, not just
+authored.
 Treat each routine firing that touches this as making **one bounded,
 committed increment** (e.g. "scaffold the project directory and get a
 minimal Blazor boot working," not "finish the whole engine") — never

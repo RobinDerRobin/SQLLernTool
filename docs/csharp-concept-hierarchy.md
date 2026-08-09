@@ -495,6 +495,24 @@ Tag-Bilanz bleibt bei 0/86 — eine Design-Entscheidung ist noch kein
 Content-Track. Nächster Schritt: Schritt 5, das mechanische Scaffolding
 des `csharp`-Content-Tracks (keine offenen Design-Fragen mehr).*
 
+*Update 2026-08-09 (stündliche Routine, Fortsetzung): Schritt 5 zum Teil
+erledigt — `src/content/tracks/csharp/types.ts` (`CSharpChallenge`-Typ)
+und `src/content/tracks/csharp/courses/csharpGrundlagen/course.ts` (noch
+`challenges: []`, exakt nach dem Vorbild von `pythonGrundlagenCourse`)
+existieren jetzt, ebenso `csharpChallengeSchema` in
+`src/content/schema.ts`. Bewusst NICHT in `src/content/registry.ts`s
+`TRACKS` eingetragen — das würde „C#" sofort als echten, wählbaren Kurs
+in der Live-Kurs-Auswahl erscheinen lassen (die UI iteriert `TRACKS`
+generisch, keine weitere Code-Änderung nötig), obwohl vier Lücken noch
+offen sind, bevor ein ausgewählter C#-Kurs tatsächlich funktionieren
+würde: kein C#-Fall in der Engine-Fabrik (`ctx.engines`), kein
+C#-`LanguagePlugin` für den Editor, keine servierte Blazor-Bundle-Quelle
+in Dev/Prod, und (logisch vorausgesetzt) noch keine einzige Challenge.
+Tag-Bilanz bleibt bei 0/86 — ein leerer, unregistrierter Kurs ist noch
+kein Content. Nächster Schritt: Schritt 6 (Node-Testmotor für CI) kann
+unabhängig von den vier oben genannten Live-UI-Lücken weitergehen, da er
+nur die jetzt existierenden Typen braucht, nicht die Live-Registrierung.*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt

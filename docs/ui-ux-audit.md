@@ -87,6 +87,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-08 | HEAD (Python B14 Objektorientierung komplett: 18-18.7) | 92.26 % | 74.16 % | 99.00 % | 92.26 % |
 | 2026-08-09 | HEAD (Python B10/B11 abgeschlossen: 19-19.2) | 92.14 % | 73.82 % | 99.01 % | 92.14 % |
 | 2026-08-09 | HEAD (C# Schritt 4: validate()-Design entschieden, result-Feld entfernt) | 92.14 % | 73.81 % | 99.01 % | 92.14 % |
+| 2026-08-09 | HEAD (C# Schritt 5: Content-Track-Scaffold, unregistriert) | 92.15 % | 73.82 % | 99.01 % | 92.15 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -1168,3 +1169,49 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Tests:** 805 (unverändert — reine Aufräumarbeit an bestehenden
   Tests/Fixtures, keine neuen Tests nötig). `typecheck`, volle
   Testsuite (805 Tests) und `npm run build` grün.
+
+### 2026-08-09 — Stündliche Routine: C# Schritt 5 (Content-Track-Scaffold, bewusst unregistriert)
+
+- **Umfang:** Baseline geprüft (805/805 grün). SQL/Python weiterhin ohne
+  großen offenen Zweig; C#-Engine-Integration hatte nach Schritt 4 klaren
+  Schwung und einen eindeutigen nächsten Schritt laut
+  `docs/csharp-engine-poc.md` — Schritt 5, das Scaffolding des
+  `csharp`-Content-Tracks.
+- **Vorgehen:** `src/content/tracks/csharp/types.ts` ergänzt
+  (`CSharpChallengeExtra` + `CSharpChallenge = BaseChallenge<CSharpRuntime,
+  CSharpExecResult, CSharpChallengeExtra>` — `BaseChallenge` selbst
+  brauchte keine Änderung, war schon generisch genug), `csharpChallengeSchema`
+  in `src/content/schema.ts` (leeres `extra`, exakt wie bei Python) mit
+  passenden Tests in `schema.test.ts`, sowie
+  `src/content/tracks/csharp/courses/csharpGrundlagen/course.ts` — Aufbau
+  exakt nach dem Vorbild von `pythonGrundlagenCourse`, aber bewusst mit
+  `challenges: []`.
+
+  Bewusste Entscheidung, den Kurs **nicht** in `src/content/registry.ts`s
+  `TRACKS` einzutragen: die Kurs-Auswahl-UI (`trackCoursePicker.ts`)
+  iteriert `TRACKS` bereits generisch, ein Eintrag würde „C#" also sofort
+  als echte, anklickbare Option in der Live-App erscheinen lassen — ohne
+  dass irgendetwas davon tatsächlich liefe. Vier Lücken stehen dem noch im
+  Weg: kein C#-Fall in der Engine-Fabrik (`ctx.engines`), kein
+  C#-`LanguagePlugin` für Syntax-Highlighting/Auto-Indent im Editor,
+  keine servierte Quelle für den Blazor-Bundle in Dev/Prod (die
+  `baseUrl`-Frage aus Schritt 3 ist immer noch offen), und noch keine
+  einzige Challenge. Eine auswählbare, aber nicht funktionierende
+  Kurskarte auszuliefern wäre schlechter, als sie noch nicht auszuliefern
+  — dieselbe Zurückhaltung, mit der schon die `baseUrl`- und
+  CI/Deploy-Fragen in früheren Schritten bewusst offengelassen wurden,
+  statt sie mit einer Notlösung zu verdecken.
+- **Ergebnis:** Keine Bugs gefunden — reines, sauberes Scaffolding.
+  C#-Engine-Fortschritt: Schritt 5 von 7 aus `docs/csharp-engine-poc.md`
+  zum Teil abgeschlossen (Typen/Schema/leerer Kurs stehen, Live-
+  Registrierung bewusst offen). Tag-Bilanz bleibt bei 0/86 — ein leerer,
+  unregistrierter Kurs ist noch kein Content. Nächster Schritt: Schritt 6
+  (Node-Testmotor für CI) kann unabhängig von den vier offenen
+  Live-UI-Lücken weitergehen, da er nur die jetzt existierenden Typen
+  braucht.
+- **Tests:** 805 → 809 (+4: 2 für die neue `csharpGrundlagenCourse`-
+  Struktur, 2 für `csharpChallengeSchema`). `typecheck`, volle Testsuite
+  (809 Tests) und `npm run build` grün. `knip` bestätigt: keine neuen
+  toten Dateien (nur `CSharpChallengeExtra` als unbenutzter Export
+  geflaggt, exakt dasselbe akzeptierte Muster wie bei
+  `PythonChallengeExtra`/`SqlChallengeExtra`).
