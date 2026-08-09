@@ -474,8 +474,19 @@ abgeschlossen. Update 2026-08-08 (stündliche Routine, Fortsetzung):
 Challenges 18–18.2 ergänzt und decken B13 (Indizes) komplett ab —
 zusätzlich auch `create-index` selbst (strukturell B1, aber bis dahin
 ebenfalls ungenutzt), womit der letzte komplett offene SQL-Zweig
-geschlossen ist. Der Rest dieses Abschnitts ist der historische Stand vor
-diesen Updates; die Bilanz am Ende ist bereits aktualisiert.*
+geschlossen ist. Update 2026-08-09 (stündliche Routine, Fortsetzung):
+Challenges 19–19.1 ergänzt und decken B9 (CTE & Rekursion) komplett ab —
+die vom Dokument selbst als zweitgrößte Lücke benannten Tags
+`multiple-ctes-chained` und `recursive-cte-traversal`. 19 verkettet zwei
+CTEs (Abteilungsdurchschnitt → Mitarbeiter darüber), 19.1 ist die erste
+Challenge im Kurs, die `WITH RECURSIVE` über echte hierarchische Daten
+traversiert (ein Organigramm) statt nur Zahlen-/Datumsreihen zu erzeugen
+— inklusive einer mitgezählten Rekursionstiefe als Sicherheitsnetz gegen
+zyklische Daten, da die App selbst eine `WITH RECURSIVE` ohne `WHERE`
+oder `LIMIT` im rekursiven Teil vorab blockiert (`findUnboundedRecursion`)
+und ein reiner Join-basierter Abbruch dafür nicht erkannt wird. Der Rest
+dieses Abschnitts ist der historische Stand vor diesen Updates; die
+Bilanz am Ende ist bereits aktualisiert.*
 
 Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (58 Challenges)
 folgende **nicht** ab — das ist die eigentliche Planungs-Nutzlast dieses
@@ -509,12 +520,17 @@ der Kurs löste bis dahin alles über CTEs/Joins, nie über eine Subquery in
 **B8 Mengenoperationen:** `union-distinct`, `intersect`, `except-minus`
 (nur `UNION ALL` wird unterrichtet).
 
-**B9 CTE:** `multiple-ctes-chained`, und vor allem
+**B9 CTE:** ~~`multiple-ctes-chained`, und vor allem
 `recursive-cte-traversal` — die vorhandenen Challenges nutzen Rekursion
 ausschließlich zur **Erzeugung** von Zahlen-/Datumsreihen, nie zur
 **Traversierung** existierender hierarchischer Daten (z. B. "finde alle
 Mitarbeiter unter einem Manager"). Das ist die zweitgrößte Lücke — beide
-sind SQL-Kernkompetenzen, die im Kurs bisher fehlen.
+sind SQL-Kernkompetenzen, die im Kurs bisher fehlen.~~ — **seit
+2026-08-09 vollständig abgedeckt** durch Challenge 19 (`multiple-ctes-chained`:
+zwei verkettete CTEs, Abteilungsdurchschnitt gefolgt von den Mitarbeitern
+darüber) und 19.1 (`recursive-cte-traversal`: die erste Rekursion im Kurs
+über eine echte hierarchische Tabelle statt einer erzeugten Zahlenreihe —
+ein Organigramm, mit mitgezählter Tiefe als Abbruchbedingung).
 
 **B10 Fensterfunktionen:** ~~komplett nicht abgedeckt~~ — **seit
 2026-08-07 vollständig abgedeckt** durch Challenges 15 (`window-function-basic`),
@@ -544,15 +560,16 @@ wechselt, 18.2 lässt den Query-Plan selbst schreiben und lesen.
 
 **Gut abgedeckt:** B0–B1-Basics (jetzt inklusive `create-index`), DML-Kern
 (ohne Upsert), DQL-Kern fast vollständig, Aggregation/Gruppierung, Joins
-bis `LEFT JOIN`, CTE/Rekursion (Erzeugungs-Variante), **B7 Subqueries
-(seit 2026-08-05 vollständig)**, **B10 Fensterfunktionen (seit
+bis `LEFT JOIN`, **B7 Subqueries (seit 2026-08-05 vollständig)**,
+**B9 CTE & Rekursion (seit 2026-08-09 vollständig, jetzt inklusive
+Traversierung echter Hierarchien)**, **B10 Fensterfunktionen (seit
 2026-08-07 vollständig)**, **B11 Transaktionen (seit 2026-08-08
 vollständig)**, **B12 Views (seit 2026-08-08 abgeschlossen, `create-view`
 abgedeckt, `updatable-view` als dauerhafte Ausnahme)**, **B13 Indizes
 (seit 2026-08-08 vollständig)**.
 
-**Bilanz:** 62 von 82 Tags sind heute durch mindestens eine Challenge
-abgedeckt (≈ 76 %). Kein Zweig ist mehr zu 100 % Lücke — die einzige
+**Bilanz:** 64 von 82 Tags sind heute durch mindestens eine Challenge
+abgedeckt (≈ 78 %). Kein Zweig ist mehr zu 100 % Lücke — die einzige
 verbleibende Struktur-Lücke ist `updatable-view`, das als dauerhafte
 Scope-Ausnahme dokumentiert ist (nicht als offene Aufgabe).
 

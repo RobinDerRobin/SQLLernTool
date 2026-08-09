@@ -89,6 +89,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (C# Schritt 4: validate()-Design entschieden, result-Feld entfernt) | 92.14 % | 73.81 % | 99.01 % | 92.14 % |
 | 2026-08-09 | HEAD (C# Schritt 5: Content-Track-Scaffold, unregistriert) | 92.15 % | 73.82 % | 99.01 % | 92.15 % |
 | 2026-08-09 | HEAD (C# Schritt 6: Node-Testmotor für CI) | 92.15 % | 73.82 % | 99.01 % | 92.15 % |
+| 2026-08-09 | HEAD (SQL B9 CTE & Rekursion abgeschlossen: 19-19.1) | 92.12 % | 73.84 % | 99.02 % | 92.12 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -1286,3 +1287,77 @@ sondern pro PR direkt in den Checks sichtbar.
   ['src/**/*.ts']`) nicht in die Coverage-Metrik ein, und
   `CSharpRuntime.ts` selbst enthält nur Typdeklarationen ohne
   Laufzeitcode.
+
+### 2026-08-09 — Stündliche Routine: SQL B9 (CTE & Rekursion) abgeschlossen
+
+- **Umfang:** Baseline geprüft (814/814 grün, `typecheck` und
+  `npm run build` sauber). `docs/sql-concept-hierarchy.md` benennt B9
+  selbst als "zweitgrößte Lücke" (nach dem inzwischen geschlossenen B7)
+  — die vorhandenen `WITH RECURSIVE`-Challenges erzeugen ausschließlich
+  Zahlen-/Datumsreihen, keine einzige traversiert eine echte
+  hierarchische Tabelle, und kein Kurs-Kapitel verkettet zwei CTEs
+  hintereinander. Klarer, größter nächster Content-Schritt laut Mandat.
+- **Vorgehen:** Zwei neue Challenges, beide vorab empirisch gegen
+  `node:sqlite` verifiziert (Lösung UND jeder Distraktor), bevor der
+  Content geschrieben wurde:
+  - **19** (`multiple-ctes-chained`): zwei verkettete CTEs
+    (`abteilung_avg` berechnet den Durchschnittsgehalt je Abteilung,
+    `top_verdiener` joint das gegen `mitarbeiter` und filtert darüber) —
+    Validator rechnet den erwarteten Wert unabhängig über eine
+    korrelierte Subquery nach (nicht über dieselben CTEs, um denselben
+    Denkfehler nicht doppelt abzusichern). Distraktor vergleicht mit dem
+    Gesamtdurchschnitt aller Mitarbeiter statt dem Abteilungsdurchschnitt
+    — liefert nachweislich ein anderes, falsches Ergebnis (3 statt 2
+    Zeilen).
+  - **19.1** (`recursive-cte-traversal`): die erste Challenge im Kurs,
+    die `WITH RECURSIVE` über eine echte selbstreferenzierende Tabelle
+    (ein Organigramm mit `manager_id`) statt einer erzeugten
+    Zahlenreihe laufen lässt — findet alle direkt und indirekt
+    Unterstellten einer Managerin. Validator liest die rohe
+    `mitarbeiter`-Tabelle aus und berechnet die erwartete Menge über
+    eine eigene Breitensuche in TypeScript (nicht über eine zweite SQL-
+    Abfrage), damit derselbe Rekursionsfehler nicht auf beiden Seiten
+    unbemerkt bliebe. Distraktor lässt die Rekursion komplett weg (nur
+    die direkten Unterstellten) — findet nachweislich nur 2 von 5
+    Personen.
+
+  **Ein echter, zuvor unbekannter Reibungspunkt dabei gefunden:** Die
+  naheliegendste Lösung für 19.1 (`JOIN unterstellte u ON m.manager_id =
+  u.id` ohne zusätzliches `WHERE`) wird von der App selbst blockiert —
+  `findUnboundedRecursion` (`src/domain/sql/unboundedRecursionCheck.ts`)
+  verlangt im rekursiven Teil einer `WITH RECURSIVE`-CTE zwingend entweder
+  ein `WHERE` oder ein `LIMIT` danach, weil sql.js 1.10.2 keine
+  Möglichkeit bietet, eine echte Endlosschleife von außen abzubrechen.
+  Ein rein Join-basierter, durch die Baumstruktur natürlich beschränkter
+  Abbruch wird von dieser (bewusst einfachen) Heuristik nicht erkannt —
+  das ist kein Bug in `unboundedRecursionCheck.ts` selbst (die Datei
+  dokumentiert genau dieses Verhalten als akzeptierten Kompromiss:
+  "erring toward false negatives ... rather than blocking legitimate
+  queries it can't parse", was hier aber eben doch einen legitimen Fall
+  blockiert), sondern ein echter Content-Design-Constraint: jede künftige
+  Join-basierte `WITH RECURSIVE`-Traversierung im Kurs muss ebenfalls
+  eine explizite Abbruchbedingung mitführen. Statt die Prüfung zu
+  umgehen, wurde die Lösung um eine mitgezählte Rekursionstiefe
+  (`WHERE u.tiefe < 10`) erweitert — fachlich sogar eine sinnvolle
+  Ergänzung (Schutz vor zyklischen Daten in echten Organigrammen), nicht
+  nur ein Workaround, und jetzt auch im Tutorial-Text als solche erklärt.
+  Alle 216 Challenge-Runner-Tests (Gate 1 + Gate 2, inklusive der beiden
+  neuen) laufen über exakt denselben `executeAndValidate`-Codepfad wie
+  die echte App, decken diesen Blocker also bereits automatisch ab — ein
+  separater Live-Playwright-Durchlauf war für diese beiden Challenges
+  nicht nötig.
+- **Ergebnis:** Kein Produktbug gefunden (der Unbounded-Recursion-Guard
+  funktioniert korrekt, nur eine bisher ungetestete Content-Form stieß
+  erstmals daran). SQL-Tag-Bilanz: 62/82 → 64/82 (≈ 78 %). B9 (CTE &
+  Rekursion) ist damit als letzter SQL-Zweig mit mehr als einem offenen
+  Tag geschlossen — verbleibende SQL-Lücken sind nur noch einzelne,
+  über mehrere Zweige verstreute Tags (B1: 5, B3: 2, B4: 3, B6: 3, B8: 3)
+  plus die dauerhafte Scope-Ausnahme `updatable-view`.
+- **Tests:** 814 → 818 (+4: Gate 1 + Gate 2 für Challenge 19 und 19.1).
+  `typecheck`, volle Testsuite (818 Tests) und `npm run build` grün.
+  Coverage: 92,15 % → 92,12 % Statements (mehr neuer Code als neu
+  gedeckte Zeilen — beide Validatoren haben Fehlerzweige, die im
+  Gate-1/2-Lauf nicht alle getroffen werden), 73,82 % → 73,84 % Branches,
+  99,01 % → 99,02 % Functions. `knip` bestätigt: keine neuen toten
+  Exporte durch diese Änderung (nur die bereits akzeptierten,
+  unveränderten Funde).
