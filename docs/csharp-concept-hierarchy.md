@@ -592,6 +592,29 @@ dem echten `dotnet`-Treiber verifiziert, nicht nur angenommen.
 `constants-readonly` bleiben als Rest von B2 offen — bewusst nicht in
 derselben Challenge mit untergebracht, um sie nicht zu überladen.*
 
+*Update 2026-08-09 (stündliche Routine, Fortsetzung): Challenge 03 ergänzt
+— deckt die restlichen drei Tags aus B2 ab: `char-type`, `var-type-inference`,
+`constants-readonly`. Szenario: eine Prüfung mit 100 Maximalpunkten, 82
+erreichten Punkten und Note B — eine Konstante (`const int maxPunkte`),
+eine per Typinferenz angelegte Variable (`var erreichtePunkte`) und ein
+einzelnes Zeichen (`char notenBuchstabe`) in einem Durchgang. Beide
+Distraktoren sind bewusst **Compilerfehler**, nicht falsche Laufzeit-
+Ausgaben — anders als bei Challenge 02 lässt sich "eine Konstante wurde
+verändert" oder "ein string wurde als char behandelt" nicht über
+unterschiedlichen stdout beobachten, weil beide Verstöße den Compiler
+selbst stoppen, bevor überhaupt etwas läuft. Das ist konzeptionell korrekt
+so: `executeAndValidate` liefert bei einem Compilerfehler `{ ok: false,
+error: ... }`, bevor `validate()` je aufgerufen wird (dasselbe Muster, das
+schon bei SQL-Constraint-Verletzungen greift) — der Test prüft nur
+`outcome.ok === false`, das reicht als Nachweis. Beide Distraktoren vor
+dem Schreiben empirisch gegen den echten `dotnet`-Treiber verifiziert:
+Neuzuweisung an `maxPunkte` erzeugt tatsächlich `CS0131`, `char
+notenBuchstabe = "B";` tatsächlich `CS0029`.
+
+**Tag-Bilanz: 15 von 86 (≈ 17 %).** Damit ist **B2 (Variablen & Typen)
+vollständig abgedeckt** — B0, B1 und B2 sind jetzt komplett. Nächster
+offener Zweig: B3 (nach der Branch-Übersicht in Abschnitt 5).*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt

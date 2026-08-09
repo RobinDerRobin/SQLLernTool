@@ -2,6 +2,7 @@ import type { Course } from '../../../../../domain/challenge.types';
 import type { CSharpChallenge } from '../../types';
 import { challenge01 } from './challenges/01';
 import { challenge02 } from './challenges/02';
+import { challenge03 } from './challenges/03';
 
 /**
  * Step 7 of the plan in docs/csharp-engine-poc.md (actual content) has
@@ -10,7 +11,7 @@ import { challenge02 } from './challenges/02';
  * rigorous way every other track's content is verified (Gate 1/Gate 2 via
  * test/content/challengeRunner.test.ts).
  */
-const challenges: CSharpChallenge[] = [challenge01, challenge02];
+const challenges: CSharpChallenge[] = [challenge01, challenge02, challenge03];
 
 export const csharpGrundlagenCourse: Course<CSharpChallenge> = {
   id: 'csharpGrundlagen',

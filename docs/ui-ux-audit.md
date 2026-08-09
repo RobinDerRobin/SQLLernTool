@@ -122,6 +122,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (Live-Bug-Hunt sauber + C# Schritt 7 gestartet: Challenge 01) | 91.76 % | 72.87 % | 99.08 % | 91.76 % |
 | 2026-08-09 | HEAD (C# Challenge 02: B2-Grundtypen, int/double-Division) | 91.79 % | 72.86 % | 99.08 % | 91.79 % |
 | 2026-08-09 | HEAD (Syntax-Highlighting in Tutorial/Tipps/Erklärung/Lösung) | 91.82 % | 72.95 % | 99.09 % | 91.82 % |
+| 2026-08-09 | HEAD (C# Challenge 03: B2 vollständig, 15/86) | 91.80 % | 72.92 % | 99.09 % | 91.80 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -2062,3 +2063,47 @@ sondern pro PR direkt in den Checks sichtbar.
   gerenderten DOM). Volle Testsuite 879 → 893, alle grün. `typecheck`,
   `npm run build` grün (+0,6 kB). `knip`: unverändert 10 Funde. Coverage:
   91,82 % / 72,95 % / 99,09 % / 91,82 %.
+
+### 2026-08-09 — Stündliche Routine: C# Challenge 03 (B2 vollständig)
+
+- **Umfang:** Baseline sauber (893/893, typecheck/build/knip grün, HEAD
+  `2463d94` nach dem Nutzer-Syntax-Highlighting-Commit). SQL/Python bleiben
+  bei 81/82 (nur permanente Ausnahmen offen) — kein aktionabler
+  Content-Tag mehr in beiden Tracks. C# hat nach Challenge 01/02 klaren
+  Schwung, also das nächste begrenzte Increment: die drei restlichen
+  B2-Tags (`char-type`, `var-type-inference`, `constants-readonly`), die
+  Challenge 02 bewusst nicht mit abgedeckt hatte.
+
+- **Content:** Szenario "Prüfung mit 100 Punkten, 82 erreicht, Note B" —
+  eine Konstante (`const int maxPunkte`), eine per Typinferenz angelegte
+  Variable (`var erreichtePunkte`) und ein einzelnes Zeichen (`char
+  notenBuchstabe`) in einem Durchgang.
+
+- **C#-spezifisches Distraktor-Muster (neu für diesen Track):** Beide
+  Distraktoren sind bewusst **Compilerfehler**, nicht falsche
+  stdout-Ausgaben — anders als bei Challenge 02 lässt sich weder "eine
+  Konstante wurde verändert" noch "ein string wurde als char behandelt"
+  über unterschiedlichen stdout beobachten, weil beide Verstöße den
+  Compiler stoppen, bevor überhaupt etwas läuft. Das passt zum
+  stdout-only-`validate()`-Design (Schritt-4-Entscheidung): `
+  executeAndValidate` liefert bei einem Compilerfehler `{ ok: false,
+  error: ... }`, bevor `validate()` je aufgerufen wird — dasselbe Muster,
+  das schon bei SQL-Constraint-Verletzungen (z. B. `upsert-on-conflict`)
+  genutzt wurde. Beide Distraktoren vor dem Schreiben empirisch gegen den
+  echten `dotnet`-Treiber verifiziert: Neuzuweisung an die Konstante
+  erzeugt tatsächlich `CS0131` ("The left-hand side of an assignment must
+  be a variable, property or indexer"), `char notenBuchstabe = "B";`
+  tatsächlich `CS0029` ("Cannot implicitly convert type 'string' to
+  'char'").
+
+- **Ergebnis:** C#-Tag-Bilanz 12/86 → 15/86 (≈17 %). B0, B1 und B2 sind
+  damit vollständig abgedeckt — nächster offener Zweig ist B3
+  (Operatoren). Build-Größe unverändert (632,33 kB) — Track bleibt
+  unregistriert, wirkt sich nicht auf den Browser-Bundle aus.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 270 → 273 (Gate 1 +
+  Gate 2 für Challenge 03, beide Distraktoren grün, beide als echter
+  Compilerfehler bestätigt statt nur als abweichender stdout). Volle
+  Testsuite 893 → 896, alle grün. `typecheck`, `npm run build` grün.
+  `knip`: unverändert 10 Funde. Coverage: 91,80 % / 72,92 % / 99,09 % /
+  91,80 %.

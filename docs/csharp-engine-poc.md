@@ -534,15 +534,23 @@ yet wired into the live `TRACKS` registry (see step 5's own entry above
 for exactly which four gaps block that safely). Step 6 (Node-side test
 engine) is now done — `test/helpers/nodeCSharpEngine.ts` and its driver
 project exist and are verified against the real `dotnet` toolchain. Step
-7 (real content) needs a `describeCSharpCourse` added to
-`test/content/challengeRunner.test.ts` (that file currently hardcodes
-`describeSqlCourse`/`describePythonCourse` calls rather than iterating
-`TRACKS` generically, so a C# course isn't picked up automatically) plus
-actual challenges written against `csharpGrundlagenCourse`, following the
-same house style as SQL/Python (3 hints, verified-failing distractors).
-The live app additionally still needs the four wiring gaps from step 5
-closed before any of it is actually playable in the browser, not just
-authored and Gate-1/2-verified in Node.
+7 (real content) is underway: `describeCSharpCourse` in
+`test/content/challengeRunner.test.ts` iterates `csharpGrundlagenCourse.
+challenges` generically (added alongside the first challenge, unlike the
+hardcoded-per-course setup that predates it), and three challenges exist
+as of 2026-08-09 — `01` (Console.WriteLine), `02` (typed variables: int/
+double/string/bool), `03` (const, var type inference, char) — covering
+B0–B2 completely (see `docs/csharp-concept-hierarchy.md`'s dated updates
+for per-challenge detail). Same house style as SQL/Python throughout: 3
+hints, at least one verified-failing distractor per challenge — with one
+deliberate C#-specific variant, since step 4 decided `validate()` is
+stdout-only: distractors that violate a compile-time rule (reassigning a
+`const`, passing a `string` where `char` is expected) are verified to
+produce a real compiler error rather than a differing stdout, which
+`executeAndValidate` already treats as a failing outcome before
+`validate()` is ever called. The live app additionally still needs the
+four wiring gaps from step 5 closed before any of it is actually playable
+in the browser, not just authored and Gate-1/2-verified in Node.
 Treat each routine firing that touches this as making **one bounded,
 committed increment** (e.g. "scaffold the project directory and get a
 minimal Blazor boot working," not "finish the whole engine") — never
