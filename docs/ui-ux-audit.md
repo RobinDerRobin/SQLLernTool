@@ -119,6 +119,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (SQL B8 Mengenoperationen abgeschlossen: 24-24.2) | 91.76 % | 73.05 % | 99.06 % | 91.76 % |
 | 2026-08-09 | HEAD (Python B2/B5/B6 Restlücken abgeschlossen: 20-20.3) | 91.77 % | 72.88 % | 99.07 % | 91.77 % |
 | 2026-08-09 | HEAD (SQL upsert-on-conflict abgeschlossen: 25) | 91.72 % | 72.81 % | 99.08 % | 91.72 % |
+| 2026-08-09 | HEAD (Live-Bug-Hunt sauber + C# Schritt 7 gestartet: Challenge 01) | 91.76 % | 72.87 % | 99.08 % | 91.76 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -1872,3 +1873,62 @@ sondern pro PR direkt in den Checks sichtbar.
   (dieselben strukturellen Interfaces, kein neuer Fund durch reinen
   Content). Coverage: 91,72 % / 72,81 % / 99,08 % / 91,72 % (marginal
   verschoben, reine Content-Ergänzung ohne Engine-Code-Änderung).
+
+### 2026-08-09 — Stündliche Routine: Live-Bug-Hunt (sauber) + C# Schritt 7 gestartet
+
+- **Umfang:** SQL und Python sind seit dem vorherigen Durchgang bei 81/82
+  Tags (nur permanente Scope-Ausnahmen offen) — keine aktionable
+  Content-Lücke mehr in Priorität 3. Also zuerst Priorität 2 (Live-Bug-Hunt
+  gegen den echten Dev-Server), danach Priorität 4 (C#), da diese laut
+  Mandat einen klaren nächsten kleinen Schritt hat.
+
+- **Live-Bug-Hunt (Priorität 2):** Alle seit den letzten drei
+  Content-Durchgängen neu geschriebenen Challenges (SQL 24, 24.1, 24.2, 25;
+  Python 20, 20.1, 20.2, 20.3) live gegen den echten Dev-Server verifiziert
+  — sowohl Lösung als auch Distraktor pro Challenge, über echtes
+  sql.js-WASM und echtes Pyodide (nicht nur die Node-Testmotoren). Alle 8
+  Lösungen bestehen, alle 8 Distraktoren scheitern korrekt, keine
+  Konsolenfehler. Zusätzlich ein mobiler Regressionscheck (375×667,
+  Standing Requirement seit F-020): kein horizontales Seiten-Overflow,
+  Sidebar-Drawer schließt nach Auswahl korrekt, Editor/Tab/Run-Button
+  echte `.click()`-Erreichbarkeit bestätigt, Editor-Schriftgröße weiterhin
+  16px (F-022 hält), `.results-body` weiterhin `overflow-x: auto` (F-021
+  hält). **Keine neuen Bugs gefunden** — sauberer Durchgang.
+
+- **C# Schritt 7 gestartet (Priorität 4):** Erste echte C#-Challenge.
+  Vorher nötige Plumbing ergänzt:
+  - `src/runtime/csharp/executeAndValidate.ts` (+ Test) — async-Pendant zu
+    Pythons `executeAndValidate.ts`, weil `CSharpRuntime.exec()` (echter
+    `dotnet exec`-Subprozess bzw. Blazor-WASM-Aufruf) nie synchron ist.
+  - `describeCSharpCourse` in `test/content/challengeRunner.test.ts` —
+    Gate-1/Gate-2-Harness für den C#-Track, async `it()`-Callbacks
+    (einziger struktureller Unterschied zu `describeSqlCourse`/
+    `describePythonCourse`).
+  - Challenge 01 (`Console.WriteLine`, deckt `console-write-line`,
+    `top-level-statements`, `function-call-syntax`,
+    `member-access-dot-syntax` ab — B0+B1 komplett). `validate()` prüft
+    exakte Zeilentrennung des stdout, nicht nur Teilstring-Enthaltensein:
+    ein reiner `.includes()`-Check hätte den `Console.Write`-statt-
+    `WriteLine`-Distraktor fälschlich bestehen lassen, weil beide
+    erwarteten Texte auch ohne Zeilenumbruch dazwischen als Teilstrings
+    vorkommen. Live gegen den echten `dotnet`-Treiber verifiziert (Lösung
+    besteht, Distraktor scheitert).
+  - `csharpGrundlagenCourse` bleibt bewusst **nicht** in `TRACKS`
+    registriert (dieselben vier Live-UI-Lücken wie in
+    `docs/csharp-engine-poc.md` Schritt 5 dokumentiert: Engine-Fabrik,
+    Editor-Sprachplugin, servierte Blazor-Quelle — alle noch offen).
+    `registry.test.ts`s genereller Schema-Check erfasst diese Challenge
+    deshalb nicht automatisch; ein eigener Test in `course.test.ts`
+    validiert stattdessen direkt gegen `csharpChallengeSchema`. Kein
+    Live-Playwright-Test möglich, da C# noch nicht in der Kurs-Auswahl der
+    UI erscheint — nur Node-seitig (Gate 1/2) verifiziert.
+
+- **Ergebnis:** C#-Tag-Bilanz bewegt sich erstmals: 0/86 → 4/86 (≈5 %),
+  B0 (Grundlagen) und B1 (Ausgabe) komplett abgedeckt. Build-Größe
+  unverändert (631.73 kB) — bestätigt, dass der unregistrierte Track
+  weiterhin nicht ins Live-Bundle gezogen wird.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 262 → 264 (neue C#
+  Gate 1/2-Tests). Volle Testsuite 869 → 876, alle grün. `typecheck`,
+  `npm run build` grün. `knip`: unverändert 10 Funde. Coverage: 91,76 % /
+  72,87 % / 99,08 % / 91,76 %.

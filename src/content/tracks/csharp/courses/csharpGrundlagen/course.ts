@@ -1,14 +1,15 @@
 import type { Course } from '../../../../../domain/challenge.types';
 import type { CSharpChallenge } from '../../types';
+import { challenge01 } from './challenges/01';
 
 /**
- * Deliberately empty so far — this is step 5 of the plan in
- * docs/csharp-engine-poc.md (content-track scaffold), not step 7 (actual
- * content). Challenges land here once step 6 (Node-side test engine, for
- * Gate 1/Gate 2) exists to verify them the same rigorous way every other
- * track's content is verified.
+ * Step 7 of the plan in docs/csharp-engine-poc.md (actual content) has
+ * begun — the first challenge lands here now that step 6 (Node-side test
+ * engine, test/helpers/nodeCSharpEngine.ts) exists to verify it the same
+ * rigorous way every other track's content is verified (Gate 1/Gate 2 via
+ * test/content/challengeRunner.test.ts).
  */
-const challenges: CSharpChallenge[] = [];
+const challenges: CSharpChallenge[] = [challenge01];
 
 export const csharpGrundlagenCourse: Course<CSharpChallenge> = {
   id: 'csharpGrundlagen',

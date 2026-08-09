@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { createNodeCSharpEngine } from '../helpers/nodeCSharpEngine';
 import { createNodePythonEngine } from '../helpers/nodePythonEngine';
 import { createNodeSqliteEngine } from '../helpers/nodeSqliteEngine';
+import { csharpGrundlagenCourse } from '../../src/content/tracks/csharp/courses/csharpGrundlagen/course';
+import type { CSharpChallenge } from '../../src/content/tracks/csharp/types';
 import { pythonGrundlagenCourse } from '../../src/content/tracks/python/courses/pythonGrundlagen/course';
 import type { PythonChallenge } from '../../src/content/tracks/python/types';
 import { sqlLernenToolCourse } from '../../src/content/tracks/sqlite/courses/sqlLernenTool/course';
 import type { SqlChallenge } from '../../src/content/tracks/sqlite/types';
+import { executeAndValidate as executeAndValidateCSharp } from '../../src/runtime/csharp/executeAndValidate';
 import { executeAndValidate as executeAndValidatePython } from '../../src/runtime/python/executeAndValidate';
 import type { PythonRuntime } from '../../src/runtime/python/PythonRuntime';
 import { executeAndValidate } from '../../src/runtime/sql/executeAndValidate';
@@ -116,3 +120,38 @@ function describePythonCourse(courseLabel: string, challenges: PythonChallenge[]
 }
 
 describePythonCourse(pythonGrundlagenCourse.title, pythonGrundlagenCourse.challenges);
+
+/**
+ * The C# track's equivalent of `describePythonCourse` above — same
+ * no-prereq-replay reasoning (every challenge is a standalone program run
+ * fresh), except `exec()` is async (real `dotnet exec` subprocess per call,
+ * see test/helpers/nodeCSharpEngine.ts), so both the runner and its `it()`
+ * callbacks are async here where the SQL/Python ones aren't.
+ */
+function describeCSharpCourse(courseLabel: string, challenges: CSharpChallenge[]) {
+  describe(`challenge runner: ${courseLabel}`, () => {
+    for (const challenge of challenges) {
+      it(`${challenge.num} — ${challenge.title} (own solution passes its own validate)`, async () => {
+        const engine = createNodeCSharpEngine();
+        const outcome = await executeAndValidateCSharp(engine, challenge.solution, challenge.validate);
+        if (outcome.error) {
+          throw new Error(`[${challenge.num}] C# error: ${outcome.error}`);
+        }
+        expect(outcome.ok, `[${challenge.num}] validate() failed: ${outcome.message}`).toBe(true);
+      });
+
+      for (const [i, distractor] of (challenge.distractors ?? []).entries()) {
+        it(`${challenge.num} — distractor ${i + 1}/${challenge.distractors!.length} (${distractor.reason}) must fail validate`, async () => {
+          const engine = createNodeCSharpEngine();
+          const outcome = await executeAndValidateCSharp(engine, distractor.code, challenge.validate);
+          expect(
+            outcome.ok,
+            `Distractor "${distractor.reason}" for ${challenge.num} passed validate() — the check does not actually test the intended concept.`,
+          ).toBe(false);
+        });
+      }
+    }
+  });
+}
+
+describeCSharpCourse(csharpGrundlagenCourse.title, csharpGrundlagenCourse.challenges);

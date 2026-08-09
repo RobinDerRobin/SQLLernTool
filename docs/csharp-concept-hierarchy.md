@@ -535,6 +535,34 @@ gegen den echten `dotnet`-Toolchain (kein Mock). Tag-Bilanz bleibt bei
 `TRACKS` bisher nicht generisch, sondern ruft `describeSqlCourse`/
 `describePythonCourse` fest verdrahtet auf).*
 
+*Update 2026-08-09 (stündliche Routine, Fortsetzung): Schritt 7 hat jetzt
+begonnen — die erste echte Challenge existiert. Vorher nötige Plumbing
+ergänzt: `src/runtime/csharp/executeAndValidate.ts` (async-Pendant zu
+Pythons `executeAndValidate.ts` — `CSharpRuntime.exec()` ist ein echter
+`await`, anders als die synchronen SQL-/Python-Engines) und
+`describeCSharpCourse` in `test/content/challengeRunner.test.ts` (async
+`it()`-Callbacks, sonst identisches Gate-1/Gate-2-Muster). Challenge 01
+(`console-write-line` + `top-level-statements`, `function-call-syntax`,
+`member-access-dot-syntax` implizit über die zwei `Console.WriteLine(...)`-
+Aufrufe) deckt damit die ersten 4 Tags ab — analog zu SQL Challenge 01 und
+Python Challenge 01. `validate()` folgt dem in Schritt 4 entschiedenen
+stdout-only-Muster, prüft aber exakte Zeilentrennung (nicht nur
+Teilstring-Enthaltensein): der Distraktor (`Console.Write` statt
+`Console.WriteLine`) erzeugt sonst zufällig einen String, der beide
+erwarteten Teiltexte noch enthält, nur ohne Zeilenumbruch dazwischen — ein
+reiner `.includes()`-Check hätte diesen Distraktor fälschlich bestehen
+lassen. Beides live gegen den echten `dotnet`-Treiber verifiziert (Lösung
+besteht, Distraktor scheitert). `csharpGrundlagenCourse` bleibt bewusst
+**nicht** in `TRACKS` registriert (dieselben vier Live-UI-Lücken wie bei
+Schritt 5 notiert), daher validiert `registry.test.ts`s generischer
+Schema-Check diese Challenge nicht automatisch — ein eigener Test in
+`course.test.ts` übernimmt das stattdessen direkt gegen
+`csharpChallengeSchema`.
+
+**Tag-Bilanz: 4 von 86 (≈ 5 %).** Erster inhaltlicher Fortschritt seit
+Beginn dieses Dokuments — B0 (Grundlagen) und B1 (Ausgabe) sind damit
+komplett abgedeckt.*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt
