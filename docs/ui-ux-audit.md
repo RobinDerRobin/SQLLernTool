@@ -25,6 +25,9 @@ wie gut das jeweils testabgedeckt ist.
    nach einer Interaktion tatsächlich klickbar sind (nicht nur laut
    `isVisible()`, das reine Overlap-/Z-Index-Verdeckung nicht erkennt —
    ein echter `.click()`-Versuch deckt das auf, siehe F-020).
+   Der Stand und die geplante Reihenfolge der Mobile-Arbeit stehen in
+   `docs/mobile-roadmap.md` — dort auch die noch offene Richtungsfrage
+   (Read-and-Run vs. vollwertiges Authoring), die M2 blockiert.
 2. Findings gegen die Tabelle unten prüfen: schon bekannt (Status
    aktualisieren) oder neu (neue Zeile, neue ID `F-0xx`)?
 3. Für jedes neue Finding vor dem Fix kurz durchdenken: was genau ist der
