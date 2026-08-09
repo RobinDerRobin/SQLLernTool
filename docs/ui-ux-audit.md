@@ -95,6 +95,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (SQL B1 Schema/DDL abgeschlossen: 20-20.4, F-018 Fix) | 91.91 % | 73.28 % | 99.03 % | 91.91 % |
 | 2026-08-09 | HEAD (SQL B6 Joins abgeschlossen: 21-21.2, F-019 Fix) | 91.89 % | 73.34 % | 99.04 % | 91.89 % |
 | 2026-08-09 | HEAD (Live-Bug-Hunt sauber + SQL B3 DQL abgeschlossen: 22-22.1) | 91.86 % | 73.23 % | 99.05 % | 91.86 % |
+| 2026-08-09 | HEAD (SQL B4 Funktionen abgeschlossen: 23-23.2) | 91.80 % | 73.06 % | 99.06 % | 91.80 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -1570,4 +1571,48 @@ sondern pro PR direkt in den Checks sichtbar.
   Challenges). `typecheck`, volle Testsuite (839 Tests) und
   `npm run build` grün. Coverage: 91,89 % → 91,86 % Statements,
   73,34 % → 73,23 % Branches, 99,04 % → 99,05 % Functions. `knip`
+  bestätigt: keine neuen toten Exporte.
+
+### 2026-08-09 — Stündliche Routine: SQL B4 (Funktionen) abgeschlossen
+
+- **Umfang:** Baseline geprüft (839/839 grün, `typecheck` und
+  `npm run build` sauber). Nach B3 sind B4 (Funktionen) und B8
+  (Mengenoperationen) mit je 3 offenen Tags die letzten beiden SQL-
+  Zweige mit mehr als einer Einzeltag-Lücke — B4 gewählt, da alle drei
+  Tags (`math-functions`, `string-functions`, `cast-conversion`)
+  direkte, voneinander unabhängige Geschwister von `scalar-function-
+  call` sind (bereits abgedeckt), ohne offene Abhängigkeitsfragen.
+- **Vorgehen:** Drei neue Challenges (23–23.2), jede vorab empirisch
+  gegen `node:sqlite` **und** live gegen echtes sql.js verifiziert
+  (Lösung UND jeder Distraktor):
+  - **23** (`math-functions`): `ROUND(ABS(betrag))` auf Kontobewegungen
+    mit Vorzeichen und Nachkommastellen — bündelt beide Tags
+    (`round()`, `abs()`) in einem motivierten Beispiel, analog dazu,
+    wie schon `sum-avg-min-max` als ein Tag mehrere Funktionen bündelt.
+    Distraktor lässt ROUND weg — liefert unrunde Werte (49.6 statt 50).
+  - **23.1** (`string-functions`): `SUBSTR(UPPER(TRIM(name)), 1, 4)`
+    erzeugt einen Produktcode aus unsauber importierten Namen —
+    verschachtelt drei der fünf Funktionen des Tags (TRIM, UPPER,
+    SUBSTR) in einem realen Beispiel, dieselbe "innerste Funktion
+    zuerst"-Lesart wie bei Challenge 23 explizit im Tutorial
+    aufgegriffen. Distraktor lässt TRIM/UPPER weg — liefert
+    unbereinigte Codes mit Leerzeichen/Kleinschreibung.
+  - **23.2** (`cast-conversion`): eine als TEXT gespeicherte
+    Gehaltsspalte (klassischer CSV-Import-Fehler) erzwingt
+    `CAST(... AS INTEGER)` vor dem Vergleich — die Daten sind bewusst
+    so gewählt, dass ein reiner Textvergleich ('12000' vs '4000')
+    ein anderes, nachweislich falsches Ergebnis liefert (David mit
+    12000 fehlt, Clara mit 950 erscheint fälschlich), nicht nur
+    zufällig derselbe Wert mit anderem Typ. Distraktor lässt CAST weg
+    — genau dieser Fehler tritt ein.
+- **Ergebnis:** Keine Bugs im Produkt gefunden. SQL-Tag-Bilanz: 74/82
+  → 77/82 (≈ 94 %) — SQL liegt damit erstmals gleichauf mit Python
+  (ebenfalls 77/82). B4 (Funktionen) ist der siebte vollständig
+  geschlossene SQL-Zweig in dieser Session. Verbleibende SQL-Lücke:
+  nur noch B8 (Mengenoperationen, 3 Tags) plus die dauerhafte
+  Scope-Ausnahme `updatable-view`.
+- **Tests:** 839 → 845 (+6 Gate 1/Gate 2 für die drei neuen
+  Challenges). `typecheck`, volle Testsuite (845 Tests) und
+  `npm run build` grün. Coverage: 91,86 % → 91,80 % Statements,
+  73,23 % → 73,06 % Branches, 99,05 % → 99,06 % Functions. `knip`
   bestätigt: keine neuen toten Exporte.

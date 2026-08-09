@@ -489,8 +489,10 @@ SQL-Kurs), `bool-conversion-truthiness`, `truthiness-in-conditions`,
 Begründung oben) — die einzige verbleibende Lücke, die keine
 Einzeltag-Frage, sondern eine dauerhafte Sandbox-Grenze ist.
 
-**Bilanz:** 77 von 82 Tags abgedeckt (≈ 94 %) — Python liegt weiterhin
-**deutlich vor** SQL (62/82, ≈ 76 %). Der Kursname `pythonGrundlagen`
+**Bilanz:** 77 von 82 Tags abgedeckt (≈ 94 %) — Stand 2026-08-09 liegt
+SQL gleichauf (ebenfalls 77/82, ≈ 94 %, nach mehreren SQL-Content-
+Routinen seit dieser Zahl hier zuletzt aktualisiert wurde — siehe
+`docs/sql-concept-hierarchy.md`). Der Kursname `pythonGrundlagen`
 deckt inzwischen deutlich mehr als nur die absoluten Basics ab (Variablen,
 Grundrechenarten, Verzweigung, Schleifen, ganz Funktionen inklusive
 *args/**kwargs, lambda, map()/filter()/sorted(), ganz Datenstrukturen,
