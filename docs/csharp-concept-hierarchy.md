@@ -636,6 +636,26 @@ eine Verifikation lohnt.
 vollständig abgedeckt** — B0 bis B3 sind jetzt komplett. Nächster offener
 Zweig: B4 (Strings, nach der Branch-Übersicht in Abschnitt 5).*
 
+*Update 2026-08-09 (stündliche Routine, Fortsetzung): Challenge 05
+ergänzt — deckt alle 3 Tags aus B4 (Strings) in einem Durchgang ab:
+`string-concatenation`, `string-interpolation`, `string-methods`.
+Szenario: Vor- und Nachname per `+` zu einem vollen Namen verketten,
+per `$"..."`-Interpolation begrüßen (inklusive `.Length` als
+eingebundener Ausdruck) und per `.ToUpper()` großschreiben — damit
+kommen alle drei Tags in einer einzigen zusammenhängenden
+Anweisungskette vor, nicht isoliert nebeneinander. Beide Distraktoren
+wieder reguläre Falschberechnungen (kein Compilerfehler): das
+Leerzeichen bei der Verkettung vergessen (wirkt sich auf alle drei
+Ausgabezeilen aus, weil `vollerName` überall wiederverwendet wird) und
+`ToLower()` statt `ToUpper()` (wirkt sich nur auf die letzte Zeile aus).
+Beide vor dem Schreiben empirisch gegen den echten `dotnet`-Treiber
+verifiziert.
+
+**Tag-Bilanz: 24 von 86 (≈ 28 %).** Damit ist **B4 (Strings)
+vollständig abgedeckt** — B0 bis B4 sind jetzt komplett. Nächster offener
+Zweig: B5 (Typumwandlung & Nullability, nach der Branch-Übersicht in
+Abschnitt 5).*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt

@@ -124,6 +124,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (Syntax-Highlighting in Tutorial/Tipps/Erklärung/Lösung) | 91.82 % | 72.95 % | 99.09 % | 91.82 % |
 | 2026-08-09 | HEAD (C# Challenge 03: B2 vollständig, 15/86) | 91.80 % | 72.92 % | 99.09 % | 91.80 % |
 | 2026-08-09 | HEAD (Live-Bug-Hunt sauber + C# Challenge 04: B3 vollständig, 21/86) | 91.83 % | 72.90 % | 99.09 % | 91.83 % |
+| 2026-08-09 | HEAD (C# Challenge 05: B4 vollständig, 24/86) | 91.87 % | 72.89 % | 99.09 % | 91.87 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -2157,3 +2158,38 @@ sondern pro PR direkt in den Checks sichtbar.
   Gate 2 für Challenge 04, beide Distraktoren grün). Volle Testsuite
   896 → 899, alle grün. `typecheck`, `npm run build` grün. `knip`:
   unverändert 10 Funde. Coverage: 91,83 % / 72,90 % / 99,09 % / 91,83 %.
+
+### 2026-08-09 — Stündliche Routine: C# Challenge 05 (B4 vollständig)
+
+- **Umfang:** Baseline sauber (899/899, typecheck/build/knip grün, HEAD
+  `8dd1562`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. C# hat nach Challenge 01-04
+  klaren Schwung, also das nächste begrenzte Increment: B4 (Strings), der
+  nächste offene Zweig nach B3.
+
+- **Content:** Challenge 05 deckt alle 3 Tags aus B4 in einem Durchgang
+  ab: `string-concatenation`, `string-interpolation`, `string-methods`.
+  Szenario: Vor- und Nachname per `+` zu einem vollen Namen verketten,
+  per `$"..."`-Interpolation begrüßen (inklusive `.Length` als
+  eingebundener Ausdruck) und per `.ToUpper()` großschreiben — alle drei
+  Tags kommen dadurch in einer zusammenhängenden Anweisungskette vor,
+  nicht isoliert nebeneinander in separaten Zeilen.
+
+- **Distraktoren wieder stdout-basiert** (wie bei Challenge 04, anders
+  als beim Compilerfehler-Muster aus Challenge 03): das Leerzeichen bei
+  der Verkettung vergessen (wirkt sich auf alle drei Ausgabezeilen aus,
+  da `vollerName` in Interpolation und Großschreibung wiederverwendet
+  wird — Length wird dadurch 11 statt 12) und `ToLower()` statt
+  `ToUpper()` (wirkt sich nur auf die letzte Zeile aus). Beide vor dem
+  Schreiben empirisch gegen den echten `dotnet`-Treiber verifiziert statt
+  nur angenommen.
+
+- **Ergebnis:** C#-Tag-Bilanz 21/86 → 24/86 (≈28 %). B0 bis B4 sind damit
+  vollständig abgedeckt — nächster offener Zweig ist B5 (Typumwandlung &
+  Nullability). Build-Größe unverändert (632,33 kB) — Track bleibt
+  unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 276 → 279 (Gate 1 +
+  Gate 2 für Challenge 05, beide Distraktoren grün). Volle Testsuite
+  899 → 902, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 91,87 % / 72,89 % / 99,09 % / 91,87 %.
