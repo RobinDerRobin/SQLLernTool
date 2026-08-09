@@ -85,6 +85,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-08 | HEAD (C# Schritt 3: csharpEngine.ts Browser-Loader) | 92.51 % | 75.16 % | 98.97 % | 92.51 % |
 | 2026-08-08 | HEAD (F-017-Fix + SQL B13 komplett: 18-18.2) | 92.50 % | 74.96 % | 98.98 % | 92.50 % |
 | 2026-08-08 | HEAD (Python B14 Objektorientierung komplett: 18-18.7) | 92.26 % | 74.16 % | 99.00 % | 92.26 % |
+| 2026-08-09 | HEAD (Python B10/B11 abgeschlossen: 19-19.2) | 92.14 % | 73.82 % | 99.01 % | 92.14 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -1063,3 +1064,52 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Tests:** 783 → 799 (+16, alle für die acht neuen
   Objektorientierungs-Challenges via `challengeRunner.test.ts`).
   `typecheck`, volle Testsuite (799 Tests) und `npm run build` grün.
+
+### 2026-08-09 — Stündliche Routine: Python B10/B11 abgeschlossen (die drei durch B14 entsperrten Einzeltags)
+
+- **Umfang:** Baseline geprüft (799/799 grün). Kurzer Coverage-Check
+  vorab (keine neuen, echten Lücken über die bekannten Challenge-Catch-
+  Branches hinaus). Direkt zum in der letzten Routine identifizierten,
+  klar umrissenen nächsten Schritt gegangen: die drei Tags
+  `iterator-protocol`/`generator-functions` (B10) und `custom-exceptions`
+  (B11), die zuvor an B14 (Objektorientierung) blockiert waren — B14
+  existiert seit der letzten Routine vollständig, die drei Tags sind
+  seither entsperrt, aber noch nicht geschrieben.
+- **Vorgehen (Content):** Challenge 19 (`iterator-protocol`) baut eine
+  `Countdown`-Klasse von Hand mit `__iter__`/`__next__`. Challenge 19.1
+  (`generator-functions`) erzählt bewusst dieselbe Countdown-Idee noch
+  einmal, diesmal als `yield`-Generatorfunktion — der Kontrast "von Hand"
+  vs. "eine Zeile mit yield" ist der eigentliche Lerninhalt hinter dem
+  Tag, nicht nur die Syntax für sich. Challenge 19.2 (`custom-exceptions`)
+  definiert eine eigene `NichtGenugGeldError(Exception)`-Klasse für ein
+  Konto-Abheben-Szenario. Alle drei Distraktoren vor dem Schreiben mit
+  echtem `python3` verifiziert, nicht angenommen: fehlendes `return self`
+  in `__iter__` löst `TypeError: iter() returned non-iterator of type
+  'NoneType'` aus; `return` statt `yield` macht die Funktion zu keiner
+  Generatorfunktion mehr, `list(...)` auf dem zurückgegebenen `int`
+  schlägt mit `TypeError: 'int' object is not iterable` fehl; ein
+  eingebautes `ValueError` statt der eigenen Exception-Klasse wird vom
+  `except NichtGenugGeldError` nicht abgefangen und bleibt unbehandelt.
+  Bei der Distraktor-Wahl bewusst auf jede Variante verzichtet, die eine
+  Endlosschleife hätte auslösen können (z. B. ein `StopIteration`, das
+  nie ausgelöst wird) — sowohl aus Sicherheits- als auch aus
+  Testlaufzeit-Gründen.
+- **Live-Verifikation:** Alle drei Lösungen und Distraktoren gegen echtes
+  Pyodide bestätigt — diesmal von vornherein mit der in der letzten
+  Routine korrigierten Methodik (Editor-Wert direkt setzen statt
+  Tastatureingabe zu simulieren), kein erneutes Stolpern über das
+  Auto-Indent-Artefakt. Alle drei Lösungen korrekt mit ★★★, alle drei
+  Distraktoren mit den erwarteten Fehlermeldungen, 0 echte
+  Konsolenfehler.
+- **Ergebnis:** Keine Bugs gefunden. Python-Konzept-Hierarchie-Bilanz:
+  74/82 → 77/82 Tags (≈ 94 %). **B10 und B11 sind jetzt ebenfalls
+  vollständig abgedeckt** — zusammen mit B7, B8, B9, B13, B14 sind das
+  sieben komplett geschlossene Python-Zweige. Die einzige verbleibende
+  strukturelle Lücke ist `own-modules` (B12), die dauerhafte
+  Sandbox-Grenze; die restlichen vier offenen Tags (`dynamic-typing`,
+  `bool-conversion-truthiness`, `truthiness-in-conditions`,
+  `ternary-expression`) sind kleine, unabhängige Einzeltags ohne
+  Blockade, einfach noch nicht an der Reihe.
+- **Tests:** 799 → 805 (+6, alle für die drei neuen Challenges via
+  `challengeRunner.test.ts`). `typecheck`, volle Testsuite (805 Tests)
+  und `npm run build` grün.

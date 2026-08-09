@@ -419,10 +419,26 @@ auf direktes Setzen des Textarea-Werts umgestellt. Da B14 jetzt existiert,
 sind die zuvor zurückgestellten Tags `iterator-protocol`/`generator-
 functions` (B10) und `custom-exceptions` (B11) nicht mehr blockiert —
 noch nicht geschrieben, aber jetzt ein klarer, kleiner nächster Schritt.
+Update 2026-08-09 (stündliche Routine, Fortsetzung): genau diese drei
+entsperrten Tags mit Challenges 19–19.2 ergänzt — `iterator-protocol`
+(19, eine `Countdown`-Klasse mit `__iter__`/`__next__` von Hand),
+`generator-functions` (19.1, dieselbe Idee als `yield`-Generatorfunktion,
+bewusst als direkte Fortsetzung von 19 erzählt, um den Kontrast
+"von Hand" vs. "mit yield" spürbar zu machen), `custom-exceptions` (19.2,
+eine eigene `NichtGenugGeldError(Exception)`-Klasse). Alle drei
+Distraktoren vor dem Schreiben mit echtem `python3` verifiziert: fehlendes
+`return self` in `__iter__` löst `TypeError: iter() returned
+non-iterator of type 'NoneType'` aus, `return` statt `yield` macht die
+Funktion zu keiner Generatorfunktion mehr (`TypeError: 'int' object is
+not iterable`), ein eingebautes `ValueError` statt der eigenen
+Exception-Klasse wird vom `except NichtGenugGeldError` nicht abgefangen
+und bleibt unbehandelt. Alle drei zusätzlich live gegen echtes Pyodide
+bestätigt. **Damit sind alle drei zuvor durch B14 blockierten Tags
+geschrieben — B10 und B11 sind jetzt ebenfalls vollständig abgedeckt.**
 Der Rest dieses Abschnitts ist der historische Stand vor diesen Updates;
 die Bilanz am Ende ist bereits aktualisiert.*
 
-Von den 82 Tags deckt `pythonGrundlagen` (60 Challenges) folgende ab:
+Von den 82 Tags deckt `pythonGrundlagen` (63 Challenges) folgende ab:
 
 **Vollständig abgedeckt:** `program-execution-model`, `function-call-syntax`
 (implizit über `print`), `print-statement`, `comments`, `variable-
@@ -461,36 +477,35 @@ Objektorientierung komplett**: `class-definition` (18),
 `instance-attributes-init` (18.1), `instance-methods` (18.2),
 `class-vs-instance-attributes` (18.3), `inheritance` (18.4),
 `method-overriding` (18.5), `dunder-methods` (18.6),
-`encapsulation-convention` (18.7) —
-**74 von 82 Tags (≈ 90 %).**
+`encapsulation-convention` (18.7), sowie **seit 2026-08-09 die
+verbleibenden Tags aus B10 und B11**: `iterator-protocol` (19),
+`generator-functions` (19.1), `custom-exceptions` (19.2) —
+**77 von 82 Tags (≈ 94 %).**
 
 **Nicht abgedeckt:** `dynamic-typing` als **eigenes** Thema (wird
 durchgehend demonstriert, nie benannt — genau wie `logical-operators` im
 SQL-Kurs), `bool-conversion-truthiness`, `truthiness-in-conditions`,
-`ternary-expression`, die letzten beiden Tags von B10 (`iterator-
-protocol`, `generator-functions`), der letzte Tag von B11 (`custom-
-exceptions`) — alle drei waren an B14-Voraussetzungen
-(`dunder-methods`/`class-definition`) blockiert; B14 existiert jetzt
-vollständig, die drei Tags sind also entsperrt, aber noch nicht
-geschrieben, und `own-modules` aus B12 (siehe architektonische Begründung
-oben).
+`ternary-expression`, und `own-modules` aus B12 (siehe architektonische
+Begründung oben) — die einzige verbleibende Lücke, die keine
+Einzeltag-Frage, sondern eine dauerhafte Sandbox-Grenze ist.
 
-**Bilanz:** 74 von 82 Tags abgedeckt (≈ 90 %) — Python liegt weiterhin
+**Bilanz:** 77 von 82 Tags abgedeckt (≈ 94 %) — Python liegt weiterhin
 **deutlich vor** SQL (62/82, ≈ 76 %). Der Kursname `pythonGrundlagen`
 deckt inzwischen deutlich mehr als nur die absoluten Basics ab (Variablen,
 Grundrechenarten, Verzweigung, Schleifen, ganz Funktionen inklusive
 *args/**kwargs, lambda, map()/filter()/sorted(), ganz Datenstrukturen,
-List-/Dict-/Set-Comprehensions, Generator Expressions, den Großteil der
-Fehlerbehandlung inklusive eigener raise-Fehler, die Kernsyntax von
-Imports/Standardbibliothek, ganz Dateizugriff, und jetzt auch ganz
-Objektorientierung) — B7, B8, B9, B13 und B14 sind vollständig
-geschlossen, B10 und B11 fast komplett (5/7 bzw. 5/6, beide nur noch durch
-die drei jetzt entsperrten, aber noch ungeschriebenen Einzeltags offen).
-**Kein Zweig ist mehr komplett Lücke** — der Kurs hat jetzt in jedem der
-14 Zweige mindestens einen abgedeckten Tag. Die verbleibenden Lücken sind
-drei jetzt entsperrte Einzeltags (`iterator-protocol`,
-`generator-functions`, `custom-exceptions`) und `own-modules` aus B12,
-das unabhängig davon als dauerhafte Sandbox-Grenze offen bleibt.
+List-/Dict-/Set-Comprehensions, Generator Expressions, ganz
+Fehlerbehandlung inklusive eigener Exception-Klassen, die Kernsyntax von
+Imports/Standardbibliothek, ganz Dateizugriff, und ganz
+Objektorientierung inklusive des Iterator-Protokolls und
+Generatorfunktionen) — B7, B8, B9, B10, B11, B13 und B14 sind vollständig
+geschlossen. **Kein Zweig ist mehr komplett Lücke, und bis auf B12 (das
+own-modules-Sandbox-Limit) ist kein Zweig mehr überhaupt teilweise
+offen** — B2, B5 und B6 bleiben bei den drei kleinen, bewusst nicht
+vorgezogenen "Nicht abgedeckt"-Tags oben (`dynamic-typing`,
+`bool-conversion-truthiness`, `truthiness-in-conditions`,
+`ternary-expression`), die keiner B14-Abhängigkeit unterlagen, sondern
+schlicht noch nicht an der Reihe waren.
 
 ## 7. Bewusst ausgeklammert
 
