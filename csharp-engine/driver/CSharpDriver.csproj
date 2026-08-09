@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <!-- Desktop-.NET twin of CSharpEngine.cs's compile step, used only by
+       test/helpers/nodeCSharpEngine.ts for fast CI/test execution — never
+       shipped to the browser. Unlike the WASM engine, Assembly.Location
+       works normally here, so reference assemblies come straight from the
+       running runtime's own trusted-platform-assemblies list instead of
+       being fetched over HTTP from wwwroot/refs/. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.9.2" />
+  </ItemGroup>
+
+</Project>

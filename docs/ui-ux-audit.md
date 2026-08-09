@@ -88,6 +88,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (Python B10/B11 abgeschlossen: 19-19.2) | 92.14 % | 73.82 % | 99.01 % | 92.14 % |
 | 2026-08-09 | HEAD (C# Schritt 4: validate()-Design entschieden, result-Feld entfernt) | 92.14 % | 73.81 % | 99.01 % | 92.14 % |
 | 2026-08-09 | HEAD (C# Schritt 5: Content-Track-Scaffold, unregistriert) | 92.15 % | 73.82 % | 99.01 % | 92.15 % |
+| 2026-08-09 | HEAD (C# Schritt 6: Node-Testmotor für CI) | 92.15 % | 73.82 % | 99.01 % | 92.15 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -1215,3 +1216,73 @@ sondern pro PR direkt in den Checks sichtbar.
   toten Dateien (nur `CSharpChallengeExtra` als unbenutzter Export
   geflaggt, exakt dasselbe akzeptierte Muster wie bei
   `PythonChallengeExtra`/`SqlChallengeExtra`).
+
+### 2026-08-09 — Stündliche Routine: C# Schritt 6 (Node-Testmotor für CI)
+
+- **Umfang:** Baseline geprüft (809/809 grün, `typecheck` und
+  `npm run build` sauber). SQL/Python weiterhin ohne großen offenen
+  Zweig; C#-Engine-Integration hatte laut `docs/csharp-engine-poc.md`
+  einen klaren, unabhängig umsetzbaren nächsten Schritt — Schritt 6, der
+  Node-seitige Testmotor für CI, der laut Dokument „unabhängig von den
+  vier [Live-UI-]Lücken weitergehen kann, da er nur die [in Schritt 5]
+  existierenden Typen braucht".
+- **Vorgehen:** Ein `dotnet run` gegen ein frisches Temp-Projekt pro
+  `exec()`-Aufruf (die naheliegendste erste Idee) wurde verworfen, bevor
+  Code dafür geschrieben wurde — das würde bei jedem einzelnen Aufruf
+  einen vollen NuGet-Restore + Build erzwingen, viel zu langsam für eine
+  Testsuite, die perspektivisch einen Prozess pro Challenge/Distraktor
+  startet. Stattdessen: ein neues, separat eingechecktes Desktop-.NET-
+  Konsolenprojekt `csharp-engine/driver/` (`CSharpDriver.csproj`,
+  referenziert `Microsoft.CodeAnalysis.CSharp` direkt, **nicht** Teil des
+  Blazor-WASM-Projekts), dessen `Program.cs` dieselbe
+  `CSharpCompilation`-basierte Parse/Emit/`Assembly.Load`/Reflection-
+  Invoke/stdout-Capture-Pipeline wie `CSharpEngine.cs` implementiert und
+  dasselbe JSON-`{stdout, error}`-Format ausgibt. Einziger echter
+  Unterschied: statt Referenz-Assemblies per `HttpClient` von
+  `wwwroot/refs/` zu laden (nötig unter Mono/WASM, wo `Assembly.Location`
+  nicht funktioniert), liest der Treiber sie direkt aus
+  `AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")` — auf Desktop-.NET
+  funktioniert `Assembly.Location` normal. Ein `ToDictionary` über diese
+  Liste warf beim ersten Testlauf `ArgumentException: An item with the
+  same key has already been added` (echter, empirisch beobachteter Bug,
+  kein hypothetischer Fall: `System.Private.CoreLib` taucht in der
+  TPA-Liste in der Praxis doppelt auf) — behoben durch eine simple
+  Last-wins-Schleife über ein `Dictionary` statt `ToDictionary`.
+
+  `test/helpers/nodeCSharpEngine.ts` spiegelt `nodePythonEngine.ts`
+  strukturell exakt (Temp-Verzeichnis pro `exec()`, Nutzer-Code in eine
+  eigene Datei geschrieben statt in einen String interpoliert, Subprozess
+  mit diesem Verzeichnis als `cwd`, JSON-Stdout zu `CSharpExecResult`
+  geparst), treibt den Treiber aber über `dotnet exec <Driver.dll> <Pfad>`
+  an statt einen bereits installierten Interpreter direkt aufzurufen —
+  kein Restore, kein Rebuild pro Aufruf, nur das Kompilieren des
+  eigentlichen Nutzer-Schnipsels. Der Treiber wird beim ersten Gebrauch
+  einmalig lazy gebaut (`ensureDriverBuilt()`), keine separate CI-Stufe
+  nötig — `npm test` allein reicht aus. Gemessen: ca. 1,0–2,4 s pro
+  `exec()`-Aufruf nach dem einmaligen Build.
+
+  Fünf Smoke-Tests (`test/helpers/nodeCSharpEngine.test.ts`) bestätigen
+  gegen den echten `dotnet`-Toolchain (kein Mock): Erfolgspfad
+  (`Console.WriteLine` → stdout), Compiler-Fehler (`CS0029` bei
+  Typ-Mismatch), Laufzeit-Exception (`IndexOutOfRangeException`),
+  frischer Namensraum pro Aufruf (kein State-Leck zwischen `exec()`-
+  Aufrufen), sowie LINQ/`List<T>` über die vom Treiber injizierten
+  `global using`-Direktiven. `.gitignore` um
+  `csharp-engine/driver/{bin,obj}/` ergänzt — die bestehenden
+  `csharp-engine/{bin,obj}/`-Einträge deckten das neue, verschachtelte
+  Projektverzeichnis nicht ab.
+- **Ergebnis:** Keine Bugs im Produkt gefunden. C#-Engine-Fortschritt:
+  Schritt 6 von 7 aus `docs/csharp-engine-poc.md` jetzt abgeschlossen.
+  Tag-Bilanz bleibt bei 0/86 — ein Testmotor ist noch kein Content.
+  Nächster Schritt: Schritt 7 (echte Challenges), sobald zusätzlich ein
+  `describeCSharpCourse` in `test/content/challengeRunner.test.ts`
+  ergänzt wurde (diese Datei ruft `describeSqlCourse`/
+  `describePythonCourse` bisher fest verdrahtet auf statt `TRACKS`
+  generisch zu iterieren).
+- **Tests:** 809 → 814 (+5, alle in `nodeCSharpEngine.test.ts`).
+  `typecheck`, volle Testsuite (814 Tests) und `npm run build` grün.
+  Coverage-Zahlen unverändert (92,15 % / 73,82 % / 99,01 % / 92,15 %) —
+  `test/helpers/**` fließt laut `vitest.config.ts` (`include:
+  ['src/**/*.ts']`) nicht in die Coverage-Metrik ein, und
+  `CSharpRuntime.ts` selbst enthält nur Typdeklarationen ohne
+  Laufzeitcode.

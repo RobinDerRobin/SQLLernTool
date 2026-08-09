@@ -479,11 +479,48 @@ Roughly in dependency order:
    a track that's selectable but non-functional would be worse than not
    shipping it yet, so the registry line is the one deliberately-withheld
    piece here — added the moment those four gaps are closed, not before.
-6. **Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
+6. ~~**Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
    mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
    feasible now that `dotnet` works in this sandbox; likely just
    `dotnet run` against a temp project, or a small persistent compiler
-   host process for speed.
+   host process for speed.~~ **done (2026-08-09):** `dotnet run` against a
+   fresh temp project was rejected — it pays for a NuGet restore and full
+   build on every single `exec()` call, far too slow for a test suite
+   that will eventually run one process per challenge/distractor. Went
+   with the "pre-built driver, fast per-call `dotnet exec`" option
+   instead: `csharp-engine/driver/` is a small, separately checked-in
+   desktop-.NET console project (`CSharpDriver.csproj`, referencing
+   `Microsoft.CodeAnalysis.CSharp` directly, **not** part of the Blazor
+   WASM project) whose `Program.cs` is a twin of
+   `CSharpEngine.cs`'s `RunCode`: same `CSharpCompilation`-based
+   parse/emit/`Assembly.Load`/reflection-invoke/stdout-capture pipeline,
+   same JSON `{stdout, error}` output shape. The one real difference is
+   how reference assemblies are obtained — the WASM engine fetches
+   `.dll`s over `HttpClient` from `wwwroot/refs/` because `Assembly.Location`
+   doesn't work under Mono/WASM, but on desktop .NET
+   `AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")` lists every BCL
+   assembly's real file path directly, so the driver just filters that
+   list by filename instead (a `ToDictionary` naively deduping that list
+   throws — `System.Private.CoreLib` appears twice in it in practice — a
+   plain last-wins loop over a `Dictionary` fixed it).
+   `test/helpers/nodeCSharpEngine.ts` mirrors `nodePythonEngine.ts`
+   exactly (temp dir per `exec()`, user code written to its own file,
+   never string-interpolated, subprocess spawned with that dir as `cwd`,
+   JSON stdout parsed into `CSharpExecResult`), except it drives the
+   driver via `dotnet exec <DriverDll> <path>` — no restore, no rebuild,
+   only compiling the *user's* snippet — instead of shelling out to an
+   already-installed interpreter the way Python does. The driver `.dll`
+   is built lazily on first use (`ensureDriverBuilt()`, a plain
+   `dotnet build -c Release` if the `.dll` isn't already there) rather
+   than as a separate CI step, so `npm test` alone is still sufficient
+   to exercise it. Measured: ~1.0–2.4s per `exec()` after the one-time
+   build (vs. an unmeasured but clearly much slower cold `dotnet run`
+   path with restore). `test/helpers/nodeCSharpEngine.test.ts` proves
+   the success/compiler-error/runtime-exception/fresh-namespace-per-call/
+   LINQ round trip against the real `dotnet` toolchain (not mocked) — all
+   5 pass. `csharp-engine/driver/{bin,obj}/` added to `.gitignore`
+   (mirroring the existing `csharp-engine/{bin,obj}/` entries, which
+   didn't cover this new nested project directory).
 7. **Actual challenge content**, once 1–6 are settled — start from
    `docs/csharp-concept-hierarchy.md`'s branch overview, same house style
    as the SQL/Python content (3 hints, live-recomputed or state-inspected
@@ -495,11 +532,17 @@ design) are now done. Step 5 (the `csharp` content track scaffold) is
 mostly done — types, schema, and an empty course exist, deliberately not
 yet wired into the live `TRACKS` registry (see step 5's own entry above
 for exactly which four gaps block that safely). Step 6 (Node-side test
-engine) can proceed independently of closing those four gaps — it only
-needs the types this step already added. Real content (step 7) needs
-step 6 for Gate 1/2 verification, and the live app additionally needs
-those four wiring gaps closed before it's actually playable, not just
-authored.
+engine) is now done — `test/helpers/nodeCSharpEngine.ts` and its driver
+project exist and are verified against the real `dotnet` toolchain. Step
+7 (real content) needs a `describeCSharpCourse` added to
+`test/content/challengeRunner.test.ts` (that file currently hardcodes
+`describeSqlCourse`/`describePythonCourse` calls rather than iterating
+`TRACKS` generically, so a C# course isn't picked up automatically) plus
+actual challenges written against `csharpGrundlagenCourse`, following the
+same house style as SQL/Python (3 hints, verified-failing distractors).
+The live app additionally still needs the four wiring gaps from step 5
+closed before any of it is actually playable in the browser, not just
+authored and Gate-1/2-verified in Node.
 Treat each routine firing that touches this as making **one bounded,
 committed increment** (e.g. "scaffold the project directory and get a
 minimal Blazor boot working," not "finish the whole engine") — never

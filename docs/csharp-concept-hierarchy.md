@@ -513,6 +513,28 @@ kein Content. Nächster Schritt: Schritt 6 (Node-Testmotor für CI) kann
 unabhängig von den vier oben genannten Live-UI-Lücken weitergehen, da er
 nur die jetzt existierenden Typen braucht, nicht die Live-Registrierung.*
 
+*Update 2026-08-09 (stündliche Routine, Fortsetzung): Schritt 6 jetzt
+fertig — `test/helpers/nodeCSharpEngine.ts` plus ein eigenes, separat
+eingechecktes Desktop-.NET-Treiberprojekt (`csharp-engine/driver/`,
+`CSharpDriver.csproj`), das dieselbe `CSharpCompilation`-Pipeline wie
+`CSharpEngine.cs` implementiert, aber über `AppContext.GetData(
+"TRUSTED_PLATFORM_ASSEMBLIES")` statt über `HttpClient`-Fetches gegen
+`wwwroot/refs/` an Referenz-Assemblies kommt (auf Desktop-.NET funktioniert
+`Assembly.Location` normal, anders als unter Mono/WASM). Ein `dotnet run`
+gegen ein frisches Temp-Projekt pro `exec()`-Aufruf wurde verworfen (NuGet-
+Restore + vollständiger Build bei jedem Aufruf, zu langsam für eine
+Testsuite mit einem Prozess pro Challenge/Distraktor); stattdessen wird der
+Treiber einmalig gebaut und pro `exec()` nur noch per `dotnet exec
+<Driver.dll> <Pfad>` aufgerufen (~1,0–2,4 s pro Aufruf, gemessen). Fünf
+Smoke-Tests (`nodeCSharpEngine.test.ts`) bestätigen Erfolg, Compiler-Fehler,
+Laufzeit-Exception, frischer Namensraum pro Aufruf, und LINQ — alle grün
+gegen den echten `dotnet`-Toolchain (kein Mock). Tag-Bilanz bleibt bei
+0/86 — ein Testmotor ist noch kein Content. Nächster Schritt: Schritt 7
+(echte Challenges), sobald zusätzlich ein `describeCSharpCourse` in
+`test/content/challengeRunner.test.ts` ergänzt wurde (diese Datei iteriert
+`TRACKS` bisher nicht generisch, sondern ruft `describeSqlCourse`/
+`describePythonCourse` fest verdrahtet auf).*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt
