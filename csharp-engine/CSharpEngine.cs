@@ -46,7 +46,6 @@ public partial class CSharpEngine
         var sw = new StringWriter();
         var originalOut = Console.Out;
 
-        object? result = null;
         string? error = null;
         try
         {
@@ -107,7 +106,6 @@ public partial class CSharpEngine
         var payload = new
         {
             stdout = sw.ToString(),
-            result = result?.ToString(),
             error,
         };
         return JsonSerializer.Serialize(payload);

@@ -476,6 +476,25 @@ Challenge. Nächster Schritt laut `docs/csharp-engine-poc.md`: die
 `validate()`-Design-Entscheidung (Schritt 4) — erst danach kann die
 Tag-Bilanz hier überhaupt anfangen sich zu bewegen.*
 
+*Update 2026-08-09 (stündliche Routine, Fortsetzung): Schritt 4 ist jetzt
+ebenfalls entschieden — **stdout-only**. `Console.WriteLine` ist der
+natürliche Weg für Einsteiger-C#, Ausgabe zu erzeugen (genaue Parallele zu
+Pythons `print()`), und dieses Projekt nutzt `stdout`-Prüfungen in
+Python-Validatoren bereits als etabliertes Muster. Die Alternative
+(Ergebnisse über `public static`-Felder einer bekannten Klasse
+zurückmelden, per Reflection ausgelesen) wurde bewusst verworfen — sie
+hätte schon die allererste Lektion gezwungen, `static` zu benutzen, obwohl
+`static-members` laut Tag-Katalog oben ein Level-6-Tag in B10 ist, den der
+Kurs an dieser Stelle noch gar nicht erklärt hätte. Als direkte Folge:
+Das seit Schritt 3 nur als Platzhalter vorhandene, nie befüllte
+`result`-Feld wurde aus `CSharpExecResult` (`src/runtime/csharp/
+CSharpRuntime.ts`) und aus dem C#-Treiber selbst (`csharp-engine/
+CSharpEngine.cs`) entfernt und die Änderung live gegen den echten
+kompilierten Bundle erneut bestätigt (Erfolgs- und Compiler-Fehler-Pfad).
+Tag-Bilanz bleibt bei 0/86 — eine Design-Entscheidung ist noch kein
+Content-Track. Nächster Schritt: Schritt 5, das mechanische Scaffolding
+des `csharp`-Content-Tracks (keine offenen Design-Fragen mehr).*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt

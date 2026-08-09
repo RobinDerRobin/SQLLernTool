@@ -409,16 +409,47 @@ Roughly in dependency order:
    `loadCSharpEngineFromServer` takes `baseUrl` as a parameter rather than
    a hardcoded path specifically so that decision can be made later
    without changing this module.
-4. **Decide the `validate()` story for C#.** Python's `variables` capture
-   works because Pyodide's driver inspects the script's final namespace
-   dict. C# has no equivalent "namespace dict" — a compiled Program's
-   local variables aren't reflectable after `Main` returns. Realistic
-   options: (a) stdout-only validation for early challenges (print-based,
-   like this POC's snippets already are), (b) have challenges assign to
-   `public static` fields on a well-known class and reflect those out
-   after execution (more C#-idiomatic, closer to SQL/Python's "inspect
-   final state" pattern, but constrains how challenges are authored), or
-   (c) a hybrid. Needs a decision before content can be written at scale.
+4. ~~Decide the `validate()` story for C#~~ — **decided (2026-08-09):
+   stdout-only.** `CSharpExecResult` is now exactly `{ stdout, error }` —
+   the dead `result` field (always `null`, reserved for this decision)
+   was removed from both `CSharpRuntime.ts` and the C# driver's JSON
+   payload (`csharp-engine/CSharpEngine.cs`), verified live against the
+   real compiled bundle afterward (COOP/COEP server + esbuild-bundled
+   loader, same technique as step 3) to confirm the payload shape changed
+   correctly on both the success and compiler-error paths.
+
+   Reasoning, weighing the three options this section originally posed:
+   - **(a) stdout-only** — chosen. `Console.WriteLine` is the natural way
+     a beginner produces output in a console app, exactly parallel to
+     Python's `print()`. This project's own Python validators already
+     lean on `lastResult.stdout.includes(...)` as a secondary check
+     alongside `variables` — so stdout-based assertions are an
+     already-proven, already-idiomatic pattern in this codebase, not a
+     novel one being introduced for C#. It requires **zero** engine
+     changes: `RunCode` has captured stdout faithfully since the original
+     POC.
+   - **(b) `public static` fields, reflected out** — rejected for the
+     early curriculum. It's more C#-idiomatic in the abstract, but it
+     would force every challenge — including the very first "print
+     something" lesson — to declare `public static` fields on a
+     well-known class before the curriculum has taught what `static`
+     means (`static-members` is a level-6 B10 tag in
+     `docs/csharp-concept-hierarchy.md`, not something a lesson-1
+     challenge should need). Teaching a syntax the learner hasn't reached
+     yet just to satisfy the test harness is exactly the kind of
+     tutorial-imposed artificiality this project avoids elsewhere.
+   - **(c) hybrid** — not adopted now, but not foreclosed either. If a
+     specific later challenge (e.g. something OOP-heavy that genuinely
+     needs to inspect object state, not just printed text) turns out to
+     need structured-value introspection, that is the point to revisit a
+     static-field-reflection escape hatch for *that* content — not
+     something to build speculatively ahead of a concrete need.
+
+   Practical consequence for future content: validators will pattern-
+   match/parse `stdout` (regex or substring, same as several existing
+   Python validators already do) rather than reading typed values out of
+   a `variables`-style dict. Slightly more manual to author than Python's
+   validators, but a known, already-used shape in this project.
 5. **New `csharp` content track**: `src/content/tracks/csharp/` (registry
    entry, `types.ts`, a course, following the exact SQL/Python
    scaffolding pattern), plus a `CSharpChallenge` type in
@@ -433,11 +464,12 @@ Roughly in dependency order:
    as the SQL/Python content (3 hints, live-recomputed or state-inspected
    validators, at least one verified-failing distractor per challenge).
 
-This is genuinely several more sessions of real engineering work — step 4
-in particular (the `validate()` design) still involves an architecture
-decision worth deliberate attention rather than being rushed through
-opportunistically. Steps 1–3 (hosting decision, project scaffold, browser
-loader) are now done.
+This is genuinely several more sessions of real engineering work. Steps
+1–4 (hosting decision, project scaffold, browser loader, `validate()`
+design) are now done. Step 5 (the `csharp` content track scaffold) is the
+next concrete piece — mechanical work mirroring the existing SQL/Python
+track structure, no open design questions. Step 6 (Node-side test engine)
+can follow independently. Real content (step 7) needs both in place.
 Treat each routine firing that touches this as making **one bounded,
 committed increment** (e.g. "scaffold the project directory and get a
 minimal Blazor boot working," not "finish the whole engine") — never

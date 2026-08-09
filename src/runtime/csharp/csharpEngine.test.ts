@@ -15,18 +15,18 @@ function fakeExports(runCodeResult: string): CSharpEngineExports & { calls: stri
 
 describe('createCSharpEngine', () => {
   it('exec() hands the code to RunCode and parses the driver JSON result', async () => {
-    const json = JSON.stringify({ stdout: 'x = 4\n', result: null, error: null });
+    const json = JSON.stringify({ stdout: 'x = 4\n', error: null });
     const exports = fakeExports(json);
     const engine = createCSharpEngine(exports);
 
     const result = await engine.exec('int x = 2 + 2; Console.WriteLine($"x = {x}");');
 
     expect(exports.calls).toEqual(['int x = 2 + 2; Console.WriteLine($"x = {x}");']);
-    expect(result).toEqual({ stdout: 'x = 4\n', result: null, error: null });
+    expect(result).toEqual({ stdout: 'x = 4\n', error: null });
   });
 
   it('surfaces a compiler-diagnostic error unchanged', async () => {
-    const json = JSON.stringify({ stdout: '', result: null, error: "(1,1): error CS0029: Cannot implicitly convert type 'string' to 'int'" });
+    const json = JSON.stringify({ stdout: '', error: "(1,1): error CS0029: Cannot implicitly convert type 'string' to 'int'" });
     const engine = createCSharpEngine(fakeExports(json));
 
     const result = await engine.exec('int x = "not a number";');

@@ -1,10 +1,15 @@
 import type { Runtime } from '../Runtime';
 
 export interface CSharpExecResult {
-  /** Everything the user's code wrote via Console.WriteLine/Console.Write. */
+  /**
+   * Everything the user's code wrote via Console.WriteLine/Console.Write —
+   * the sole basis for validate() (see docs/csharp-engine-poc.md, step 4:
+   * C# has no equivalent of Python's post-exec namespace dict, since a
+   * compiled Program's locals aren't reflectable after Main returns, so
+   * content is written to print its answer rather than leave it in a
+   * variable).
+   */
   stdout: string;
-  /** Reserved for a future validate() design (see docs/csharp-engine-poc.md, step 4) — always null for now. */
-  result: string | null;
   /** The compiler's error diagnostics (joined) or an unhandled exception's ToString(), otherwise null. */
   error: string | null;
 }

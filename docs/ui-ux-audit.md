@@ -86,6 +86,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-08 | HEAD (F-017-Fix + SQL B13 komplett: 18-18.2) | 92.50 % | 74.96 % | 98.98 % | 92.50 % |
 | 2026-08-08 | HEAD (Python B14 Objektorientierung komplett: 18-18.7) | 92.26 % | 74.16 % | 99.00 % | 92.26 % |
 | 2026-08-09 | HEAD (Python B10/B11 abgeschlossen: 19-19.2) | 92.14 % | 73.82 % | 99.01 % | 92.14 % |
+| 2026-08-09 | HEAD (C# Schritt 4: validate()-Design entschieden, result-Feld entfernt) | 92.14 % | 73.81 % | 99.01 % | 92.14 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -1113,3 +1114,57 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Tests:** 799 → 805 (+6, alle für die drei neuen Challenges via
   `challengeRunner.test.ts`). `typecheck`, volle Testsuite (805 Tests)
   und `npm run build` grün.
+
+### 2026-08-09 — Stündliche Routine: Bug-Hunt (nichts gefunden) + C# Schritt 4 (validate()-Design entschieden)
+
+- **Umfang:** Baseline geprüft (805/805 grün). SQL und Python haben
+  beide keinen größeren offenen Zweig mehr (SQL: nur `updatable-view`
+  als dauerhafte Ausnahme; Python: nur `own-modules` + vier kleine,
+  nie blockierte Einzeltags) — Content-Arbeit hätte diesmal nur noch
+  verstreute Einzeltags statt eines zusammenhängenden Zweigs bedient.
+  Stattdessen zuerst gezielt nach echten Bugs gesucht (Priorität 2),
+  dann zum C#-Engine-Schritt 4 gewechselt, der seit mehreren Routinen
+  als klar umrissener nächster Schritt dokumentiert war.
+- **Bug-Hunt:** Live-Playwright-Durchlauf gegen Theme-Picker,
+  Tastatur-Fokus in der Challenge-Liste, Tipps-Sektion, Vergleichs-
+  Ansicht, Chat-Tab und mobiles Sidebar-Overlay. Mehrere anfängliche
+  „Fehler" entpuppten sich beim Nachprüfen als falsche Selektoren im
+  eigenen Testskript, nicht als echte Bugs — u. a. wurde
+  `document.documentElement.dataset.theme` statt `.sql-app`s
+  `data-theme`-Attribut geprüft (das Theme wird bewusst nur auf dem
+  App-Root gesetzt, nicht auf `<html>`), und ein Pfeiltasten-Test ging
+  von einer Roving-Tabindex-Navigation aus, die die Challenge-Liste nie
+  hatte (nur Enter/Space sind laut `challengeList.test.ts` bewusst
+  unterstützt, Pfeiltasten nutzen die native Tab-Reihenfolge). Nach
+  Korrektur der Selektoren: alles funktioniert wie erwartet, 0 echte
+  Bugs gefunden.
+- **C# Schritt 4:** `docs/csharp-engine-poc.md` Schritt 4 entschieden —
+  **stdout-only** validate()-Design (Option a aus den drei dort
+  aufgeführten). Begründung: `Console.WriteLine` ist die natürliche
+  Ausgabe-Form für Einsteiger-C#, direkte Parallele zu Pythons
+  `print()`, und dieses Projekt prüft in Python-Validatoren bereits
+  etabliert gegen `stdout` — kein neues, unbewiesenes Muster. Die
+  Alternative (Ergebnisse über `public static`-Felder zurückmelden,
+  per Reflection ausgelesen) wurde verworfen, weil sie schon die
+  allererste Lektion gezwungen hätte, `static` zu benutzen — ein
+  Level-6-Tag laut `docs/csharp-concept-hierarchy.md`, den der Kurs an
+  der Stelle noch gar nicht erklärt hätte. Als direkte Konsequenz das
+  seit Schritt 3 nie befüllte, nur als Platzhalter vorhandene
+  `result`-Feld aus `CSharpExecResult` (`src/runtime/csharp/
+  CSharpRuntime.ts`) und aus dem C#-Treiber selbst (`csharp-engine/
+  CSharpEngine.cs`, wo die zugehörige lokale Variable ebenfalls nie
+  zugewiesen wurde) entfernt — echter, wenn auch kleiner Totcode-Fund.
+  `dotnet build` weiterhin grün, und die Änderung zusätzlich live gegen
+  den echten kompilierten Blazor+Roslyn-Bundle erneut bestätigt (COOP/
+  COEP-Server + esbuild-Bundle, gleiche Technik wie in Schritt 3):
+  Erfolgspfad liefert jetzt `{stdout, error}` ohne `result`-Schlüssel,
+  Compiler-Fehler-Pfad ebenso.
+- **Ergebnis:** Keine Bugs im Produkt gefunden. C#-Engine-Fortschritt:
+  Schritte 1–4 von 7 aus `docs/csharp-engine-poc.md` jetzt
+  abgeschlossen. Nächster Schritt: Schritt 5, das mechanische
+  Scaffolding des `csharp`-Content-Tracks — keine offenen
+  Design-Fragen mehr, rein strukturelle Arbeit nach dem SQL/Python-
+  Vorbild.
+- **Tests:** 805 (unverändert — reine Aufräumarbeit an bestehenden
+  Tests/Fixtures, keine neuen Tests nötig). `typecheck`, volle
+  Testsuite (805 Tests) und `npm run build` grün.
