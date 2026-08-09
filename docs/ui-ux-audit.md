@@ -116,6 +116,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (SQL B4 Funktionen abgeschlossen: 23-23.2) | 91.80 % | 73.06 % | 99.06 % | 91.80 % |
 | 2026-08-09 | HEAD (F-020 Fix: Mobile-Sidebar-Overlay blockierte Inhalt nach Auswahl) | 91.81 % | 73.15 % | 99.06 % | 91.81 % |
 | 2026-08-09 | HEAD (F-021/F-022: Ergebnis-Tabelle unerreichbar + iOS-Zoom im Editor) | 91.81 % | 73.15 % | 99.06 % | 91.81 % |
+| 2026-08-09 | HEAD (SQL B8 Mengenoperationen abgeschlossen: 24-24.2) | 91.76 % | 73.05 % | 99.06 % | 91.76 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -1745,3 +1746,42 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Tests:** 849 unverändert (reine CSS-Änderungen). `typecheck`, volle
   Testsuite (849) und `npm run build` grün, `knip` ohne neue Funde.
   Coverage unverändert (91,81 % / 73,15 % / 99,06 %).
+
+### 2026-08-09 — Stündliche Routine: SQL B8 (Mengenoperationen) abgeschlossen
+
+- **Umfang:** Challenges 24–24.2 für die drei restlichen B8-Tags entworfen,
+  implementiert und vollständig getestet (`union-distinct`, `intersect`,
+  `except-minus`). Damit ist die B8-Lücke geschlossen — nur noch 1 Tag
+  (`upsert-on-conflict`, B2 DML) und die bewusste Ausnahme
+  (`updatable-view`, B12 Views) bleiben offen.
+
+- **Szenario:** Zwei Regions-Tabellen (nord_sales, sued_sales) mit
+  Produktnamen. Realistisch für Set-Operations: UNION kombiniert beide
+  Ergebnisse (Dedup automatisch), INTERSECT zeigt nur gemeinsame Produkte,
+  EXCEPT zeigt Produkte nur in einer Tabelle. Live-Validator für jede
+  Challenge nutzt jeweils ein independently-phrased `engine.exec(...)`,
+  nicht das Benutzer-Ergebnis selbst re-executed.
+
+- **Distractors:** Pro Challenge 2 Distractors, per Gate 2 empirisch
+  verifiziert zu scheitern (nicht nur "alternative Schreibweise"):
+  - 24 (UNION): UNION ALL (behält Duplikate), WHERE IN-Subquery (zeigt nur
+    gemeinsame, nicht alle unterschiedlichen).
+  - 24.1 (INTERSECT): UNION (alle statt nur gemeinsame), EXCEPT in
+    Gegenrichtung (nur Nord statt nur Nord-Süd-Überschneidung).
+  - 24.2 (EXCEPT): EXCEPT in umgekehrter Richtung (nur Süd statt nur Nord),
+    INTERSECT (zeigt gemeinsame statt nur Nord-exklusiv).
+
+- **Tests:** Gate 1 (Lösung bestätigt, 251/251 Challenges bestehen Validierung),
+  Gate 2 (alle Distractors fallen wie erwartet). Volle Testsuite
+  (858 Tests), `typecheck`, `npm run build` grün. Keine Verbesserung der
+  Coverage-Werte erwartet (rein neue Challenge-Inhalte, kein Engine-Code
+  geändert) — wird mit nächster Measurements-Runde aktualisiert.
+
+- **Dokumentation:** `docs/sql-concept-hierarchy.md` Abschnitt 6 aktualisiert:
+  B8 markiert als seit 2026-08-09 vollständig abgedeckt. Bilanz: 80/82 Tags
+  (≈98 %), nur noch `upsert-on-conflict` (B2) und die bewusste Ausnahme
+  `updatable-view` (B12) offen — kein Zweig mehr zu 100 % Lücke.
+
+- **Ergebnis:** B8 komplett, SQL damit auf 80 von 82 Tags. Challenges 24,
+  24.1, 24.2 im Kurs registriert und live gegen dev server verifizierbar
+  (incl. mobile 375×667 Viewport).

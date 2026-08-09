@@ -572,8 +572,10 @@ vollständig abgedeckt** durch Challenges 14 (`scalar-subquery`), 14.1
 der Kurs löste bis dahin alles über CTEs/Joins, nie über eine Subquery in
 `WHERE`/`FROM`/`SELECT`.
 
-**B8 Mengenoperationen:** `union-distinct`, `intersect`, `except-minus`
-(nur `UNION ALL` wird unterrichtet).
+**B8 Mengenoperationen:** ~~`union-distinct`, `intersect`, `except-minus`~~ — **seit
+2026-08-09 vollständig abgedeckt** durch Challenge 24 (`union-distinct`:
+UNION ohne Duplikate), 24.1 (`intersect`: Produkte aus beiden Regions-Tabellen)
+und 24.2 (`except-minus`: Produkte nur in Nord, nicht in Süd).
 
 **B9 CTE:** ~~`multiple-ctes-chained`, und vor allem
 `recursive-cte-traversal` — die vorhandenen Challenges nutzen Rekursion
@@ -618,18 +620,19 @@ vollständig)**, DML-Kern (ohne Upsert), **B3 DQL-Kern (seit 2026-08-09
 vollständig)**, **B4 Funktionen (seit 2026-08-09 vollständig)**,
 Aggregation/Gruppierung, **B6 Joins (seit 2026-08-09 vollständig,
 inklusive SELF/RIGHT/FULL OUTER JOIN)**, **B7 Subqueries (seit
-2026-08-05 vollständig)**, **B9 CTE & Rekursion (seit 2026-08-09
+2026-08-05 vollständig)**, **B8 Mengenoperationen (seit 2026-08-09
+vollständig, UNION/INTERSECT/EXCEPT)**, **B9 CTE & Rekursion (seit 2026-08-09
 vollständig, jetzt inklusive Traversierung echter Hierarchien)**,
 **B10 Fensterfunktionen (seit 2026-08-07 vollständig)**, **B11
 Transaktionen (seit 2026-08-08 vollständig)**, **B12 Views (seit
 2026-08-08 abgeschlossen, `create-view` abgedeckt, `updatable-view` als
 dauerhafte Ausnahme)**, **B13 Indizes (seit 2026-08-08 vollständig)**.
 
-**Bilanz:** 77 von 82 Tags sind heute durch mindestens eine Challenge
-abgedeckt (≈ 94 %) — SQL liegt damit erstmals gleichauf mit Python
-(ebenfalls 77/82). Kein Zweig ist mehr zu 100 % Lücke — die einzige
-verbleibende Struktur-Lücke ist `updatable-view`, das als dauerhafte
-Scope-Ausnahme dokumentiert ist (nicht als offene Aufgabe).
+**Bilanz:** 80 von 82 Tags sind heute durch mindestens eine Challenge
+abgedeckt (≈ 98 %). Die einzigen noch offenen Tags sind `upsert-on-conflict`
+(B2 DML) — und die permanente Scope-Ausnahme `updatable-view` (B12 Views),
+die aufgrund von SQLites Trigger-Anforderung nicht implementierbar ist
+(siehe Abschnitt 7). Kein Zweig ist mehr eine strukturelle Lücke.
 
 ## 7. Bewusst ausgeklammert
 
