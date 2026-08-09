@@ -123,6 +123,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (C# Challenge 02: B2-Grundtypen, int/double-Division) | 91.79 % | 72.86 % | 99.08 % | 91.79 % |
 | 2026-08-09 | HEAD (Syntax-Highlighting in Tutorial/Tipps/Erklärung/Lösung) | 91.82 % | 72.95 % | 99.09 % | 91.82 % |
 | 2026-08-09 | HEAD (C# Challenge 03: B2 vollständig, 15/86) | 91.80 % | 72.92 % | 99.09 % | 91.80 % |
+| 2026-08-09 | HEAD (Live-Bug-Hunt sauber + C# Challenge 04: B3 vollständig, 21/86) | 91.83 % | 72.90 % | 99.09 % | 91.83 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -2107,3 +2108,52 @@ sondern pro PR direkt in den Checks sichtbar.
   Testsuite 893 → 896, alle grün. `typecheck`, `npm run build` grün.
   `knip`: unverändert 10 Funde. Coverage: 91,80 % / 72,92 % / 99,09 % /
   91,80 %.
+
+### 2026-08-09 — Stündliche Routine: Live-Bug-Hunt (sauber) + C# Challenge 04 (B3 vollständig)
+
+- **Umfang:** Baseline sauber (896/896, typecheck/build/knip grün, HEAD
+  `e115901`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr in beiden Tracks. Priorität 2
+  (Live-Bug-Hunt) zuerst, da der letzte gezielte Durchlauf zwei
+  Content-Durchgänge zurücklag; danach C#, das nach Challenge 01-03
+  klaren Schwung hat.
+
+- **Live-Bug-Hunt (Priorität 2):** Gegen den echten Dev-Server, sql.js
+  und Pyodide lokal geroutet. Alle 78 SQL- und alle 67
+  Python-Challenges per Sweep durchlaufen (Tutorial-Tab öffnen, Text
+  vorhanden prüfen) — 0 leere/fehlende Tutorials in beiden Tracks. Drei
+  SQL-Musterlösungen (01, 13, 25) und die erste Python-Musterlösung per
+  Editor tatsächlich ausgeführt — alle vier korrekt als
+  "✓ Aufgabe erfüllt" akzeptiert. Mobiler Durchlauf (375×667): kein
+  horizontales Overflow, keine Konsolenfehler. Keine neuen Bugs
+  gefunden.
+
+- **C# Content (Priorität 4):** Challenge 04 ergänzt — deckt alle 6 Tags
+  aus B3 (Operatoren) in einem Durchgang ab: `arithmetic-operators`,
+  `integer-division-modulo`, `comparison-operators`,
+  `boolean-logic-operators`, `compound-assignment-operators`,
+  `increment-decrement-operators`. Szenario: ein Punktestand-Tracker
+  (Start 10 Punkte) als gerade Anweisungsfolge ohne Schleife (`for`/
+  `while` aus B7 sind noch nicht freigeschaltet) — `+=`, `++`, `*`, `/`,
+  `%`, `>` und `&&` in Folge auf denselben Variablenwert angewendet.
+
+- **Distraktor-Muster diesmal wieder stdout-basiert, nicht
+  Compilerfehler** (anders als Challenge 03): beide Distraktoren
+  kompilieren fehlerfrei, liefern aber nachweislich falsche Werte —
+  `/` und `%` vertauscht (klassischer Verwechslungsfehler bei
+  Ganzzahl-Division: liefert `1`/`5` statt `5`/`1`) und das komplette
+  Weglassen von `punkte++` (verschiebt alle sechs Ausgabezeilen, u. a.
+  wird `bestanden` fälschlich `false` statt `true`, weil `15 > 15` nicht
+  mehr zutrifft). Beide vor dem Schreiben empirisch gegen den echten
+  `dotnet`-Treiber nachgerechnet statt nur angenommen — die Verkettung
+  aus `+=` und `++` auf denselben Wert macht Kopfrechnen fehleranfällig
+  genug, dass sich die Verifikation gelohnt hat.
+
+- **Ergebnis:** C#-Tag-Bilanz 15/86 → 21/86 (≈24 %). B0 bis B3 sind damit
+  vollständig abgedeckt — nächster offener Zweig ist B4 (Strings).
+  Build-Größe unverändert (632,33 kB) — Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 273 → 276 (Gate 1 +
+  Gate 2 für Challenge 04, beide Distraktoren grün). Volle Testsuite
+  896 → 899, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 91,83 % / 72,90 % / 99,09 % / 91,83 %.

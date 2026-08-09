@@ -615,6 +615,27 @@ notenBuchstabe = "B";` tatsächlich `CS0029`.
 vollständig abgedeckt** — B0, B1 und B2 sind jetzt komplett. Nächster
 offener Zweig: B3 (nach der Branch-Übersicht in Abschnitt 5).*
 
+*Update 2026-08-09 (stündliche Routine, Fortsetzung): Challenge 04
+ergänzt — deckt alle 6 Tags aus B3 (Operatoren) in einem Durchgang ab:
+`arithmetic-operators`, `integer-division-modulo`,
+`comparison-operators`, `boolean-logic-operators`,
+`compound-assignment-operators`, `increment-decrement-operators`.
+Szenario: ein Punktestand-Tracker (Start 10 Punkte), der nacheinander
+`+=`, `++`, `*`, `/`, `%`, `>` und `&&` einsetzt — bewusst als
+gerade Anweisungsfolge ohne Schleife, da `for`/`while` (B7) noch nicht
+freigeschaltet sind. Beide Distraktoren sind reguläre falsche
+Berechnungen (kein Compilerfehler diesmal, anders als bei Challenge 03):
+`/` und `%` vertauscht (ein klassischer Verwechslungsfehler bei
+Ganzzahl-Division), sowie das komplette Weglassen von `punkte++`. Beide
+vor dem Schreiben empirisch gegen den echten `dotnet`-Treiber
+nachgerechnet, nicht nur angenommen — die Verkettung aus `+=` und `++`
+auf denselben Variablenwert macht Kopfrechnen fehleranfällig genug, dass
+eine Verifikation lohnt.
+
+**Tag-Bilanz: 21 von 86 (≈ 24 %).** Damit ist **B3 (Operatoren)
+vollständig abgedeckt** — B0 bis B3 sind jetzt komplett. Nächster offener
+Zweig: B4 (Strings, nach der Branch-Übersicht in Abschnitt 5).*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt
