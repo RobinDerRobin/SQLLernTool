@@ -78,6 +78,16 @@ describe('mountHintsSection', () => {
     expect(root.querySelector('.hint-text code')).not.toBeNull();
   });
 
+  it('syntax-highlights code inside a revealed hint using the same tokenizer as the editor', () => {
+    let progress = createDefaultProgressState();
+    progress = withChallengeProgress(progress, 'sqlite', 'sqlLernenTool', '01', { hintsUsed: 3 });
+    const ctx = makeCtx(progress);
+    mountHintsSection(root, ctx);
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
+
+    expect(root.querySelector('.hint-text .tok-keyword')).not.toBeNull();
+  });
+
   it('shows revealed hints and still offers the next one', () => {
     let progress = createDefaultProgressState();
     progress = withChallengeProgress(progress, 'sqlite', 'sqlLernenTool', '01', { hintsUsed: 2 });

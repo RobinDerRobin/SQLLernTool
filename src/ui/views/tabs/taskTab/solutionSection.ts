@@ -1,8 +1,8 @@
 import { getCourseSettings } from '../../../../domain/progress/progressModel';
-import { escapeHtml } from '../../../../domain/text/escapeHtml';
 import type { AppContext } from '../../../context';
 import type { EditorBridge } from '../../../editorBridge';
 import { mountView } from '../../../mount';
+import { highlightCodeForTrack, highlightContentHtml } from '../../../render/contentHighlight';
 import { markSolutionViewed } from '../../../state/actions';
 import { selectChallengeProgress, type AppState } from '../../../state/appState';
 import { findChallengeInRegistry } from '../../../state/challengeLookup';
@@ -15,6 +15,7 @@ interface SolutionSlice {
   syntaxExplanation: string;
   solutionViewed: boolean;
   mode: 'study' | 'exam';
+  trackId: string;
 }
 
 function sliceSolution(state: AppState, registry: AppContext['registry']): SolutionSlice {
@@ -31,6 +32,7 @@ function sliceSolution(state: AppState, registry: AppContext['registry']): Solut
     syntaxExplanation: challenge?.syntaxExplanation ?? '',
     solutionViewed: selectChallengeProgress(state)?.solutionViewed ?? false,
     mode: settings.mode,
+    trackId: selection?.trackId ?? '',
   };
 }
 
@@ -48,10 +50,10 @@ function renderSolution(slice: SolutionSlice): string {
       <div class="solution-panel">
         ${slice.solutionViewed ? '<div class="solution-cost-note">Lösung angesehen — diese Challenge zählt mit 0 Sternen.</div>' : ''}
         <span class="sp-label">Musterlösung</span>
-        <pre>${escapeHtml(slice.solution)}</pre>
+        <pre>${highlightCodeForTrack(slice.solution, slice.trackId)}</pre>
         <div class="solution-explanation">
           <div class="se-label">Syntax erklärt</div>
-          <div class="se-text">${slice.syntaxExplanation}</div>
+          <div class="se-text">${highlightContentHtml(slice.syntaxExplanation, slice.trackId)}</div>
         </div>
         <button type="button" class="btn solution-insert-btn">In den Editor übernehmen</button>
       </div>
@@ -79,7 +81,10 @@ export function mountSolutionSection(root: HTMLElement, ctx: AppContext, editor:
     {
       render: renderSolution,
       shouldUpdate: (prev, next) =>
-        prev.num !== next.num || prev.solutionViewed !== next.solutionViewed || prev.mode !== next.mode,
+        prev.num !== next.num ||
+        prev.trackId !== next.trackId ||
+        prev.solutionViewed !== next.solutionViewed ||
+        prev.mode !== next.mode,
       afterRender: (rootEl, slice) => {
         if (slice.num !== renderedNum) {
           renderedNum = slice.num;

@@ -100,6 +100,15 @@ describe('mountSolutionSection', () => {
     expect(root.querySelector('.solution-explanation')?.querySelector('li')).not.toBeNull();
   });
 
+  it('syntax-highlights the solution code and its explanation using the same tokenizer as the editor', () => {
+    const ctx = makeCtx();
+    mountSolutionSection(root, ctx, fakeEditor());
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
+
+    expect(root.querySelector('.solution-panel pre .tok-keyword')).not.toBeNull();
+    expect(root.querySelector('.solution-explanation .tok-keyword')).not.toBeNull();
+  });
+
   it('shows the star-cost note once the solution has been viewed', () => {
     const progress = withChallengeProgress(createDefaultProgressState(), 'sqlite', 'sqlLernenTool', '01', {
       solutionViewed: true,

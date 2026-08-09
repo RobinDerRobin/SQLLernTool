@@ -46,6 +46,15 @@ describe('mountTutorialTab', () => {
     expect(tutorial?.textContent).toContain('Tabelle');
   });
 
+  it('syntax-highlights code inside the tutorial using the same tokenizer as the editor', () => {
+    const ctx = makeCtx();
+    mountTutorialTab(root, ctx);
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '2.2');
+
+    const tutorial = root.querySelector('.tutorial-text');
+    expect(tutorial?.querySelector('.tok-keyword')).not.toBeNull();
+  });
+
   it('repeats the success criteria alongside the tutorial', () => {
     const ctx = makeCtx();
     mountTutorialTab(root, ctx);

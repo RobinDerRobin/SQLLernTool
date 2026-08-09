@@ -9,41 +9,6 @@ hier entfernt/als erledigt markiert) oder bewusst verworfen wird.
 
 ## Offen
 
-### Syntax-Highlighting in Tutorial-Text und Erklärungen
-
-Code-Beispiele in `tutorial` (Tutorial-Tab) und `syntaxExplanation`
-(Lösungs-Erklärung im Task-Tab) sind aktuell rohes, unstyled HTML
-(`<pre>`/`<code>`-Blöcke, siehe `tutorialTab.ts`s eigener Kommentar dazu)
-— keine Farbcodierung, obwohl der Editor selbst (`textarea.editor` +
-`.highlight-layer`) für SQL/Python bereits einen echten Tokenizer mit
-Syntax-Highlighting hat (`src/editor/languages/`).
-
-Gewünscht: dieselbe Farbcodierung wie im Editor auch für die
-Code-Beispiele in Tutorial und Erklärungen anwenden — sowohl für
-mehrzeilige `<pre>`-Blöcke als auch für einzelne inline `<code>`-Wörter,
-die einzelne Sprachelemente benennen (z. B. "das Schlüsselwort
-<code>WHERE</code>").
-
-**Betroffene Dateien (Ausgangspunkt für eine spätere Umsetzung):**
-- `src/ui/views/tabs/tutorialTab.ts` — rendert `tutorial` roh als HTML.
-- `src/ui/views/tabs/taskTab/solutionSection.ts` — rendert
-  `syntaxExplanation` roh als HTML.
-- `src/editor/languages/` — enthält die bereits vorhandenen Tokenizer für
-  SQL und Python, die für den Editor selbst schon funktionieren; die
-  gleiche Logik müsste auf Text innerhalb von `<pre>`/`<code>` in
-  authored HTML angewendet werden, nicht nur auf den Editor-Inhalt.
-- Alle Content-Dateien unter
-  `src/content/tracks/*/courses/*/challenges/*.ts` — Quelle der
-  `tutorial`/`syntaxExplanation`-Strings.
-
-**Offene Fragen für die Umsetzung:** Inline-`<code>`-Wörter sind oft kein
-vollständiges, syntaktisch gültiges Code-Fragment (z. B. nur ein einzelnes
-Schlüsselwort) — der Tokenizer müsste robust genug für Teilausschnitte
-sein, oder es braucht eine einfachere wortweise Klassifizierung statt des
-vollen Editor-Tokenizers für diesen Fall. Track-Auswahl (SQL vs. Python vs.
-künftig C#) muss pro Challenge korrekt an den richtigen Tokenizer
-weitergereicht werden.
-
 ### Nachvollziehbare gemerkte Chat-Nachrichten
 
 Der eingebaute Chat (`chatTab.ts`, siehe `docs/csharp-engine-poc.md`-
@@ -65,3 +30,27 @@ linearen `chatHistory`-Verlauf pro Challenge (`ChatMessage[]` in
 sein sollen — nur hervorgehoben im normalen Verlauf, oder zusätzlich in
 einer eigenen, challenge-übergreifenden Übersicht? Letzteres bräuchte
 einen neuen Speicherort außerhalb der pro-Challenge-`chatHistory`.
+
+## Erledigt
+
+### Syntax-Highlighting in Tutorial-Text und Erklärungen (2026-08-09)
+
+Umgesetzt auf direkten Nutzer-Befehl. Neues Modul
+`src/ui/render/contentHighlight.ts` (`highlightCodeForTrack` für reinen
+Code, `highlightContentHtml` für authored HTML mit eingebetteten
+`<pre>`/`<code>`-Blöcken) parst das HTML per DOM, re-rendert jeden
+`<pre>`/`<code>`-Textinhalt durch denselben Tokenizer wie der Editor
+(`src/editor/languages/{sql,python}/highlight.ts`) und ersetzt die
+Farbgebung so, dass sie exakt der Editor-Farbcodierung entspricht.
+Angewendet in: `tutorialTab.ts` (Tutorial + Erfolgskriterium),
+`hintsSection.ts` (alle drei Tipps), `solutionSection.ts` (Musterlösung +
+Syntax-Erklärung). CSS in `themes.css`: die vier betroffenen
+`<pre>`/`<code>`-Regeln von einer festen `color: var(--gold)` auf
+`color: var(--input-text)` (Editor-Basisfarbe) umgestellt, damit die
+neuen `.tok-*`-Spans (bereits vorhandene, globale Klassen) sichtbar
+durchscheinen. Bewusst **nicht** angefasst: `pgAskPanel.ts` (der
+`extra.pg`-Text mischt Prosa und Code unvorhersehbar, ein naives
+Voll-Highlighting hätte deutsche Prosa-Sätze fälschlich als SQL
+tokenisiert). Live gegen den echten Dev-Server verifiziert (Desktop und
+375px mobil, SQL und Python, keine Konsolenfehler, kein horizontales
+Overflow). Details siehe `docs/ui-ux-audit.md`, Durchgang vom 2026-08-09.

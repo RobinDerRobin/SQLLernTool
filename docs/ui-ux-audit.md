@@ -121,6 +121,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (SQL upsert-on-conflict abgeschlossen: 25) | 91.72 % | 72.81 % | 99.08 % | 91.72 % |
 | 2026-08-09 | HEAD (Live-Bug-Hunt sauber + C# Schritt 7 gestartet: Challenge 01) | 91.76 % | 72.87 % | 99.08 % | 91.76 % |
 | 2026-08-09 | HEAD (C# Challenge 02: B2-Grundtypen, int/double-Division) | 91.79 % | 72.86 % | 99.08 % | 91.79 % |
+| 2026-08-09 | HEAD (Syntax-Highlighting in Tutorial/Tipps/Erklärung/Lösung) | 91.82 % | 72.95 % | 99.09 % | 91.82 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -1978,3 +1979,86 @@ sondern pro PR direkt in den Checks sichtbar.
   Gate 2 für Challenge 02, beide Distraktoren grün). Volle Testsuite
   876 → 879, alle grün. `typecheck`, `npm run build` grün. `knip`:
   unverändert 10 Funde. Coverage: 91,79 % / 72,86 % / 99,08 % / 91,79 %.
+
+### 2026-08-09 — Nutzer-Anfrage: Syntax-Highlighting in Tutorial/Tipps/Erklärung/Lösung
+
+- **Umfang:** Direkter Nutzer-Auftrag (nicht Teil der autonomen Routine):
+  "tutorial syntax needs to be colored as code is in the editor. also
+  color the words in the explanations accordingly." Vorher als Backlog-
+  Eintrag notiert (`docs/backlog.md`), jetzt auf expliziten Befehl
+  ("Do") umgesetzt.
+
+- **Befund vor der Umsetzung:** `tutorial`, `hints` und `syntaxExplanation`
+  sind authored HTML mit eingebetteten `<pre>`/`<code>`-Codebeispielen,
+  aber bislang komplett unstyled — eine feste `color: var(--gold)` in
+  `themes.css` färbte jeden Code-Textabschnitt einheitlich gold, obwohl
+  der Editor selbst (`textarea.editor` + `.highlight-layer`) für SQL und
+  Python längst einen echten Tokenizer mit Mehrfarben-Highlighting hat
+  (`src/editor/languages/{sql,python}/highlight.ts`, bereits vorhandene
+  globale `.tok-*`-CSS-Klassen).
+
+- **Umsetzung:** Neues Modul `src/ui/render/contentHighlight.ts`:
+  - `highlightCodeForTrack(code, trackId)` — für reinen Code-Text (z. B.
+    die Musterlösung), ruft direkt `highlightSql`/`highlightPython` aus
+    dem Editor-Modul auf.
+  - `highlightContentHtml(html, trackId)` — für authored HTML, das Prosa
+    (`<b>`, `<ul>`, ...) mit Code-Beispielen mischt: parst per
+    `document.createElement('div').innerHTML`, findet alle `<pre>`- und
+    (nicht bereits in einem `<pre>` verschachtelte) `<code>`-Elemente,
+    ersetzt deren `innerHTML` durch den tokenisierten, escapten Text.
+  - Fallback für Tracks ohne Tokenizer (aktuell nur `csharp`, noch nicht
+    live registriert): Rückgabe unverändert bzw. reines `escapeHtml`.
+  - Angewendet in `tutorialTab.ts` (Tutorial-Text + Erfolgskriterium),
+    `hintsSection.ts` (alle drei aufgedeckten Tipps),
+    `solutionSection.ts` (Musterlösungs-`<pre>` UND die "Syntax
+    erklärt"-Box).
+  - CSS (`themes.css`): die vier betroffenen `<pre>`/`<code>`-Regeln
+    (`.tutorial-text`, `.hint-revealed .hint-text`,
+    `.solution-explanation .se-text`) von der festen `color: var(--gold)`
+    auf `color: var(--input-text)` umgestellt — dieselbe Basisfarbe, die
+    der Editor für nicht extra eingefärbte Tokens (Satzzeichen,
+    Leerraum) nutzt. `.solution-panel pre` hatte diese Farbe bereits.
+  - Bewusst **nicht** angefasst: `pgAskPanel.ts` (`extra.pg`). Der Text
+    dort mischt unvorhersehbar Prosa und Code im selben String (z. B.
+    "In echtem Postgres reicht eine Zeile:\n\nINSERT INTO...") — ein
+    naives Voll-Highlighting des ganzen Strings hätte deutsche
+    Prosa-Wörter fälschlich als SQL-Bezeichner eingefärbt. Bleibt
+    unverändert mit reinem `escapeHtml`.
+
+- **Nebenbefund (echter, kleiner Bug, im selben Zug behoben):** Alle drei
+  betroffenen Views (`tutorialTab.ts`, `hintsSection.ts`,
+  `solutionSection.ts`) hatten `shouldUpdate` nur an `challenge.num`
+  geknüpft, nicht an den Track — ein Wechsel von z. B. SQL Challenge "01"
+  zu Python Challenge "01" (gleiche `num`, anderer Track) hätte den
+  Re-Render fälschlich übersprungen und den alten Tutorial-/Tipp-/
+  Lösungstext des vorherigen Tracks stehen lassen. Alle drei
+  `shouldUpdate`-Prüfungen um `prev.trackId !== next.trackId` ergänzt.
+
+- **Live-Verifikation:** Gegen den echten Dev-Server (sql.js + Pyodide
+  lokal geroutet). SQL Challenge 03 (Tutorial mit `WITH RECURSIVE`-Block):
+  33 hervorgehobene Tokens im Tutorial, 31 in den Tipps, 37 in der
+  Musterlösung, 26 in der Syntax-Erklärung — `Console.WriteLine`-Analoga
+  für SQL sichtbar korrekt eingefärbt (Keywords orange, Identifier hell,
+  Kommentare kursiv-grau, exakt wie im Editor). Python Challenge 14 (List
+  Comprehension): `for`/`in` als Keywords eingefärbt, deutsche
+  Platzhalterwörter in Inline-Code (`AUSDRUCK`, `VARIABLE`, `ITERABLE`)
+  bleiben unauffällig als Identifier eingefärbt statt zu brechen —
+  bestätigt, dass der Tokenizer robust mit unvollständigen/nicht-echten
+  Code-Fragmenten umgeht. Mobiler Durchlauf (375×667): kein horizontales
+  Overflow, 33 Tokens weiterhin korrekt hervorgehoben, keine
+  Konsolenfehler.
+
+- **Ergebnis:** Tutorial-, Tipp-, Erklärungs- und Lösungstexte zeigen
+  jetzt dieselbe Mehrfarben-Syntaxhervorhebung wie der Editor selbst,
+  für SQL und Python. `docs/backlog.md` aktualisiert (Eintrag von
+  "Offen" nach "Erledigt" verschoben).
+
+- **Tests:** 11 neue Tests in `contentHighlight.test.ts` (Kern-Logik:
+  Keyword-Highlighting, HTML-Escaping, Fallback ohne Tokenizer, korrekte
+  Verschachtelungs-Behandlung, mehrere unabhängige `<code>`-Snippets,
+  korrekte Escaping von `<` als Vergleichsoperator). Je eine neue
+  Integrations-Assertion in `tutorialTab.test.ts`, `hintsSection.test.ts`,
+  `solutionSection.test.ts` (prüft `.tok-keyword` tatsächlich im
+  gerenderten DOM). Volle Testsuite 879 → 893, alle grün. `typecheck`,
+  `npm run build` grün (+0,6 kB). `knip`: unverändert 10 Funde. Coverage:
+  91,82 % / 72,95 % / 99,09 % / 91,82 %.
