@@ -513,11 +513,18 @@ Danach Challenges 22–22.1 ergänzt und decken B3 (DQL-Kern) komplett ab —
 `logical-operators` als eigenes Thema (eine Bonusregel mit AND/OR/NOT
 in einer geklammerten Bedingung) und `coalesce-nullif`
 (`COALESCE(NULLIF(...), ...)` gegen zwei Arten von "fehlend": echtes
-NULL und einen Platzhalter-Text). Der Rest dieses Abschnitts ist der
-historische Stand vor diesen Updates; die Bilanz am Ende ist bereits
-aktualisiert.*
+NULL und einen Platzhalter-Text). Update 2026-08-09 (stündliche
+Routine, Fortsetzung): Challenges 23–23.2 ergänzt und decken B4
+(Funktionen) komplett ab — `math-functions` (`ROUND(ABS(...))` auf
+Kontobewegungen), `string-functions` (`SUBSTR(UPPER(TRIM(...)))` für
+Produktcodes) und `cast-conversion` (`CAST(... AS INTEGER)` gegen eine
+als TEXT gespeicherte Gehaltsspalte, mit Daten, bei denen ein reiner
+Textvergleich nachweislich ein anderes, falsches Ergebnis liefert).
+SQL liegt damit erstmals gleichauf mit Python (beide 77/82). Der Rest
+dieses Abschnitts ist der historische Stand vor diesen Updates; die
+Bilanz am Ende ist bereits aktualisiert.*
 
-Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (71 Challenges)
+Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (74 Challenges)
 folgende **nicht** ab — das ist die eigentliche Planungs-Nutzlast dieses
 Dokuments:
 
@@ -541,10 +548,14 @@ verwendet, nie explizit erklärt), `coalesce-nullif`.~~ — **seit
 geklammerten Bonusregel geübt) und 22.1 (`coalesce-nullif`:
 `COALESCE(NULLIF(...), ...)` gegen zwei Arten von "fehlend").
 
-**B4 Funktionen:** `math-functions` (`round()`, `abs()`), `cast-conversion`,
+**B4 Funktionen:** ~~`math-functions` (`round()`, `abs()`), `cast-conversion`,
 und `string-functions` (`substr()`, `upper()`, `lower()`, `trim()`,
 `replace()` — der Kurs nutzt nur den `||`-Operator, keine dieser Funktionen
-taucht in einer der 41 Challenges auf).
+taucht in einer der 41 Challenges auf).~~ — **seit 2026-08-09
+vollständig abgedeckt** durch Challenge 23 (`math-functions`:
+`ROUND(ABS(...))`), 23.1 (`string-functions`: `SUBSTR(UPPER(TRIM(...)))`,
+drei der fünf Funktionen des Tags) und 23.2 (`cast-conversion`:
+`CAST(... AS INTEGER)` gegen einen echten Textvergleichs-Fallstrick).
 
 **B6 Joins:** ~~`self-join`, `right-join`, `full-outer-join`.~~ —
 **seit 2026-08-09 vollständig abgedeckt** durch Challenge 21
@@ -604,17 +615,19 @@ wechselt, 18.2 lässt den Query-Plan selbst schreiben und lesen.
 
 **Gut abgedeckt:** **B0/B1 Grundlagen & Schema (seit 2026-08-09
 vollständig)**, DML-Kern (ohne Upsert), **B3 DQL-Kern (seit 2026-08-09
-vollständig)**, Aggregation/Gruppierung, **B6 Joins (seit 2026-08-09
-vollständig, inklusive SELF/RIGHT/FULL OUTER JOIN)**, **B7 Subqueries
-(seit 2026-08-05 vollständig)**, **B9 CTE & Rekursion (seit 2026-08-09
+vollständig)**, **B4 Funktionen (seit 2026-08-09 vollständig)**,
+Aggregation/Gruppierung, **B6 Joins (seit 2026-08-09 vollständig,
+inklusive SELF/RIGHT/FULL OUTER JOIN)**, **B7 Subqueries (seit
+2026-08-05 vollständig)**, **B9 CTE & Rekursion (seit 2026-08-09
 vollständig, jetzt inklusive Traversierung echter Hierarchien)**,
 **B10 Fensterfunktionen (seit 2026-08-07 vollständig)**, **B11
 Transaktionen (seit 2026-08-08 vollständig)**, **B12 Views (seit
 2026-08-08 abgeschlossen, `create-view` abgedeckt, `updatable-view` als
 dauerhafte Ausnahme)**, **B13 Indizes (seit 2026-08-08 vollständig)**.
 
-**Bilanz:** 74 von 82 Tags sind heute durch mindestens eine Challenge
-abgedeckt (≈ 90 %). Kein Zweig ist mehr zu 100 % Lücke — die einzige
+**Bilanz:** 77 von 82 Tags sind heute durch mindestens eine Challenge
+abgedeckt (≈ 94 %) — SQL liegt damit erstmals gleichauf mit Python
+(ebenfalls 77/82). Kein Zweig ist mehr zu 100 % Lücke — die einzige
 verbleibende Struktur-Lücke ist `updatable-view`, das als dauerhafte
 Scope-Ausnahme dokumentiert ist (nicht als offene Aufgabe).
 
