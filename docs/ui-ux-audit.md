@@ -94,6 +94,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (SQL B9 CTE & Rekursion abgeschlossen: 19-19.1) | 92.12 % | 73.84 % | 99.02 % | 92.12 % |
 | 2026-08-09 | HEAD (SQL B1 Schema/DDL abgeschlossen: 20-20.4, F-018 Fix) | 91.91 % | 73.28 % | 99.03 % | 91.91 % |
 | 2026-08-09 | HEAD (SQL B6 Joins abgeschlossen: 21-21.2, F-019 Fix) | 91.89 % | 73.34 % | 99.04 % | 91.89 % |
+| 2026-08-09 | HEAD (Live-Bug-Hunt sauber + SQL B3 DQL abgeschlossen: 22-22.1) | 91.86 % | 73.23 % | 99.05 % | 91.86 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -1514,3 +1515,59 @@ sondern pro PR direkt in den Checks sichtbar.
   Tests) und `npm run build` grün. Coverage: 91,91 % → 91,89 %
   Statements, 73,28 % → 73,34 % Branches, 99,03 % → 99,04 % Functions.
   `knip` bestätigt: keine neuen toten Exporte.
+
+### 2026-08-09 — Stündliche Routine: Live-Bug-Hunt (sauber) + SQL B3 (DQL-Kern) abgeschlossen
+
+- **Umfang:** Baseline geprüft (835/835 grün, `typecheck` und
+  `npm run build` sauber). Nach drei Routinen in Folge, die reinen
+  Content + Node-Testmotor-Fixes ohne echten Browser-Durchlauf
+  gemacht haben (B9, B1, B6 — alle 11 neuen Challenges bislang nur
+  gegen `node:sqlite` geprüft), zuerst ein gezielter Live-Playwright-
+  Durchlauf gegen den echten Dev-Server, bevor weiterer Content
+  entsteht — genau die in den letzten beiden Routinen gefundenen
+  `node:sqlite`-spezifischen Bugs (F-018, F-019) machen einen
+  Gegencheck im echten Browser-Motor besonders wertvoll (umgekehrtes
+  Risiko: ein sql.js-spezifisches Verhalten, das `node:sqlite` nicht
+  hätte). Danach: kleinster verbliebener SQL-Zweig (B3, DQL-Kern,
+  2 offene Tags) als Content-Abschluss.
+- **Vorgehen Live-Bug-Hunt:** Dev-Server gestartet, `sql.js` lokal
+  (bereits installiert, `--no-save`) per Playwright `context.route()`
+  statt der in dieser Sandbox blockierten CDN-Domain ausgeliefert —
+  echtes WASM, keine Mocks. Für alle 10 seit der letzten Live-
+  Verifikation neu hinzugekommenen Challenges (19, 19.1, 20–20.4,
+  21–21.2): Sidebar-Auswahl, Musterlösung eingefügt, ausgeführt,
+  `✓ Aufgabe erfüllt` bestätigt. Zusätzlich 4 Distraktoren
+  stichprobenartig ausgeführt (19, 20.2, 21.1, 21.2) und die korrekte
+  Ablehnung (`status-warn`, kein `status-ok`) bestätigt. Alle 10/10
+  Lösungen und 4/4 Distraktoren verhielten sich exakt wie von
+  `challengeRunner.test.ts` vorhergesagt — keine Diskrepanz zwischen
+  `node:sqlite` (nach den F-018/F-019-Fixes) und echtem sql.js-WASM
+  gefunden, keine Konsolenfehler.
+- **Vorgehen B3:** Zwei neue Challenges (22, 22.1), vorab empirisch
+  gegen `node:sqlite` verifiziert:
+  - **22** (`logical-operators` als eigenes Thema): eine Bonusregel
+    ("Vertrieb nur mit Gehalt über 3000, alle anderen automatisch")
+    verlangt `AND`, `OR` und `NOT` in einer einzigen, geklammerten
+    Bedingung — Tutorial erklärt explizit die Vorrangregel (AND bindet
+    stärker als OR). Distraktor lässt die `OR NOT (...)`-Hälfte
+    komplett weg — nur ein einziger Mitarbeiter (statt fünf) besteht.
+  - **22.1** (`coalesce-nullif`): eine Telefonnummern-Spalte mit zwei
+    Arten von "fehlend" — echtes NULL und der Platzhalter-Text `'-'`
+    — verlangt `NULLIF(telefon, '-')` verschachtelt in `COALESCE(...,
+    'unbekannt')`, ein sehr reales Datenbereinigungs-Muster. Distraktor
+    nutzt nur COALESCE ohne NULLIF — der Platzhalter `'-'` bleibt
+    unverändert stehen statt zu "unbekannt" zu werden.
+  Beide Challenges zusätzlich live gegen den echten Dev-Server
+  verifiziert (Lösung und Distraktor je Challenge) — keine Diskrepanz.
+- **Ergebnis:** Keine Bugs im Produkt gefunden (der Live-Bug-Hunt
+  bestätigt eine saubere Produktionsparität nach den letzten beiden
+  Engine-Fixes). SQL-Tag-Bilanz: 72/82 → 74/82 (≈ 90 %). B3 (DQL-Kern)
+  ist damit der sechste vollständig geschlossene SQL-Zweig in dieser
+  Session. Verbleibende SQL-Lücken: nur noch B4 (3 Tags) und B8 (3) —
+  beide größer als jeder verbleibende Python-Rest — plus die
+  dauerhafte Scope-Ausnahme `updatable-view`.
+- **Tests:** 835 → 839 (+4 Gate 1/Gate 2 für die zwei neuen
+  Challenges). `typecheck`, volle Testsuite (839 Tests) und
+  `npm run build` grün. Coverage: 91,89 % → 91,86 % Statements,
+  73,34 % → 73,23 % Branches, 99,04 % → 99,05 % Functions. `knip`
+  bestätigt: keine neuen toten Exporte.

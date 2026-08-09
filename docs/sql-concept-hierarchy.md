@@ -504,11 +504,20 @@ Datei gefunden und behoben (siehe `docs/ui-ux-audit.md`, F-019):
 `setReturnArrays(true)` namensbasiert statt positionsbasiert — zwei
 gleichnamige Spalten aus verschiedenen Tabellen (z. B. ein unaliaster
 Self-Join) kollabierten dadurch stillschweigend auf einen Wert, obwohl
-`sql.js` (der echte Browser-Motor) davon nie betroffen war. Der Rest
-dieses Abschnitts ist der historische Stand vor diesen Updates; die
-Bilanz am Ende ist bereits aktualisiert.*
+`sql.js` (der echte Browser-Motor) davon nie betroffen war. Update
+2026-08-09 (stündliche Routine, Fortsetzung): Erst ein Live-Playwright-
+Durchlauf gegen den echten Dev-Server (alle 10 seit der letzten
+Browser-Verifikation neuen Challenges 19–21.2, live gegen echtes
+sql.js-WASM) — keine Diskrepanz zu `node:sqlite` gefunden, sauber.
+Danach Challenges 22–22.1 ergänzt und decken B3 (DQL-Kern) komplett ab —
+`logical-operators` als eigenes Thema (eine Bonusregel mit AND/OR/NOT
+in einer geklammerten Bedingung) und `coalesce-nullif`
+(`COALESCE(NULLIF(...), ...)` gegen zwei Arten von "fehlend": echtes
+NULL und einen Platzhalter-Text). Der Rest dieses Abschnitts ist der
+historische Stand vor diesen Updates; die Bilanz am Ende ist bereits
+aktualisiert.*
 
-Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (69 Challenges)
+Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (71 Challenges)
 folgende **nicht** ab — das ist die eigentliche Planungs-Nutzlast dieses
 Dokuments:
 
@@ -525,8 +534,12 @@ Zeitpunkt der größte offene Zweig im gesamten Projekt.
 
 **B2 DML:** `upsert-on-conflict`.
 
-**B3 DQL:** `logical-operators` als **eigenes** Thema (wird implizit
-verwendet, nie explizit erklärt), `coalesce-nullif`.
+**B3 DQL:** ~~`logical-operators` als **eigenes** Thema (wird implizit
+verwendet, nie explizit erklärt), `coalesce-nullif`.~~ — **seit
+2026-08-09 vollständig abgedeckt** durch Challenge 22
+(`logical-operators`: AND/OR/NOT explizit erklärt und mit einer
+geklammerten Bonusregel geübt) und 22.1 (`coalesce-nullif`:
+`COALESCE(NULLIF(...), ...)` gegen zwei Arten von "fehlend").
 
 **B4 Funktionen:** `math-functions` (`round()`, `abs()`), `cast-conversion`,
 und `string-functions` (`substr()`, `upper()`, `lower()`, `trim()`,
@@ -590,18 +603,18 @@ muss, damit `EXPLAIN QUERY PLAN` von `SCAN` auf `SEARCH ... USING INDEX`
 wechselt, 18.2 lässt den Query-Plan selbst schreiben und lesen.
 
 **Gut abgedeckt:** **B0/B1 Grundlagen & Schema (seit 2026-08-09
-vollständig)**, DML-Kern (ohne Upsert), DQL-Kern fast vollständig,
-Aggregation/Gruppierung, **B6 Joins (seit 2026-08-09 vollständig,
-inklusive SELF/RIGHT/FULL OUTER JOIN)**, **B7 Subqueries (seit
-2026-08-05 vollständig)**, **B9 CTE & Rekursion (seit 2026-08-09
+vollständig)**, DML-Kern (ohne Upsert), **B3 DQL-Kern (seit 2026-08-09
+vollständig)**, Aggregation/Gruppierung, **B6 Joins (seit 2026-08-09
+vollständig, inklusive SELF/RIGHT/FULL OUTER JOIN)**, **B7 Subqueries
+(seit 2026-08-05 vollständig)**, **B9 CTE & Rekursion (seit 2026-08-09
 vollständig, jetzt inklusive Traversierung echter Hierarchien)**,
 **B10 Fensterfunktionen (seit 2026-08-07 vollständig)**, **B11
 Transaktionen (seit 2026-08-08 vollständig)**, **B12 Views (seit
 2026-08-08 abgeschlossen, `create-view` abgedeckt, `updatable-view` als
 dauerhafte Ausnahme)**, **B13 Indizes (seit 2026-08-08 vollständig)**.
 
-**Bilanz:** 72 von 82 Tags sind heute durch mindestens eine Challenge
-abgedeckt (≈ 88 %). Kein Zweig ist mehr zu 100 % Lücke — die einzige
+**Bilanz:** 74 von 82 Tags sind heute durch mindestens eine Challenge
+abgedeckt (≈ 90 %). Kein Zweig ist mehr zu 100 % Lücke — die einzige
 verbleibende Struktur-Lücke ist `updatable-view`, das als dauerhafte
 Scope-Ausnahme dokumentiert ist (nicht als offene Aufgabe).
 
