@@ -125,6 +125,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (C# Challenge 03: B2 vollständig, 15/86) | 91.80 % | 72.92 % | 99.09 % | 91.80 % |
 | 2026-08-09 | HEAD (Live-Bug-Hunt sauber + C# Challenge 04: B3 vollständig, 21/86) | 91.83 % | 72.90 % | 99.09 % | 91.83 % |
 | 2026-08-09 | HEAD (C# Challenge 05: B4 vollständig, 24/86) | 91.87 % | 72.89 % | 99.09 % | 91.87 % |
+| 2026-08-09 | HEAD (C# Challenge 06: B5 vollständig, 28/86) | 91.85 % | 72.88 % | 99.09 % | 91.85 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -2193,3 +2194,51 @@ sondern pro PR direkt in den Checks sichtbar.
   Gate 2 für Challenge 05, beide Distraktoren grün). Volle Testsuite
   899 → 902, alle grün. `typecheck`, `npm run build` grün. `knip`:
   unverändert 10 Funde. Coverage: 91,87 % / 72,89 % / 99,09 % / 91,87 %.
+
+### 2026-08-09 — Stündliche Routine: C# Challenge 06 (B5 vollständig)
+
+- **Umfang:** Baseline sauber (902/902, typecheck/build/knip grün, HEAD
+  `fdf6b67`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. C# hat nach Challenge 01-05
+  klaren Schwung, nächstes begrenztes Increment: B5 (Typumwandlung &
+  Nullability), der nächste offene Zweig nach B4.
+
+- **Content:** Challenge 06 deckt alle 4 Tags aus B5 in einem Durchgang
+  ab: `explicit-type-casting`, `nullable-value-types`,
+  `null-conditional-operator`, `null-coalescing-operator`. Szenario: eine
+  Testauswertung mit roher Punktzahl (per `(int)`-Cast gerundet — schneidet
+  ab, `87.6` wird `87`), einer `int?`-Bonuspunktzahl (`null`, per `??` auf
+  `0` ersetzt) und einem `string?`-Spitznamen (`null`, per `?.` sicher auf
+  `.Length` zugegriffen).
+
+- **Nebenbefund (validate()-Musteränderung, kein Bug im bisherigen
+  Content):** Diese Challenge ist die erste mit einer **legitim leeren
+  Ausgabezeile** (`spitznameLaenge` ist `null`, `Console.WriteLine(null)`
+  gibt eine leere Zeile aus). Das bisherige Muster in allen C#-Challenges,
+  `stdout.split('\n').filter(line => line.length > 0)`, hätte diese Zeile
+  fälschlich verschluckt — es filtert *jede* leere Zeile weg, nicht nur
+  den Trailing-Newline-Artefakt am Stringende. Für Challenge 06 stattdessen
+  `stdout.split('\n').slice(0, -1)` verwendet — entfernt gezielt nur das
+  letzte, durch das abschließende `\n` erzeugte leere Element. Rückwirkend
+  äquivalent zum alten Muster bei allen fünf bisherigen Challenges (keine
+  hatte je eine legitime Leerzeile), also kein Fix an bestehendem Content
+  nötig, aber ein Präzedenzfall für künftige C#-Challenges mit
+  möglicherweise leerer Ausgabe.
+
+- **Drei statt der üblichen zwei Distraktoren:** Alle drei einzeln
+  empirisch gegen den echten `dotnet`-Treiber verifiziert. Fehlender Cast
+  (Compilerfehler CS0266); `.` statt `?.` (kompiliert, stürzt aber zur
+  Laufzeit mit `NullReferenceException` ab — demonstriert die Kernaussage
+  von `?.` an einem echten Absturz statt nur zu behaupten); fehlendes `?`
+  bei der `int?`-Deklaration (zwei Compilerfehler, CS0037 + CS0019, weil
+  ohne Nullable-Markierung weder die `null`-Zuweisung noch die
+  anschließende `??`-Verknüpfung typprüfen).
+
+- **Ergebnis:** C#-Tag-Bilanz 24/86 → 28/86 (≈33 %). B0 bis B5 sind damit
+  vollständig abgedeckt — nächster offener Zweig ist B6 (Kontrollfluss).
+  Build-Größe unverändert (632,33 kB) — Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 279 → 283 (Gate 1 +
+  Gate 2 für Challenge 06, alle drei Distraktoren grün). Volle Testsuite
+  902 → 906, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 91,85 % / 72,88 % / 99,09 % / 91,85 %.

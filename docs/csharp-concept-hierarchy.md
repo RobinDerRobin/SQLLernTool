@@ -656,6 +656,38 @@ vollständig abgedeckt** — B0 bis B4 sind jetzt komplett. Nächster offener
 Zweig: B5 (Typumwandlung & Nullability, nach der Branch-Übersicht in
 Abschnitt 5).*
 
+*Update 2026-08-09 (stündliche Routine, Fortsetzung): Challenge 06
+ergänzt — deckt alle 4 Tags aus B5 (Typumwandlung & Nullability) in
+einem Durchgang ab: `explicit-type-casting`, `nullable-value-types`,
+`null-conditional-operator`, `null-coalescing-operator`. Szenario: eine
+Testauswertung mit roher Punktzahl (per `(int)`-Cast gerundet — schneidet
+ab, `87.6` wird `87`, nicht 88), einer `int?`-Bonuspunktzahl (`null`, per
+`??` auf `0` ersetzt) und einem `string?`-Spitznamen (`null`, per `?.`
+sicher auf `.Length` zugegriffen). Dabei musste `validate()` erstmals
+mit einer **legitim leeren Ausgabezeile** umgehen (`spitznameLaenge` ist
+`null`, `Console.WriteLine(null)` gibt eine leere Zeile aus) — das
+bisherige Muster `stdout.split('\n').filter(line => line.length > 0)`
+hätte diese Zeile fälschlich verschluckt, weil es *jede* leere Zeile
+wegfiltert, nicht nur den einen Trailing-Newline-Artefakt am Stringende.
+Neues Muster stattdessen: `stdout.split('\n').slice(0, -1)` — entfernt
+gezielt nur das letzte, durch das abschließende `\n` erzeugte leere
+Element, lässt aber echte Leerzeilen mitten in der Ausgabe stehen.
+Rückwirkend äquivalent zum alten Muster bei allen bisherigen Challenges
+(keine hatte je eine legitime Leerzeile), aber allgemeiner korrekt.
+Drei statt der üblichen zwei Distraktoren, weil sich hier drei
+unabhängige, alle einzeln empirisch verifizierte Fehlerarten anboten:
+fehlender Cast (Compilerfehler CS0266), `.` statt `?.` (kompiliert,
+stürzt aber zur Laufzeit mit `NullReferenceException` ab — die
+Kernaussage von `?.` an einem echten Absturz demonstriert statt nur
+behauptet), und fehlendes `?` bei der `int?`-Deklaration (zwei
+Compilerfehler, CS0037 + CS0019, weil ohne Nullable-Markierung weder die
+`null`-Zuweisung noch die anschließende `??`-Verknüpfung typprüfen).
+
+**Tag-Bilanz: 28 von 86 (≈ 33 %).** Damit ist **B5 (Typumwandlung &
+Nullability) vollständig abgedeckt** — B0 bis B5 sind jetzt komplett.
+Nächster offener Zweig: B6 (Kontrollfluss, nach der Branch-Übersicht in
+Abschnitt 5).*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt
