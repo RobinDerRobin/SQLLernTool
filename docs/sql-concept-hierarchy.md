@@ -484,18 +484,34 @@ traversiert (ein Organigramm) statt nur Zahlen-/Datumsreihen zu erzeugen
 — inklusive einer mitgezählten Rekursionstiefe als Sicherheitsnetz gegen
 zyklische Daten, da die App selbst eine `WITH RECURSIVE` ohne `WHERE`
 oder `LIMIT` im rekursiven Teil vorab blockiert (`findUnboundedRecursion`)
-und ein reiner Join-basierter Abbruch dafür nicht erkannt wird. Der Rest
-dieses Abschnitts ist der historische Stand vor diesen Updates; die
-Bilanz am Ende ist bereits aktualisiert.*
+und ein reiner Join-basierter Abbruch dafür nicht erkannt wird. Update
+2026-08-09 (stündliche Routine, Fortsetzung): Challenges 20–20.4 ergänzt
+und decken B1 (Schema/DDL) komplett ab — die letzten fünf offenen Tags
+(`default-value-constraint`, `check-constraint`,
+`foreign-key-constraint`, `alter-table`, `drop-table`), zu diesem
+Zeitpunkt der größte offene Zweig im gesamten Projekt (SQL und Python
+zusammen). Dabei einen echten Test-Engine-Bug gefunden und behoben (siehe
+`docs/ui-ux-audit.md`, F-018): `node:sqlite` defaultet
+`PRAGMA foreign_keys` auf ON, `sql.js`/echtes SQLite auf OFF — ohne Fix
+hätte ein Distraktor, der `PRAGMA foreign_keys = ON;` vergisst, in Node
+fälschlich als blockiert gegolten. Der Rest dieses Abschnitts ist der
+historische Stand vor diesen Updates; die Bilanz am Ende ist bereits
+aktualisiert.*
 
-Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (61 Challenges)
+Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (66 Challenges)
 folgende **nicht** ab — das ist die eigentliche Planungs-Nutzlast dieses
 Dokuments:
 
-**B1 Schema:** `default-value-constraint`, `check-constraint`,
+**B1 Schema:** ~~`default-value-constraint`, `check-constraint`,
 `foreign-key-constraint` (der Kurs verknüpft Tabellen nur über zufällig
 passende IDs, deklariert nie einen echten `FOREIGN KEY`), `alter-table`,
-`drop-table`.
+`drop-table`.~~ — **seit 2026-08-09 vollständig abgedeckt** durch
+Challenges 20 (`default-value-constraint`), 20.1 (`check-constraint`),
+20.2 (`foreign-key-constraint`, inklusive `PRAGMA foreign_keys = ON;`
+— SQLite prüft Fremdschlüssel standardmäßig gar nicht), 20.3
+(`alter-table`, gegen "Tabelle löschen und neu anlegen" abgegrenzt) und
+20.4 (`drop-table`, gegen `DELETE FROM` abgegrenzt). War zu diesem
+Zeitpunkt der größte offene Zweig im gesamten Projekt.
 
 **B2 DML:** `upsert-on-conflict`.
 
@@ -558,18 +574,18 @@ zweiten Tabelle, dass der Index gezielt auf die `WHERE`-Spalte zeigen
 muss, damit `EXPLAIN QUERY PLAN` von `SCAN` auf `SEARCH ... USING INDEX`
 wechselt, 18.2 lässt den Query-Plan selbst schreiben und lesen.
 
-**Gut abgedeckt:** B0–B1-Basics (jetzt inklusive `create-index`), DML-Kern
-(ohne Upsert), DQL-Kern fast vollständig, Aggregation/Gruppierung, Joins
-bis `LEFT JOIN`, **B7 Subqueries (seit 2026-08-05 vollständig)**,
-**B9 CTE & Rekursion (seit 2026-08-09 vollständig, jetzt inklusive
-Traversierung echter Hierarchien)**, **B10 Fensterfunktionen (seit
-2026-08-07 vollständig)**, **B11 Transaktionen (seit 2026-08-08
-vollständig)**, **B12 Views (seit 2026-08-08 abgeschlossen, `create-view`
-abgedeckt, `updatable-view` als dauerhafte Ausnahme)**, **B13 Indizes
-(seit 2026-08-08 vollständig)**.
+**Gut abgedeckt:** **B0/B1 Grundlagen & Schema (seit 2026-08-09
+vollständig)**, DML-Kern (ohne Upsert), DQL-Kern fast vollständig,
+Aggregation/Gruppierung, Joins bis `LEFT JOIN`, **B7 Subqueries (seit
+2026-08-05 vollständig)**, **B9 CTE & Rekursion (seit 2026-08-09
+vollständig, jetzt inklusive Traversierung echter Hierarchien)**,
+**B10 Fensterfunktionen (seit 2026-08-07 vollständig)**, **B11
+Transaktionen (seit 2026-08-08 vollständig)**, **B12 Views (seit
+2026-08-08 abgeschlossen, `create-view` abgedeckt, `updatable-view` als
+dauerhafte Ausnahme)**, **B13 Indizes (seit 2026-08-08 vollständig)**.
 
-**Bilanz:** 64 von 82 Tags sind heute durch mindestens eine Challenge
-abgedeckt (≈ 78 %). Kein Zweig ist mehr zu 100 % Lücke — die einzige
+**Bilanz:** 69 von 82 Tags sind heute durch mindestens eine Challenge
+abgedeckt (≈ 84 %). Kein Zweig ist mehr zu 100 % Lücke — die einzige
 verbleibende Struktur-Lücke ist `updatable-view`, das als dauerhafte
 Scope-Ausnahme dokumentiert ist (nicht als offene Aufgabe).
 

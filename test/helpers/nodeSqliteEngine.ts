@@ -35,8 +35,20 @@ function bigIntToNumber(value: unknown): unknown {
  * This is what the automated challenge-runner test suite (and everything
  * else in test/) uses instead of loading the WASM build in every test run.
  */
+/**
+ * node:sqlite defaults `PRAGMA foreign_keys` to ON — a Node-specific deviation from real SQLite
+ * (and sql.js, compiled from the standard amalgamation), both of which default it OFF unless a
+ * connection explicitly turns it on. Without this, a challenge/distractor involving FOREIGN KEY
+ * would silently behave differently here than in the actual browser app. Applied on both initial
+ * construction and reset() so it holds across `engine.reset()` calls between test cases too.
+ */
+function withSqliteDefaults(db: DatabaseSyncCtor): void {
+  db.exec('PRAGMA foreign_keys = OFF;');
+}
+
 export function createNodeSqliteEngine(): SqlEngine {
   let db = new DatabaseSync(':memory:');
+  withSqliteDefaults(db);
 
   function exec(sql: string): SqlResultSet[] {
     const results: SqlResultSet[] = [];
@@ -79,6 +91,7 @@ export function createNodeSqliteEngine(): SqlEngine {
   function reset(): void {
     db.close();
     db = new DatabaseSync(':memory:');
+    withSqliteDefaults(db);
   }
 
   return { exec, getTablesInfo, reset };

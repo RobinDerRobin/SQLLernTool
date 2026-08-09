@@ -51,6 +51,7 @@ wie gut das jeweils testabgedeckt ist.
 | F-015 | Coverage-Lücke | Mittel | `pythonResultsArea.ts` (10 % Statements, 0 % Functions) hatte überhaupt keine Testdatei — obwohl es der komplette Render-Pfad für jedes Python-Ergebnis ist (Status, stdout, Variablen-Tabelle) und mehrfach `escapeHtml` auf nutzergenerierten Inhalt anwendet (stdout, Variablennamen, JSON-stringifizierte Werte). Beim Nachprüfen: keine XSS-Lücke gefunden, alle Stellen escapen bereits korrekt — aber komplett unabgesichert gegen eine künftige Regression. | ✅ Fixed | `pythonResultsArea.test.ts` (11 neue Tests): Error/Success/Warn-Status, leere stdout/Variablen als Empty-State, `result: null` ohne Fehler, Escaping von stdout/Variablennamen/verschachtelten JSON-Werten, `renderPythonLoadingOutcome`. |
 | F-016 | Bug | Mittel | `test/helpers/nodePythonEngine.ts` (der Node-Testmotor für Python-Content, benutzt von `challengeRunner.test.ts` für Gate 1/Gate 2) spawnte den `python3`-Subprozess ohne `cwd` — der Subprozess erbte das cwd des Test-Runners selbst (das Repo-Root), statt im isolierten Temp-Verzeichnis zu laufen, das für die Treiber-/User-Code-Dateien bereits verwendet wurde. Jede Challenge, deren Python-Code eine relative Datei öffnet (`open("notizen.txt", "w")`), schrieb dadurch echte Dateien ins Repo-Arbeitsverzeichnis statt in den isolierten Temp-Ordner — entdeckt live beim ersten Testlauf der neuen B13-Dateizugriff-Challenges (17–17.2): `liste.txt`, `log.txt`, `notizen.txt` tauchten als unversionierte Dateien im Repo-Root auf, inhaltlich sogar über mehrere Testläufe hinweg akkumuliert (kein Reset zwischen Läufen, weil `rmSync` nur den eigentlich ungenutzten Temp-Ordner löschte). | ✅ Fixed | `spawnSync(..., { cwd: dir })` gesetzt, damit relative Dateipfade im Testcode in den bereits vorhandenen, per `rmSync` aufgeräumten Temp-Ordner zeigen. Neuer Regressionstest in `nodePythonEngine.test.ts` (`isolates relative-path file I/O to a temp dir instead of the process cwd`) — schreibt eine Datei per Python-Code und prüft explizit `existsSync(join(process.cwd(), "notizen.txt")) === false`; vor dem Fix rot reproduziert (per `git stash` auf die alte Implementierung), nach dem Fix grün. Leere Dateien aus dem Repo-Root entfernt, nie committet. |
 | F-017 | Bug | Niedrig | `editorTab.ts`: der Leerzustand vor dem ersten „Ausführen" zeigte auf **beiden** Tracks immer den SQL-Text „Noch keine Query ausgeführt." — obwohl Toolbar-Label und die Python-spezifische Ergebnis-Darstellung an anderer Stelle bereits track-bewusst sind. Gefunden bei einem gezielten Live-Playwright-Durchlauf, der zwischen SQL- und Python-Kurs wechselt und den DOM vor dem ersten Run vergleicht. | ✅ Fixed | Neue Funktion `emptyResultsPlaceholder(trackId)`; ein neuer Test in `editorTab.test.ts` (vor dem Fix rot reproduziert, danach grün) prüft für beide Tracks den korrekten Text. Live im Browser gegen beide Tracks bestätigt. |
+| F-018 | Bug | Mittel | `test/helpers/nodeSqliteEngine.ts` (der Node-Testmotor für SQL-Content, benutzt von `challengeRunner.test.ts` für Gate 1/Gate 2) übernahm stillschweigend `node:sqlite`s eigenen Default für `PRAGMA foreign_keys` (**ON**) — echtes SQLite und `sql.js` (der Browser-Motor, den die App tatsächlich nutzt) defaulten dagegen beide auf **OFF**. Entdeckt beim Entwurf der neuen `foreign-key-constraint`-Challenge (20.2): ein Distraktor, der `PRAGMA foreign_keys = ON;` vergisst, hätte in Node fälschlich trotzdem FK-Verletzungen abgelehnt (weil `node:sqlite` sie ohnehin immer prüft), im echten Browser aber nicht — der Gate-2-Test hätte also einen Distraktor "bestätigt fehlschlagend" gemeldet, der im echten Produkt tatsächlich durchgekommen wäre. Kein Bestandscontent betroffen (FOREIGN KEY wurde vorher nirgends im Kurs verwendet), aber eine echte Falle für jeden künftigen FK-Content. | ✅ Fixed | `PRAGMA foreign_keys = OFF;` explizit nach jedem `new DatabaseSync(...)` (Konstruktion und `reset()`) gesetzt, um `node:sqlite` auf denselben Default wie sql.js/echtes SQLite zu bringen. Manuell verifiziert: ohne PRAGMA-ON-Zeile im Testcode wird eine ungültige FK-Referenz jetzt (korrekterweise) nicht mehr abgelehnt; mit `PRAGMA foreign_keys = ON;` weiterhin doch. Kein bestehender Test verließ sich auf das alte (falsche) Default-Verhalten — volle Suite weiterhin grün. |
 
 **Hinweis zu 0%-Dateien in der Coverage:** `ProgressStore.ts`, `Runtime.ts`,
 `SqlEngine.ts`, `editorBridge.ts`, `LanguagePlugin.ts`, `PythonRuntime.ts`
@@ -90,6 +91,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (C# Schritt 5: Content-Track-Scaffold, unregistriert) | 92.15 % | 73.82 % | 99.01 % | 92.15 % |
 | 2026-08-09 | HEAD (C# Schritt 6: Node-Testmotor für CI) | 92.15 % | 73.82 % | 99.01 % | 92.15 % |
 | 2026-08-09 | HEAD (SQL B9 CTE & Rekursion abgeschlossen: 19-19.1) | 92.12 % | 73.84 % | 99.02 % | 92.12 % |
+| 2026-08-09 | HEAD (SQL B1 Schema/DDL abgeschlossen: 20-20.4, F-018 Fix) | 91.91 % | 73.28 % | 99.03 % | 91.91 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -1361,3 +1363,80 @@ sondern pro PR direkt in den Checks sichtbar.
   99,01 % → 99,02 % Functions. `knip` bestätigt: keine neuen toten
   Exporte durch diese Änderung (nur die bereits akzeptierten,
   unveränderten Funde).
+
+### 2026-08-09 — Stündliche Routine: SQL B1 (Schema/DDL) abgeschlossen + F-018 (node:sqlite-Engine-Bug)
+
+- **Umfang:** Baseline geprüft (818/818 grün, `typecheck` und
+  `npm run build` sauber). Nach dem Abschluss von B9 in der letzten
+  Routine ist B1 (Schema/DDL) jetzt der Zweig mit den meisten offenen
+  Tags im gesamten Projekt (SQL und Python zusammen): 5 von 10 Tags
+  (`default-value-constraint`, `check-constraint`,
+  `foreign-key-constraint`, `alter-table`, `drop-table`) — größer als
+  jeder verbleibende Python- oder sonstige SQL-Zweig.
+- **Vorgehen:** Fünf neue Challenges (20–20.4), jede vorab empirisch
+  gegen `node:sqlite` verifiziert (Lösung UND jeder Distraktor):
+  - **20** (`default-value-constraint`): `DEFAULT 0` in der
+    Spaltendefinition. Validator prüft nicht nur den sichtbaren
+    Zeilenwert, sondern über `PRAGMA table_info` auch, dass `DEFAULT`
+    tatsächlich im Schema steht — ein Distraktor, der denselben
+    sichtbaren Wert stattdessen per explizitem INSERT erzeugt, besteht
+    den reinen Ergebnisvergleich, scheitert aber am Schema-Check.
+  - **20.1** (`check-constraint`): `CHECK (preis > 0)`. Validator prüft
+    den gültigen Datensatz und **probiert zusätzlich selbst** einen
+    ungültigen INSERT (preis = -1) innerhalb von `validate()` — schlägt
+    der Probe-INSERT nicht fehl, ist die CHECK-Bedingung nicht
+    (ausreichend) vorhanden. Wichtige Einschränkung dabei entdeckt und
+    berücksichtigt: `executeAndValidate` bricht bei jedem Statement-Fehler
+    sofort ab und ruft `validate()` gar nicht erst auf — eine Challenge,
+    deren *gradierte* SQL selbst einen erwarteten Fehler auslösen soll,
+    ist mit der aktuellen Ausführungssemantik architektonisch nicht
+    möglich. Die Probe muss deshalb aus `validate()` selbst kommen, nicht
+    aus der Lösung.
+  - **20.2** (`foreign-key-constraint`): Hier der eigentliche Fund dieser
+    Runde (siehe F-018 unten) — `node:sqlite` (der Node-Testmotor)
+    defaultet `PRAGMA foreign_keys` auf **ON**, echtes SQLite/`sql.js`
+    (der Browser-Motor) auf **OFF**. Ohne den Fix hätte ein Distraktor,
+    der `PRAGMA foreign_keys = ON;` vergisst, in Node fälschlich als
+    "korrekt blockiert" durchgegangen, im echten Browser aber nicht
+    geblockt — eine stille Divergenz zwischen Test und Produkt, die erst
+    bei echtem FK-Content sichtbar geworden wäre. Nach dem Fix (siehe
+    unten): Lösung aktiviert `PRAGMA foreign_keys = ON;` explizit (eine
+    für SQLite untypische, aber reale Eigenheit, die die Challenge selbst
+    jetzt auch lehrt), Validator probiert wie bei 20.1 einen ungültigen
+    Fremdschlüssel-INSERT.
+  - **20.3** (`alter-table`): `ALTER TABLE ... ADD COLUMN` auf eine
+    bereits bestehende, per `setup` befüllte Tabelle. Validator prüft,
+    dass die neue Spalte existiert **und** die vorherige Zeile weiterhin
+    da ist. Distraktor: `DROP TABLE` + `CREATE TABLE` neu — hat zwar am
+    Ende dieselbe Spalte, aber die ursprüngliche Zeile ist weg (empirisch
+    bestätigt).
+  - **20.4** (`drop-table`): `DROP TABLE` gegen `DELETE FROM` abgegrenzt
+    — Validator prüft `sqlite_master` direkt (kein Eintrag mehr), nicht
+    nur die Zeilenzahl. Distraktor `DELETE FROM temp_report;` leert die
+    Tabelle, lässt sie aber in `sqlite_master` bestehen.
+
+  **F-018 gefunden und behoben:** `test/helpers/nodeSqliteEngine.ts`
+  gab bisher `node:sqlite`s eigenen `PRAGMA foreign_keys`-Default
+  (ON) ungefiltert durch, statt ihn auf denselben Default wie `sql.js`/
+  echtes SQLite (OFF) zu bringen — betraf bisher keinen bestehenden
+  Content (FOREIGN KEY wurde vorher nirgends im Kurs verwendet), wäre
+  aber für jede künftige FK-Challenge eine stille Falle gewesen. Fix:
+  `PRAGMA foreign_keys = OFF;` explizit nach jeder `DatabaseSync`-
+  Konstruktion (Erststart und `reset()`) gesetzt. Manuell mit zwei
+  Vitest-Fällen verifiziert (ohne `PRAGMA ON` bleibt eine ungültige
+  FK-Referenz jetzt unblockiert, mit `PRAGMA ON` wird sie geblockt) —
+  entspricht jetzt exakt dem in Challenge 20.2 verifizierten Verhalten.
+- **Ergebnis:** Ein echter Engine-Parität-Bug gefunden und behoben
+  (F-018), bevor er sich in Content hätte festsetzen können. SQL-Tag-
+  Bilanz: 64/82 → 69/82 (≈ 84 %). B1 (Schema/DDL) ist damit der vierte
+  vollständig geschlossene SQL-Zweig in dieser Session (nach B7, B9,
+  B10 sowie B11–B13). Verbleibende SQL-Lücken: nur noch B3 (2 Tags), B4
+  (3), B6 (3), B8 (3) — jeweils kleiner als B1 vorher — plus die
+  dauerhafte Scope-Ausnahme `updatable-view`.
+- **Tests:** 818 → 828 (+10: Gate 1 + Gate 2 für die fünf neuen
+  Challenges). `typecheck`, volle Testsuite (828 Tests) und
+  `npm run build` grün. Coverage: 92,12 % → 91,91 % Statements (der
+  Nenner wächst schneller als die neu gedeckten Zeilen — üblich bei
+  reinem Content-Wachstum mit mehreren Fehlerzweigen pro Validator),
+  73,84 % → 73,28 % Branches, 99,02 % → 99,03 % Functions. `knip`
+  bestätigt: keine neuen toten Exporte.
