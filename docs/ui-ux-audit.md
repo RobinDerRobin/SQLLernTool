@@ -118,6 +118,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (F-021/F-022: Ergebnis-Tabelle unerreichbar + iOS-Zoom im Editor) | 91.81 % | 73.15 % | 99.06 % | 91.81 % |
 | 2026-08-09 | HEAD (SQL B8 Mengenoperationen abgeschlossen: 24-24.2) | 91.76 % | 73.05 % | 99.06 % | 91.76 % |
 | 2026-08-09 | HEAD (Python B2/B5/B6 Restlücken abgeschlossen: 20-20.3) | 91.77 % | 72.88 % | 99.07 % | 91.77 % |
+| 2026-08-09 | HEAD (SQL upsert-on-conflict abgeschlossen: 25) | 91.72 % | 72.81 % | 99.08 % | 91.72 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -1824,3 +1825,50 @@ sondern pro PR direkt in den Checks sichtbar.
   (dieselben strukturellen Interfaces wie zuvor, kein neuer durch reinen
   Content). Coverage: 91,77 % / 72,88 % / 99,07 % / 91,77 % (marginal
   verschoben durch neue, größtenteils gut getestete Validator-Zweige).
+
+### 2026-08-09 — Stündliche Routine: SQL upsert-on-conflict abgeschlossen (81/82, letzter aktionabler Tag)
+
+- **Umfang:** Nach den vorherigen Durchgängen (SQL B8, Python B2/B5/B6)
+  war `upsert-on-conflict` (B2 DML) der letzte noch offene, aktionable Tag
+  in SQL oder Python überhaupt — jeder andere offene Tag in beiden
+  Dokumenten ist eine permanente Scope-Ausnahme (`updatable-view` in SQL,
+  `own-modules` in Python), keine offene Aufgabe. Challenge 25 geschrieben
+  und registriert.
+
+- **Content:** Lager-Szenario (`lagerbestand`, PRIMARY KEY auf `sku`), das
+  in einem einzigen `INSERT` beide Upsert-Pfade gleichzeitig zeigt: eine
+  neue Lieferung für einen **bekannten** Artikel (`A100`) löst per
+  `ON CONFLICT(sku) DO UPDATE SET menge = menge + excluded.menge` eine
+  Bestandserhöhung statt eines Fehlers aus, während ein **neuer** Artikel
+  (`B200`) im selben Statement ganz normal eingefügt wird — beide Pfade
+  in einer Abfrage, kein künstlich getrenntes Beispiel.
+
+- **Distraktoren:** Beide empirisch mit `node:sqlite` verifiziert, bevor
+  geschrieben:
+  1. Kein `ON CONFLICT` — wirft einen echten `UNIQUE constraint
+     failed`-Fehler. Da `executeAndValidate` (`src/runtime/sql/
+     executeAndValidate.ts`) bei einem SQL-Fehler sofort `{ok: false,
+     error: ...}` zurückgibt, bevor `validate()` überhaupt aufgerufen
+     wird, erfüllt ein werfender Distraktor Gate 2 automatisch — ein
+     bestätigtes, wiederverwendbares Muster für Constraint-Verletzungen
+     als Distraktor.
+  2. `SET menge = excluded.menge` (überschreiben) statt `SET menge =
+     menge + excluded.menge` (addieren) — liefert A100 fälschlich mit
+     menge=15 statt der erwarteten 35, weil der alte Bestand verloren
+     geht. Ein echter, lehrreicher Upsert-Fallstrick (Ersetzen vs.
+     Addieren via `excluded`).
+
+- **Ergebnis:** Letzter aktionabler SQL-Tag geschlossen — 81 von 82 (nur
+  noch die permanente `updatable-view`-Ausnahme offen). SQL und Python
+  liegen jetzt praktisch gleichauf (81/82 bzw. 81/82), beide mit
+  ausschließlich permanenten Scope-Ausnahmen als Rest-Lücke. Die C#-Spur
+  (`docs/csharp-engine-poc.md`, Schritt 7: echte Challenges) ist damit
+  der einzige verbleibende Content-Umfang mit noch aktionablen Lücken.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 259 → 262 (Gate 1 +
+  Gate 2 für Challenge 25 grün, inklusive der beiden empirisch
+  verifizierten Distraktoren). Volle Testsuite 866 → 869, alle grün.
+  `typecheck`, `npm run build` grün. `knip`: unverändert 10 Funde
+  (dieselben strukturellen Interfaces, kein neuer Fund durch reinen
+  Content). Coverage: 91,72 % / 72,81 % / 99,08 % / 91,72 % (marginal
+  verschoben, reine Content-Ergänzung ohne Engine-Code-Änderung).

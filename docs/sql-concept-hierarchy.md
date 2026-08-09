@@ -520,9 +520,20 @@ Kontobewegungen), `string-functions` (`SUBSTR(UPPER(TRIM(...)))` für
 Produktcodes) und `cast-conversion` (`CAST(... AS INTEGER)` gegen eine
 als TEXT gespeicherte Gehaltsspalte, mit Daten, bei denen ein reiner
 Textvergleich nachweislich ein anderes, falsches Ergebnis liefert).
-SQL liegt damit erstmals gleichauf mit Python (beide 77/82). Der Rest
-dieses Abschnitts ist der historische Stand vor diesen Updates; die
-Bilanz am Ende ist bereits aktualisiert.*
+SQL liegt damit erstmals gleichauf mit Python (beide 77/82). Update
+2026-08-09 (stündliche Routine, Fortsetzung): Challenges 19–19.1 (B9),
+20–20.4 (B1), 21–21.2 (B6), 22–22.1 (B3), 23–23.2 (B4) und 24–24.2 (B8)
+brachten SQL zwischenzeitlich auf 80/82. Diese Routine schließt jetzt den
+letzten offenen aktionablen Tag: Challenge 25 (`upsert-on-conflict`) —
+ein Lager-Szenario, das in einem `INSERT` sowohl den Update-Pfad
+(bekannter Artikel: Bestand addiert, nicht überschrieben) als auch den
+Insert-Pfad (neuer Artikel) zeigt, mit zwei Distraktoren (fehlendes
+`ON CONFLICT` wirft einen echten `UNIQUE`-Fehler; `menge = excluded.menge`
+überschreibt statt zu addieren). **Damit ist jeder aktionable SQL-Tag
+abgedeckt — 81 von 82, nur noch die permanente Scope-Ausnahme
+`updatable-view` bleibt offen.** Der Rest dieses Abschnitts ist der
+historische Stand vor diesen Updates; die Bilanz am Ende ist bereits
+aktualisiert.*
 
 Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (74 Challenges)
 folgende **nicht** ab — das ist die eigentliche Planungs-Nutzlast dieses
@@ -539,7 +550,14 @@ Challenges 20 (`default-value-constraint`), 20.1 (`check-constraint`),
 20.4 (`drop-table`, gegen `DELETE FROM` abgegrenzt). War zu diesem
 Zeitpunkt der größte offene Zweig im gesamten Projekt.
 
-**B2 DML:** `upsert-on-conflict`.
+**B2 DML:** ~~`upsert-on-conflict`.~~ — **seit 2026-08-09 abgedeckt**
+durch Challenge 25 (`INSERT ... ON CONFLICT(sku) DO UPDATE SET
+menge = menge + excluded.menge` — ein Lager-Szenario, das in einem
+einzigen `INSERT` sowohl den Update- als auch den Insert-Pfad zeigt: ein
+bekannter Artikel wird per Upsert addiert, ein neuer normal eingefügt).
+Damit ist **jeder aktionable SQL-Tag abgedeckt** — der einzige noch
+offene Tag ist die permanente Scope-Ausnahme `updatable-view` (B12,
+siehe Abschnitt 7).
 
 **B3 DQL:** ~~`logical-operators` als **eigenes** Thema (wird implizit
 verwendet, nie explizit erklärt), `coalesce-nullif`.~~ — **seit
@@ -616,8 +634,9 @@ muss, damit `EXPLAIN QUERY PLAN` von `SCAN` auf `SEARCH ... USING INDEX`
 wechselt, 18.2 lässt den Query-Plan selbst schreiben und lesen.
 
 **Gut abgedeckt:** **B0/B1 Grundlagen & Schema (seit 2026-08-09
-vollständig)**, DML-Kern (ohne Upsert), **B3 DQL-Kern (seit 2026-08-09
-vollständig)**, **B4 Funktionen (seit 2026-08-09 vollständig)**,
+vollständig)**, **B2 DML (seit 2026-08-09 vollständig, inklusive
+Upsert)**, **B3 DQL-Kern (seit 2026-08-09 vollständig)**, **B4 Funktionen
+(seit 2026-08-09 vollständig)**,
 Aggregation/Gruppierung, **B6 Joins (seit 2026-08-09 vollständig,
 inklusive SELF/RIGHT/FULL OUTER JOIN)**, **B7 Subqueries (seit
 2026-08-05 vollständig)**, **B8 Mengenoperationen (seit 2026-08-09
@@ -628,11 +647,11 @@ Transaktionen (seit 2026-08-08 vollständig)**, **B12 Views (seit
 2026-08-08 abgeschlossen, `create-view` abgedeckt, `updatable-view` als
 dauerhafte Ausnahme)**, **B13 Indizes (seit 2026-08-08 vollständig)**.
 
-**Bilanz:** 80 von 82 Tags sind heute durch mindestens eine Challenge
-abgedeckt (≈ 98 %). Die einzigen noch offenen Tags sind `upsert-on-conflict`
-(B2 DML) — und die permanente Scope-Ausnahme `updatable-view` (B12 Views),
-die aufgrund von SQLites Trigger-Anforderung nicht implementierbar ist
-(siehe Abschnitt 7). Kein Zweig ist mehr eine strukturelle Lücke.
+**Bilanz:** 81 von 82 Tags sind heute durch mindestens eine Challenge
+abgedeckt (≈ 99 %). Der einzige noch offene Tag ist die permanente
+Scope-Ausnahme `updatable-view` (B12 Views), die aufgrund von SQLites
+Trigger-Anforderung nicht implementierbar ist (siehe Abschnitt 7) — jeder
+aktionable Tag ist abgedeckt, kein Zweig ist mehr eine strukturelle Lücke.
 
 ## 7. Bewusst ausgeklammert
 
