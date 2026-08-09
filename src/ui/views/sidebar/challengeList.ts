@@ -5,7 +5,7 @@ import { makeProgressKey } from '../../../domain/progress/progressKey';
 import type { AppContext } from '../../context';
 import { mountView } from '../../mount';
 import { renderResultGlyph, renderStars } from '../../render/format';
-import { playChallenge, selectChallenge } from '../../state/actions';
+import { playChallenge, selectChallenge, toggleSidebar } from '../../state/actions';
 import type { AppState } from '../../state/appState';
 import { getCourseChallenges, getDefaultTrackAndCourse } from '../../state/challengeLookup';
 import type { PlayResult } from '../../state/sessionState';
@@ -88,6 +88,22 @@ function renderRow(row: ChallengeRow): string {
     </li>`;
 }
 
+// Must match src/theme/themes.css's `@media (max-width: 760px)` sidebar-overlay
+// breakpoint. Below it the sidebar becomes a fixed overlay drawer with a backdrop
+// (see sidebarShell.ts) — without closing it here, selecting a challenge would
+// leave the drawer covering the task/editor content the selection was supposed
+// to reveal, forcing an extra manual close tap before the user can see anything.
+const MOBILE_SIDEBAR_BREAKPOINT_QUERY = '(max-width: 760px)';
+
+function closeSidebarIfMobileOverlay(ctx: AppContext): void {
+  // jsdom (used by this file's own tests) doesn't implement matchMedia — treat
+  // "can't tell" the same as "not mobile" rather than throwing.
+  if (typeof window.matchMedia !== 'function') return;
+  if (!window.matchMedia(MOBILE_SIDEBAR_BREAKPOINT_QUERY).matches) return;
+  if (ctx.store.getState().progress.app.sidebarCollapsed) return;
+  toggleSidebar(ctx);
+}
+
 export function mountChallengeList(root: HTMLElement, ctx: AppContext): Unsubscribe {
   return mountView(
     root,
@@ -114,6 +130,7 @@ export function mountChallengeList(root: HTMLElement, ctx: AppContext): Unsubscr
           }
 
           selectChallenge(ctx, trackId, courseId, num);
+          closeSidebarIfMobileOverlay(ctx);
         });
 
         // Keyboard equivalent of clicking a row. Scoped to keydown events whose
@@ -130,6 +147,7 @@ export function mountChallengeList(root: HTMLElement, ctx: AppContext): Unsubscr
           const num = target.dataset.num;
           if (!trackId || !courseId || !num) return;
           selectChallenge(ctx, trackId, courseId, num);
+          closeSidebarIfMobileOverlay(ctx);
         });
       },
     },

@@ -13,6 +13,18 @@ wie gut das jeweils testabgedeckt ist.
    laden von einem CDN — in Sandboxen ohne Zugriff auf cdnjs per
    `page.route()` lokal aus dem npm-Paket `sql.js` servieren, siehe
    Vorgehen in dieser PR-Historie.
+   **Standing requirement (seit 2026-08-09): mindestens ein schmaler
+   Viewport (`newContext({ viewport: { width: 375, height: 667 } })`,
+   iPhone-SE-Breite) gehört zu jedem Live-Playwright-Durchlauf, nicht
+   nur Desktop-Breite** — die Desktop-only-Durchläufe der letzten
+   Routinen hätten F-020 (Sidebar-Overlay blockiert Inhalt nach Auswahl
+   auf Mobile) nie gefunden. Mindestens prüfen: horizontales Overflow
+   (`document.documentElement.scrollWidth > clientWidth` sollte immer
+   `false` sein), dass die Sidebar-Drawer nach einer Auswahl nicht
+   liegen bleibt und den Hauptinhalt verdeckt, und dass Tabs/Run-Button
+   nach einer Interaktion tatsächlich klickbar sind (nicht nur laut
+   `isVisible()`, das reine Overlap-/Z-Index-Verdeckung nicht erkennt —
+   ein echter `.click()`-Versuch deckt das auf, siehe F-020).
 2. Findings gegen die Tabelle unten prüfen: schon bekannt (Status
    aktualisieren) oder neu (neue Zeile, neue ID `F-0xx`)?
 3. Für jedes neue Finding vor dem Fix kurz durchdenken: was genau ist der
@@ -53,6 +65,7 @@ wie gut das jeweils testabgedeckt ist.
 | F-017 | Bug | Niedrig | `editorTab.ts`: der Leerzustand vor dem ersten „Ausführen" zeigte auf **beiden** Tracks immer den SQL-Text „Noch keine Query ausgeführt." — obwohl Toolbar-Label und die Python-spezifische Ergebnis-Darstellung an anderer Stelle bereits track-bewusst sind. Gefunden bei einem gezielten Live-Playwright-Durchlauf, der zwischen SQL- und Python-Kurs wechselt und den DOM vor dem ersten Run vergleicht. | ✅ Fixed | Neue Funktion `emptyResultsPlaceholder(trackId)`; ein neuer Test in `editorTab.test.ts` (vor dem Fix rot reproduziert, danach grün) prüft für beide Tracks den korrekten Text. Live im Browser gegen beide Tracks bestätigt. |
 | F-018 | Bug | Mittel | `test/helpers/nodeSqliteEngine.ts` (der Node-Testmotor für SQL-Content, benutzt von `challengeRunner.test.ts` für Gate 1/Gate 2) übernahm stillschweigend `node:sqlite`s eigenen Default für `PRAGMA foreign_keys` (**ON**) — echtes SQLite und `sql.js` (der Browser-Motor, den die App tatsächlich nutzt) defaulten dagegen beide auf **OFF**. Entdeckt beim Entwurf der neuen `foreign-key-constraint`-Challenge (20.2): ein Distraktor, der `PRAGMA foreign_keys = ON;` vergisst, hätte in Node fälschlich trotzdem FK-Verletzungen abgelehnt (weil `node:sqlite` sie ohnehin immer prüft), im echten Browser aber nicht — der Gate-2-Test hätte also einen Distraktor "bestätigt fehlschlagend" gemeldet, der im echten Produkt tatsächlich durchgekommen wäre. Kein Bestandscontent betroffen (FOREIGN KEY wurde vorher nirgends im Kurs verwendet), aber eine echte Falle für jeden künftigen FK-Content. | ✅ Fixed | `PRAGMA foreign_keys = OFF;` explizit nach jedem `new DatabaseSync(...)` (Konstruktion und `reset()`) gesetzt, um `node:sqlite` auf denselben Default wie sql.js/echtes SQLite zu bringen. Manuell verifiziert: ohne PRAGMA-ON-Zeile im Testcode wird eine ungültige FK-Referenz jetzt (korrekterweise) nicht mehr abgelehnt; mit `PRAGMA foreign_keys = ON;` weiterhin doch. Kein bestehender Test verließ sich auf das alte (falsche) Default-Verhalten — volle Suite weiterhin grün. |
 | F-019 | Bug | Hoch | `test/helpers/nodeSqliteEngine.ts` las SELECT-Zeilen über `node:sqlite`s `prepared.all()` **ohne** `setReturnArrays(true)` — die Methode liefert dann Zeilen als Objekte, die pro **Spaltenname** (nicht pro Spaltenposition) indiziert sind. Eine Abfrage, die zwei gleichnamige Spalten aus verschiedenen Tabellen selektiert (z. B. ein unaliaster Self-Join `SELECT a.name, b.name FROM t a, t b`, oder jeder JOIN zweier Tabellen mit gemeinsamem Spaltennamen ohne `AS`) kollabierte dadurch beide Werte auf denselben (den zuletzt geschriebenen) — der andere ging spurlos verloren, obwohl `SqlResultSet.columns` beide Spaltennamen korrekt zweimal auflistete. `sqlJsEngine.ts` (der echte Browser-Motor) liest Zeilen dagegen schon immer positionsbasiert über `stmt.get()` und war nie betroffen — reiner Node-Testmotor-Bug, live beim Schreiben des Validators für die neue `right-join`-Challenge (21.1) entdeckt: eine unabhängige Nachrechnung mit zwei `k.name`/`p.name`-Spalten lieferte in der Prüfung für beide Spalten denselben Wert. | ✅ Fixed | `prepared.setReturnArrays(true)` gesetzt, sodass Zeilen wie bei sql.js positionsbasiert (Array) statt namensbasiert (Objekt) gelesen werden. Neuer Regressionstest in `nodeSqliteEngine.test.ts` (`keeps both values distinct when a join selects two columns with the same name`) — vor dem Fix per `git stash` auf die alte Implementierung rot reproduziert (beide Werte kollabierten auf "Ben"), nach dem Fix grün. |
+| F-020 | Bug | Hoch | Auf schmalen Viewports (≤760px, `challengeList.ts` + `sidebarShell.ts`s mobiles Sidebar-Overlay) blieb die Sidebar-Drawer nach Auswahl einer Challenge **offen** liegen, statt sich zu schließen — sie deckte dabei (fixed position, z-index 41, mit Backdrop) den kompletten Hauptinhalt ab, inklusive Tabs und Editor. Ein Tap auf eine Challenge zeigte dadurch scheinbar nichts (der Nutzer musste erst manuell den Toggle-Button oder den Backdrop antippen, um die Drawer zu schließen, bevor er die Aufgabe überhaupt sehen konnte) — auf Desktop-Breite unsichtbar, da die Sidebar dort permanent als Flow-Element neben dem Inhalt steht, nie als Overlay. Gefunden beim ersten gezielten Live-Playwright-Durchlauf mit einem schmalen Viewport (375px) seit langer Zeit — ein realer `page.locator(...).click()`-Versuch auf den Task-Tab schlug mit "element intercepts pointer events" fehl, weil die (fälschlich offene) Sidebar darüber lag. | ✅ Fixed | `challengeList.ts`: Nach `selectChallenge(...)` (Maus-Klick und Enter/Space) wird jetzt `closeSidebarIfMobileOverlay(ctx)` aufgerufen — schließt die Sidebar nur, wenn `window.matchMedia('(max-width: 760px)').matches` (identischer Breakpoint wie `themes.css`) und sie aktuell nicht schon eingeklappt ist. `window.matchMedia` existiert in jsdom nicht — defensiv mit `typeof window.matchMedia !== 'function'` abgefangen, statt zu werfen. 4 neue Tests in `challengeList.test.ts` (schließt bei schmalem Viewport, bleibt offen bei breitem Viewport, kein redundanter Toggle bei bereits eingeklappter Sidebar, schließt auch bei Tastatur-Auswahl). Live gegen den echten Dev-Server bei 375×667 bestätigt: Sidebar-Klasse wechselt nach Auswahl zu `sidebar collapsed`, Task-Tab/Editor/Run-Button danach tatsächlich klickbar, kein horizontales Overflow, keine Konsolenfehler. |
 
 **Hinweis zu 0%-Dateien in der Coverage:** `ProgressStore.ts`, `Runtime.ts`,
 `SqlEngine.ts`, `editorBridge.ts`, `LanguagePlugin.ts`, `PythonRuntime.ts`
@@ -96,6 +109,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (SQL B6 Joins abgeschlossen: 21-21.2, F-019 Fix) | 91.89 % | 73.34 % | 99.04 % | 91.89 % |
 | 2026-08-09 | HEAD (Live-Bug-Hunt sauber + SQL B3 DQL abgeschlossen: 22-22.1) | 91.86 % | 73.23 % | 99.05 % | 91.86 % |
 | 2026-08-09 | HEAD (SQL B4 Funktionen abgeschlossen: 23-23.2) | 91.80 % | 73.06 % | 99.06 % | 91.80 % |
+| 2026-08-09 | HEAD (F-020 Fix: Mobile-Sidebar-Overlay blockierte Inhalt nach Auswahl) | 91.81 % | 73.15 % | 99.06 % | 91.81 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -1616,3 +1630,56 @@ sondern pro PR direkt in den Checks sichtbar.
   `npm run build` grün. Coverage: 91,86 % → 91,80 % Statements,
   73,23 % → 73,06 % Branches, 99,05 % → 99,06 % Functions. `knip`
   bestätigt: keine neuen toten Exporte.
+
+### 2026-08-09 — Stündliche Routine: F-020 (Mobile-Sidebar-Overlay blockierte Inhalt)
+
+- **Umfang:** Auf Nutzeranfrage mitten im Durchgang ("integrate mobile
+  compatibility into the requirements") die Mobile-Kompatibilität
+  gezielt geprüft — ein Bereich, der in den letzten Routinen nicht mehr
+  aktiv live getestet wurde (der letzte Mobile-Check liegt mehrere
+  Routinen zurück, siehe Durchgang „Bug-Hunt (nichts gefunden) + C#
+  Schritt 4"). Als direkte Konsequenz Abschnitt „Wie ein neuer Durchgang
+  abläuft" oben um einen Standing-Requirement-Absatz ergänzt: jeder
+  künftige Live-Playwright-Durchlauf muss mindestens einen schmalen
+  Viewport (375×667) einschließen, nicht nur Desktop-Breite.
+- **Vorgehen:** Playwright mit `newContext({ viewport: { width: 375,
+  height: 667 } })` gegen den echten Dev-Server (lokales sql.js statt
+  CDN, wie gewohnt). Ein Durchklick-Skript (Challenge auswählen → Task-
+  Tab → Editor-Tab → Run) schlug beim `.click()` auf den Task-Tab mit
+  "element intercepts pointer events" fehl — ein Debug-Skript mit
+  Screenshots und Bounding-Boxes zeigte: die Sidebar-Klasse blieb nach
+  der Challenge-Auswahl bei `sidebar` (nicht `sidebar collapsed`), die
+  fixed-position Drawer (z-index 41, mit Backdrop) lag also weiterhin
+  über dem kompletten Hauptinhalt. `challengeList.ts`s Klick-/Tastatur-
+  Handler riefen nur `selectChallenge(...)` auf, nie `toggleSidebar(...)`
+  — die Sidebar hatte offenbar nie eine Auto-Close-bei-Auswahl-Logik für
+  schmale Viewports, obwohl `sidebarShell.ts` bereits einen Backdrop-
+  Klick-Handler zum manuellen Schließen kennt.
+
+  Fix: `closeSidebarIfMobileOverlay(ctx)` in `challengeList.ts` — schließt
+  die Sidebar nur, wenn `window.matchMedia('(max-width: 760px)').matches`
+  (identischer Breakpoint wie `themes.css`) und sie nicht schon
+  eingeklappt ist, aufgerufen nach jeder `selectChallenge(...)` (Maus UND
+  Tastatur). `window.matchMedia` existiert in jsdom (der Testumgebung
+  dieser Datei) nicht — mit einer `typeof`-Prüfung defensiv abgefangen,
+  statt beim ersten Testlauf zu werfen (was tatsächlich passierte, bevor
+  der Guard ergänzt wurde — 3 bestehende Tests liefen initial rot). 4
+  neue Tests in `challengeList.test.ts` mit gemocktem `window.matchMedia`
+  decken alle vier Fälle ab (schmal+offen → schließt, breit+offen →
+  bleibt offen, schmal+schon-geschlossen → kein redundanter Toggle,
+  Tastatur-Auswahl schließt ebenfalls). Fix danach live gegen den echten
+  Dev-Server bei 375×667 erneut bestätigt: kompletter Durchklick
+  (Auswahl → Task-Tab → Lösung einfügen → Editor-Tab → Run) funktioniert
+  jetzt fehlerfrei, kein horizontales Overflow, keine Konsolenfehler.
+- **Ergebnis:** Ein echter, nutzerseitig blockierender Mobile-Bug
+  gefunden und behoben (F-020) — auf einem echten Telefon hätte das
+  Antippen einer Challenge scheinbar nichts bewirkt, bis man zufällig
+  den richtigen Ort zum Schließen der Drawer gefunden hätte. Betraf
+  vermutlich die App seit Einführung des Sidebar-Overlays selbst (Task
+  #1 der Projekt-Historie), da nie mit einem echten schmalen Viewport
+  bis zum Ende durchgeklickt wurde.
+- **Tests:** 845 → 849 (+4 für den neuen Mobile-Close-Regressionsschutz).
+  `typecheck`, volle Testsuite (849 Tests) und `npm run build` grün.
+  Coverage: 91,80 % → 91,81 % Statements, 73,06 % → 73,15 % Branches,
+  99,06 % Functions unverändert. `knip` bestätigt: keine neuen toten
+  Exporte.

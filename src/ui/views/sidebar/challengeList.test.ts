@@ -34,6 +34,9 @@ describe('mountChallengeList', () => {
   });
 
   afterEach(() => {
+    // jsdom has no real matchMedia — undo any per-test mock so it doesn't leak
+    // into tests that rely on the (unmocked) "not a function" fallback path.
+    Reflect.deleteProperty(window, 'matchMedia');
     document.body.innerHTML = '';
   });
 
@@ -140,6 +143,54 @@ describe('mountChallengeList', () => {
     playBtn.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 
     expect(ctx.store.getState().session.selection).toBeNull();
+  });
+
+  function mockMatchMedia(matches: boolean): void {
+    window.matchMedia = vi.fn().mockReturnValue({ matches }) as unknown as typeof window.matchMedia;
+  }
+
+  it('closes the (expanded) sidebar drawer after selecting a challenge on a narrow viewport', () => {
+    mockMatchMedia(true);
+    const ctx = makeCtx();
+    mountChallengeList(root, ctx);
+
+    root.querySelector('[data-num="1.1"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(ctx.store.getState().session.selection?.challengeNum).toBe('1.1');
+    expect(ctx.store.getState().progress.app.sidebarCollapsed).toBe(true);
+  });
+
+  it('leaves the sidebar alone when selecting a challenge on a wide (desktop) viewport', () => {
+    mockMatchMedia(false);
+    const ctx = makeCtx();
+    mountChallengeList(root, ctx);
+
+    root.querySelector('[data-num="1.1"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(ctx.store.getState().progress.app.sidebarCollapsed).toBe(false);
+  });
+
+  it('does not re-collapse an already-collapsed sidebar on a narrow viewport (no redundant toggle)', () => {
+    mockMatchMedia(true);
+    let progress = createDefaultProgressState();
+    progress = { ...progress, app: { ...progress.app, sidebarCollapsed: true } };
+    const ctx = makeCtx(progress);
+    mountChallengeList(root, ctx);
+
+    root.querySelector('[data-num="1.1"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(ctx.store.getState().progress.app.sidebarCollapsed).toBe(true);
+  });
+
+  it('also closes the mobile sidebar drawer when selecting a challenge via keyboard (Enter)', () => {
+    mockMatchMedia(true);
+    const ctx = makeCtx();
+    mountChallengeList(root, ctx);
+    const item = root.querySelector('[data-num="1.1"]') as HTMLElement;
+
+    item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    expect(ctx.store.getState().progress.app.sidebarCollapsed).toBe(true);
   });
 
   it('re-renders when the underlying challenge-list signature changes, not on unrelated state changes', () => {
