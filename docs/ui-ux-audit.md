@@ -1904,10 +1904,14 @@ sondern pro PR direkt in den Checks sichtbar.
     Gate-1/Gate-2-Harness für den C#-Track, async `it()`-Callbacks
     (einziger struktureller Unterschied zu `describeSqlCourse`/
     `describePythonCourse`).
-  - Challenge 01 (`Console.WriteLine`, deckt `console-write-line`,
+  - Challenge 01 (`Console.WriteLine`, deckt alle 5 B0-Tags ab —
+    `program-execution-model` und `comments` im Tutorial-Text erklärt,
+    genau wie Pythons Challenge 01 Kommentare nur im Tutorial einführt;
     `top-level-statements`, `function-call-syntax`,
-    `member-access-dot-syntax` ab — B0+B1 komplett). `validate()` prüft
-    exakte Zeilentrennung des stdout, nicht nur Teilstring-Enthaltensein:
+    `member-access-dot-syntax` direkt über die zwei `Console.WriteLine(...)`-
+    Aufrufe — plus den einzigen B1-Tag `console-write-line`: B0+B1 damit
+    komplett, 6 Tags). `validate()` prüft exakte Zeilentrennung des stdout,
+    nicht nur Teilstring-Enthaltensein:
     ein reiner `.includes()`-Check hätte den `Console.Write`-statt-
     `WriteLine`-Distraktor fälschlich bestehen lassen, weil beide
     erwarteten Texte auch ohne Zeilenumbruch dazwischen als Teilstrings
@@ -1923,7 +1927,7 @@ sondern pro PR direkt in den Checks sichtbar.
     Live-Playwright-Test möglich, da C# noch nicht in der Kurs-Auswahl der
     UI erscheint — nur Node-seitig (Gate 1/2) verifiziert.
 
-- **Ergebnis:** C#-Tag-Bilanz bewegt sich erstmals: 0/86 → 4/86 (≈5 %),
+- **Ergebnis:** C#-Tag-Bilanz bewegt sich erstmals: 0/86 → 6/86 (≈7 %),
   B0 (Grundlagen) und B1 (Ausgabe) komplett abgedeckt. Build-Größe
   unverändert (631.73 kB) — bestätigt, dass der unregistrierte Track
   weiterhin nicht ins Live-Bundle gezogen wird.

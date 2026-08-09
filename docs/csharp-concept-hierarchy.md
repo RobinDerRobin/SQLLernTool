@@ -542,10 +542,14 @@ Pythons `executeAndValidate.ts` — `CSharpRuntime.exec()` ist ein echter
 `await`, anders als die synchronen SQL-/Python-Engines) und
 `describeCSharpCourse` in `test/content/challengeRunner.test.ts` (async
 `it()`-Callbacks, sonst identisches Gate-1/Gate-2-Muster). Challenge 01
-(`console-write-line` + `top-level-statements`, `function-call-syntax`,
-`member-access-dot-syntax` implizit über die zwei `Console.WriteLine(...)`-
-Aufrufe) deckt damit die ersten 4 Tags ab — analog zu SQL Challenge 01 und
-Python Challenge 01. `validate()` folgt dem in Schritt 4 entschiedenen
+deckt alle 5 Tags aus B0 ab (`program-execution-model` und `comments` im
+Tutorial-Text erklärt — analog zu Pythons Challenge 01, die Kommentare
+ebenfalls nur im Tutorial einführt, nicht im geforderten Code;
+`top-level-statements`, `function-call-syntax` und
+`member-access-dot-syntax` direkt über die zwei `Console.WriteLine(...)`-
+Aufrufe) sowie den einzigen Tag aus B1 (`console-write-line`) — macht B0
+und B1 beide vollständig, 6 Tags insgesamt. `validate()` folgt dem in
+Schritt 4 entschiedenen
 stdout-only-Muster, prüft aber exakte Zeilentrennung (nicht nur
 Teilstring-Enthaltensein): der Distraktor (`Console.Write` statt
 `Console.WriteLine`) erzeugt sonst zufällig einen String, der beide
@@ -559,7 +563,7 @@ Schema-Check diese Challenge nicht automatisch — ein eigener Test in
 `course.test.ts` übernimmt das stattdessen direkt gegen
 `csharpChallengeSchema`.
 
-**Tag-Bilanz: 4 von 86 (≈ 5 %).** Erster inhaltlicher Fortschritt seit
+**Tag-Bilanz: 6 von 86 (≈ 7 %).** Erster inhaltlicher Fortschritt seit
 Beginn dieses Dokuments — B0 (Grundlagen) und B1 (Ausgabe) sind damit
 komplett abgedeckt.*
 
