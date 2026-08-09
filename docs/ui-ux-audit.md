@@ -120,6 +120,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (Python B2/B5/B6 Restlücken abgeschlossen: 20-20.3) | 91.77 % | 72.88 % | 99.07 % | 91.77 % |
 | 2026-08-09 | HEAD (SQL upsert-on-conflict abgeschlossen: 25) | 91.72 % | 72.81 % | 99.08 % | 91.72 % |
 | 2026-08-09 | HEAD (Live-Bug-Hunt sauber + C# Schritt 7 gestartet: Challenge 01) | 91.76 % | 72.87 % | 99.08 % | 91.76 % |
+| 2026-08-09 | HEAD (C# Challenge 02: B2-Grundtypen, int/double-Division) | 91.79 % | 72.86 % | 99.08 % | 91.79 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -1936,3 +1937,44 @@ sondern pro PR direkt in den Checks sichtbar.
   Gate 1/2-Tests). Volle Testsuite 869 → 876, alle grün. `typecheck`,
   `npm run build` grün. `knip`: unverändert 10 Funde. Coverage: 91,76 % /
   72,87 % / 99,08 % / 91,76 %.
+
+### 2026-08-09 — Stündliche Routine: C# Challenge 02 (B2-Grundtypen)
+
+- **Umfang:** SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen), kein neuer Bug im letzten Live-Bug-Hunt gefunden — C# hat nach
+  dem vorherigen Durchgang (Plumbing + Challenge 01) klaren Schwung, also
+  ein weiteres begrenztes Increment: Challenge 02 für B2 (Variablen &
+  Typen).
+
+- **Content:** Szenario "7 Äpfel auf 2 Personen aufteilen" — deckt 6 der
+  9 B2-Tags in einem Durchgang ab: `static-typing-concept`,
+  `typed-variable-declaration`, `int-type`, `double-type`, `string-type`,
+  `bool-type`. Zeigt dabei einen echten C#-Stolperstein: `int`-Division
+  rundet immer ab (`7 / 2` → `3`), auch wenn das Ergebnis in eine
+  `double`-Variable geschrieben wird — erst wenn mindestens ein Operand
+  selbst `double` ist (`7.0 / 2.0` → `3.5`), wird tatsächlich genau
+  gerechnet.
+
+- **Design-Hürde vor dem Schreiben erkannt und umgangen:** Ein erster
+  Entwurf (jeden Typ mit einem passenden Wert deklarieren, direkt
+  ausgeben) wurde verworfen, nachdem eine Live-Probe zeigte: `string x =
+  "25";` und `int x = 25;` erzeugen über `Console.WriteLine` **denselben**
+  stdout ("25\n") — `ToString()` macht den Typunterschied unsichtbar,
+  sobald nur der reine Wert ausgegeben wird. Weil C#s `validate()`
+  ausschließlich stdout-basiert ist (Schritt-4-Entscheidung, kein
+  Variablen-Dict wie bei Python), musste die Aufgabe so konstruiert
+  werden, dass ein falscher Typ nachweislich einen **anderen Wert**
+  produziert — die int/double-Divisions-Aufgabe leistet das. Beide
+  Distraktoren (fehlendes `.0`; falscher `bool`-Wert) vor dem Schreiben
+  empirisch mit dem echten `dotnet`-Treiber verifiziert.
+
+- **Ergebnis:** C#-Tag-Bilanz 6/86 → 12/86 (≈14 %). `char-type`,
+  `var-type-inference`, `constants-readonly` bleiben als B2-Rest offen
+  (bewusst nicht mit untergebracht, um die Challenge nicht zu
+  überladen). Build-Größe weiterhin unverändert (631.73 kB) — Track
+  bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 264 → 270 (Gate 1 +
+  Gate 2 für Challenge 02, beide Distraktoren grün). Volle Testsuite
+  876 → 879, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 91,79 % / 72,86 % / 99,08 % / 91,79 %.

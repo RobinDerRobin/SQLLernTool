@@ -567,6 +567,31 @@ Schema-Check diese Challenge nicht automatisch — ein eigener Test in
 Beginn dieses Dokuments — B0 (Grundlagen) und B1 (Ausgabe) sind damit
 komplett abgedeckt.*
 
+*Update 2026-08-09 (stündliche Routine, Fortsetzung): Challenge 02 ergänzt
+— deckt 6 der 9 Tags aus B2 (Variablen & Typen) ab: `static-typing-concept`,
+`typed-variable-declaration`, `int-type`, `double-type`, `string-type`,
+`bool-type`. Szenario: 7 Äpfel auf 2 Personen aufteilen, in einem
+Durchgang alle vier Grundtypen. Zeigt dabei einen echten C#-Stolperstein
+konkret: `int`-Division rundet immer ab (`7 / 2` → `3`), selbst wenn das
+Ergebnis danach in eine `double`-Variable geschrieben wird — nur wenn
+mindestens ein Operand selbst schon `double` ist (`7.0 / 2.0` → `3.5`),
+wird tatsächlich genau gerechnet. `validate()` ist stdout-only (Schritt-4-
+Entscheidung) und musste deshalb bewusst um dieses Verhalten herum
+konstruiert werden: ein erster Entwurf (Typ + Wert einfach ausgeben, ohne
+weitere Rechnung) wurde vor dem Schreiben verworfen, weil eine als
+`string` statt `int` deklarierte Zahl (<code>string x = "25";</code>)
+denselben stdout wie ein `int` erzeugt — <code>ToString()</code> macht
+den Typunterschied unsichtbar, sobald nur der reine Wert ausgegeben wird.
+Die int/double-Divisions-Aufgabe umgeht das, weil die beiden Typen dabei
+nachweislich **unterschiedliche Werte** produzieren, nicht nur denselben
+Wert in unterschiedlicher Verpackung. Beide Distraktoren (fehlendes `.0`
+bei der Division; falscher `bool`-Wert) vor dem Schreiben empirisch mit
+dem echten `dotnet`-Treiber verifiziert, nicht nur angenommen.
+
+**Tag-Bilanz: 12 von 86 (≈ 14 %).** `char-type`, `var-type-inference` und
+`constants-readonly` bleiben als Rest von B2 offen — bewusst nicht in
+derselben Challenge mit untergebracht, um sie nicht zu überladen.*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt
