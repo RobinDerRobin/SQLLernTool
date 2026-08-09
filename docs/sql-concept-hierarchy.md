@@ -494,11 +494,21 @@ zusammen). Dabei einen echten Test-Engine-Bug gefunden und behoben (siehe
 `docs/ui-ux-audit.md`, F-018): `node:sqlite` defaultet
 `PRAGMA foreign_keys` auf ON, `sql.js`/echtes SQLite auf OFF — ohne Fix
 hätte ein Distraktor, der `PRAGMA foreign_keys = ON;` vergisst, in Node
-fälschlich als blockiert gegolten. Der Rest dieses Abschnitts ist der
-historische Stand vor diesen Updates; die Bilanz am Ende ist bereits
-aktualisiert.*
+fälschlich als blockiert gegolten. Update 2026-08-09 (stündliche
+Routine, Fortsetzung): Challenges 21–21.2 ergänzt und decken B6 (Joins)
+komplett ab — `self-join`, `right-join`, `full-outer-join`, vorab in
+beiden Motoren (`sql.js` 3.45.0, `node:sqlite` 3.51.2) empirisch
+verifiziert. Dabei einen zweiten echten Test-Engine-Bug in derselben
+Datei gefunden und behoben (siehe `docs/ui-ux-audit.md`, F-019):
+`node:sqlite`s `prepared.all()` liefert Zeilen ohne
+`setReturnArrays(true)` namensbasiert statt positionsbasiert — zwei
+gleichnamige Spalten aus verschiedenen Tabellen (z. B. ein unaliaster
+Self-Join) kollabierten dadurch stillschweigend auf einen Wert, obwohl
+`sql.js` (der echte Browser-Motor) davon nie betroffen war. Der Rest
+dieses Abschnitts ist der historische Stand vor diesen Updates; die
+Bilanz am Ende ist bereits aktualisiert.*
 
-Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (66 Challenges)
+Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (69 Challenges)
 folgende **nicht** ab — das ist die eigentliche Planungs-Nutzlast dieses
 Dokuments:
 
@@ -523,7 +533,12 @@ und `string-functions` (`substr()`, `upper()`, `lower()`, `trim()`,
 `replace()` — der Kurs nutzt nur den `||`-Operator, keine dieser Funktionen
 taucht in einer der 41 Challenges auf).
 
-**B6 Joins:** `self-join`, `right-join`, `full-outer-join`.
+**B6 Joins:** ~~`self-join`, `right-join`, `full-outer-join`.~~ —
+**seit 2026-08-09 vollständig abgedeckt** durch Challenge 21
+(`self-join`, ein Organigramm mit zwei Aliassen derselben Tabelle),
+21.1 (`right-join`, direkte Fortsetzung von Kapitel 10.1 mit
+vertauschter Blickrichtung) und 21.2 (`full-outer-join`, kombiniert
+unmatched Zeilen von beiden Seiten anhand einer verwaisten Bestellung).
 
 **B7 Subqueries:** ~~komplett nicht abgedeckt~~ — **seit 2026-08-05
 vollständig abgedeckt** durch Challenges 14 (`scalar-subquery`), 14.1
@@ -576,7 +591,8 @@ wechselt, 18.2 lässt den Query-Plan selbst schreiben und lesen.
 
 **Gut abgedeckt:** **B0/B1 Grundlagen & Schema (seit 2026-08-09
 vollständig)**, DML-Kern (ohne Upsert), DQL-Kern fast vollständig,
-Aggregation/Gruppierung, Joins bis `LEFT JOIN`, **B7 Subqueries (seit
+Aggregation/Gruppierung, **B6 Joins (seit 2026-08-09 vollständig,
+inklusive SELF/RIGHT/FULL OUTER JOIN)**, **B7 Subqueries (seit
 2026-08-05 vollständig)**, **B9 CTE & Rekursion (seit 2026-08-09
 vollständig, jetzt inklusive Traversierung echter Hierarchien)**,
 **B10 Fensterfunktionen (seit 2026-08-07 vollständig)**, **B11
@@ -584,8 +600,8 @@ Transaktionen (seit 2026-08-08 vollständig)**, **B12 Views (seit
 2026-08-08 abgeschlossen, `create-view` abgedeckt, `updatable-view` als
 dauerhafte Ausnahme)**, **B13 Indizes (seit 2026-08-08 vollständig)**.
 
-**Bilanz:** 69 von 82 Tags sind heute durch mindestens eine Challenge
-abgedeckt (≈ 84 %). Kein Zweig ist mehr zu 100 % Lücke — die einzige
+**Bilanz:** 72 von 82 Tags sind heute durch mindestens eine Challenge
+abgedeckt (≈ 88 %). Kein Zweig ist mehr zu 100 % Lücke — die einzige
 verbleibende Struktur-Lücke ist `updatable-view`, das als dauerhafte
 Scope-Ausnahme dokumentiert ist (nicht als offene Aufgabe).
 

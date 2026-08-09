@@ -35,6 +35,20 @@ describe('createNodeSqliteEngine', () => {
     expect(() => engine.exec('SELEKT * FROM nope;')).toThrow();
   });
 
+  it('keeps both values distinct when a join selects two columns with the same name (e.g. an unaliased self-join)', () => {
+    const engine = createNodeSqliteEngine();
+    engine.exec(
+      "CREATE TABLE t (id INTEGER, name TEXT); INSERT INTO t VALUES (1, 'Anna'), (2, 'Ben');",
+    );
+    const results = engine.exec('SELECT a.name, b.name FROM t a, t b WHERE a.id = 1 AND b.id = 2;');
+    expect(results).toEqual([
+      {
+        columns: ['name', 'name'],
+        values: [['Anna', 'Ben']],
+      },
+    ]);
+  });
+
   it('getTablesInfo() lists table name, columns with their types, and row count', () => {
     const engine = createNodeSqliteEngine();
     engine.exec("CREATE TABLE users (id INTEGER, name TEXT); INSERT INTO users VALUES (1, 'a'), (2, 'b');");

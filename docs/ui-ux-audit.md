@@ -52,6 +52,7 @@ wie gut das jeweils testabgedeckt ist.
 | F-016 | Bug | Mittel | `test/helpers/nodePythonEngine.ts` (der Node-Testmotor für Python-Content, benutzt von `challengeRunner.test.ts` für Gate 1/Gate 2) spawnte den `python3`-Subprozess ohne `cwd` — der Subprozess erbte das cwd des Test-Runners selbst (das Repo-Root), statt im isolierten Temp-Verzeichnis zu laufen, das für die Treiber-/User-Code-Dateien bereits verwendet wurde. Jede Challenge, deren Python-Code eine relative Datei öffnet (`open("notizen.txt", "w")`), schrieb dadurch echte Dateien ins Repo-Arbeitsverzeichnis statt in den isolierten Temp-Ordner — entdeckt live beim ersten Testlauf der neuen B13-Dateizugriff-Challenges (17–17.2): `liste.txt`, `log.txt`, `notizen.txt` tauchten als unversionierte Dateien im Repo-Root auf, inhaltlich sogar über mehrere Testläufe hinweg akkumuliert (kein Reset zwischen Läufen, weil `rmSync` nur den eigentlich ungenutzten Temp-Ordner löschte). | ✅ Fixed | `spawnSync(..., { cwd: dir })` gesetzt, damit relative Dateipfade im Testcode in den bereits vorhandenen, per `rmSync` aufgeräumten Temp-Ordner zeigen. Neuer Regressionstest in `nodePythonEngine.test.ts` (`isolates relative-path file I/O to a temp dir instead of the process cwd`) — schreibt eine Datei per Python-Code und prüft explizit `existsSync(join(process.cwd(), "notizen.txt")) === false`; vor dem Fix rot reproduziert (per `git stash` auf die alte Implementierung), nach dem Fix grün. Leere Dateien aus dem Repo-Root entfernt, nie committet. |
 | F-017 | Bug | Niedrig | `editorTab.ts`: der Leerzustand vor dem ersten „Ausführen" zeigte auf **beiden** Tracks immer den SQL-Text „Noch keine Query ausgeführt." — obwohl Toolbar-Label und die Python-spezifische Ergebnis-Darstellung an anderer Stelle bereits track-bewusst sind. Gefunden bei einem gezielten Live-Playwright-Durchlauf, der zwischen SQL- und Python-Kurs wechselt und den DOM vor dem ersten Run vergleicht. | ✅ Fixed | Neue Funktion `emptyResultsPlaceholder(trackId)`; ein neuer Test in `editorTab.test.ts` (vor dem Fix rot reproduziert, danach grün) prüft für beide Tracks den korrekten Text. Live im Browser gegen beide Tracks bestätigt. |
 | F-018 | Bug | Mittel | `test/helpers/nodeSqliteEngine.ts` (der Node-Testmotor für SQL-Content, benutzt von `challengeRunner.test.ts` für Gate 1/Gate 2) übernahm stillschweigend `node:sqlite`s eigenen Default für `PRAGMA foreign_keys` (**ON**) — echtes SQLite und `sql.js` (der Browser-Motor, den die App tatsächlich nutzt) defaulten dagegen beide auf **OFF**. Entdeckt beim Entwurf der neuen `foreign-key-constraint`-Challenge (20.2): ein Distraktor, der `PRAGMA foreign_keys = ON;` vergisst, hätte in Node fälschlich trotzdem FK-Verletzungen abgelehnt (weil `node:sqlite` sie ohnehin immer prüft), im echten Browser aber nicht — der Gate-2-Test hätte also einen Distraktor "bestätigt fehlschlagend" gemeldet, der im echten Produkt tatsächlich durchgekommen wäre. Kein Bestandscontent betroffen (FOREIGN KEY wurde vorher nirgends im Kurs verwendet), aber eine echte Falle für jeden künftigen FK-Content. | ✅ Fixed | `PRAGMA foreign_keys = OFF;` explizit nach jedem `new DatabaseSync(...)` (Konstruktion und `reset()`) gesetzt, um `node:sqlite` auf denselben Default wie sql.js/echtes SQLite zu bringen. Manuell verifiziert: ohne PRAGMA-ON-Zeile im Testcode wird eine ungültige FK-Referenz jetzt (korrekterweise) nicht mehr abgelehnt; mit `PRAGMA foreign_keys = ON;` weiterhin doch. Kein bestehender Test verließ sich auf das alte (falsche) Default-Verhalten — volle Suite weiterhin grün. |
+| F-019 | Bug | Hoch | `test/helpers/nodeSqliteEngine.ts` las SELECT-Zeilen über `node:sqlite`s `prepared.all()` **ohne** `setReturnArrays(true)` — die Methode liefert dann Zeilen als Objekte, die pro **Spaltenname** (nicht pro Spaltenposition) indiziert sind. Eine Abfrage, die zwei gleichnamige Spalten aus verschiedenen Tabellen selektiert (z. B. ein unaliaster Self-Join `SELECT a.name, b.name FROM t a, t b`, oder jeder JOIN zweier Tabellen mit gemeinsamem Spaltennamen ohne `AS`) kollabierte dadurch beide Werte auf denselben (den zuletzt geschriebenen) — der andere ging spurlos verloren, obwohl `SqlResultSet.columns` beide Spaltennamen korrekt zweimal auflistete. `sqlJsEngine.ts` (der echte Browser-Motor) liest Zeilen dagegen schon immer positionsbasiert über `stmt.get()` und war nie betroffen — reiner Node-Testmotor-Bug, live beim Schreiben des Validators für die neue `right-join`-Challenge (21.1) entdeckt: eine unabhängige Nachrechnung mit zwei `k.name`/`p.name`-Spalten lieferte in der Prüfung für beide Spalten denselben Wert. | ✅ Fixed | `prepared.setReturnArrays(true)` gesetzt, sodass Zeilen wie bei sql.js positionsbasiert (Array) statt namensbasiert (Objekt) gelesen werden. Neuer Regressionstest in `nodeSqliteEngine.test.ts` (`keeps both values distinct when a join selects two columns with the same name`) — vor dem Fix per `git stash` auf die alte Implementierung rot reproduziert (beide Werte kollabierten auf "Ben"), nach dem Fix grün. |
 
 **Hinweis zu 0%-Dateien in der Coverage:** `ProgressStore.ts`, `Runtime.ts`,
 `SqlEngine.ts`, `editorBridge.ts`, `LanguagePlugin.ts`, `PythonRuntime.ts`
@@ -92,6 +93,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (C# Schritt 6: Node-Testmotor für CI) | 92.15 % | 73.82 % | 99.01 % | 92.15 % |
 | 2026-08-09 | HEAD (SQL B9 CTE & Rekursion abgeschlossen: 19-19.1) | 92.12 % | 73.84 % | 99.02 % | 92.12 % |
 | 2026-08-09 | HEAD (SQL B1 Schema/DDL abgeschlossen: 20-20.4, F-018 Fix) | 91.91 % | 73.28 % | 99.03 % | 91.91 % |
+| 2026-08-09 | HEAD (SQL B6 Joins abgeschlossen: 21-21.2, F-019 Fix) | 91.89 % | 73.34 % | 99.04 % | 91.89 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -1440,3 +1442,75 @@ sondern pro PR direkt in den Checks sichtbar.
   reinem Content-Wachstum mit mehreren Fehlerzweigen pro Validator),
   73,84 % → 73,28 % Branches, 99,02 % → 99,03 % Functions. `knip`
   bestätigt: keine neuen toten Exporte.
+
+### 2026-08-09 — Stündliche Routine: SQL B6 (Joins) abgeschlossen + F-019 (node:sqlite-Engine-Bug, Spaltennamen-Kollision)
+
+- **Umfang:** Baseline geprüft (828/828 grün, `typecheck` und
+  `npm run build` sauber). Nach B1 sind B4, B6 und B8 mit je 3 offenen
+  Tags die größten verbliebenen SQL-Zweige (gleichauf); B6 (Joins)
+  gewählt, da `self-join`/`right-join`/`full-outer-join` inhaltlich
+  direkt aufeinander aufbauen und beide restlichen Motoren (`sql.js`
+  3.45.0, `node:sqlite` 3.51.2) vorab empirisch auf RIGHT-/FULL-OUTER-
+  JOIN-Unterstützung geprüft wurden (beide unterstützen sie seit
+  SQLite 3.39 — kein Wiederholungsrisiko wie bei F-018).
+- **Vorgehen:** Drei neue Challenges (21–21.2), jede vorab empirisch
+  gegen `node:sqlite` **und** `sql.js` verifiziert (Lösung UND jeder
+  Distraktor, in beiden Motoren identisch):
+  - **21** (`self-join`): Organigramm-Tabelle mit `manager_id`, zwei
+    Aliasse derselben Tabelle. Bewusst als Kontrast zur rekursiven CTE
+    aus 19.1 im Tutorial erklärt (eine Ebene statt Traversierung der
+    ganzen Kette). Validator berechnet die erwarteten Mitarbeiter-
+    Manager-Paare aus der rohen Tabelle in TypeScript (kein zweiter
+    Self-Join), Distraktor joint `e.id = m.id` (jeder auf sich selbst).
+  - **21.1** (`right-join`): direkte Fortsetzung von Kapitel 10.1
+    (`LEFT JOIN`) mit vertauschter Blickrichtung — eine Kategorie ohne
+    Produkt muss trotzdem erscheinen. Validator rechnet unabhängig über
+    einen `LEFT JOIN` mit vertauschten Tabellen nach (RIGHT JOIN
+    `produkte RIGHT JOIN kategorien` ≡ LEFT JOIN `kategorien LEFT JOIN
+    produkte`), nicht über denselben RIGHT JOIN. Distraktor nutzt LEFT
+    JOIN mit unveränderter Tabellenreihenfolge — verliert die leere
+    Kategorie.
+  - **21.2** (`full-outer-join`): kombiniert unmatched Zeilen von
+    beiden Seiten (Kunde ohne Bestellung UND eine verwaiste Bestellung
+    mit nicht existierender kunde_id). Validator rechnet unabhängig
+    über `LEFT JOIN` + `NOT EXISTS`-Anti-Join zusammen nach, nicht über
+    denselben FULL OUTER JOIN. Distraktor nutzt LEFT JOIN — verliert
+    die verwaiste Bestellung.
+
+  **F-019 gefunden und behoben, mitten im Schreiben von 21.1:** Der
+  erste Testlauf des RIGHT-JOIN-Validators lieferte für beide erwarteten
+  Spalten (`k.name`, `p.name`) denselben Wert — der Validator selbst
+  rechnet unabhängig über `SELECT k.name, p.name FROM kategorien k LEFT
+  JOIN produkte p ...` nach, zwei gleichnamige Spalten ohne Alias.
+  Ursache: `test/helpers/nodeSqliteEngine.ts` las Zeilen bisher über
+  `node:sqlite`s `prepared.all()` **ohne** `setReturnArrays(true)` —
+  diese Methode liefert Zeilen dann als Objekte, indiziert nach
+  **Spaltenname**, nicht nach Position. Zwei Spalten mit demselben Namen
+  (hier: zwei `name`-Spalten aus verschiedenen Tabellen) kollabieren
+  dabei auf einen einzigen Objekt-Key — der zweite Wert überschreibt den
+  ersten spurlos, obwohl `SqlResultSet.columns` beide Namen weiterhin
+  korrekt zweimal auflistet. `sql.js` (der echte Browser-Motor) liest
+  Zeilen dagegen schon immer positionsbasiert über `stmt.get()` und war
+  nie betroffen. Das ist kein Nischenfall: jeder unaliaste Self-Join
+  (genau wie Challenge 21, hätte deren Validator ebenfalls unaliast
+  nachgerechnet) oder Join zweier Tabellen mit gemeinsamem Spaltennamen
+  ohne `AS` wäre in Node-Tests bisher stillschweigend falsch geprüft
+  worden. Fix: `prepared.setReturnArrays(true)` gesetzt, Zeilen jetzt
+  wie bei sql.js positionsbasiert gelesen. Regressionstest in
+  `nodeSqliteEngine.test.ts` (vor dem Fix per `git stash` rot
+  reproduziert — beide Werte kollabierten auf den zweiten von zwei
+  echten Namen —, danach grün).
+- **Ergebnis:** Ein zweiter echter Engine-Parität-Bug in derselben
+  Datei innerhalb von zwei Routinen gefunden und behoben (F-019, nach
+  F-018) — beide durch dieselbe Disziplin aufgefallen: jeden neuen
+  Validator sofort gegen die echten Motoren laufen lassen, statt der
+  Node-Implementierung blind zu vertrauen. SQL-Tag-Bilanz: 69/82 →
+  72/82 (≈ 88 %). B6 (Joins) ist damit der fünfte vollständig
+  geschlossene SQL-Zweig in dieser Session. Verbleibende SQL-Lücken:
+  nur noch B3 (2 Tags), B4 (3), B8 (3) — jeweils kleiner oder gleich B6
+  vorher — plus die dauerhafte Scope-Ausnahme `updatable-view`.
+- **Tests:** 828 → 835 (+6 Gate 1/Gate 2 für die drei neuen Challenges,
+  +1 Regressionstest für F-019). `typecheck`, volle Testsuite (835
+  Tests) und `npm run build` grün. Coverage: 91,91 % → 91,89 %
+  Statements, 73,28 % → 73,34 % Branches, 99,03 % → 99,04 % Functions.
+  `knip` bestätigt: keine neuen toten Exporte.

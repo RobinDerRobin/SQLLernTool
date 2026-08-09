@@ -28,14 +28,6 @@ function bigIntToNumber(value: unknown): unknown {
 }
 
 /**
- * Test-only SqlEngine backed by Node's built-in SQLite (`node:sqlite`),
- * behind the exact same interface the browser's sql.js adapter implements.
- * Chosen over better-sqlite3 because it ships with Node itself — no native
- * compiler (Visual Studio Build Tools on Windows) required to install it.
- * This is what the automated challenge-runner test suite (and everything
- * else in test/) uses instead of loading the WASM build in every test run.
- */
-/**
  * node:sqlite defaults `PRAGMA foreign_keys` to ON — a Node-specific deviation from real SQLite
  * (and sql.js, compiled from the standard amalgamation), both of which default it OFF unless a
  * connection explicitly turns it on. Without this, a challenge/distractor involving FOREIGN KEY
@@ -46,6 +38,14 @@ function withSqliteDefaults(db: DatabaseSyncCtor): void {
   db.exec('PRAGMA foreign_keys = OFF;');
 }
 
+/**
+ * Test-only SqlEngine backed by Node's built-in SQLite (`node:sqlite`),
+ * behind the exact same interface the browser's sql.js adapter implements.
+ * Chosen over better-sqlite3 because it ships with Node itself — no native
+ * compiler (Visual Studio Build Tools on Windows) required to install it.
+ * This is what the automated challenge-runner test suite (and everything
+ * else in test/) uses instead of loading the WASM build in every test run.
+ */
 export function createNodeSqliteEngine(): SqlEngine {
   let db = new DatabaseSync(':memory:');
   withSqliteDefaults(db);
@@ -58,6 +58,13 @@ export function createNodeSqliteEngine(): SqlEngine {
 
       const prepared = db.prepare(stmt.text);
       prepared.setReadBigInts(true);
+      // Rows are read positionally (arrays), not by column name (objects) — a query
+      // joining two tables that share a column name (e.g. `SELECT a.name, b.name ...`,
+      // exactly what an unaliased self-join or join produces) would otherwise silently
+      // collapse both columns into a single name-keyed value, since object keys can't
+      // hold two "name" entries. sql.js's real adapter (sqlJsEngine.ts) already reads
+      // rows positionally via `stmt.get()`, so this keeps both engines in parity.
+      prepared.setReturnArrays(true);
       const columnMeta = prepared.columns();
       if (columnMeta.length > 0) {
         // A statement that *declares* columns (a SELECT shape) always produces a
@@ -65,8 +72,8 @@ export function createNodeSqliteEngine(): SqlEngine {
         // which the prototype UI relies on to distinguish "no tabular result at
         // all" (e.g. a bare INSERT) from "query ran, but returned 0 rows".
         const columns = columnMeta.map((c) => String(c.name));
-        const rows = prepared.all() as Record<string, unknown>[];
-        const values = rows.map((row) => columns.map((col) => bigIntToNumber(row[col])));
+        const rows = prepared.all() as unknown as unknown[][];
+        const values = rows.map((row) => row.map((cell) => bigIntToNumber(cell)));
         results.push({ columns, values });
       } else {
         prepared.run();
