@@ -488,7 +488,7 @@ und ein reiner Join-basierter Abbruch dafür nicht erkannt wird. Der Rest
 dieses Abschnitts ist der historische Stand vor diesen Updates; die
 Bilanz am Ende ist bereits aktualisiert.*
 
-Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (58 Challenges)
+Von den 82 Tags in diesem Dokument deckt `sqlLernenTool` (61 Challenges)
 folgende **nicht** ab — das ist die eigentliche Planungs-Nutzlast dieses
 Dokuments:
 
