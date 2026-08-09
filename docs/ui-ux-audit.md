@@ -117,6 +117,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (F-020 Fix: Mobile-Sidebar-Overlay blockierte Inhalt nach Auswahl) | 91.81 % | 73.15 % | 99.06 % | 91.81 % |
 | 2026-08-09 | HEAD (F-021/F-022: Ergebnis-Tabelle unerreichbar + iOS-Zoom im Editor) | 91.81 % | 73.15 % | 99.06 % | 91.81 % |
 | 2026-08-09 | HEAD (SQL B8 Mengenoperationen abgeschlossen: 24-24.2) | 91.76 % | 73.05 % | 99.06 % | 91.76 % |
+| 2026-08-09 | HEAD (Python B2/B5/B6 Restlücken abgeschlossen: 20-20.3) | 91.77 % | 72.88 % | 99.07 % | 91.77 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -1785,3 +1786,41 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Ergebnis:** B8 komplett, SQL damit auf 80 von 82 Tags. Challenges 24,
   24.1, 24.2 im Kurs registriert und live gegen dev server verifizierbar
   (incl. mobile 375×667 Viewport).
+
+### 2026-08-09 — Stündliche Routine: Python B2/B5/B6-Restlücken abgeschlossen (81/82)
+
+- **Umfang:** Nach SQL B8 (Mengenoperationen, vorheriger Durchgang) war
+  Python die größere aktionable Lücke: 4 thematisch verstreute Einzeltags
+  in B2/B5/B6, die keiner B14-Abhängigkeit unterlagen (anders als die
+  vorherigen Restlücken in B10/B11), sondern schlicht noch nicht an der
+  Reihe waren. Challenges 20–20.3 geschrieben und registriert.
+
+- **Content:**
+  - 20 (`dynamic-typing`): dieselbe Variable wechselt per Neuzuweisung den
+    Typ (`int` → `str`), geprüft über `type(x).__name__`.
+  - 20.1 (`bool-conversion-truthiness`): `bool(0/""/[])` vs. Werte mit
+    Inhalt — sechs Ausdrücke, alle Falsy-Grundfälle abgedeckt.
+  - 20.2 (`truthiness-in-conditions`): `if liste:` direkt in der Bedingung,
+    ohne `bool()`-Wrapper oder Vergleich — mit einer leeren und einer
+    nicht-leeren Liste, damit beide Zweige tatsächlich geprüft werden.
+  - 20.3 (`ternary-expression`): `x if bedingung else y` als Ein-Zeilen-
+    Ausdruck.
+
+- **Distraktoren:** Alle vier Annahmen vor dem Schreiben mit echtem
+  `python3` verifiziert, nicht nur angenommen — u. a. `[] == True` → `False`
+  bestätigt (Grundlage für den 20.2-Distraktor: `if liste == True:` scheitert
+  bei jeder Liste, auch nicht-leeren, weil Listen nie gleich `True` sind).
+  20.1-Distraktor demonstriert die naheliegende Fehlannahme, jeder
+  "vorhandene" Wert (ein String, eine Liste) sei automatisch truthy,
+  unabhängig davon ob er leer ist.
+
+- **Ergebnis:** Alle vier aktionablen Python-Tags abgedeckt — 81 von 82
+  (nur noch `own-modules`, permanente Sandbox-Ausnahme, offen). Python
+  liegt damit erstmals **vor** SQL (80/82) statt gleichauf.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 251 → 259 (Gate 1 + Gate
+  2 für alle 4 neuen Challenges grün). Volle Testsuite 858 → 866, alle
+  grün. `typecheck`, `npm run build` grün. `knip`: unverändert 10 Funde
+  (dieselben strukturellen Interfaces wie zuvor, kein neuer durch reinen
+  Content). Coverage: 91,77 % / 72,88 % / 99,07 % / 91,77 % (marginal
+  verschoben durch neue, größtenteils gut getestete Validator-Zweige).
