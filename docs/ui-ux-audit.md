@@ -66,6 +66,8 @@ wie gut das jeweils testabgedeckt ist.
 | F-018 | Bug | Mittel | `test/helpers/nodeSqliteEngine.ts` (der Node-Testmotor für SQL-Content, benutzt von `challengeRunner.test.ts` für Gate 1/Gate 2) übernahm stillschweigend `node:sqlite`s eigenen Default für `PRAGMA foreign_keys` (**ON**) — echtes SQLite und `sql.js` (der Browser-Motor, den die App tatsächlich nutzt) defaulten dagegen beide auf **OFF**. Entdeckt beim Entwurf der neuen `foreign-key-constraint`-Challenge (20.2): ein Distraktor, der `PRAGMA foreign_keys = ON;` vergisst, hätte in Node fälschlich trotzdem FK-Verletzungen abgelehnt (weil `node:sqlite` sie ohnehin immer prüft), im echten Browser aber nicht — der Gate-2-Test hätte also einen Distraktor "bestätigt fehlschlagend" gemeldet, der im echten Produkt tatsächlich durchgekommen wäre. Kein Bestandscontent betroffen (FOREIGN KEY wurde vorher nirgends im Kurs verwendet), aber eine echte Falle für jeden künftigen FK-Content. | ✅ Fixed | `PRAGMA foreign_keys = OFF;` explizit nach jedem `new DatabaseSync(...)` (Konstruktion und `reset()`) gesetzt, um `node:sqlite` auf denselben Default wie sql.js/echtes SQLite zu bringen. Manuell verifiziert: ohne PRAGMA-ON-Zeile im Testcode wird eine ungültige FK-Referenz jetzt (korrekterweise) nicht mehr abgelehnt; mit `PRAGMA foreign_keys = ON;` weiterhin doch. Kein bestehender Test verließ sich auf das alte (falsche) Default-Verhalten — volle Suite weiterhin grün. |
 | F-019 | Bug | Hoch | `test/helpers/nodeSqliteEngine.ts` las SELECT-Zeilen über `node:sqlite`s `prepared.all()` **ohne** `setReturnArrays(true)` — die Methode liefert dann Zeilen als Objekte, die pro **Spaltenname** (nicht pro Spaltenposition) indiziert sind. Eine Abfrage, die zwei gleichnamige Spalten aus verschiedenen Tabellen selektiert (z. B. ein unaliaster Self-Join `SELECT a.name, b.name FROM t a, t b`, oder jeder JOIN zweier Tabellen mit gemeinsamem Spaltennamen ohne `AS`) kollabierte dadurch beide Werte auf denselben (den zuletzt geschriebenen) — der andere ging spurlos verloren, obwohl `SqlResultSet.columns` beide Spaltennamen korrekt zweimal auflistete. `sqlJsEngine.ts` (der echte Browser-Motor) liest Zeilen dagegen schon immer positionsbasiert über `stmt.get()` und war nie betroffen — reiner Node-Testmotor-Bug, live beim Schreiben des Validators für die neue `right-join`-Challenge (21.1) entdeckt: eine unabhängige Nachrechnung mit zwei `k.name`/`p.name`-Spalten lieferte in der Prüfung für beide Spalten denselben Wert. | ✅ Fixed | `prepared.setReturnArrays(true)` gesetzt, sodass Zeilen wie bei sql.js positionsbasiert (Array) statt namensbasiert (Objekt) gelesen werden. Neuer Regressionstest in `nodeSqliteEngine.test.ts` (`keeps both values distinct when a join selects two columns with the same name`) — vor dem Fix per `git stash` auf die alte Implementierung rot reproduziert (beide Werte kollabierten auf "Ben"), nach dem Fix grün. |
 | F-020 | Bug | Hoch | Auf schmalen Viewports (≤760px, `challengeList.ts` + `sidebarShell.ts`s mobiles Sidebar-Overlay) blieb die Sidebar-Drawer nach Auswahl einer Challenge **offen** liegen, statt sich zu schließen — sie deckte dabei (fixed position, z-index 41, mit Backdrop) den kompletten Hauptinhalt ab, inklusive Tabs und Editor. Ein Tap auf eine Challenge zeigte dadurch scheinbar nichts (der Nutzer musste erst manuell den Toggle-Button oder den Backdrop antippen, um die Drawer zu schließen, bevor er die Aufgabe überhaupt sehen konnte) — auf Desktop-Breite unsichtbar, da die Sidebar dort permanent als Flow-Element neben dem Inhalt steht, nie als Overlay. Gefunden beim ersten gezielten Live-Playwright-Durchlauf mit einem schmalen Viewport (375px) seit langer Zeit — ein realer `page.locator(...).click()`-Versuch auf den Task-Tab schlug mit "element intercepts pointer events" fehl, weil die (fälschlich offene) Sidebar darüber lag. | ✅ Fixed | `challengeList.ts`: Nach `selectChallenge(...)` (Maus-Klick und Enter/Space) wird jetzt `closeSidebarIfMobileOverlay(ctx)` aufgerufen — schließt die Sidebar nur, wenn `window.matchMedia('(max-width: 760px)').matches` (identischer Breakpoint wie `themes.css`) und sie aktuell nicht schon eingeklappt ist. `window.matchMedia` existiert in jsdom nicht — defensiv mit `typeof window.matchMedia !== 'function'` abgefangen, statt zu werfen. 4 neue Tests in `challengeList.test.ts` (schließt bei schmalem Viewport, bleibt offen bei breitem Viewport, kein redundanter Toggle bei bereits eingeklappter Sidebar, schließt auch bei Tastatur-Auswahl). Live gegen den echten Dev-Server bei 375×667 bestätigt: Sidebar-Klasse wechselt nach Auswahl zu `sidebar collapsed`, Task-Tab/Editor/Run-Button danach tatsächlich klickbar, kein horizontales Overflow, keine Konsolenfehler. |
+| F-021 | Bug | Mittel | Ein Ergebnis mit vielen/breiten Spalten ist breiter als das Ergebnis-Panel. `.results-body` hatte **keine** `overflow-x`-Regel (Default `visible`), und ein Vorfahr (`.main`) hat `overflow: hidden` — die Tabelle wurde dadurch schlicht **abgeschnitten, ohne Scrollbar irgendwo**. Die rechten Spalten waren damit nicht nur außerhalb des Sichtfelds, sondern buchstäblich **unerreichbar**: kein Scrollen, kein Wischen, keine Möglichkeit an die Werte zu kommen. Auf Mobile akut (bei 375px passen ~2 Spalten), auf schmalen Desktop-Fenstern derselbe Effekt. Empirisch gemessen mit einer 6-Spalten-Abfrage bei 375px: `.results-body` scrollWidth 618px vs. clientWidth 281px, `overflow-x: visible` — Spalten 3–6 unerreichbar. **Meine ursprüngliche Vermutung war falsch**: ich hatte horizontales Seiten-Scrollen erwartet; die Seite scrollte gar nicht (375 == 375), weil der Vorfahr clippt — der tatsächliche Fehler ist schlimmer als der vermutete. | ✅ Fixed | `.results-body { overflow-x: auto; }` (global, nicht mobil-only — schmale Desktop-Fenster haben dasselbe Problem). Live bei 375px und 1280px verifiziert: `overflow-x: auto`, `scrollLeft` lässt sich tatsächlich bewegen (Spalten erreichbar), und die **Seite** scrollt weiterhin nicht horizontal. Kein Unit-Test (reines CSS-Layout, analog F-001/F-007). |
+| F-022 | Bug | Mittel | `textarea.editor` hat `font-size: 13px`. iOS Safari zoomt die **gesamte Seite** automatisch hinein, sobald ein Textfeld mit einer Schriftgröße **unter 16px** den Fokus bekommt — und zoomt danach **nicht** wieder heraus. Jeder Tap in den Editor hätte den Lernenden also in einem hineingezoomten Viewport zurückgelassen, aus dem er sich von Hand herauszoomen muss. Betrifft beide Tracks (SQL und Python teilen denselben Editor). | ✅ Fixed | Im ≤760px-Breakpoint `font-size: 16px` — **für alle drei Editor-Schichten gemeinsam**: `textarea.editor` ist `color: transparent` und liefert nur den Cursor, die sichtbaren Glyphen kommen aus `.highlight-layer` darüber, `.line-numbers` ist die dritte Spalte. Nur die Textarea zu ändern hätte den Cursor pro Zeichen ~3px gegen den sichtbaren Text driften lassen. `.line-numbers` zusätzlich von 36px auf 42px (3 Ziffern passen bei 16px sonst nicht). **Erster Fix-Versuch war wirkungslos** und wurde erst durch die Live-Messung entdeckt: der Override lag im früheren Narrow-Viewport-Block (Zeile ~270), aber `textarea.editor` dort hat dieselbe Spezifität wie die Basisregel bei Zeile ~547 — Media Queries erhöhen die Spezifität nicht, also gewann die spätere Basisregel per Quellreihenfolge. Der Block liegt jetzt **nach** den Editor-Regeln, mit Kommentar, der genau diese Falle festhält. Live verifiziert: mobil alle drei Schichten 16px mit identischen Typografie-Metriken und Ursprungs-Delta {x:0, y:0} (Cursor-Alignment intakt), Desktop unverändert 13px. Kein Unit-Test (reines CSS-Layout). |
 
 **Hinweis zu 0%-Dateien in der Coverage:** `ProgressStore.ts`, `Runtime.ts`,
 `SqlEngine.ts`, `editorBridge.ts`, `LanguagePlugin.ts`, `PythonRuntime.ts`
@@ -110,6 +112,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (Live-Bug-Hunt sauber + SQL B3 DQL abgeschlossen: 22-22.1) | 91.86 % | 73.23 % | 99.05 % | 91.86 % |
 | 2026-08-09 | HEAD (SQL B4 Funktionen abgeschlossen: 23-23.2) | 91.80 % | 73.06 % | 99.06 % | 91.80 % |
 | 2026-08-09 | HEAD (F-020 Fix: Mobile-Sidebar-Overlay blockierte Inhalt nach Auswahl) | 91.81 % | 73.15 % | 99.06 % | 91.81 % |
+| 2026-08-09 | HEAD (F-021/F-022: Ergebnis-Tabelle unerreichbar + iOS-Zoom im Editor) | 91.81 % | 73.15 % | 99.06 % | 91.81 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -1683,3 +1686,59 @@ sondern pro PR direkt in den Checks sichtbar.
   Coverage: 91,80 % → 91,81 % Statements, 73,06 % → 73,15 % Branches,
   99,06 % Functions unverändert. `knip` bestätigt: keine neuen toten
   Exporte.
+
+### 2026-08-09 — Stündliche Routine: F-021 + F-022 (die zwei vermuteten Mobile-Bugs bestätigt und behoben)
+
+- **Umfang:** Baseline grün (849/849, typecheck, build). Im letzten
+  Durchgang hatte ich beim Beantworten der Mobile-Frage zwei Probleme als
+  **vermutet, aber unbestätigt** notiert. Diese Runde bestand genau darin,
+  sie empirisch zu prüfen statt sie anzunehmen — beide bestätigten sich,
+  einer aber **anders als vermutet**.
+- **F-021 (Ergebnis-Tabelle):** Vermutet hatte ich horizontales
+  Seiten-Scrollen. Gemessen bei 375px mit einer 6-Spalten-Abfrage: Die
+  Seite scrollt gar **nicht** (scrollWidth 375 == clientWidth 375) — meine
+  Vermutung war falsch. Der echte Befund ist schlimmer: `.results-body`
+  hat scrollWidth 618px vs. clientWidth 281px bei `overflow-x: visible`,
+  und ein Vorfahr (`.main`) clippt mit `overflow: hidden`. Die Spalten 3–6
+  waren damit **unerreichbar** — nicht scrollbar, nicht wischbar, gar
+  nicht an die Werte heranzukommen. Fix: `.results-body { overflow-x:
+  auto; }`, bewusst global statt mobil-only, da schmale Desktop-Fenster
+  denselben Effekt haben.
+- **F-022 (iOS-Zoom im Editor):** Bestätigt — `textarea.editor` steht auf
+  13px, unterhalb der 16px-Schwelle, ab der iOS Safari beim Fokussieren
+  die ganze Seite hineinzoomt und **nicht** wieder herauszoomt. Fix im
+  ≤760px-Breakpoint auf 16px, aber zwingend **für alle drei
+  Editor-Schichten gemeinsam**: die Textarea ist `color: transparent` und
+  liefert nur den Cursor, die sichtbaren Glyphen kommen aus
+  `.highlight-layer`, `.line-numbers` ist die dritte Spalte — nur die
+  Textarea zu ändern hätte den Cursor gegen den sichtbaren Text driften
+  lassen.
+
+  **Der erste Fix-Versuch war wirkungslos**, und das fiel nur auf, weil
+  live nachgemessen statt auf „CSS geschrieben, also erledigt" vertraut
+  wurde: Der Override lag zunächst im früheren Narrow-Viewport-Block
+  (Zeile ~270), aber Media Queries erhöhen die Spezifität nicht — dort
+  hat `textarea.editor` dieselbe Spezifität wie die Basisregel bei Zeile
+  ~547, und die spätere Regel gewinnt per Quellreihenfolge. Der mobile
+  Block liegt jetzt **nach** den Editor-Regeln, mit einem Kommentar, der
+  genau diese Falle für die Zukunft festhält.
+- **Verifikation:** Beide Fixes live bei 375×667 **und** 1280×900
+  gegengemessen. Mobil: alle drei Editor-Schichten 16px mit identischen
+  Typografie-Metriken (fontSize/lineHeight/fontFamily/padding/
+  letterSpacing/tabSize) und Ursprungs-Delta {x:0, y:0} — das
+  Cursor-Alignment ist nachweislich intakt, nicht nur vermutlich.
+  Ergebnis-Tabelle: `overflow-x: auto`, `scrollLeft` lässt sich
+  tatsächlich bewegen, Seite scrollt weiterhin nicht horizontal. Desktop:
+  unverändert 13px, Layout unberührt.
+- **Ergebnis:** Zwei echte Mobile-Bugs behoben, davon einer (F-021) in
+  einer schlimmeren Ausprägung als ursprünglich vermutet. Beide sind
+  reine CSS-Layout-Fixes und daher wie F-001/F-007 nicht unit-testbar —
+  die Absicherung ist die Live-Messung, die jetzt Teil des Runbooks ist.
+  Damit sind die zwei konkreten Bugs aus dem Mobile-Plan erledigt; offen
+  bleiben die Design-lastigen Punkte (Touch-Targets ~44px, Compare-Ansicht
+  stapeln, Typo-Skala) — die hängen an der noch offenen Frage, ob Mobile
+  eine vollwertige Authoring-Umgebung oder ein Read-and-Run-Modus sein
+  soll, und werden deshalb bewusst nicht vorweggenommen.
+- **Tests:** 849 unverändert (reine CSS-Änderungen). `typecheck`, volle
+  Testsuite (849) und `npm run build` grün, `knip` ohne neue Funde.
+  Coverage unverändert (91,81 % / 73,15 % / 99,06 %).
