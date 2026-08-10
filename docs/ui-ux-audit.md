@@ -3217,3 +3217,44 @@ sondern pro PR direkt in den Checks sichtbar.
   Coverage und Build-Größe unverändert (990/990, 92,31 % / 73,15 % /
   99,14 % / 92,31 %, 632,59 kB). Kein neuer Commit, keine
   Artifact-Republikation nötig.
+
+### 2026-08-10 — Stündliche Routine: C#-Wiring-Frage empirisch geklärt — iframe endgültig bestätigt als nötig
+
+- **Umfang:** Baseline sauber (990/990, typecheck/build/knip grün, HEAD
+  `008d856`). SQL/Python weiterhin an der permanenten Scope-Grenze,
+  letzter Bug-Hunt gerade erst sauber durchgelaufen. Der letzte
+  C#-Durchgang hatte eine offene Unsicherheit hinterlassen: hängt Blazors
+  eigener Core-Loader (`_framework/dotnet.js`) beim Booten vom
+  `<base href>` des hostenden Dokuments ab, oder vom Skript-eigenen
+  Ladeort? Davon hängt ab, ob die spätere Wiring-Arbeit einen einfachen
+  JS-Setter braucht oder eine echte iframe-Umstellung.
+
+- **Test:** Wegwerf-Server im Scratchpad (kein Repo-Code geändert) —
+  Publish-Output unter `/v2/` ausgeliefert, Seiten-eigenes
+  `<base href>` bewusst auf `/` belassen (derselbe Mismatch, den die
+  Haupt-App hätte, die aktuell gar kein `<base>`-Tag besitzt), mit einem
+  korrekt absoluten `<script src="/v2/_framework/blazor.webassembly.js">`
+  — exakt wie `loadCSharpEngineFromServer` es bereits macht. Ergebnis:
+  das Skript selbst lädt einwandfrei, aber Blazors eigener Bootstrapper
+  versucht danach `_framework/dotnet.js` gegen `<base href>` aufzulösen
+  (`http://.../​_framework/dotnet.js` statt `http://.../v2/_framework/dotnet.js`)
+  — 404, `Failed to start platform`. Das passiert innerhalb von Blazors
+  eigenem Kern-Loader, bevor überhaupt eigener C#-Code läuft — kein
+  JS-seitiger Override von `CSharpEngine.BaseAddress` könnte das beheben.
+
+- **Konsequenz:** Direktes Einbetten in das Haupt-Dokument der App
+  funktioniert nicht, solange dessen `<base href>` nicht auf
+  `/csharp-engine/` zeigt (aktuell gar kein `<base>`-Tag vorhanden).
+  Dynamisches Umschreiben des Haupt-`<base href>` wurde verworfen (zu
+  riskanter globaler Seiteneffekt auf jede relative URL-Auflösung in der
+  SPA). Eine iframe-Einbettung (eigenes Dokument, eigene korrekte
+  `baseURI`, erbt Isolation vom bereits isolierten Elterndokument) ist
+  damit die einzig tragfähige Option — die Unsicherheit, die diese
+  Entscheidung bisher zurückgestellt hatte, ist jetzt aufgelöst. Der
+  nächste C#-Wiring-Schritt kann direkt mit iframe + `postMessage` als
+  Transport geplant werden, ohne weitere Design-Fragen.
+
+- **Ergebnis:** Reine Analyse (`docs/csharp-engine-poc.md`), kein Code im
+  Repo geändert — der Testaufbau lief komplett im Scratchpad.
+  Tests/Coverage/Build-Größe unverändert (990/990, 92,31 % / 73,15 % /
+  99,14 % / 92,31 %, 632,59 kB). Keine Artifact-Republikation nötig.

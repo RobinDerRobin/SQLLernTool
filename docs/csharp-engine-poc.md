@@ -745,6 +745,49 @@ Roughly in dependency order:
    specific reason — not the COOP/COEP reason it was wrongly proposed for
    earlier today — is worth real consideration in the next increment that
    wires an actual `ensureCSharpEngine` call site.
+
+   **Update (2026-08-10, next day's first firing): confirmed empirically
+   — an iframe (or equivalent dedicated document) is required, not just
+   nicer-to-have.** The open question above was whether Blazor's *own*
+   core module loader (`_framework/dotnet.js` etc., not just this
+   project's custom ref-assembly `HttpClient`) resolves paths from
+   `document.baseURI`/`<base href>`, or from wherever the
+   `blazor.webassembly.js` script itself was loaded from — if the latter,
+   a small `[JSExport]` setter overriding `CSharpEngine.BaseAddress`
+   explicitly from JS might have been enough, without needing an iframe.
+
+   Tested directly with a throwaway static server (scratchpad-only, no
+   repo changes): served the published output under `/v2/` while the
+   page's own `<base href>` stayed `/` (the same mismatch the main
+   SQLLernTool document would have — no `<base>` tag at all, so
+   `document.baseURI` defaults to site root), with a correctly-absolute
+   `<script src="/v2/_framework/blazor.webassembly.js">` tag (mirroring
+   exactly what `loadCSharpEngineFromServer` already does). Result: the
+   script itself loaded fine, but Blazor's own bootstrapper then tried to
+   fetch `http://.../​_framework/dotnet.js` (base-href-relative, resolving
+   against `/`) instead of `http://.../v2/_framework/dotnet.js` (where it
+   actually lives) — a 404, and `Failed to start platform. Reason:
+   TypeError: Failed to fetch dynamically imported module`. This happens
+   inside Blazor's own core loader, before any of this project's C# code
+   ever runs — so no JS-side override of `CSharpEngine.BaseAddress` could
+   possibly fix it; the fix has to happen before `Blazor.start()`, at the
+   level of which document is hosting it.
+
+   **Conclusion, now settled:** injecting Blazor directly into the main
+   SQLLernTool document will not work as long as that document has no
+   `<base href>` matching `/csharp-engine/` (it currently has none at
+   all). The two remaining options are (a) mutate the main document's
+   `<base href>` dynamically before booting Blazor — rejected as too
+   risky, since it's a global side effect on *every* relative URL
+   resolution in the SPA for as long as it's set, including anything
+   SQL/Python-related happening concurrently; or (b) host the engine in a
+   dedicated iframe pointed at `/csharp-engine/`, whose own `document.baseURI`
+   is naturally correct without touching the parent at all, and whose
+   isolation is inherited for free from the already-isolated parent. (b)
+   is the only sound option. The next C# increment that wires a real
+   `ensureCSharpEngine` call site should build this iframe + `postMessage`
+   transport as part of that work, not attempt direct injection — the
+   uncertainty that justified deferring this decision is now resolved.
 6. ~~**Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
    mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
    feasible now that `dotnet` works in this sandbox; likely just
