@@ -127,6 +127,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (C# Challenge 05: B4 vollständig, 24/86) | 91.87 % | 72.89 % | 99.09 % | 91.87 % |
 | 2026-08-09 | HEAD (C# Challenge 06: B5 vollständig, 28/86) | 91.85 % | 72.88 % | 99.09 % | 91.85 % |
 | 2026-08-10 | HEAD (C# Challenge 07: B6 vollständig, 33/86) | 91.88 % | 72.86 % | 99.10 % | 91.88 % |
+| 2026-08-10 | HEAD (C# Challenge 08: B7 vollständig, 38/86) | 91.92 % | 72.85 % | 99.10 % | 91.92 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -2281,3 +2282,40 @@ sondern pro PR direkt in den Checks sichtbar.
   Gate 2 für Challenge 07, alle drei Distraktoren grün). Volle Testsuite
   906 → 910, alle grün. `typecheck`, `npm run build` grün. `knip`:
   unverändert 10 Funde. Coverage: 91,88 % / 72,86 % / 99,10 % / 91,88 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 08 (B7 vollständig)
+
+- **Umfang:** Baseline sauber (910/910, typecheck/build/knip grün, HEAD
+  `5fa3492`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr, kein neuer Coverage-Ausfall,
+  keine SQL/Python/UI-Datei seit dem letzten Live-Bug-Hunt geändert. C#
+  hat nach Challenge 01-07 klaren Schwung, nächstes begrenztes
+  Increment: B7 (Schleifen).
+
+- **Content:** Challenge 08 deckt alle 5 Tags aus B7 in einem Durchgang
+  ab: `while-loop`, `for-loop`, `do-while-loop`, `break-continue`,
+  `nested-loops`. Fünf unabhängige Berechnungen, je eine pro
+  Schleifenform: eine `for`-Schleife (Quadratsumme 1²–5²), eine
+  `while`-Schleife (Summe akkumulieren bis zur Grenze), eine
+  `do`-`while`-Schleife mit einer von Anfang an falschen Bedingung — zeigt
+  konkret, dass der Rumpf trotzdem mindestens einmal läuft, eine
+  `for`-Schleife mit sowohl `continue` als auch `break` im selben
+  Durchlauf, und zwei verschachtelte `for`-Schleifen.
+
+- **Drei Distraktoren, alle empirisch verifiziert:** `while` statt
+  `do`-`while` (Rumpf läuft dann gar nicht, 0 statt 1 — der
+  Kernunterschied der beiden Schleifenformen an einem echten Zahlenwert
+  demonstriert statt nur behauptet); das `continue` komplett weggelassen
+  (falsches Summenergebnis); dieselbe Schleifenvariable in innerer und
+  äußerer `for`-Schleife wiederverwendet — in C# kein stilles
+  Überschreiben, sondern ein Compilerfehler (`CS0136`).
+
+- **Ergebnis:** C#-Tag-Bilanz 33/86 → 38/86 (≈44 %). B0 bis B7 sind damit
+  vollständig abgedeckt — nächster offener Zweig ist B8 (Arrays &
+  Collections). Build-Größe unverändert (632,33 kB) — Track bleibt
+  unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 287 → 291 (Gate 1 +
+  Gate 2 für Challenge 08, alle drei Distraktoren grün). Volle Testsuite
+  910 → 914, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 91,92 % / 72,85 % / 99,10 % / 91,92 %.

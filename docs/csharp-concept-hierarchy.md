@@ -713,6 +713,32 @@ vollständig abgedeckt** — B0 bis B6 sind jetzt komplett. Nächster
 offener Zweig: B7 (Schleifen, nach der Branch-Übersicht in Abschnitt
 5).*
 
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 08
+ergänzt — deckt alle 5 Tags aus B7 (Schleifen) in einem Durchgang ab:
+`while-loop`, `for-loop`, `do-while-loop`, `break-continue`,
+`nested-loops`. Fünf unabhängige Berechnungen, je eine pro Schleifenform:
+eine `for`-Schleife (Quadratsumme 1²–5²), eine `while`-Schleife (Summe
+akkumulieren bis zur Grenze), eine `do`-`while`-Schleife mit einer von
+Anfang an falschen Bedingung (`versuch < 5` bei `versuch = 10`) — zeigt
+konkret, dass der Rumpf trotzdem mindestens einmal läuft, anders als bei
+`while`, eine `for`-Schleife mit sowohl `continue` (gerade Zahlen
+überspringen) als auch `break` (bei Werten über 7 abbrechen) im selben
+Durchlauf, und zwei verschachtelte `for`-Schleifen (3×4-Zellen-Zählung).
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `while` statt `do`-`while` (Rumpf läuft dann gar nicht,
+0 statt 1 — der Kernunterschied der beiden Schleifenformen an einem
+echten Zahlenwert demonstriert statt nur behauptet); das `continue`
+komplett weggelassen (falsches Summenergebnis, 28 statt 16); dieselbe
+Schleifenvariable `zeile` in innerer und äußerer `for`-Schleife wieder
+verwendet — in C# kein stilles Überschreiben, sondern ein Compilerfehler
+(`CS0136`, "cannot be declared in this scope because that name is used
+in an enclosing local scope").
+
+**Tag-Bilanz: 38 von 86 (≈ 44 %).** Damit ist **B7 (Schleifen)
+vollständig abgedeckt** — B0 bis B7 sind jetzt komplett, fast die Hälfte
+aller 86 Tags. Nächster offener Zweig: B8 (Arrays & Collections, nach der
+Branch-Übersicht in Abschnitt 5).*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt
