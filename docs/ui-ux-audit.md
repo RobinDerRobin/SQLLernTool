@@ -134,6 +134,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-10 | HEAD (C# Challenge 12: B10 Teil 1, erste Klasse, 53/86) | 92.06 % | 72.78 % | 99.11 % | 92.06 % |
 | 2026-08-10 | HEAD (C# Challenge 13: B10 vollständig, 57/86) | 92.09 % | 72.74 % | 99.11 % | 92.09 % |
 | 2026-08-10 | HEAD (C# Challenge 14: B9 vollständig, B0–B10 komplett, 58/86) | 92.13 % | 72.74 % | 99.11 % | 92.13 % |
+| 2026-08-10 | HEAD (Live-Bug-Hunt sauber + C# Challenge 15: B11 Teil 1, 62/86) | 92.16 % | 72.69 % | 99.11 % | 92.16 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -2611,3 +2612,56 @@ sondern pro PR direkt in den Checks sichtbar.
   Gate 2 für Challenge 14, alle drei Distraktoren grün). Volle Testsuite
   934 → 938, alle grün. `typecheck`, `npm run build` grün. `knip`:
   unverändert 10 Funde. Coverage: 92,13 % / 72,74 % / 99,11 % / 92,13 %.
+
+### 2026-08-10 — Stündliche Routine: Live-Bug-Hunt (sauber) + C# Challenge 15 (B11 Teil 1)
+
+- **Umfang:** Baseline sauber (938/938, typecheck/build/knip grün, HEAD
+  `d6850cb`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. Nach fünf reinen
+  Content-Durchgängen in Folge (Challenge 10-14) zuerst wieder Priorität
+  2: ein Live-Playwright-Durchlauf gegen den echten Dev-Server, da seit
+  dem letzten sauberen Durchlauf mehrere Firings vergangen sind.
+
+- **Live-Bug-Hunt-Ergebnis:** Dev-Server per Playwright gefahren (CDN-
+  Workaround aus dem Runbook: `context.route()` liefert lokal
+  installiertes `sql.js`/`pyodide` aus). Stichprobe von 13 SQL- und 12
+  Python-Challenges (jede 6.): Tutorial-Text vorhanden, Lösung über
+  "In den Editor übernehmen" eingefügt, ausgeführt, `✓ Aufgabe erfüllt`
+  bestätigt — 25/25 bestanden. Mobile-Viewport (375×667) ohne
+  horizontalen Overflow. 0 Konsolenfehler (nach Ausschluss des bekannten
+  `ERR_CERT_AUTHORITY_INVALID`-Sandbox-Artefakts vom Hint-Chat-Fetch).
+  Ein erster Skript-Entwurf meldete fälschlich "Tutorial fehlt" für alle
+  Challenges — eigener Selektor-Bug im Testskript (`.tutorial-section`
+  statt des tatsächlichen `.tutorial-text`), kein Anwendungsfehler;
+  nach der Korrektur lief die Stichprobe sauber durch. Keine neuen
+  Funde.
+
+- **Content:** Challenge 15 deckt 4 der 7 Tags aus B11 (Vererbung &
+  Polymorphie) ab: `inheritance`, `method-overriding`, `base-keyword`,
+  `abstract-classes`. Szenario: eine `abstract class Tier` mit einer
+  `abstract`-Methode `GeraeuschMachen()` (muss überschrieben werden) und
+  einer `virtual`-Methode `Beschreibung()` (Standardimplementierung,
+  Überschreiben optional) — zwei abgeleitete Klassen `Hund : Tier` und
+  `Katze : Tier`, beide rufen `base(name)` im Konstruktor auf, nur
+  `Katze` überschreibt zusätzlich `Beschreibung()`.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** `: base(name)` weggelassen (Compilerfehler `CS7036`);
+  `override` bei der abstrakten Methode vergessen (Compilerfehler
+  `CS0534`); `override` bei der virtuellen Methode `Beschreibung()` in
+  `Katze` vergessen — anders als beim abstrakten Fall erzwingt der
+  Compiler das bei `virtual` nicht, der Aufruf läuft dann
+  stillschweigend mit der geerbten Standardversion (kompiliert, falsches
+  Ergebnis). Der dritte Distraktor demonstriert den Kernunterschied
+  zwischen `abstract` (compile-time erzwungen) und `virtual` (optional,
+  silent fallback) empirisch.
+
+- **Ergebnis:** C#-Tag-Bilanz 58/86 → 62/86 (≈72 %). B11 zu 4 von 7 Tags
+  abgedeckt (`interfaces`, `polymorphism-via-interface`,
+  `sealed-classes` offen). B0 bis B10 weiterhin vollständig. Build-Größe
+  unverändert (632,33 kB) — Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 312 → 316 (Gate 1 +
+  Gate 2 für Challenge 15, alle drei Distraktoren grün). Volle Testsuite
+  938 → 942, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 92,16 % / 72,69 % / 99,11 % / 92,16 %.

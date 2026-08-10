@@ -916,6 +916,39 @@ vollständig abgedeckt** — B0 bis B10 sind jetzt komplett, deutlich über
 die Hälfte aller 86 Tags. Nächster offener Zweig: B11 (Vererbung &
 Polymorphie, nach der Branch-Übersicht in Abschnitt 5).*
 
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Vor dem Content-
+Schritt ein Live-Playwright-Durchlauf gegen den echten Dev-Server (CDN-
+Workaround aus dem Runbook) — 13 SQL- und 12 Python-Lösungen
+stichprobenartig eingefügt und ausgeführt, alle 25/25 mit `✓ Aufgabe
+erfüllt` bestätigt, keine Konsolenfehler, keine mobile Overflow bei
+375×667. Sauber, keine Regression durch die letzten Content-Durchgänge.
+
+Anschließend Challenge 15 ergänzt — deckt 4 der 7 Tags aus B11
+(Vererbung & Polymorphie) ab: `inheritance`, `method-overriding`,
+`base-keyword`, `abstract-classes`. Szenario: eine `abstract class Tier`
+mit einer `abstract`-Methode `GeraeuschMachen()` (ohne Implementierung,
+muss überschrieben werden) und einer `virtual`-Methode `Beschreibung()`
+(mit Standardimplementierung, Überschreiben optional) — zwei abgeleitete
+Klassen `Hund : Tier` und `Katze : Tier`, beide rufen `base(name)` im
+Konstruktor auf, nur `Katze` überschreibt zusätzlich `Beschreibung()`.
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `: base(name)` weggelassen (Compilerfehler `CS7036`, da
+`Tier` keinen parameterlosen Konstruktor hat); `override` bei der
+abstrakten Methode vergessen (Compilerfehler `CS0534`, abstrakte
+Methoden müssen implementiert werden); `override` bei der virtuellen
+Methode `Beschreibung()` in `Katze` vergessen — anders als beim
+abstrakten Fall erzwingt der Compiler das bei `virtual` **nicht**, der
+Aufruf läuft dann stillschweigend mit der geerbten Standardversion
+(kompiliert, falsches Ergebnis). Der dritte Distraktor demonstriert den
+Kernunterschied zwischen `abstract` (compile-time erzwungen) und
+`virtual` (optional, silent fallback) empirisch.
+
+**Tag-Bilanz: 62 von 86 (≈ 72 %).** B11 ist damit zu 4 von 7 Tags
+abgedeckt (`interfaces`, `polymorphism-via-interface`, `sealed-classes`
+offen). B0 bis B10 weiterhin vollständig. Nächster Schritt: die
+restlichen B11-Tags (Interfaces, Polymorphie über Interface-Typen,
+`sealed`) in einer künftigen Challenge.*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt
