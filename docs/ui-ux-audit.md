@@ -141,6 +141,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-10 | HEAD (C# Challenge 19: B13 vollständig, B0–B13 komplett, 74/86) | 92.24 % | 72.60 % | 99.12 % | 92.24 % |
 | 2026-08-10 | HEAD (C#-LanguagePlugin für den Editor: Tokenizer/Highlight/Auto-Indent) | 92.30 % | 73.11 % | 99.13 % | 92.30 % |
 | 2026-08-10 | HEAD (C#-Engine-Wiring: EngineFactory.ensureCSharpEngine) | 92.31 % | 73.15 % | 99.14 % | 92.31 % |
+| 2026-08-10 | HEAD (C#-Engine: iframe+postMessage-Transport statt direktem Script-Inject) | 92.33 % | 73.16 % | 99.14 % | 92.33 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -3258,3 +3259,60 @@ sondern pro PR direkt in den Checks sichtbar.
   Repo geändert — der Testaufbau lief komplett im Scratchpad.
   Tests/Coverage/Build-Größe unverändert (990/990, 92,31 % / 73,15 % /
   99,14 % / 92,31 %, 632,59 kB). Keine Artifact-Republikation nötig.
+
+### 2026-08-10 — Stündliche Routine: C#-Engine — iframe+postMessage-Transport implementiert und live verifiziert
+
+- **Umfang:** Baseline sauber (990/990, typecheck/build/knip grün, HEAD
+  `3f4242e`). SQL/Python weiterhin an der permanenten Scope-Grenze. Der
+  letzte Durchgang hatte die verbleibende Design-Unsicherheit für die
+  C#-Engine vollständig aufgelöst (iframe statt direktem Script-Inject
+  nötig, empirisch bestätigt) — kein offener Punkt mehr im Weg, klarer
+  nächster Schritt: die eigentliche Umsetzung.
+
+- **Implementiert:** `src/runtime/csharp/csharpEngine.ts`s
+  `loadCSharpEngineFromServer` injiziert nicht mehr direkt ein
+  `<script>`-Tag ins aktuelle Dokument, sondern erstellt ein verstecktes
+  `<iframe src="${baseUrl}host.html">` und wartet auf eine
+  `csharp-host-ready`-`postMessage`. Neue Datei
+  `csharp-engine/wwwroot/host.html` — eigenständiges Hosting-Dokument,
+  bootet Blazor selbst (bewusst ohne `<base>`-Tag, damit
+  `document.baseURI` automatisch zum tatsächlichen Serving-Pfad passt),
+  hört danach auf `{ type: 'csharp-run', id, code }`-Nachrichten und
+  antwortet mit `{ type: 'csharp-result', id, json }` (oder `error`) —
+  per `id` zugeordnet, damit gleichzeitige Anfragen sich nicht
+  überschneiden können. `CSharpRuntime`/`CSharpExecResult` (die
+  öffentliche Form, von der `EngineFactory.ensureCSharpEngine` bereits
+  abhängt) mussten sich nicht ändern — nur der Transport darunter, das
+  AppContext-Wiring vom vorletzten Durchgang bleibt unverändert
+  funktionsfähig.
+
+- **Tests komplett neu geschrieben** (`csharpEngine.test.ts`, 12 statt 7):
+  iframe-Erstellung/-Attribute, Nachrichten-Roundtrip per Request-`id`
+  zugeordnet, Origin-/Source-Mismatch-Nachrichten ignoriert,
+  Boot-Fehler- und iframe-Ladefehler-Ablehnung mit denselben
+  deutschsprachigen Meldungen wie zuvor, Retry nach Fehlschlag erzeugt
+  ein neues iframe, gleichzeitige Aufrufer teilen sich ein
+  In-Flight-iframe, ein aufgelöster Engine liefert bei erneutem Aufruf
+  dieselben Exports ohne zweites iframe.
+
+- **Live-end-to-end verifiziert, nicht nur unit-getestet:** `csharp-engine`
+  frisch gepublished (`host.html` bestätigt im Publish-Output), über die
+  Dev-Server-Middleware ausgeliefert, das exakte iframe+postMessage-
+  Protokoll per Playwright aus dem **echten Haupt-Dokument** heraus
+  angesteuert (`http://localhost:5173/`, kein `<base>`-Tag — genau das
+  Szenario, das für direkten Script-Inject nachweislich kaputt war). Alle
+  drei Fälle erfolgreich: echter Compile+Run (`x = 4`), echter
+  Compilerfehler (`CS0029`) bei ungültigem Code, echte Laufzeit-Exception
+  mit vollständigem .NET-Stacktrace (`IndexOutOfRangeException` über
+  `TargetInvocationException`). SQL zeigte danach weiterhin alle 78
+  Challenges — das iframe hat keine Nebenwirkung auf den Rest der App.
+
+- **Bewusst nicht getan:** Noch keine echte Aufrufstelle
+  (`ensureCSharpEngine` wird nirgends aufgerufen) und der Registry-Eintrag
+  bleibt zurückgehalten — dieser Durchgang schließt die Transport-Frage
+  vollständig ab, das eigentliche UI-Wiring bleibt der nächste Schritt.
+
+- **Ergebnis:** Tests 990 → 993 (netto +3: 12 neue iframe-Transport-Tests
+  ersetzen 7 alte Script-Inject-Tests). `typecheck`, `npm run build` grün
+  (632,59 kB, unverändert). `knip`: unverändert 10 Funde. Coverage:
+  92,33 % / 73,16 % / 99,14 % / 92,33 %.

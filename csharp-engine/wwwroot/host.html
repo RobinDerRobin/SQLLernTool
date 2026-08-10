@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+<!--
+  Dedicated hosting document for the C# engine, loaded into a hidden iframe by
+  src/runtime/csharp/csharpEngine.ts — never navigated to directly by a user.
+
+  Why a separate document instead of index.html (the manual smoke-test page):
+  Blazor's own core loader (_framework/dotnet.js etc.) resolves its asset
+  paths from *this document's* document.baseURI, not from wherever the
+  blazor.webassembly.js <script> tag itself was loaded from (confirmed
+  empirically, see docs/csharp-engine-poc.md's 2026-08-10 "iframe
+  requirement" writeup). Deliberately no <base> tag here: whatever path this
+  file is actually served from (dev: /csharp-engine/host.html, a future
+  production path via coi-serviceworker), document.baseURI defaults to that
+  same path, so asset resolution is always correct without hardcoding a mount
+  point.
+
+  Protocol (window.postMessage, JSON-shaped):
+    parent -> iframe: { type: 'csharp-run', id: string, code: string }
+    iframe -> parent: { type: 'csharp-host-ready' }                          (once, after Blazor.start() resolves)
+                       { type: 'csharp-boot-error', message: string }        (once, if Blazor.start() itself throws)
+                       { type: 'csharp-result', id: string, json: string }   (RunCode's raw JSON, one per 'csharp-run')
+                       { type: 'csharp-result', id: string, error: string }  (RunCode itself threw)
+-->
+<body>
+<script src="_framework/blazor.webassembly.js" autostart="false"></script>
+<script>
+  Blazor.start()
+    .then(async () => {
+      const exports = await Blazor.runtime.getAssemblyExports('CSharpEngineBlazor');
+      const engine = exports.CSharpEngineBlazor.CSharpEngine;
+
+      window.addEventListener('message', async (event) => {
+        if (event.origin !== window.location.origin || event.source !== window.parent) return;
+        if (!event.data || event.data.type !== 'csharp-run') return;
+        const { id, code } = event.data;
+        try {
+          const json = await engine.RunCode(code);
+          window.parent.postMessage({ type: 'csharp-result', id, json }, window.location.origin);
+        } catch (err) {
+          window.parent.postMessage({ type: 'csharp-result', id, error: String(err) }, window.location.origin);
+        }
+      });
+
+      window.parent.postMessage({ type: 'csharp-host-ready' }, window.location.origin);
+    })
+    .catch((err) => {
+      window.parent.postMessage({ type: 'csharp-boot-error', message: String(err) }, window.location.origin);
+    });
+</script>
+</body>
+</html>

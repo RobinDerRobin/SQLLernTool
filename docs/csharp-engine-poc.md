@@ -788,6 +788,66 @@ Roughly in dependency order:
    `ensureCSharpEngine` call site should build this iframe + `postMessage`
    transport as part of that work, not attempt direct injection — the
    uncertainty that justified deferring this decision is now resolved.
+
+   **Update (2026-08-10, next firing): the iframe transport is now built.**
+   `src/runtime/csharp/csharpEngine.ts`'s `loadCSharpEngineFromServer` no
+   longer injects a `<script>` tag into the current document at all — it
+   creates a hidden `<iframe src="${baseUrl}host.html">` and waits for a
+   `csharp-host-ready` `postMessage` before resolving. A new file,
+   `csharp-engine/wwwroot/host.html`, is the dedicated hosting document:
+   boots Blazor itself on load (deliberately no `<base>` tag, so its
+   `document.baseURI` naturally matches wherever it was actually served
+   from), then listens for `{ type: 'csharp-run', id, code }` messages and
+   replies with `{ type: 'csharp-result', id, json }` (or `error`) —
+   `RunCode`'s JSON payload passed through unchanged, id-matched so
+   concurrent requests can't cross-resolve. `CSharpRuntime`/
+   `CSharpExecResult` (the public shape `EngineFactory.ensureCSharpEngine`
+   already depends on) did not need to change — only the transport
+   underneath did, so last firing's `AppContext` wiring stays intact
+   without modification. `createIframeExports`/`loadCSharpEngineFromServer`
+   validate every incoming message's `origin` against
+   `window.location.origin` and its `source` against the specific iframe's
+   `contentWindow`, rejecting anything else — both frames are always
+   same-origin by construction, so this is a same-origin sanity check, not
+   a cross-origin security boundary.
+
+   `csharpEngine.test.ts` fully rewritten for the new transport (12 tests,
+   up from 7): iframe creation/attributes, message round-tripping matched
+   by request id, origin/source-mismatch messages ignored, boot-error and
+   iframe-load-error rejection with the same friendly German messages as
+   before, retry-after-failure creates a fresh iframe, concurrent callers
+   share one in-flight iframe, and a resolved engine keeps returning the
+   same exports without creating a second iframe. `createCSharpEngine`'s
+   own tests (exec/reset) are unchanged since that layer didn't move.
+
+   **Live-verified end-to-end**, not just unit-tested: rebuilt
+   `csharp-engine` (`dotnet publish -c Release`, confirming `host.html`
+   lands in the publish output), served it through the Vite dev-server
+   middleware from two firings ago, and drove the *exact* iframe +
+   `postMessage` protocol via Playwright from inside the **real main
+   SQLLernTool document** (`http://localhost:5173/`, no `<base>` tag,
+   already `crossOriginIsolated`) — the precise scenario that was
+   confirmed broken for direct script injection. All three cases
+   succeeded: a real compile-and-run (`x = 4`), a real compiler diagnostic
+   (`CS0029`) on invalid code, and a real runtime exception with full
+   .NET stack trace (`IndexOutOfRangeException` via
+   `TargetInvocationException`, matching the original POC's documented
+   behavior). SQL still listed all 78 challenges afterward — creating and
+   messaging the iframe has no effect on the rest of the app.
+
+   Tests 990 → 993 (+3 net: 12 new iframe-transport tests replacing 7
+   script-injection ones). `typecheck`, `npm run build` green (632.59 kB,
+   unchanged — this only touches `src/runtime/csharp/` and
+   `csharp-engine/wwwroot/`, neither reachable from the production bundle
+   any differently than before). `knip`: unchanged, 10 findings. Coverage:
+   92.33 % / 73.16 % / 99.14 % / 92.33 %.
+
+   **Deliberately not done in this increment:** still no real
+   `ensureCSharpEngine` call site (`src/ui/state/actions.ts` has no
+   C#-track equivalent of `ensurePythonEngineLoaded` yet) and the registry
+   line is still withheld — this closes the transport-design question
+   completely, but wiring the actual UI trigger and making C# selectable
+   remains the next increment.
 6. ~~**Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
    mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
    feasible now that `dotnet` works in this sandbox; likely just
