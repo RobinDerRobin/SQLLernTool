@@ -139,6 +139,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-10 | HEAD (C# Challenge 17: B12 vollständig, B0–B12 komplett, 68/86) | 92.17 % | 72.64 % | 99.12 % | 92.17 % |
 | 2026-08-10 | HEAD (C# Challenge 18: B13 Teil 1, 72/86) | 92.21 % | 72.62 % | 99.12 % | 92.21 % |
 | 2026-08-10 | HEAD (C# Challenge 19: B13 vollständig, B0–B13 komplett, 74/86) | 92.24 % | 72.60 % | 99.12 % | 92.24 % |
+| 2026-08-10 | HEAD (C#-LanguagePlugin für den Editor: Tokenizer/Highlight/Auto-Indent) | 92.30 % | 73.11 % | 99.13 % | 92.30 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -2828,3 +2829,57 @@ sondern pro PR direkt in den Checks sichtbar.
   Gate 2 für Challenge 19, alle drei Distraktoren grün). Volle Testsuite
   954 → 958, alle grün. `typecheck`, `npm run build` grün. `knip`:
   unverändert 10 Funde. Coverage: 92,24 % / 72,60 % / 99,12 % / 92,24 %.
+
+### 2026-08-10 — Stündliche Routine: C#-Engine-Integration — LanguagePlugin für den Editor
+
+- **Umfang:** Baseline sauber (958/958, typecheck/build/knip grün, HEAD
+  `b2dee97`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. C#-Content ist bei
+  B0–B13 komplett (74/86); der nächste offene Zweig B14 wäre der übliche
+  nächste Content-Schritt, aber laut Mandat ist C#-Engine-Integration
+  jetzt explizit in Scope und hat hier klaren Schwung: `docs/
+  csharp-engine-poc.md` listet für die Live-Wiring vier offene Lücken
+  (Registry-Eintrag, `ctx.engines`/`AppContext`-Fall, Editor-
+  `LanguagePlugin`, Blazor-Serving in Dev/Prod). Die `LanguagePlugin`-Lücke
+  ist die einzige davon, die sich isoliert, ohne die anderen drei
+  anzufassen, bauen und testen lässt — genau ein begrenztes Increment.
+
+- **Implementiert:** `src/editor/languages/csharp/` — `keywords.ts`
+  (Keyword-/Typ-/Sonstige-Mengen), `tokenizer.ts` (`//`- und `/* */`-
+  Kommentare, `"..."`/`$"..."`/`@"..."`-Strings inkl. Verbatim-`""`-
+  Escape, `'x'`-Char-Literale, Zahlen mit Suffix wie `10.5f`/`42L`),
+  `highlight.ts`, `autoIndent.ts` (kopiert Einrückung, +1 Tab nach Zeilen,
+  die mit `{` enden — brace-basiertes Pendant zu Pythons Doppelpunkt-Regel),
+  `autoClosePairs.ts` (wiederverwendet aus dem SQL-Modul, sprachagnostisch),
+  `uppercaseKeyword.ts` (No-Op, wie schon bei Python), zusammengeführt in
+  `csharpLanguagePlugin.ts` (`id: 'csharp'`, implementiert das bestehende
+  `LanguagePlugin`-Interface unverändert). 28 neue Unit-Tests in
+  `csharpLanguagePlugin.test.ts`, gleicher Stil wie
+  `pythonLanguagePlugin.test.ts`.
+
+- **Ein echter Bug, beim Testen gegen echte C#-Syntax gefunden (nicht nur
+  angenommen):** SQL/Python klassifizieren jedes Wort direkt vor `(` immer
+  als Funktionsaufruf, geprüft *vor* jeder Keyword-Zugehörigkeit — richtig
+  für SQL, wo z. B. `DATE` sowohl Datentyp als auch Funktion sein kann.
+  Direkt auf C# übertragen hätte das `if (`, `while (`, `catch (` — also
+  praktisch jede reale C#-Kontrollfluss-Syntax — fälschlich als
+  Funktionsaufruf eingefärbt, weil diese Keywords fast immer direkt von
+  `(` gefolgt werden. Fix: für C# werden Keyword-/Typ-Mengen zuerst
+  geprüft, die Klammer-Heuristik greift nur noch für echte, nicht
+  reservierte Bezeichner — in C# ist das sogar korrekter als das
+  SQL/Python-Vorbild, weil jedes C#-Keyword und jeder eingebaute Typ ein
+  echtes reserviertes Wort ist (anders als in SQL), es also gar keine
+  echte Mehrdeutigkeit mehr gibt, die die Klammer-Regel auflösen müsste.
+
+- **Bewusst nicht getan:** Keine Anbindung an `domEditor.ts`/`editorTab.ts`,
+  kein Registry-Eintrag, kein `AppContext`-Fall, kein Blazor-Serving —
+  C# bleibt weiterhin nicht auswählbar in der Live-App. Das Plugin ist
+  eigenständig gebaut und getestet, genau wie es `docs/csharp-engine-poc.md`
+  für diese Lücke vorsieht (fertig, sobald die übrigen drei Lücken
+  geschlossen sind).
+
+- **Tests:** Volle Testsuite 958 → 986 (28 neue Tests), alle grün.
+  `typecheck`, `npm run build` grün (632,33 kB, unverändert — reiner
+  Editor-Code, keine neue Route). `knip`: unverändert 10 Funde (das neue
+  Modul wird von seiner eigenen Testdatei referenziert, keine toten
+  Dateien). Coverage: 92,30 % / 73,11 % / 99,13 % / 92,30 %.

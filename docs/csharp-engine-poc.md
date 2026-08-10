@@ -479,6 +479,47 @@ Roughly in dependency order:
    a track that's selectable but non-functional would be worse than not
    shipping it yet, so the registry line is the one deliberately-withheld
    piece here — added the moment those four gaps are closed, not before.
+
+   **Update (2026-08-10): one of these four gaps is now closed.** The C#
+   `LanguagePlugin` (`src/editor/languages/csharp/`) exists — a
+   `tokenizer.ts`/`highlight.ts`/`autoIndent.ts` trio mirroring the
+   SQL/Python plugins' shape exactly, plus a reused `autoClosePairs.ts`
+   (bracket/quote closing is language-agnostic) and a no-op
+   `uppercaseKeyword.ts` (C# keywords are conventionally lowercase, same
+   reasoning Python's plugin already used), combined into
+   `csharpLanguagePlugin.ts` implementing the `LanguagePlugin` interface
+   with `id: 'csharp'`. 28 unit tests
+   (`csharpLanguagePlugin.test.ts`) cover keyword/type/string/comment
+   tokenization and auto-indent.
+
+   One real design deviation from the SQL/Python precedent, found by
+   writing the tests against real C# syntax rather than assuming the
+   ported pattern would just work: SQL's and Python's tokenizers both
+   classify *any* word immediately followed by `(` as a function call,
+   checked *before* keyword-set membership — correct for SQL, where a
+   word like `DATE` can legitimately be either a datatype or a function
+   name, so the paren-call heuristic is the only way to disambiguate.
+   Porting that same priority order to C# verbatim initially misclassified
+   `if (`, `while (`, `catch (` — i.e. virtually all real C# control-flow
+   syntax — as function calls, since those keywords are almost always
+   immediately followed by `(`. Fixed by flipping the priority for C#
+   specifically: keyword/type-set membership is checked *first*, and the
+   paren heuristic only applies to words that aren't reserved at all. This
+   is actually more correct for C# than the SQL/Python order it was copied
+   from — every C# keyword and built-in type is a genuinely reserved word
+   that can never be reused as an identifier (unlike SQL's looser
+   reserved-word rules), so there is no real ambiguity left to resolve with
+   paren-position once reserved words are excluded first.
+
+   Deliberately **not** wired into `domEditor.ts`/`editorTab.ts` yet (no
+   language-picker code path routes to it) and the C# track is still not
+   in `TRACKS` — this increment closes exactly one of the four gaps listed
+   above, not all of them. Remaining gaps before the C# track is playable
+   in the live app: `ctx.engines`/`AppContext` wiring for a C#-track case,
+   the registry line itself, and deciding where the Blazor bundle is
+   served from in dev/production (the COOP/COEP `coi-serviceworker`
+   question from step 1 is resolved in principle but not yet implemented
+   as an actual dev-server/build step).
 6. ~~**Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
    mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
    feasible now that `dotnet` works in this sandbox; likely just
