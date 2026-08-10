@@ -949,6 +949,28 @@ offen). B0 bis B10 weiterhin vollständig. Nächster Schritt: die
 restlichen B11-Tags (Interfaces, Polymorphie über Interface-Typen,
 `sealed`) in einer künftigen Challenge.*
 
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 16
+ergänzt — deckt die restlichen 3 Tags aus B11 ab und schließt den
+Zweig vollständig: `interfaces`, `polymorphism-via-interface`,
+`sealed-classes`. Szenario: ein `interface IBeschreibbar` mit einer
+Methoden-Signatur (kein Rumpf), zwei implementierende Klassen `Buch`
+und `sealed class DVD`, und ein `IBeschreibbar[]`-Array mit je einer
+Instanz beider Klassen — eine `foreach`-Schleife ruft `Beschreiben()`
+über den Interface-Typ auf, die konkrete Implementierung wird erst zur
+Laufzeit bestimmt (Polymorphie über Interfaces, nicht über eine
+gemeinsame Basisklasse). Drei Distraktoren, alle empirisch gegen den
+echten `dotnet`-Treiber verifiziert: `Buch` implementiert
+`Beschreiben()` nicht (Compilerfehler `CS0535`, jede Interface-Methode
+muss bereitgestellt werden); ein Versuch `class BluRay : DVD` von der
+als `sealed` markierten `DVD` zu erben (Compilerfehler `CS0509`, genau
+der Zweck von `sealed`); die beiden Array-Zuweisungen vertauscht
+(kompiliert, aber falsche Ausgabereihenfolge).
+
+**Tag-Bilanz: 65 von 86 (≈ 76 %).** Damit ist **B11 (Vererbung &
+Polymorphie) vollständig abgedeckt** — B0 bis B11 sind jetzt komplett,
+gut drei Viertel aller 86 Tags. Nächster offener Zweig: B12 (Generics,
+nach der Branch-Übersicht in Abschnitt 5).*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt

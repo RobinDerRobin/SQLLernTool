@@ -135,6 +135,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-10 | HEAD (C# Challenge 13: B10 vollständig, 57/86) | 92.09 % | 72.74 % | 99.11 % | 92.09 % |
 | 2026-08-10 | HEAD (C# Challenge 14: B9 vollständig, B0–B10 komplett, 58/86) | 92.13 % | 72.74 % | 99.11 % | 92.13 % |
 | 2026-08-10 | HEAD (Live-Bug-Hunt sauber + C# Challenge 15: B11 Teil 1, 62/86) | 92.16 % | 72.69 % | 99.11 % | 92.16 % |
+| 2026-08-10 | HEAD (C# Challenge 16: B11 vollständig, 65/86) | 92.19 % | 72.65 % | 99.11 % | 92.19 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -2665,3 +2666,38 @@ sondern pro PR direkt in den Checks sichtbar.
   Gate 2 für Challenge 15, alle drei Distraktoren grün). Volle Testsuite
   938 → 942, alle grün. `typecheck`, `npm run build` grün. `knip`:
   unverändert 10 Funde. Coverage: 92,16 % / 72,69 % / 99,11 % / 92,16 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 16 (B11 vollständig)
+
+- **Umfang:** Baseline sauber (942/942, typecheck/build/knip grün, HEAD
+  `411a911`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. C# hat nach Challenge 15
+  klaren Schwung, nächster Schritt: die restlichen 3 B11-Tags, um den
+  Zweig abzuschließen.
+
+- **Content:** Challenge 16 deckt `interfaces`,
+  `polymorphism-via-interface`, `sealed-classes` ab. Szenario: ein
+  `interface IBeschreibbar` mit einer Methoden-Signatur (kein Rumpf),
+  zwei implementierende Klassen `Buch` und `sealed class DVD`, und ein
+  `IBeschreibbar[]`-Array mit je einer Instanz beider Klassen — eine
+  `foreach`-Schleife ruft `Beschreiben()` über den Interface-Typ auf,
+  die konkrete Implementierung wird erst zur Laufzeit bestimmt
+  (Polymorphie über Interfaces statt über eine gemeinsame Basisklasse).
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** `Buch` implementiert `Beschreiben()` nicht
+  (Compilerfehler `CS0535`); ein Versuch `class BluRay : DVD` von der
+  als `sealed` markierten `DVD` zu erben (Compilerfehler `CS0509`, genau
+  der Zweck von `sealed`); die beiden Array-Zuweisungen vertauscht
+  (kompiliert, aber falsche Ausgabereihenfolge).
+
+- **Ergebnis:** C#-Tag-Bilanz 62/86 → 65/86 (≈76 %). B11 (Vererbung &
+  Polymorphie) ist damit vollständig abgedeckt — **B0 bis B11 sind
+  jetzt komplett**, gut drei Viertel aller 86 Tags. Nächster offener
+  Zweig: B12 (Generics). Build-Größe unverändert (632,33 kB) — Track
+  bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 316 → 320 (Gate 1 +
+  Gate 2 für Challenge 16, alle drei Distraktoren grün). Volle Testsuite
+  942 → 946, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 92,19 % / 72,65 % / 99,11 % / 92,19 %.
