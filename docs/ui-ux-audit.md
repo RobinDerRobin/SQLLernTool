@@ -3184,3 +3184,36 @@ sondern pro PR direkt in den Checks sichtbar.
   nur im Dev-Server). `knip`: unverändert 10 Funde. Keine
   Artifact-Republikation nötig (keine dargestellte Zahl hat sich
   bewegt).
+
+### 2026-08-10 — Stündliche Routine: Live-Bug-Hunt (sauber), kein aktionabler Schritt
+
+- **Umfang:** Baseline sauber (990/990, typecheck/build/knip grün, HEAD
+  `2998683`). SQL/Python weiterhin an der permanenten Scope-Grenze. Nach
+  fünf C#-Engine-Durchgängen in Folge (LanguagePlugin, AppContext-Wiring,
+  Hosting-Analyse ×3, Dev-Server-Middleware) laut Mandat-Priorität wieder
+  zuerst Priorität 2: ein gründlicherer Live-Playwright-Durchlauf gegen
+  den echten Dev-Server, da der letzte dedizierte Bug-Hunt mehrere
+  Durchgänge zurückliegt (die zwischenzeitlichen C#-Firings enthielten
+  zwar kleinere SQL/Python-Stichproben als Nebenprodukt ihrer eigenen
+  Verifikation, aber keinen vollständigen Durchlauf).
+
+- **Live-Bug-Hunt-Ergebnis:** Dev-Server per Playwright gefahren (CDN-
+  Workaround aus dem Runbook: `context.route()` liefert lokal
+  installiertes `sql.js`/`pyodide` aus; `crossOriginIsolated=true` dank
+  der seit letztem Durchgang aktiven COOP/COEP-Middleware weiterhin
+  bestätigt). Breitere Stichprobe als in den letzten Durchgängen — jede
+  4. Challenge statt jede 6./8.: 20 von 78 SQL- und 17 von 67
+  Python-Challenges, jeweils Tutorial-Text geprüft, Lösung über "In den
+  Editor übernehmen" eingefügt, ausgeführt, `✓ Aufgabe erfüllt`
+  bestätigt — 37/37 bestanden. Zusätzlich zwei frische, in keinem der
+  letzten Durchgänge geprüfte echte Distraktoren manuell eingefügt und
+  ausgeführt (SQL 25 UPSERT: `menge = excluded.menge` statt `menge =
+  menge + excluded.menge`; Python 20 dynamische Typisierung: neue
+  Variable `wert2` statt Wiederverwendung von `wert`) — beide korrekt
+  abgelehnt. Mobile-Viewport (375×667) ohne horizontalen Overflow. 0
+  Konsolenfehler. Keine neuen Funde.
+
+- **Ergebnis:** Keine Code-/Content-Änderung in diesem Durchgang — Tests,
+  Coverage und Build-Größe unverändert (990/990, 92,31 % / 73,15 % /
+  99,14 % / 92,31 %, 632,59 kB). Kein neuer Commit, keine
+  Artifact-Republikation nötig.
