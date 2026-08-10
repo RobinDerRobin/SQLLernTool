@@ -825,6 +825,42 @@ Lösung für `method-overloading` finden, oder direkt mit B10
 (Objektorientierung) weitermachen, was `method-overloading` über den
 Klassen-Container gleich mitlösen würde.*
 
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 12
+ergänzt — deckt 4 der 8 Tags aus B10 (Objektorientierung) ab:
+`class-definition`, `fields`, `constructors`, `this-keyword`. Erste
+Challenge mit einer echten Klasse. Szenario: eine `Konto`-Klasse mit
+den Feldern `name` (`string`) und `kontostand` (`double`), einem
+Konstruktor `Konto(string name, double kontostand)`, der beide Felder
+per `this.` setzt (Parameter und Feld heißen bewusst gleich, um die
+Namenskollision zu demonstrieren, die `this` auflöst) — sowie zwei
+unabhängige Instanzen (`anna`, `ben`), von denen nur `anna`s Kontostand
+geändert wird, um Instanz-Unabhängigkeit sichtbar zu machen.
+
+**Empirischer Fund vor dem Schreiben des Contents:** Ein erster Entwurf
+platzierte die Klassen-Definition vor den Top-Level-Statements (wie bei
+den lokalen Funktionen aus Challenge 10/11 üblich) — das schlägt fehl
+mit `CS8803: Top-level statements must precede namespace and type
+declarations`. Anders als lokale Funktionen (die überall im Top-Level-
+Statements-Block stehen dürfen) müssen echte Typ-Deklarationen wie
+`class` **nach** allen ausführbaren Anweisungen der Datei stehen. Die
+Challenge — und ihr Tutorial-Text — folgen dieser Regel entsprechend.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `this.` im Konstruktor vergessen — `name = name;` ist dann
+nur eine wirkungslose Selbstzuweisung an den Parameter, das Feld bleibt
+bei seinem Standardwert (`null`/`0`); das Feld `kontostand` komplett
+vergessen zu deklarieren (Compilerfehler `CS1061`, da der Konstruktor
+und alle Zugriffe auf ein nicht existierendes Feld verweisen); und
+`Konto ben = anna;` statt einer eigenen neuen Instanz — `ben` wird
+dadurch nur ein zweiter Name für dieselbe Instanz, zeigt also fälschlich
+Annas Werte.
+
+**Tag-Bilanz: 53 von 86 (≈ 62 %).** B10 ist damit zu 4 von 8 Tags
+abgedeckt (`access-modifiers`, `properties`, `static-members`,
+`value-vs-reference-types` offen). Mit einer echten Klasse jetzt
+verfügbar, ist auch der Weg für das zurückgestellte `method-overloading`
+(B9) frei — beide sind Kandidaten für eine künftige Challenge.*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt

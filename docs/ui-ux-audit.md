@@ -131,6 +131,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-10 | HEAD (Live-Bug-Hunt sauber + C# Challenge 09: B8 vollständig, 42/86) | 91.95 % | 72.82 % | 99.10 % | 91.95 % |
 | 2026-08-10 | HEAD (C# Challenge 10: B9 Teil 1, 46/86) | 91.99 % | 72.81 % | 99.10 % | 91.99 % |
 | 2026-08-10 | HEAD (C# Challenge 11: B9 7/8, 49/86) | 92.02 % | 72.79 % | 99.10 % | 92.02 % |
+| 2026-08-10 | HEAD (C# Challenge 12: B10 Teil 1, erste Klasse, 53/86) | 92.06 % | 72.78 % | 99.11 % | 92.06 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -2478,3 +2479,51 @@ sondern pro PR direkt in den Checks sichtbar.
   Gate 2 für Challenge 11, alle drei Distraktoren grün). Volle Testsuite
   922 → 926, alle grün. `typecheck`, `npm run build` grün. `knip`:
   unverändert 10 Funde. Coverage: 92,02 % / 72,79 % / 99,10 % / 92,02 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 12 (B10 Teil 1, erste Klasse)
+
+- **Umfang:** Baseline sauber (926/926, typecheck/build/knip grün, HEAD
+  `a55e103`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr in diesen beiden Tracks.
+  Kein SQL/Python/UI/Editor-Code seit dem letzten Live-Bug-Hunt (2
+  Durchgänge zuvor, sauber) geändert — reiner Content seither, ein
+  erneuter Playwright-Durchlauf hätte keinen neuen Signal-Wert erwartet.
+  C# hat nach Challenge 10/11 klaren Schwung, nächster Zweig: B10
+  (Objektorientierung, 8 Tags — analog zu B2/B9 auf mehrere Challenges
+  aufgeteilt).
+
+- **Content:** Challenge 12 deckt 4 der 8 B10-Tags ab: `class-definition`,
+  `fields`, `constructors`, `this-keyword`. Erste Challenge mit einer
+  echten Klasse. Szenario: eine `Konto`-Klasse mit den Feldern `name`
+  (`string`) und `kontostand` (`double`), einem Konstruktor, der beide
+  Felder per `this.` setzt (Parameter und Feld heißen bewusst gleich, um
+  die Namenskollision zu demonstrieren, die `this` auflöst), sowie zwei
+  unabhängige Instanzen — nur eine davon wird verändert, um
+  Instanz-Unabhängigkeit sichtbar zu machen.
+
+- **Empirischer Fund vor dem Schreiben des Contents:** Ein erster
+  Entwurf platzierte die Klassen-Definition vor den Top-Level-Statements
+  (wie bei den lokalen Funktionen aus Challenge 10/11 üblich) — das
+  schlägt fehl mit `CS8803: Top-level statements must precede namespace
+  and type declarations`. Anders als lokale Funktionen müssen echte
+  Typ-Deklarationen wie `class` **nach** allen ausführbaren Anweisungen
+  der Datei stehen. Die Challenge und ihr Tutorial-Text folgen dieser
+  Regel entsprechend — dokumentiert in
+  `docs/csharp-concept-hierarchy.md`.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** `this.` im Konstruktor vergessen (wirkungslose
+  Selbstzuweisung an den Parameter, Feld bleibt bei `null`/`0`); Feld
+  `kontostand` komplett vergessen zu deklarieren (Compilerfehler
+  `CS1061`); `Konto ben = anna;` statt einer eigenen neuen Instanz — `ben`
+  wird nur ein zweiter Name für dieselbe Instanz.
+
+- **Ergebnis:** C#-Tag-Bilanz 49/86 → 53/86 (≈62 %). B10 zu 4 von 8 Tags
+  abgedeckt. Mit einer echten Klasse jetzt verfügbar, ist auch der Weg
+  für das zurückgestellte `method-overloading` (B9) frei. Build-Größe
+  unverändert (632,33 kB) — Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 300 → 304 (Gate 1 +
+  Gate 2 für Challenge 12, alle drei Distraktoren grün). Volle Testsuite
+  926 → 930, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 92,06 % / 72,78 % / 99,11 % / 92,06 %.
