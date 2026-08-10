@@ -759,6 +759,45 @@ Collections) vollständig abgedeckt** — B0 bis B8 sind jetzt komplett,
 knapp die Hälfte aller 86 Tags. Nächster offener Zweig: B9 (Methoden,
 nach der Branch-Übersicht in Abschnitt 5).*
 
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 10
+ergänzt — deckt 4 der 8 Tags aus B9 (Methoden) ab: `method-definition`,
+`method-parameters`, `return-statement`, `recursion`. Szenario: drei
+eigene Methoden (`Quadrieren`, `Rechteckflaeche` mit zwei typisierten
+Parametern, und die rekursive `Fakultaet` mit explizitem Basisfall
+`n <= 1`). Drei Distraktoren, alle empirisch gegen den echten
+`dotnet`-Treiber verifiziert: fehlendes `return` (Compilerfehler CS0161,
+nicht alle Codepfade liefern einen Wert); `breite + hoehe` statt
+`breite * hoehe` (kompiliert, falsches Ergebnis); Rekursions-Basisfall
+liefert `0` statt `1` zurück, wodurch die ganze Multiplikationskette
+mit 0 durchmultipliziert wird.
+
+Empirisch entdeckt beim Entwurf dieser Challenge — bevor Content dazu
+geschrieben wurde, wie bei jeder C#-Challenge zuerst gegen den echten
+Treiber getestet: **`method-overloading` (der verbleibende B9-Tag)
+lässt sich mit der aktuellen Top-Level-Statements-Architektur des
+Kurses nicht direkt umsetzen.** Methoden, die nach den Top-Level-
+Statements einer `.cs`-Datei definiert werden, sind technisch
+**lokale Funktionen** der implizit generierten `Main`-Methode — und
+lokale Funktionen können in C#, anders als normale Klassenmethoden,
+**nicht überladen werden**. Ein Versuch mit zwei `Verdoppeln`-Methoden
+(eine `int`-, eine `double`-Überladung) schlägt mit `CS0128: A local
+variable or function named 'Verdoppeln' is already defined in this
+scope` fehl. Echtes Overloading bräuchte eine Klasse als Container
+(`class Rechner { public static int Verdoppeln(int x) ...; public
+static double Verdoppeln(double x) ...; }`) — das wäre inhaltlich ein
+Vorgriff auf `class-definition` (B10), das im Kurs noch nicht
+eingeführt ist. `method-overloading` bleibt deshalb vorerst
+zurückgestellt, bis B10 verfügbar ist oder eine andere Lösung gefunden
+wird; die verbleibenden B9-Tags `optional-parameters`,
+`ref-out-parameters` und `params-array` sind davon nicht betroffen
+(alle drei funktionieren mit lokalen Funktionen einwandfrei) und folgen
+in einer künftigen Challenge.
+
+**Tag-Bilanz: 46 von 86 (≈ 53 %).** B9 ist damit zu 4 von 8 Tags
+abgedeckt (`method-overloading`, `optional-parameters`,
+`ref-out-parameters`, `params-array` offen) — kein Zweig komplett neu
+geschlossen, aber über die Hälfte aller 86 Tags erreicht.*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt

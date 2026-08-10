@@ -129,6 +129,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-10 | HEAD (C# Challenge 07: B6 vollständig, 33/86) | 91.88 % | 72.86 % | 99.10 % | 91.88 % |
 | 2026-08-10 | HEAD (C# Challenge 08: B7 vollständig, 38/86) | 91.92 % | 72.85 % | 99.10 % | 91.92 % |
 | 2026-08-10 | HEAD (Live-Bug-Hunt sauber + C# Challenge 09: B8 vollständig, 42/86) | 91.95 % | 72.82 % | 99.10 % | 91.95 % |
+| 2026-08-10 | HEAD (C# Challenge 10: B9 Teil 1, 46/86) | 91.99 % | 72.81 % | 99.10 % | 91.99 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -2389,3 +2390,53 @@ sondern pro PR direkt in den Checks sichtbar.
   Gate 2 für Challenge 09, alle drei Distraktoren grün). Volle Testsuite
   914 → 918, alle grün. `typecheck`, `npm run build` grün. Coverage:
   91,95 % / 72,82 % / 99,10 % / 91,95 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 10 (B9 Teil 1) + Overloading-Einschränkung entdeckt
+
+- **Umfang:** Baseline sauber (918/918, typecheck/build/knip grün, HEAD
+  `b54e44e`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr in diesen beiden Tracks. C#
+  hat nach Challenge 01-09 klaren Schwung, nächster Zweig: B9 (Methoden,
+  8 Tags — größer als jeder bisherige C#-Zweig einzeln, deshalb analog zu
+  B2 auf zwei Challenges aufgeteilt).
+
+- **Content:** Challenge 10 deckt 4 der 8 B9-Tags ab: `method-definition`,
+  `method-parameters`, `return-statement`, `recursion`. Szenario: drei
+  eigene Methoden — `Quadrieren` (ein Parameter), `Rechteckflaeche` (zwei
+  typisierte Parameter), und die rekursive `Fakultaet` mit explizitem
+  Basisfall `n <= 1`.
+
+- **Empirischer Fund vor dem Schreiben des Contents:** Ein erster Entwurf
+  wollte auch `method-overloading` (den fünften B9-Tag) in Challenge 10
+  mitnehmen — zwei `Verdoppeln`-Überladungen (`int`/`double`). Das schlug
+  beim Testlauf gegen den echten `dotnet`-Treiber fehl:
+  `CS0128: A local variable or function named 'Verdoppeln' is already
+  defined in this scope`. Grund: Methoden, die nach den Top-Level-
+  Statements einer `.cs`-Datei stehen (wie in diesem gesamten Kurs
+  durchgehend verwendet), sind technisch **lokale Funktionen** der
+  implizit generierten `Main`-Methode — und lokale Funktionen können in
+  C#, anders als normale Klassenmethoden, nicht überladen werden. Echtes
+  Overloading bräuchte eine Klasse als Container, was inhaltlich ein
+  Vorgriff auf `class-definition` (B10) wäre. `method-overloading` bleibt
+  deshalb vorerst zurückgestellt (dokumentiert in
+  `docs/csharp-concept-hierarchy.md`); die verbleibenden B9-Tags
+  (`optional-parameters`, `ref-out-parameters`, `params-array`) sind
+  davon nicht betroffen und folgen in einer künftigen Challenge.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** fehlendes `return` in `Quadrieren` (Compilerfehler
+  CS0161, nicht alle Codepfade liefern einen Wert); `breite + hoehe`
+  statt `breite * hoehe` in `Rechteckflaeche` (kompiliert, falsches
+  Ergebnis); Rekursions-Basisfall liefert `0` statt `1` zurück, wodurch
+  die ganze Multiplikationskette mit 0 durchmultipliziert wird
+  (`Fakultaet(5)` liefert fälschlich `0` statt `120`).
+
+- **Ergebnis:** C#-Tag-Bilanz 42/86 → 46/86 (≈53 %). B9 zu 4 von 8 Tags
+  abgedeckt, kein Zweig komplett neu geschlossen, aber über die Hälfte
+  aller 86 Tags erreicht. Build-Größe unverändert (632,33 kB) — Track
+  bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 292 → 296 (Gate 1 +
+  Gate 2 für Challenge 10, alle drei Distraktoren grün). Volle Testsuite
+  918 → 922, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 91,99 % / 72,81 % / 99,10 % / 91,99 %.
