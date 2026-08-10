@@ -861,6 +861,37 @@ abgedeckt (`access-modifiers`, `properties`, `static-members`,
 verfügbar, ist auch der Weg für das zurückgestellte `method-overloading`
 (B9) frei — beide sind Kandidaten für eine künftige Challenge.*
 
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 13
+ergänzt — deckt die restlichen 4 Tags aus B10 ab und schließt den Zweig
+vollständig: `access-modifiers`, `properties`, `static-members`,
+`value-vs-reference-types`. Szenario, zweigeteilt: (1) eine
+`Person`-Klasse mit einem `private` Feld `name`, einer Property `Name`
+(`get`/`set`) davor als kontrollierter Zugriff, und einem
+`public static int anzahlPersonen`, das der Konstruktor bei jeder neuen
+Instanz erhöht — abgerufen über den Klassennamen (`Person.anzahlPersonen`),
+nicht über eine Instanz; (2) ein `struct Punkt { public int X; public
+int Y; }` neben der `Person`-`class`, um Werttyp- (Kopie bei Zuweisung)
+und Referenztyp-Semantik (Verweis bei Zuweisung, wie schon `Konto ben =
+anna;` aus Challenge 12) direkt nebeneinander zu zeigen: `Punkt p2 = p1;
+p2.X = 99;` lässt `p1.X` unverändert bei `5`.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: direkter Zugriff auf das private Feld (`anna.name` statt
+`anna.Name`, Compilerfehler `CS0122`); `static` bei `anzahlPersonen`
+vergessen — der Zugriff über den Klassennamen wird dann vom Compiler
+abgelehnt (`CS0120`); `Punkt` als `class` statt `struct` deklariert —
+dadurch wird `p2` zu einem zweiten Verweis auf dieselbe Instanz, `p1.X`
+wird durch `p2.X = 99;` fälschlich mitverändert. Der dritte Distraktor
+demonstriert den Kernunterschied des Tags empirisch, statt ihn nur zu
+behaupten.
+
+**Tag-Bilanz: 57 von 86 (≈ 66 %).** Damit ist **B10 (Objektorientierung)
+vollständig abgedeckt** — B0 bis B8 sowie B10 komplett, B9 zu 7 von 8
+(nur `method-overloading` offen, jetzt technisch lösbar). Nächster
+offener Zweig: B11 (Vererbung & Polymorphie) — oder zuerst
+`method-overloading` in B9 nachholen, jetzt wo eine Klasse als
+Container zur Verfügung steht.*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt

@@ -132,6 +132,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-10 | HEAD (C# Challenge 10: B9 Teil 1, 46/86) | 91.99 % | 72.81 % | 99.10 % | 91.99 % |
 | 2026-08-10 | HEAD (C# Challenge 11: B9 7/8, 49/86) | 92.02 % | 72.79 % | 99.10 % | 92.02 % |
 | 2026-08-10 | HEAD (C# Challenge 12: B10 Teil 1, erste Klasse, 53/86) | 92.06 % | 72.78 % | 99.11 % | 92.06 % |
+| 2026-08-10 | HEAD (C# Challenge 13: B10 vollständig, 57/86) | 92.09 % | 72.74 % | 99.11 % | 92.09 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -2527,3 +2528,46 @@ sondern pro PR direkt in den Checks sichtbar.
   Gate 2 für Challenge 12, alle drei Distraktoren grün). Volle Testsuite
   926 → 930, alle grün. `typecheck`, `npm run build` grün. `knip`:
   unverändert 10 Funde. Coverage: 92,06 % / 72,78 % / 99,11 % / 92,06 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 13 (B10 vollständig)
+
+- **Umfang:** Baseline sauber (930/930, typecheck/build/knip grün, HEAD
+  `6cc5388`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr in diesen beiden Tracks.
+  Kein SQL/Python/UI/Editor-Code seit dem letzten Live-Bug-Hunt (3
+  Durchgänge zuvor, sauber) geändert — reiner Content seither. C# hat
+  nach Challenge 12 klaren Schwung, nächster Schritt: die restlichen 4
+  B10-Tags, um den Zweig abzuschließen.
+
+- **Content:** Challenge 13 deckt die restlichen 4 B10-Tags ab:
+  `access-modifiers`, `properties`, `static-members`,
+  `value-vs-reference-types`. Zweigeteiltes Szenario: (1) eine
+  `Person`-Klasse mit einem `private` Feld hinter einer Property
+  (`get`/`set`) als kontrollierter Zugriff, und einem
+  `public static int anzahlPersonen`, das der Konstruktor bei jeder
+  neuen Instanz erhöht — abgerufen über den Klassennamen, nicht über
+  eine Instanz; (2) ein `struct Punkt` neben der `Person`-`class`, um
+  Werttyp- (Kopie bei Zuweisung) und Referenztyp-Semantik (Verweis bei
+  Zuweisung, wie schon `Konto ben = anna;` aus Challenge 12) direkt
+  nebeneinander zu zeigen.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** direkter Zugriff auf das private Feld statt die
+  Property (Compilerfehler `CS0122`); `static` bei `anzahlPersonen`
+  vergessen — Zugriff über den Klassennamen wird dann abgelehnt
+  (Compilerfehler `CS0120`); `Punkt` als `class` statt `struct`
+  deklariert — dadurch wird die zweite Variable zu einem Verweis auf
+  dieselbe Instanz statt einer Kopie, der Kernunterschied des Tags wird
+  so empirisch demonstriert statt nur behauptet.
+
+- **Ergebnis:** C#-Tag-Bilanz 53/86 → 57/86 (≈66 %). B10
+  (Objektorientierung) ist damit vollständig abgedeckt — B0 bis B8
+  sowie B10 komplett, B9 zu 7 von 8 (nur `method-overloading` offen,
+  jetzt technisch lösbar). Nächster offener Zweig: B11 (Vererbung &
+  Polymorphie) — oder zuerst `method-overloading` in B9 nachholen.
+  Build-Größe unverändert (632,33 kB) — Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 304 → 308 (Gate 1 +
+  Gate 2 für Challenge 13, alle drei Distraktoren grün). Volle Testsuite
+  930 → 934, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 92,09 % / 72,74 % / 99,11 % / 92,09 %.
