@@ -136,6 +136,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-10 | HEAD (C# Challenge 14: B9 vollständig, B0–B10 komplett, 58/86) | 92.13 % | 72.74 % | 99.11 % | 92.13 % |
 | 2026-08-10 | HEAD (Live-Bug-Hunt sauber + C# Challenge 15: B11 Teil 1, 62/86) | 92.16 % | 72.69 % | 99.11 % | 92.16 % |
 | 2026-08-10 | HEAD (C# Challenge 16: B11 vollständig, 65/86) | 92.19 % | 72.65 % | 99.11 % | 92.19 % |
+| 2026-08-10 | HEAD (C# Challenge 17: B12 vollständig, B0–B12 komplett, 68/86) | 92.17 % | 72.64 % | 99.12 % | 92.17 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -2701,3 +2702,51 @@ sondern pro PR direkt in den Checks sichtbar.
   Gate 2 für Challenge 16, alle drei Distraktoren grün). Volle Testsuite
   942 → 946, alle grün. `typecheck`, `npm run build` grün. `knip`:
   unverändert 10 Funde. Coverage: 92,19 % / 72,65 % / 99,11 % / 92,19 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 17 (B12 vollständig, B0–B12 komplett)
+
+- **Umfang:** Baseline sauber (946/946, typecheck/build/knip grün, HEAD
+  `f23dfdd`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. C# hat nach Challenge 16
+  klaren Schwung, nächster Zweig: B12 (Generics, klein genug für einen
+  einzigen Durchgang, alle 3 Tags).
+
+- **Content:** Challenge 17 deckt alle 3 Tags aus B12 in einem
+  Durchgang ab: `generic-type-definition`, `generic-method-definition`,
+  `generic-constraints`. Szenario: eine generische Klasse `Box<T>` mit
+  Feld `Inhalt`, verwendet mit zwei unterschiedlichen konkreten Typen
+  (`Box<string>` und `Box<int>`) — genau das macht den generischen Typ
+  gegenüber einer festen Klasse überhaupt erst notwendig; und eine
+  generische Methode `T Groesser<T>(T a, T b) where T :
+  IComparable<T>`, die per `CompareTo` den größeren Wert liefert,
+  aufrufbar sowohl mit `int`- als auch mit `string`-Argumenten ohne
+  explizite Typangabe (Typ-Inferenz).
+
+- **Design-Korrektur vor dem Schreiben des Contents:** Ein erster
+  Entwurf des "Box nicht generisch"-Distraktors kompilierte fälschlich
+  unverändert durch, weil das Szenario `Box` nur mit einem einzigen Typ
+  (`string`) verwendete — eine fest auf `string` zugeschnittene Klasse
+  wäre für diese Aufgabe genauso gültig gewesen. Behoben durch eine
+  zweite `Box<int>`-Instanziierung im Szenario, die Genericität dadurch
+  tatsächlich notwendig macht statt nur zu behaupten — vor dem
+  eigentlichen Content-Schreiben empirisch gegen den echten
+  `dotnet`-Treiber verifiziert.
+
+- **Drei Distraktoren, alle empirisch verifiziert:** `where T :
+  IComparable<T>` weggelassen — ein uneingeschränktes `T` kennt keine
+  `CompareTo`-Methode (Compilerfehler); `Box` nicht generisch, sondern
+  fest auf `string` zugeschnitten — `Box<int> zahlBox = ...` lässt sich
+  dann nicht mehr kompilieren (Compilerfehler `CS0308`); `Groesser`
+  nicht generisch, sondern fest auf `int` zugeschnitten — der Aufruf
+  mit zwei `string`-Argumenten passt zu keiner Methode mehr
+  (Compilerfehler `CS1503`).
+
+- **Ergebnis:** C#-Tag-Bilanz 65/86 → 68/86 (≈79 %). B12 (Generics) ist
+  damit vollständig abgedeckt — **B0 bis B12 sind jetzt komplett**.
+  Nächster offener Zweig: B13 (Fehlerbehandlung). Build-Größe
+  unverändert (632,33 kB) — Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 320 → 324 (Gate 1 +
+  Gate 2 für Challenge 17, alle drei Distraktoren grün). Volle Testsuite
+  946 → 950, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 92,17 % / 72,64 % / 99,12 % / 92,17 %.

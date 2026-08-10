@@ -971,6 +971,39 @@ Polymorphie) vollständig abgedeckt** — B0 bis B11 sind jetzt komplett,
 gut drei Viertel aller 86 Tags. Nächster offener Zweig: B12 (Generics,
 nach der Branch-Übersicht in Abschnitt 5).*
 
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 17
+ergänzt — deckt alle 3 Tags aus B12 (Generics) in einem Durchgang ab:
+`generic-type-definition`, `generic-method-definition`,
+`generic-constraints`. Szenario: eine generische Klasse `Box<T>` mit
+Feld `Inhalt`, verwendet mit zwei unterschiedlichen konkreten Typen
+(`Box<string>` und `Box<int>`) — genau das macht den generischen Typ
+gegenüber einer festen Klasse überhaupt erst notwendig; und eine
+generische Methode `T Groesser<T>(T a, T b) where T : IComparable<T>`,
+die per `CompareTo` den größeren Wert liefert, aufrufbar sowohl mit
+`int`- als auch mit `string`-Argumenten ohne explizite Typangabe (Typ-
+Inferenz).
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `where T : IComparable<T>` weggelassen — ein
+uneingeschränktes `T` kennt keine `CompareTo`-Methode, der Aufruf lässt
+sich nicht mehr auflösen (Compilerfehler); `Box` nicht generisch,
+sondern fest auf `string` zugeschnitten — `Box<int> zahlBox = ...`
+lässt sich dann nicht mehr kompilieren (Compilerfehler `CS0308`, der
+nicht-generische Typ kann nicht mit Typargumenten verwendet werden);
+`Groesser` nicht generisch, sondern fest auf `int` zugeschnitten — der
+Aufruf mit zwei `string`-Argumenten passt zu keiner Methode mehr
+(Compilerfehler `CS1503`). Ein erster Entwurf des ersten Distraktors
+(Box mit `string` fest verdrahtet, aber ohne eine zweite
+`Box<int>`-Verwendung im Szenario) kompilierte fälschlich unverändert
+durch — der Fehler wurde vor dem Schreiben des Contents durch eine
+zweite `Box<T>`-Instanziierung mit einem anderen Typ behoben, die
+Genericität dadurch tatsächlich notwendig statt nur behauptet.
+
+**Tag-Bilanz: 68 von 86 (≈ 79 %).** Damit ist **B12 (Generics)
+vollständig abgedeckt** — B0 bis B12 sind jetzt komplett. Nächster
+offener Zweig: B13 (Fehlerbehandlung, nach der Branch-Übersicht in
+Abschnitt 5).*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt
