@@ -306,16 +306,26 @@ didn't pan out; it doesn't need to be pursued now.
 - The service worker reloads the page once on first visit to activate
   itself (standard SW-registration-then-reload pattern) — acceptable for
   a learning tool, but means the C# engine's own loading UI needs to
-  tolerate one extra reload before it starts fetching Blazor assets, and
-  this should not affect the SQL/Python tracks at all if the service
-  worker's scope is limited to only the page/route that hosts the C#
-  engine (avoid registering it site-wide).
+  tolerate one extra reload before it starts fetching Blazor assets.
+  **Correction (2026-08-10, see the dated update after step 5 below for
+  the full empirical writeup):** the "scope it to only the C# route,
+  avoid registering site-wide" idea in the original version of this
+  bullet turned out to rest on a wrong assumption — this app has no
+  per-route pages to scope to (single `index.html`, no client routing),
+  *and* a live test proved a scoped/child-only COOP+COEP doesn't grant
+  isolation anyway (isolation is a top-level-document property). The
+  header injection has to apply to the whole app. That's fine: the actual
+  fix is using `COEP: credentialless` instead of `require-corp`
+  site-wide, which does **not** require SQL/Python's CDN loads to send
+  `Cross-Origin-Resource-Policy` — verified live, see below.
 - COEP `require-corp` only requires `Cross-Origin-Resource-Policy` headers
   on genuinely cross-origin subresources; everything the Blazor boot
   sequence fetches (`.wasm`, `.dll`, `blazor.boot.json`, etc.) will be
   same-origin GitHub Pages assets, so no per-file CORP header wrangling
-  is expected to be needed — worth a real Playwright check once step 3 is
-  built, not just assumed.
+  is expected to be needed there either way. **Superseded:** per the
+  finding below, use `credentialless` rather than `require-corp` in the
+  first place, which sidesteps this question for every *other* subresource
+  on the page (SQL/Python's CDN scripts) too, not just Blazor's own assets.
 - A newer header, `Document-Isolation-Policy: isolate-and-credentialless`,
   is emerging (W3C TAG review as of 2026) as a lower-friction alternative
   that doesn't require COEP on the *page itself* — not yet broadly
@@ -575,30 +585,70 @@ Roughly in dependency order:
    standing routine mandate exists to prevent, so it's flagged here rather
    than implemented under time pressure.
 
-   **Proposed fix, not yet implemented or live-verified:** host the Blazor
-   engine inside a dedicated **same-origin iframe** (e.g.
-   `csharp-engine.html`, served from its own path) instead of loading it
-   into the main document. A child frame can carry its own COOP+COEP
-   response headers and become cross-origin-isolated independently of its
-   parent — this is the standard pattern several production WASM SDKs use
-   specifically to avoid forcing isolation onto a host page that embeds
-   them (e.g. StackBlitz's WebContainers). Under this design: (1)
-   `coi-serviceworker` (or the dev-server headers, respectively) apply
-   only to requests for `csharp-engine.html` and its own subresources,
-   never to `index.html` itself; (2) `csharpEngine.ts`'s loader changes
-   from injecting a `<script>` tag into the current document to creating
-   a hidden `<iframe src="csharp-engine.html">` and communicating via
-   `postMessage` (request user code in, `{stdout, error}` JSON back) —
-   the `CSharpRuntime`/`CSharpExecResult` public shape decided in step 4
-   does not need to change, only the transport underneath
-   `loadCSharpEngineFromServer`/`createCSharpEngine`; (3) SQL/Python are
-   completely unaffected, since the main document's headers never change.
-   This needs a real Playwright check (does a same-origin iframe with its
-   own COOP+COEP actually reach `crossOriginIsolated === true` in the
-   Chromium version this project's tooling uses, independent of the
-   parent's headers?) before committing to it as the final design — that
-   verification, plus the actual dev-server middleware and iframe host
-   page, is the next concrete C# increment for a future firing.
+   **Update (2026-08-10, later same day): the iframe proposal above is
+   WRONG — empirically disproven, not just reconsidered.** Built a
+   minimal, throwaway Node+Playwright harness (two local HTTP origins on
+   different ports, standing in for a same-origin parent app and a
+   cross-origin CDN, since the sandbox blocks real CDN domains) and tested
+   the actual claim before writing any real code:
+   - **Same-origin child iframe with its own `COOP: same-origin` +
+     `COEP: require-corp`, embedded in a parent with NEITHER header:**
+     `window.crossOriginIsolated` inside the iframe measured **`false`**,
+     `SharedArrayBuffer` **undefined**. A positive control (both parent
+     *and* child sending the headers) measured `true`/available in both,
+     proving the harness itself was sound — the negative result is real.
+     Cross-origin isolation is a property of the top-level browsing
+     context / agent cluster, decided by the *top* document's own headers;
+     a child frame cannot unilaterally opt itself into it while the parent
+     stays unisolated. The whole "isolate only the iframe, leave
+     `index.html` alone" premise from the proposal above does not work,
+     full stop — it would need to be abandoned regardless of any
+     `postMessage`/transport rewrite effort spent on it.
+   - **The actual fix, verified working:** use
+     `Cross-Origin-Embedder-Policy: credentialless` instead of
+     `require-corp` on the **main document** (`COOP: same-origin` stays
+     the same either way). Unlike `require-corp`, `credentialless` does
+     **not** require a `Cross-Origin-Resource-Policy` header on cross-origin
+     no-cors subresources — it just strips credentials (cookies/HTTP
+     auth) from those specific requests, which is irrelevant for public,
+     unauthenticated CDN scripts. Verified live: a page served with
+     `COOP: same-origin` + `COEP: credentialless`, loading a
+     cross-origin `<script>` from a second local origin that sends **no**
+     `Cross-Origin-Resource-Policy` header at all (deliberately mimicking
+     an unconfigured real-world CDN), measured
+     `crossOriginIsolated=true`, `SharedArrayBuffer` available, the
+     cross-origin script loaded and ran successfully, and zero console
+     errors. This directly resolves the regression risk found earlier
+     today — SQL/Python's CDN-hosted `sql.js`/Pyodide loads and this
+     project's `context.route()`-served local copies in every Playwright
+     bug-hunt pass need no changes at all, because they're all plain,
+     unauthenticated, public-script loads with nothing that
+     `credentialless` would strip. (The one network call in this app that
+     *is* cross-origin, `claudeChatClient.ts`'s `fetch()` to
+     `api.anthropic.com`, sends no `credentials` option and carries no
+     cookies — also unaffected, confirmed by re-reading that file.)
+   - **This also simplifies the plan back down**, not up: the original
+     2026-08-08 decision ("`coi-serviceworker`, applied to the whole app")
+     turns out to have been *closer to correct* than this same day's
+     earlier iframe detour — the only real correction needed to that
+     original plan is **use `credentialless` mode, not `require-corp`**,
+     applied document-wide via whatever mechanism sets the headers
+     (`coi-serviceworker`'s injected headers in production/GitHub Pages,
+     a small Vite dev-server middleware locally). No iframe, no
+     `postMessage` transport rewrite, no change to
+     `loadCSharpEngineFromServer`'s current "inject a `<script>` tag into
+     the current document" approach.
+   - **`WasmEnableThreads` compatibility not yet re-verified:** this
+     result confirms `credentialless` grants `crossOriginIsolated`/
+     `SharedArrayBuffer` in a plain HTML page; it does **not** yet confirm
+     the actual Blazor multithreaded-WASM boot sequence
+     (`csharp-engine/CSharpEngineBlazor.csproj`'s `WasmEnableThreads`)
+     tolerates `credentialless` specifically rather than `require-corp` —
+     that needs one more live check (serve the real published
+     `csharp-engine/` output under `COEP: credentialless` and confirm
+     `CSharpEngine.RunCode` still boots and runs) before this is fully
+     closed. That check, plus the actual dev-server middleware, is the
+     next concrete C# increment for a future firing.
 6. ~~**Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
    mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
    feasible now that `dotnet` works in this sandbox; likely just

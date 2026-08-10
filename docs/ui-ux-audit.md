@@ -3015,3 +3015,57 @@ sondern pro PR direkt in den Checks sichtbar.
   (`docs/csharp-engine-poc.md`), kein Code geändert. Tests/Coverage/
   Build-Größe unverändert (990/990, 92,31 % / 73,15 % / 99,14 % /
   92,31 %, 632,59 kB) — keine Artifact-Republikation nötig.
+
+### 2026-08-10 — Stündliche Routine: C#-Hosting-Plan empirisch verifiziert — iframe-Idee widerlegt, `credentialless` als echte Lösung gefunden
+
+- **Umfang:** Baseline sauber (990/990, typecheck/build/knip grün, HEAD
+  `af872cc`). SQL/Python weiterhin an der permanenten Scope-Grenze, ein
+  erneuter Live-Bug-Hunt wäre reine Wiederholung des letzten sauberen
+  Durchlaufs. Der letzte Durchgang hatte einen konkreten nächsten
+  Schritt hinterlassen: die im selben Durchgang vorgeschlagene
+  iframe-Isolation-Idee brauchte "eine echte Playwright-Prüfung ... bevor
+  sie als endgültiges Design gilt" — genau diese Prüfung diesen
+  Durchgang durchgeführt.
+
+- **Ergebnis der Prüfung:** Ein minimaler, wegwerfbarer Node+Playwright-
+  Aufbau (zwei lokale HTTP-Origins auf verschiedenen Ports, da echte
+  CDN-Domains in dieser Sandbox blockiert sind) hat die iframe-Idee
+  **empirisch widerlegt**: ein same-origin-Kind-iframe mit eigenen
+  `COOP: same-origin`/`COEP: require-corp`-Headern erreicht
+  `crossOriginIsolated=false`, wenn das Elterndokument selbst keine
+  dieser Header sendet — Isolation ist eine Eigenschaft des
+  Top-Level-Dokuments, kein Kind-Frame kann sie sich allein verschaffen
+  (eine Positivkontrolle mit Headern auf beiden Ebenen bestätigte
+  `true`/`true`, der Testaufbau selbst war also korrekt).
+
+- **Die tatsächliche Lösung, live verifiziert:** `Cross-Origin-Embedder-
+  Policy: credentialless` statt `require-corp` aufs gesamte Hauptdokument
+  angewendet (`COOP: same-origin` bleibt gleich) — `credentialless`
+  verlangt **keinen** `Cross-Origin-Resource-Policy`-Header von
+  Cross-Origin-Subressourcen, sondern entfernt nur Credentials
+  (Cookies/HTTP-Auth) aus diesen Anfragen, was für öffentliche,
+  unauthentifizierte CDN-Skripte irrelevant ist. Live bestätigt: eine
+  Seite mit `credentialless` erreicht `crossOriginIsolated=true` und
+  `SharedArrayBuffer` ist verfügbar, während ein Cross-Origin-`<script>`
+  ganz ohne CORP-Header (bewusst als unkonfigurierter echter CDN
+  nachgebildet) weiterhin fehlerfrei lädt und ausführt — SQL/Pythons
+  CDN-Ladevorgänge und die per `context.route()` servierten lokalen
+  Kopien in jedem Bug-Hunt brauchen dadurch keine Änderung.
+  `claudeChatClient.ts`s Cross-Origin-`fetch()` zu `api.anthropic.com`
+  ist ebenfalls unbetroffen (kein `credentials`-Flag, keine Cookies).
+
+- **Konsequenz für den Plan:** Der ursprüngliche Plan vom 2026-08-08
+  ("`coi-serviceworker`, aufs ganze Dokument angewendet") war näher am
+  Richtigen als die iframe-Idee vom selben Tag — die einzige nötige
+  Korrektur ist `credentialless` statt `require-corp`. Keine
+  iframe-/postMessage-Umstellung von `csharpEngine.ts` nötig. Noch offen:
+  ein Live-Check, ob Blazors Multithreaded-WASM-Boot (`WasmEnableThreads`)
+  auch unter `credentialless` funktioniert (bisher nur an einer reinen
+  HTML-Seite verifiziert, nicht am echten Blazor-Bundle) — das plus die
+  eigentliche Dev-Server-Middleware ist der nächste konkrete C#-Schritt.
+
+- **Ergebnis:** Reine Analyse/Dokumentations-Änderung
+  (`docs/csharp-engine-poc.md`, iframe-Vorschlag korrigiert), kein
+  Code im Repo geändert (der Testaufbau lief komplett im Scratchpad).
+  Tests/Coverage/Build-Größe unverändert (990/990, 92,31 % / 73,15 % /
+  99,14 % / 92,31 %, 632,59 kB) — keine Artifact-Republikation nötig.
