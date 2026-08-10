@@ -638,17 +638,55 @@ Roughly in dependency order:
      `postMessage` transport rewrite, no change to
      `loadCSharpEngineFromServer`'s current "inject a `<script>` tag into
      the current document" approach.
-   - **`WasmEnableThreads` compatibility not yet re-verified:** this
-     result confirms `credentialless` grants `crossOriginIsolated`/
-     `SharedArrayBuffer` in a plain HTML page; it does **not** yet confirm
-     the actual Blazor multithreaded-WASM boot sequence
-     (`csharp-engine/CSharpEngineBlazor.csproj`'s `WasmEnableThreads`)
-     tolerates `credentialless` specifically rather than `require-corp` —
-     that needs one more live check (serve the real published
-     `csharp-engine/` output under `COEP: credentialless` and confirm
-     `CSharpEngine.RunCode` still boots and runs) before this is fully
-     closed. That check, plus the actual dev-server middleware, is the
-     next concrete C# increment for a future firing.
+   - **Update (2026-08-10, later same day): `WasmEnableThreads` under
+     `credentialless` now verified against the real published bundle, not
+     just a plain HTML page.** First, a real, previously-undiscovered
+     build bug surfaced while getting a fresh publish output at all: a
+     clean `dotnet publish -c Release` failed with `CS8802` (only one
+     compilation unit can have top-level statements) — the SDK's default
+     recursive `**/*.cs` glob was sweeping `csharp-engine/driver/Program.cs`
+     (the separate console project from step 6 below, added in a later
+     session) into this project's own compilation. Fixed with a
+     `<Compile Remove="driver/**/*.cs" />` exclusion in
+     `CSharpEngineBlazor.csproj` (committed separately, verified against a
+     clean publish and the full npm test suite — 990/990, this touches
+     nothing under `src/`).
+
+     With a real publish output in hand: served
+     `csharp-engine/bin/Release/net8.0/publish/wwwroot` from a minimal
+     Node static server sending `COOP: same-origin` +
+     `COEP: credentialless` on every response, and loaded it in real
+     headless Chromium via Playwright. `window.crossOriginIsolated` was
+     `true` immediately. The published `index.html`'s own built-in boot
+     script (`Blazor.start().then(...)`, already present in the checked-in
+     file, unrelated to anything written today) ran
+     `CSharpEngine.RunCode('int x = 2 + 2; Console.WriteLine($"x = {x}");')`
+     automatically on load and logged
+     `CSHARP_RESULT:{"stdout":"x = 4\n","error":null}` to the console — a
+     real Roslyn compile and a real WASM execution, both succeeding under
+     `credentialless`. A follow-up call against the same already-booted
+     instance with intentionally invalid code
+     (`int x = "not a number";`) correctly returned a real compiler
+     diagnostic, `error CS0029: Cannot implicitly convert type 'string' to
+     'int'`. (An earlier attempt to *also* manually re-inject the Blazor
+     script and call `Blazor.start()` a second time from the test harness
+     — redundant, since the page already does this itself — caused a
+     harmless "root component already attached" collision error and an
+     apparent multi-minute hang; that was a bug in the throwaway test
+     script, not in the engine or in `credentialless` itself, and
+     disappeared once the test just let the page's own boot script run
+     once.)
+
+     **This closes the hosting question for real.** The plan from
+     2026-08-08 (apply the headers document-wide via `coi-serviceworker`
+     in production / a small dev-server middleware locally), corrected
+     today to use `credentialless` instead of `require-corp`, is now
+     verified end-to-end against the actual multithreaded-WASM Blazor
+     bundle — not just reasoned about. The next concrete C# increment for
+     a future firing is building the actual Vite dev-server middleware
+     (so `npm run dev` serves `csharp-engine/`'s published output with
+     these headers) and wiring GitHub Pages' `coi-serviceworker` for
+     production — no more open design questions block that work.
 6. ~~**Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
    mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
    feasible now that `dotnet` works in this sandbox; likely just

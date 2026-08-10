@@ -3069,3 +3069,55 @@ sondern pro PR direkt in den Checks sichtbar.
   Code im Repo geändert (der Testaufbau lief komplett im Scratchpad).
   Tests/Coverage/Build-Größe unverändert (990/990, 92,31 % / 73,15 % /
   99,14 % / 92,31 %, 632,59 kB) — keine Artifact-Republikation nötig.
+
+### 2026-08-10 — Stündliche Routine: C#-Hosting-Frage endgültig geschlossen — echter Build-Bug gefunden + `credentialless` gegen den echten Blazor-Bundle verifiziert
+
+- **Umfang:** Baseline sauber (990/990, typecheck/build/knip grün, HEAD
+  `789000f`). SQL/Python weiterhin an der permanenten Scope-Grenze. Der
+  letzte Durchgang hatte einen klaren nächsten Schritt hinterlassen: die
+  `credentialless`-Erkenntnis war bis dahin nur an einer schlichten
+  HTML-Seite verifiziert, nicht am echten Blazor-Multithreaded-WASM-Bundle
+  — genau diese Lücke diesen Durchgang geschlossen.
+
+- **Echter Build-Bug gefunden, bevor überhaupt getestet werden konnte:**
+  ein frischer `dotnet publish -c Release` schlug mit `CS8802` fehl (nur
+  eine Kompilationseinheit darf Top-Level-Statements haben) — das
+  SDK-Standard-Glob `**/*.cs` erfasste rekursiv auch
+  `csharp-engine/driver/Program.cs` (das separate Konsolenprojekt aus
+  einer späteren Session), das mit dem eigenen `Program.cs` kollidierte.
+  Unentdeckt, weil seit dem Hinzufügen von `driver/` niemand mehr einen
+  frischen Publish auf das Blazor-Projekt losgelassen hatte. Behoben mit
+  `<Compile Remove="driver/**/*.cs" />` in `CSharpEngineBlazor.csproj` —
+  separat committet (`b4d00ec`), gegen einen sauberen Publish und die
+  volle npm-Testsuite verifiziert (990/990, betrifft nichts unter `src/`).
+
+- **`credentialless` gegen den echten Bundle verifiziert:** den frischen
+  Publish-Output (`csharp-engine/bin/Release/net8.0/publish/wwwroot`) über
+  einen minimalen Node-Server mit `COOP: same-origin` +
+  `COEP: credentialless` ausgeliefert, in echtem Headless-Chromium via
+  Playwright geladen. `crossOriginIsolated` sofort `true`. Das im Repo
+  bereits vorhandene `index.html` bootet Blazor selbst und ruft
+  automatisch `CSharpEngine.RunCode('int x = 2 + 2; ...')` auf — Ergebnis:
+  `CSHARP_RESULT:{"stdout":"x = 4\n","error":null}`, ein echter
+  Roslyn-Compile und eine echte WASM-Ausführung, beide erfolgreich unter
+  `credentialless`. Ein Folgeaufruf mit absichtlich ungültigem Code lieferte
+  korrekt einen echten Compilerfehler (`CS0029`). Ein erster Testlauf, der
+  zusätzlich manuell ein zweites `Blazor.start()` auslöste (überflüssig,
+  die Seite bootet sich selbst), erzeugte einen harmlosen
+  "Root component already attached"-Kollisionsfehler und einen
+  scheinbaren mehrminütigen Hänger — ein Bug im Wegwerf-Testskript, nicht
+  in der Engine oder in `credentialless` selbst.
+
+- **Konsequenz:** Die Hosting-Frage aus `docs/csharp-engine-poc.md` ist
+  damit nicht nur analytisch, sondern end-to-end gegen den echten
+  Multithreaded-WASM-Bundle verifiziert — keine offene Design-Frage
+  blockiert mehr die eigentliche Umsetzung (Vite-Dev-Server-Middleware +
+  `coi-serviceworker` für GitHub Pages), der nächste konkrete C#-Schritt
+  für einen künftigen Durchgang.
+
+- **Ergebnis:** Ein committeter Code-Fix (`csharp-engine/
+  CSharpEngineBlazor.csproj`, `b4d00ec`) außerhalb von `src/` — npm-Tests/
+  Coverage/Build-Größe dadurch unverändert (990/990, 92,31 % / 73,15 % /
+  99,14 % / 92,31 %, 632,59 kB). Der restliche Verifikationsaufbau lief
+  komplett im Scratchpad. Keine Artifact-Republikation nötig (keine der
+  dort dargestellten Zahlen hat sich bewegt).
