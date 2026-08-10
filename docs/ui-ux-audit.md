@@ -128,6 +128,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (C# Challenge 06: B5 vollständig, 28/86) | 91.85 % | 72.88 % | 99.09 % | 91.85 % |
 | 2026-08-10 | HEAD (C# Challenge 07: B6 vollständig, 33/86) | 91.88 % | 72.86 % | 99.10 % | 91.88 % |
 | 2026-08-10 | HEAD (C# Challenge 08: B7 vollständig, 38/86) | 91.92 % | 72.85 % | 99.10 % | 91.92 % |
+| 2026-08-10 | HEAD (Live-Bug-Hunt sauber + C# Challenge 09: B8 vollständig, 42/86) | 91.95 % | 72.82 % | 99.10 % | 91.95 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -2319,3 +2320,72 @@ sondern pro PR direkt in den Checks sichtbar.
   Gate 2 für Challenge 08, alle drei Distraktoren grün). Volle Testsuite
   910 → 914, alle grün. `typecheck`, `npm run build` grün. `knip`:
   unverändert 10 Funde. Coverage: 91,92 % / 72,85 % / 99,10 % / 91,92 %.
+
+### 2026-08-10 — Stündliche Routine: Live-Bug-Hunt (sauber, `ERR_CERT`-Rätsel endlich geklärt) + C# Challenge 09 (B8 vollständig)
+
+- **Umfang:** Baseline sauber (914/914, typecheck/build/knip grün, HEAD
+  `a252250`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr in diesen beiden Tracks.
+  Dev-Server per Playwright gegen die echte Anwendung gefahren (CDN-
+  Workaround aus dem Runbook: `context.route()` fängt
+  `cdnjs.cloudflare.com/ajax/libs/sql.js/**` und
+  `cdn.jsdelivr.net/pyodide/**` ab und liefert die lokal per `npm --no-save`
+  installierten `sql.js`/`pyodide`-Pakete aus dem sandboxed CDN-Sperre
+  herum).
+
+- **Live-Bug-Hunt-Ergebnis:** Alle 78 SQL- und 67 Python-Challenges
+  durchlaufen (Tutorial-Text vorhanden, Hints aufdeckbar), Stichproben der
+  Syntax-Highlighting-Token-Zahlen (`.tok-*`) unauffällig, vier
+  End-to-End-Lösungsläufe (`.status-ok`-Erfolgsbadge) grün, Mobile-Viewport
+  (375×667) ohne horizontales Overflow. Keine neuen Funde.
+
+- **`ERR_CERT_AUTHORITY_INVALID`-Rätsel endgültig geklärt:** Frühere
+  Durchgänge hatten wiederholt eine Häufung von
+  `ERR_CERT_AUTHORITY_INVALID`-Konsolenfehlern in Playwright-Läufen
+  gesehen, aber nur vage als "vermutlich unabhängig" abgetan, ohne die
+  Ursache zu bestätigen. Zwei gezielte Untersuchungsskripte haben die
+  Ursache jetzt eindeutig belegt: Ein Klick auf `.hint-btn` löst über
+  `revealHint()` in `src/ui/state/actions.ts` einen echten
+  `fetch()`-POST an `https://api.anthropic.com/v1/messages` aus
+  (`sendChatMessage()` in derselben Datei) — vollständig beabsichtigt, wie
+  sowohl der Label-Text in `hintsSection.ts` ("Claude vertieft sie im
+  Chat") als auch ein Code-Kommentar dort bestätigen. In dieser
+  Sandbox-Umgebung schlägt dieser Request am HTTPS-abfangenden Proxy mit
+  `ERR_CERT_AUTHORITY_INVALID` fehl — ein reines Sandbox-Artefakt, kein
+  Anwendungsfehler. Der Aufruf ist bereits sauber mit try/catch
+  abgesichert (Fehler landet als Chat-Nachricht, blockiert nie die
+  Hint-Anzeige). Ein gezielter Grep
+  (`fetch(|XMLHttpRequest|new Image(`) über den ganzen `src/`-Baum
+  bestätigt, dass `claudeChatClient.ts` die einzige Netzwerk-Aufrufstelle
+  der gesamten Anwendung ist — kein verstecktes zweites Problem. Zwei
+  eigene Fehlalarme im Bug-Hunt-Skript selbst wurden im selben Zug
+  aufgeklärt: ein vermeintlich fehlendes "Chat-Tab nach Klick" beruhte auf
+  einem falsch geratenen Selektor im Testskript (`.chat-tab` statt des
+  tatsächlichen `.chat-section`) — mit dem korrekten Selektor rendert das
+  Chat-Panel wie erwartet.
+
+- **Content:** Challenge 09 deckt alle 4 Tags aus B8 (Arrays & Collections)
+  in einem Durchgang ab: `array-basics`, `foreach-loop`, `list-basics`,
+  `dictionary-basics`. Szenario: eine Punktzahl-Liste (Array mit
+  Index-Zugriff und `foreach`-Summierung), eine Einkaufsliste
+  (`List<string>` mit `.Add()`/`.Remove()`/`.Count`) und eine Preisliste
+  (`Dictionary<string, double>` mit `.ContainsKey()`).
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** ein vergessenes `.Remove(...)` (`einkaufsliste.Count`
+  fälschlich 4 statt 3); der direkte Dictionary-Indexer
+  `preise["Butter"]` statt `.ContainsKey("Butter")` auf einem nie
+  eingetragenen Schlüssel — kompiliert, stürzt aber zur Laufzeit mit einer
+  `KeyNotFoundException` ab, genau die Situation, für die `.ContainsKey()`
+  existiert; und ein Off-by-one beim Array-Index (`punkte[1]` statt
+  `punkte[0]`, Indizes beginnen bei 0).
+
+- **Ergebnis:** C#-Tag-Bilanz 38/86 → 42/86 (≈49 %). B0 bis B8 sind damit
+  vollständig abgedeckt — knapp die Hälfte aller 86 Tags. Nächster offener
+  Zweig ist B9 (Methoden). Build-Größe unverändert (632,33 kB) — Track
+  bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 291 → 292 (Gate 1 +
+  Gate 2 für Challenge 09, alle drei Distraktoren grün). Volle Testsuite
+  914 → 918, alle grün. `typecheck`, `npm run build` grün. Coverage:
+  91,95 % / 72,82 % / 99,10 % / 91,95 %.

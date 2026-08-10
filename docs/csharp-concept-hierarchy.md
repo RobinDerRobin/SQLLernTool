@@ -739,6 +739,26 @@ vollständig abgedeckt** — B0 bis B7 sind jetzt komplett, fast die Hälfte
 aller 86 Tags. Nächster offener Zweig: B8 (Arrays & Collections, nach der
 Branch-Übersicht in Abschnitt 5).*
 
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 09
+ergänzt — deckt alle 4 Tags aus B8 (Arrays & Collections) in einem
+Durchgang ab: `array-basics`, `foreach-loop`, `list-basics`,
+`dictionary-basics`. Szenario: eine Punktzahl-Liste (Array mit
+Index-Zugriff und `foreach`-Summierung), eine Einkaufsliste
+(`List<string>` mit `.Add()`/`.Remove()`/`.Count`) und eine Preisliste
+(`Dictionary<string, double>` mit `.ContainsKey()`). Drei Distraktoren,
+alle empirisch gegen den echten `dotnet`-Treiber verifiziert: ein
+vergessenes `.Remove(...)` (falsche `Count`); der direkte Dictionary-
+Indexer `preise["Butter"]` statt `.ContainsKey("Butter")` auf einem nie
+eingetragenen Schlüssel — kompiliert, stürzt aber zur Laufzeit mit einer
+`KeyNotFoundException` ab, genau die Situation, für die `.ContainsKey()`
+existiert; und ein Off-by-one beim Array-Index (`punkte[1]` statt
+`punkte[0]`, Indizes beginnen bei 0).
+
+**Tag-Bilanz: 42 von 86 (≈ 49 %).** Damit ist **B8 (Arrays &
+Collections) vollständig abgedeckt** — B0 bis B8 sind jetzt komplett,
+knapp die Hälfte aller 86 Tags. Nächster offener Zweig: B9 (Methoden,
+nach der Branch-Übersicht in Abschnitt 5).*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt
