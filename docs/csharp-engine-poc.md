@@ -687,6 +687,64 @@ Roughly in dependency order:
      (so `npm run dev` serves `csharp-engine/`'s published output with
      these headers) and wiring GitHub Pages' `coi-serviceworker` for
      production — no more open design questions block that work.
+
+   **Update (2026-08-10, third increment same day): the dev-server
+   middleware is now built.** `vite.config.ts` gained a
+   `csharpEngineDevServer()` plugin (`apply: 'serve'`, so production
+   builds are completely untouched): sets `Cross-Origin-Opener-Policy:
+   same-origin` + `Cross-Origin-Embedder-Policy: credentialless` on every
+   dev-server response, and serves
+   `csharp-engine/bin/Release/net8.0/publish/wwwroot` (gitignored, built
+   locally via `dotnet publish -c Release`) under `/csharp-engine/`. If
+   that publish output doesn't exist (a fresh clone without the .NET SDK),
+   the plugin logs a one-line note and simply skips the static-file
+   middleware — `npm run dev` still works fine for SQL/Python either way.
+
+   Live-verified end-to-end with the real dev server (`npm run dev`,
+   Playwright, the usual `context.route()` CDN workaround for
+   sql.js/Pyodide): the main app's `window.crossOriginIsolated` is `true`,
+   10/10 sampled SQL solutions and 9/9 sampled Python solutions still pass
+   with zero console errors — the `credentialless` finding held up against
+   the real app, not just the earlier synthetic test. `/csharp-engine/`
+   itself also reports `crossOriginIsolated: true`, and its built-in
+   smoke-test page (already in the checked-in `index.html`, unrelated to
+   today's work) successfully compiled and ran real C#
+   (`CSHARP_RESULT:{"stdout":"x = 4\n","error":null}`) through the actual
+   Vite middleware.
+
+   **One more real bug found and fixed along the way:** the first attempt
+   at `/csharp-engine/` 404'd with `Blazor is not defined`. Cause: the
+   checked-in `index.html` hardcodes `<base href="/" />`, written for the
+   case where this project is hosted at its own origin root (e.g.
+   `dotnet run`'s own dev server). Nested under `/csharp-engine/`, that
+   base href resolves the page's relative `_framework/blazor.webassembly.js`
+   script tag against site root instead of the mount path — a 404 for the
+   script itself, hence `Blazor` staying undefined. Worse, this isn't just
+   a page-load nuance: `Program.cs` sets `CSharpEngine.BaseAddress` from
+   `WebAssemblyHostBuilder.HostEnvironment.BaseAddress`, which Blazor
+   itself derives from the same `<base href>` at boot — so a wrong base
+   href would 404 the ref-assembly fetches
+   (`CSharpEngine.GetReferencesAsync()`) too, not merely the initial
+   script load. Fixed by rewriting `<base href="/" />` to
+   `<base href="/csharp-engine/" />` specifically when the middleware
+   serves that one HTML file — nothing else about the response changes.
+   **Implication flagged for the next wiring increment:** the real
+   `loadCSharpEngineFromServer(baseUrl)` path (used once a real call site
+   exists) injects its own `<script>` tag with an absolute `src` rather
+   than relying on a relative one, sidestepping half of this problem — but
+   Blazor's *own* internal boot sequence still resolves its base address
+   from `document.baseURI` of whichever document hosts it, which for a
+   script injected into the *main SQLLernTool app's own document* would be
+   that document's base (effectively `/`, no override), not
+   `/csharp-engine/`. Embedding the engine in a dedicated iframe (its own
+   document, naturally getting the right `baseURI` from its own URL) would
+   solve this for free — and is now safe from an isolation standpoint too,
+   since a same-origin iframe *does* inherit `crossOriginIsolated` from an
+   already-isolated parent (confirmed by this session's earlier positive-
+   control test, 2026-08-10). Revisiting the iframe idea for *this*
+   specific reason — not the COOP/COEP reason it was wrongly proposed for
+   earlier today — is worth real consideration in the next increment that
+   wires an actual `ensureCSharpEngine` call site.
 6. ~~**Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
    mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
    feasible now that `dotnet` works in this sandbox; likely just

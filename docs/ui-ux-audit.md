@@ -3121,3 +3121,66 @@ sondern pro PR direkt in den Checks sichtbar.
   99,14 % / 92,31 %, 632,59 kB). Der restliche Verifikationsaufbau lief
   komplett im Scratchpad. Keine Artifact-Republikation nötig (keine der
   dort dargestellten Zahlen hat sich bewegt).
+
+### 2026-08-10 — Stündliche Routine: C#-Dev-Server-Middleware gebaut und live verifiziert
+
+- **Umfang:** Baseline sauber (990/990, typecheck/build/knip grün, HEAD
+  `04a95da`). SQL/Python weiterhin an der permanenten Scope-Grenze. Der
+  letzte Durchgang hatte die Hosting-Frage vollständig geschlossen und
+  als nächsten Schritt "die eigentliche Dev-Server-Middleware bauen"
+  hinterlassen — kein offener Design-Punkt mehr im Weg, klarer
+  nächster Schritt.
+
+- **Implementiert:** `vite.config.ts` bekommt ein
+  `csharpEngineDevServer()`-Plugin (`apply: 'serve'`, Produktions-Build
+  komplett unberührt) — setzt `COOP: same-origin` +
+  `COEP: credentialless` auf jede Dev-Server-Antwort und liefert
+  `csharp-engine/bin/Release/net8.0/publish/wwwroot` (gitignored, lokal
+  per `dotnet publish -c Release` gebaut) unter `/csharp-engine/` aus.
+  Fehlt der Publish-Output (frischer Checkout ohne .NET SDK), loggt das
+  Plugin einen einzeiligen Hinweis und liefert `/csharp-engine/` einfach
+  nicht aus — `npm run dev` funktioniert für SQL/Python trotzdem normal.
+
+- **Live gegen den echten Dev-Server verifiziert** (Playwright, üblicher
+  `context.route()`-CDN-Workaround für sql.js/Pyodide): Haupt-App
+  `crossOriginIsolated=true`, 10/10 SQL- und 9/9 Python-Stichproben
+  weiterhin bestanden, 0 Konsolenfehler — die `credentialless`-Erkenntnis
+  hält auch gegen die echte App, nicht nur den synthetischen Testaufbau.
+  `/csharp-engine/` selbst ebenfalls `crossOriginIsolated=true`, die im
+  Repo bereits vorhandene Smoke-Test-Seite kompilierte und lief
+  erfolgreich (`CSHARP_RESULT:{"stdout":"x = 4\n","error":null}`) — durch
+  die echte Vite-Middleware, nicht mehr nur einen Scratchpad-Server.
+
+- **Ein weiterer echter Bug gefunden und behoben:** erster Versuch
+  scheiterte mit `Blazor is not defined` (404). Ursache: das
+  eingecheckte `index.html` hat `<base href="/" />` fest codiert (für
+  den Fall, dass dieses Projekt an seiner eigenen Origin-Wurzel gehostet
+  wird) — unter `/csharp-engine/` verschachtelt löst das den relativen
+  `<script src="_framework/blazor.webassembly.js">` gegen die Site-Wurzel
+  auf statt gegen den Mount-Pfad. Wichtiger noch: `Program.cs` setzt
+  `CSharpEngine.BaseAddress` aus genau demselben `<base href>` — ein
+  falscher Wert hätte auch die Ref-Assembly-Fetches 404en lassen, nicht
+  nur den Skript-Load. Behoben, indem die Middleware `<base href="/" />`
+  gezielt zu `<base href="/csharp-engine/" />` umschreibt, nur für diese
+  eine HTML-Datei.
+
+- **Für den nächsten Wiring-Schritt vermerkt:** Blazors eigene
+  Boot-Sequenz löst ihre Basisadresse immer aus `document.baseURI` des
+  hostenden Dokuments auf — wird die Engine später direkt ins Dokument
+  der Haupt-App injiziert (statt in ein eigenes `/csharp-engine/`-Dokument
+  wie beim heutigen Test), bräuchte sie denselben Fix erneut. Eine
+  Iframe-Einbettung würde das für lau lösen (eigenes Dokument, eigene
+  `baseURI`) und ist isolationstechnisch inzwischen unproblematisch, da
+  ein same-origin-iframe `crossOriginIsolated` von einem bereits
+  isolierten Elterndokument erbt (bestätigt durch die Positivkontrolle
+  aus dem vorletzten Durchgang) — ein Wiedersehen mit der iframe-Idee,
+  diesmal aus einem anderen, echten Grund als der ursprünglich falschen
+  COOP/COEP-Begründung.
+
+- **Ergebnis:** Committeter Code-Fix (`vite.config.ts`), keine Änderung
+  unter `src/` — Coverage dadurch unverändert (Vitest misst nur
+  `src/**/*.ts`). Tests 990 → 990 (gleich, kein Testcode geändert),
+  `typecheck`/`npm run build` grün (632,59 kB, unverändert — Plugin läuft
+  nur im Dev-Server). `knip`: unverändert 10 Funde. Keine
+  Artifact-Republikation nötig (keine dargestellte Zahl hat sich
+  bewegt).
