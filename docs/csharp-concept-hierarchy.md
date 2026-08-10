@@ -892,6 +892,30 @@ offener Zweig: B11 (Vererbung & Polymorphie) — oder zuerst
 `method-overloading` in B9 nachholen, jetzt wo eine Klasse als
 Container zur Verfügung steht.*
 
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 14
+ergänzt — löst den zuvor zurückgestellten letzten B9-Tag
+`method-overloading` ein, jetzt wo Challenge 12 eine echte Klasse als
+Container verfügbar gemacht hat. Szenario: eine `Rechner`-Klasse mit
+drei überladenen `static`-Methoden namens `Addiere` — zwei
+`int`-Parameter, drei `int`-Parameter, und zwei `double`-Parameter. Der
+Compiler wählt beim Aufruf (`Rechner.Addiere(3, 4)`,
+`Rechner.Addiere(3, 4, 5)`, `Rechner.Addiere(2.5, 1.5)`) automatisch die
+passende Überladung anhand von Argumentanzahl und -typ. Drei
+Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: die dreistellige Überladung vergessen (Compilerfehler
+`CS1501`, keine Überladung nimmt 3 Argumente); die zweistellige
+`int`-Überladung vergessen — der Aufruf griffe dann nur noch über eine
+implizite `int`-zu-`double`-Umwandlung auf die `double`-Überladung zu,
+deren Rückgabewert sich ohne Cast nicht in eine `int`-Variable speichern
+lässt (Compilerfehler `CS0266`); `+ c` im Rumpf der dreistelligen
+Überladung vergessen (kompiliert, liefert aber `7` statt `12` — das
+dritte Argument wird stillschweigend ignoriert).
+
+**Tag-Bilanz: 58 von 86 (≈ 67 %).** Damit ist **B9 (Methoden) ebenfalls
+vollständig abgedeckt** — B0 bis B10 sind jetzt komplett, deutlich über
+die Hälfte aller 86 Tags. Nächster offener Zweig: B11 (Vererbung &
+Polymorphie, nach der Branch-Übersicht in Abschnitt 5).*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt

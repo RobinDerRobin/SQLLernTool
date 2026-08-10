@@ -133,6 +133,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-10 | HEAD (C# Challenge 11: B9 7/8, 49/86) | 92.02 % | 72.79 % | 99.10 % | 92.02 % |
 | 2026-08-10 | HEAD (C# Challenge 12: B10 Teil 1, erste Klasse, 53/86) | 92.06 % | 72.78 % | 99.11 % | 92.06 % |
 | 2026-08-10 | HEAD (C# Challenge 13: B10 vollständig, 57/86) | 92.09 % | 72.74 % | 99.11 % | 92.09 % |
+| 2026-08-10 | HEAD (C# Challenge 14: B9 vollständig, B0–B10 komplett, 58/86) | 92.13 % | 72.74 % | 99.11 % | 92.13 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -2571,3 +2572,42 @@ sondern pro PR direkt in den Checks sichtbar.
   Gate 2 für Challenge 13, alle drei Distraktoren grün). Volle Testsuite
   930 → 934, alle grün. `typecheck`, `npm run build` grün. `knip`:
   unverändert 10 Funde. Coverage: 92,09 % / 72,74 % / 99,11 % / 92,09 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 14 (B9 vollständig, B0–B10 komplett)
+
+- **Umfang:** Baseline sauber (934/934, typecheck/build/knip grün, HEAD
+  `3d90a5c`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr in diesen beiden Tracks.
+  Seit dem letzten Live-Bug-Hunt (4 Durchgänge zuvor, sauber) nur reiner
+  Content geändert, kein SQL/Python/UI/Editor-Code — ein erneuter
+  Playwright-Durchlauf hätte keinen neuen Signal-Wert erwartet. C# hat
+  klaren Schwung, nächster Schritt: den zurückgestellten letzten
+  B9-Tag `method-overloading` einlösen, jetzt wo Challenge 12 eine echte
+  Klasse als Container verfügbar gemacht hat.
+
+- **Content:** Challenge 14 deckt `method-overloading` ab — eine
+  `Rechner`-Klasse mit drei überladenen `static`-Methoden namens
+  `Addiere`: zwei `int`-Parameter, drei `int`-Parameter, und zwei
+  `double`-Parameter. Der Compiler wählt beim Aufruf automatisch die
+  passende Überladung anhand von Argumentanzahl und -typ.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** die dreistellige Überladung vergessen (Compilerfehler
+  `CS1501`, keine Überladung nimmt 3 Argumente); die zweistellige
+  `int`-Überladung vergessen — der Aufruf griffe dann nur noch über eine
+  implizite `int`-zu-`double`-Umwandlung auf die `double`-Überladung zu,
+  deren Rückgabewert sich ohne Cast nicht in eine `int`-Variable
+  speichern lässt (Compilerfehler `CS0266`); `+ c` im Rumpf der
+  dreistelligen Überladung vergessen (kompiliert, liefert aber `7`
+  statt `12`).
+
+- **Ergebnis:** C#-Tag-Bilanz 57/86 → 58/86 (≈67 %). B9 (Methoden) ist
+  damit ebenfalls vollständig abgedeckt — **B0 bis B10 sind jetzt
+  komplett**, deutlich über die Hälfte aller 86 Tags. Nächster offener
+  Zweig: B11 (Vererbung & Polymorphie). Build-Größe unverändert
+  (632,33 kB) — Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 308 → 312 (Gate 1 +
+  Gate 2 für Challenge 14, alle drei Distraktoren grün). Volle Testsuite
+  934 → 938, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 92,13 % / 72,74 % / 99,11 % / 92,13 %.
