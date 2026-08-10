@@ -138,6 +138,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-10 | HEAD (C# Challenge 16: B11 vollständig, 65/86) | 92.19 % | 72.65 % | 99.11 % | 92.19 % |
 | 2026-08-10 | HEAD (C# Challenge 17: B12 vollständig, B0–B12 komplett, 68/86) | 92.17 % | 72.64 % | 99.12 % | 92.17 % |
 | 2026-08-10 | HEAD (C# Challenge 18: B13 Teil 1, 72/86) | 92.21 % | 72.62 % | 99.12 % | 92.21 % |
+| 2026-08-10 | HEAD (C# Challenge 19: B13 vollständig, B0–B13 komplett, 74/86) | 92.24 % | 72.60 % | 99.12 % | 92.24 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -2788,3 +2789,42 @@ sondern pro PR direkt in den Checks sichtbar.
   Gate 2 für Challenge 18, alle drei Distraktoren grün). Volle Testsuite
   950 → 954, alle grün. `typecheck`, `npm run build` grün. `knip`:
   unverändert 10 Funde. Coverage: 92,21 % / 72,62 % / 99,12 % / 92,21 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 19 (B13 vollständig, B0–B13 komplett)
+
+- **Umfang:** Baseline sauber (954/954, typecheck/build/knip grün, HEAD
+  `ae03e65`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. C# hat nach Challenge 18
+  klaren Schwung, nächster Schritt: die restlichen 2 B13-Tags, um den
+  Zweig abzuschließen.
+
+- **Content:** Challenge 19 deckt `throw-statement` und
+  `custom-exceptions` ab. Szenario: eine eigene Exception-Klasse
+  `UngueltigesAlterException : Exception` mit Konstruktor, der die
+  Nachricht per `: base(nachricht)` weiterreicht — dieselbe
+  Vererbungssyntax und dasselbe `base(...)`-Muster wie schon bei
+  gewöhnlichen Klassen aus B11. Eine Methode `PruefeAlter(int alter)`
+  löst sie bei einem negativen Alter per `throw new
+  UngueltigesAlterException(...)` aus; zwei Aufrufe (einer gültig,
+  einer ungültig) zeigen sowohl den Erfolgs- als auch den Fehlerpfad.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** `throw` vor `new UngueltigesAlterException(...)`
+  vergessen — es wird nur ein Exception-Objekt erzeugt, aber nie
+  tatsächlich ausgelöst (kompiliert, falsches Ergebnis); `: base(nachricht)`
+  im Konstruktor vergessen — `e.Message` liefert den generischen
+  Standardtext statt der eigenen Nachricht (kompiliert, falsches
+  Ergebnis); `: Exception` bei der Klassendefinition weggelassen — eine
+  Klasse, die nicht von `Exception` erbt, lässt sich weder werfen noch
+  fangen (Compilerfehler `CS0155`).
+
+- **Ergebnis:** C#-Tag-Bilanz 72/86 → 74/86 (≈86 %). B13
+  (Fehlerbehandlung) ist damit vollständig abgedeckt — **B0 bis B13
+  sind jetzt komplett**. Nächster offener Zweig: B14 (Delegates &
+  Lambda-Ausdrücke). Build-Größe unverändert (632,33 kB) — Track
+  bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 328 → 332 (Gate 1 +
+  Gate 2 für Challenge 19, alle drei Distraktoren grün). Volle Testsuite
+  954 → 958, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 92,24 % / 72,60 % / 99,12 % / 92,24 %.

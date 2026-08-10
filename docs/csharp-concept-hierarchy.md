@@ -1035,6 +1035,35 @@ weiterhin vollständig. Nächster Schritt: die restlichen B13-Tags
 `inheritance` aus B11 auf, das bereits verfügbar ist) in einer
 künftigen Challenge.*
 
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 19
+ergänzt — deckt die restlichen 2 Tags aus B13 ab und schließt den Zweig
+vollständig: `throw-statement`, `custom-exceptions`. Szenario: eine
+eigene Exception-Klasse `UngueltigesAlterException : Exception` mit
+Konstruktor, der die Nachricht per `: base(nachricht)` weiterreicht —
+dieselbe Vererbungssyntax und dasselbe `base(...)`-Muster wie schon bei
+gewöhnlichen Klassen aus B11. Eine Methode `PruefeAlter(int alter)`
+löst sie bei einem negativen Alter per `throw new
+UngueltigesAlterException(...)` aus; zwei Aufrufe (einer gültig, einer
+ungültig) in je einem `try`/`catch (UngueltigesAlterException e)`-Block
+zeigen sowohl den Erfolgs- als auch den Fehlerpfad.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `throw` vor `new UngueltigesAlterException(...)`
+vergessen — es wird nur ein Exception-<b>Objekt</b> erzeugt, aber nie
+tatsächlich ausgelöst, der Code läuft normal weiter (kompiliert,
+falsches Ergebnis); `: base(nachricht)` im Konstruktor vergessen — die
+eigene Nachricht erreicht nie die geerbte `Message`-Property, `e.Message`
+liefert stattdessen den generischen Standardtext "Exception of type
+'UngueltigesAlterException' was thrown." (kompiliert, falsches
+Ergebnis); `: Exception` bei der Klassendefinition weggelassen — eine
+Klasse, die nicht von `Exception` erbt, lässt sich weder werfen noch
+fangen (Compilerfehler `CS0155`).
+
+**Tag-Bilanz: 74 von 86 (≈ 86 %).** Damit ist **B13 (Fehlerbehandlung)
+vollständig abgedeckt** — B0 bis B13 sind jetzt komplett. Nächster
+offener Zweig: B14 (Delegates & Lambda-Ausdrücke, nach der
+Branch-Übersicht in Abschnitt 5).*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt
