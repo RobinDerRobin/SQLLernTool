@@ -2932,3 +2932,45 @@ sondern pro PR direkt in den Checks sichtbar.
   jetzt auch vom Produktions-Bundle importiert wird, nicht nur von
   Tests). `knip`: unverändert 10 Funde. Coverage: 92,31 % / 73,15 % /
   99,14 % / 92,31 %.
+
+### 2026-08-10 — Stündliche Routine: Live-Bug-Hunt (sauber), kein aktionabler Schritt
+
+- **Umfang:** Baseline sauber (990/990, typecheck/build/knip grün, HEAD
+  `826b5e1`). SQL/Python weiterhin bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag. Nach zwei reinen
+  C#-Engine-Durchgängen in Folge (Editor-`LanguagePlugin`,
+  `AppContext`-Wiring) zuerst wieder Priorität 2: ein Live-Playwright-
+  Durchlauf gegen den echten Dev-Server, da seit dem letzten sauberen
+  Durchlauf mehrere Firings vergangen sind.
+
+- **Live-Bug-Hunt-Ergebnis:** Dev-Server per Playwright gefahren (CDN-
+  Workaround aus dem Runbook: `context.route()` liefert lokal
+  installiertes `sql.js`/`pyodide` aus). Stichprobe von 13 SQL- und 12
+  Python-Challenges (jede 6.): Tutorial-Text vorhanden, Lösung über
+  "In den Editor übernehmen" eingefügt, ausgeführt, `✓ Aufgabe erfüllt`
+  bestätigt — 25/25 bestanden. Zusätzlich zwei echte Distraktoren aus
+  dem Content (SQL 16: verschachteltes `BEGIN` während laufender
+  Transaktion; Python 11: `len(wort)` statt Treffer-Zählung) manuell im
+  Editor eingefügt und ausgeführt — beide korrekt abgelehnt, keine
+  Diskrepanz zur `challengeRunner.test.ts`-Vorhersage. Mobile-Viewport
+  (375×667) ohne horizontalen Overflow. 0 Konsolenfehler. Keine neuen
+  Funde.
+
+- **C#-Engine-Integration:** Kein bounded nächster Schritt für diesen
+  Durchgang identifiziert. Von den verbleibenden zwei Wiring-Lücken
+  (Registry-Eintrag, Blazor-Serving in Dev/Prod) hängt der
+  Registry-Eintrag am Serving — ohne funktionierende `baseUrl` wäre eine
+  Registrierung nur eine tote Auswahl ohne lauffähigen Engine dahinter.
+  Die Serving-Entscheidung selbst (Vite-Dev-Server-Middleware mit
+  COOP/COEP-Headern + Produktions-Integration ins `deploy-pages.yml` samt
+  `coi-serviceworker`) ist eine deutlich größere, mehrteilige
+  Änderung als die letzten beiden Increments — bewusst nicht in diesem
+  Durchgang neben dem Bug-Hunt begonnen, um kein halbfertiges Ergebnis zu
+  riskieren. Nächster C#-Schritt für einen künftigen, dafür reservierten
+  Durchgang.
+
+- **Ergebnis:** Keine Code-/Content-Änderung in diesem Durchgang — Tests,
+  Coverage und Build-Größe unverändert gegenüber dem letzten Snapshot
+  (990/990, 92,31 % / 73,15 % / 99,14 % / 92,31 %, 632,59 kB). Kein neuer
+  Commit, keine Artifact-Republikation nötig (keine Zahl hat sich
+  bewegt).
