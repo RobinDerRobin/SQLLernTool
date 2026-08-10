@@ -18,6 +18,17 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.9.2" />
   </ItemGroup>
 
+  <!-- driver/ is a separate, self-contained console project (CSharpDriver.csproj, its own
+       top-level-statements Program.cs) used only by the Node-side test engine — not part of this
+       Blazor project. The SDK's default item globs are recursive, so without this exclusion
+       driver/Program.cs gets swept into this project's own compilation too, colliding with this
+       project's own Program.cs (CS8802: only one compilation unit can have top-level statements). -->
+  <ItemGroup>
+    <Compile Remove="driver/**/*.cs" />
+    <Content Remove="driver/**" />
+    <None Remove="driver/**" />
+  </ItemGroup>
+
   <!-- CSharpEngine.RunCode compiles user code against real BCL reference assemblies, fetched at
        runtime from wwwroot/refs/ (see CSharpEngine.cs). Those .dlls are metadata-only reference
        assemblies from the installed SDK's own targeting pack, not build output of this project —
