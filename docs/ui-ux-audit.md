@@ -126,6 +126,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (Live-Bug-Hunt sauber + C# Challenge 04: B3 vollständig, 21/86) | 91.83 % | 72.90 % | 99.09 % | 91.83 % |
 | 2026-08-09 | HEAD (C# Challenge 05: B4 vollständig, 24/86) | 91.87 % | 72.89 % | 99.09 % | 91.87 % |
 | 2026-08-09 | HEAD (C# Challenge 06: B5 vollständig, 28/86) | 91.85 % | 72.88 % | 99.09 % | 91.85 % |
+| 2026-08-10 | HEAD (C# Challenge 07: B6 vollständig, 33/86) | 91.88 % | 72.86 % | 99.10 % | 91.88 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -2242,3 +2243,41 @@ sondern pro PR direkt in den Checks sichtbar.
   Gate 2 für Challenge 06, alle drei Distraktoren grün). Volle Testsuite
   902 → 906, alle grün. `typecheck`, `npm run build` grün. `knip`:
   unverändert 10 Funde. Coverage: 91,85 % / 72,88 % / 99,09 % / 91,85 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 07 (B6 vollständig)
+
+- **Umfang:** Baseline sauber (906/906, typecheck/build/knip grün, HEAD
+  `e8cf85c`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. Kein neuer Coverage-Ausfall
+  gegenüber dem letzten Snapshot, keine SQL/Python/UI-Datei seit dem
+  letzten Live-Bug-Hunt geändert — ein erneuter Playwright-Durchlauf
+  hätte nichts Neues gefunden, also direkt zu C# weiter, das nach
+  Challenge 01-06 klaren Schwung hat: nächstes begrenztes Increment ist
+  B6 (Kontrollfluss).
+
+- **Content:** Challenge 07 deckt alle 5 Tags aus B6 in einem Durchgang
+  ab: `if-else-statement`, `else-if-chain`, `switch-statement`,
+  `ternary-operator`, `pattern-matching-switch`. Szenario: ein
+  Notenrechner (`int punkte = 78`), der dieselbe grobe Logik über vier
+  verschiedene Kontrollfluss-Formen ausdrückt — eine `if`/`else if`/
+  `else`-Kette, einen Ternär-Operator, ein klassisches `switch`/`case`/
+  `break` (mit bewusst leeren `case`-Fallthroughs) und einen modernen
+  Pattern-Matching-`switch`-Ausdruck mit relationalen Mustern.
+
+- **Drei Distraktoren, alle empirisch verifiziert:** die `if`/`else if`-
+  Kette in aufsteigender statt absteigender Reihenfolge geprüft (echter
+  Logikfehler bei sich überschneidenden Bereichen); ein fehlendes
+  `break;` im `switch` — in C# anders als in C/C++ **kein
+  stillschweigender Laufzeitfehler**, sondern ein vom Compiler
+  erzwungener Fehler (`CS0163`, "Control cannot fall through from one
+  case label to another"); die beiden Zweige des Ternär-Operators
+  vertauscht.
+
+- **Ergebnis:** C#-Tag-Bilanz 28/86 → 33/86 (≈38 %). B0 bis B6 sind damit
+  vollständig abgedeckt — nächster offener Zweig ist B7 (Schleifen).
+  Build-Größe unverändert (632,33 kB) — Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 283 → 287 (Gate 1 +
+  Gate 2 für Challenge 07, alle drei Distraktoren grün). Volle Testsuite
+  906 → 910, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 91,88 % / 72,86 % / 99,10 % / 91,88 %.

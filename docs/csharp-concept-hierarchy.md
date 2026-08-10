@@ -688,6 +688,31 @@ Nullability) vollständig abgedeckt** — B0 bis B5 sind jetzt komplett.
 Nächster offener Zweig: B6 (Kontrollfluss, nach der Branch-Übersicht in
 Abschnitt 5).*
 
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 07
+ergänzt — deckt alle 5 Tags aus B6 (Kontrollfluss) in einem Durchgang
+ab: `if-else-statement`, `else-if-chain`, `switch-statement`,
+`ternary-operator`, `pattern-matching-switch`. Szenario: ein
+Notenrechner (`int punkte = 78`), der dieselbe grobe Logik (Punktzahl in
+eine von vier Kategorien einordnen) über vier verschiedene
+Kontrollfluss-Formen ausdrückt — eine `if`/`else if`/`else`-Kette
+(Textkategorie), einen Ternär-Operator (bestanden-Bool), ein klassisches
+`switch`/`case`/`break` (Stufe, mit bewusst leeren `case`-Fallthroughs
+zwischen `10`/`9` bzw. `8`/`7`) und einen modernen
+Pattern-Matching-`switch`-Ausdruck mit relationalen Mustern (Note als
+Buchstabe). Drei Distraktoren, alle empirisch gegen den echten `dotnet`-
+Treiber verifiziert: die `if`/`else if`-Kette in aufsteigender statt
+absteigender Reihenfolge geprüft (ein echter Logikfehler bei
+sich überschneidenden Bereichen — 78 erfüllt sofort die erste, zu
+großzügige Bedingung); ein fehlendes `break;` im `switch`, das in C#
+anders als in C/C++ **kein stillschweigender Laufzeitfehler** ist,
+sondern ein vom Compiler erzwungener Fehler (`CS0163`, "Control cannot
+fall through"); die beiden Zweige des Ternär-Operators vertauscht.
+
+**Tag-Bilanz: 33 von 86 (≈ 38 %).** Damit ist **B6 (Kontrollfluss)
+vollständig abgedeckt** — B0 bis B6 sind jetzt komplett. Nächster
+offener Zweig: B7 (Schleifen, nach der Branch-Übersicht in Abschnitt
+5).*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt
