@@ -47,6 +47,8 @@ function createTestEngineFactory(): EngineFactory {
     createDisposable: () => createNodeSqliteEngine(),
     getMainPython: () => null,
     ensurePythonEngine: () => Promise.reject(new Error('python engine not available in this test fixture')),
+    getMainCSharp: () => null,
+    ensureCSharpEngine: () => Promise.reject(new Error('csharp engine not available in this test fixture')),
   };
 }
 
@@ -130,6 +132,8 @@ describe('selectChallenge', () => {
       createDisposable: () => createNodeSqliteEngine(),
       getMainPython: () => null,
       ensurePythonEngine: () => Promise.reject(new Error('python engine not available in this test fixture')),
+      getMainCSharp: () => null,
+      ensureCSharpEngine: () => Promise.reject(new Error('csharp engine not available in this test fixture')),
     };
     selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
     expect(ctx.store.getState().session.selection).toBeNull();

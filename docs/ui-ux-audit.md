@@ -140,6 +140,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-10 | HEAD (C# Challenge 18: B13 Teil 1, 72/86) | 92.21 % | 72.62 % | 99.12 % | 92.21 % |
 | 2026-08-10 | HEAD (C# Challenge 19: B13 vollständig, B0–B13 komplett, 74/86) | 92.24 % | 72.60 % | 99.12 % | 92.24 % |
 | 2026-08-10 | HEAD (C#-LanguagePlugin für den Editor: Tokenizer/Highlight/Auto-Indent) | 92.30 % | 73.11 % | 99.13 % | 92.30 % |
+| 2026-08-10 | HEAD (C#-Engine-Wiring: EngineFactory.ensureCSharpEngine) | 92.31 % | 73.15 % | 99.14 % | 92.31 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -2883,3 +2884,51 @@ sondern pro PR direkt in den Checks sichtbar.
   Editor-Code, keine neue Route). `knip`: unverändert 10 Funde (das neue
   Modul wird von seiner eigenen Testdatei referenziert, keine toten
   Dateien). Coverage: 92,30 % / 73,11 % / 99,13 % / 92,30 %.
+
+### 2026-08-10 — Stündliche Routine: C#-Engine-Integration — AppContext/EngineFactory-Wiring
+
+- **Umfang:** Baseline sauber (986/986, typecheck/build/knip grün, HEAD
+  `cfbc50c`). SQL/Python weiterhin bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. C#-Engine-Integration hat
+  nach dem letzten Durchgang (Editor-`LanguagePlugin`) klaren Schwung:
+  von den vier Wiring-Lücken aus `docs/csharp-engine-poc.md` ist die
+  `ctx.engines`/`AppContext`-Lücke die nächste, die sich isoliert bauen
+  und testen lässt, ohne die übrigen (Registry-Eintrag, Blazor-Serving)
+  anzufassen.
+
+- **Implementiert:** `EngineFactory` (`src/ui/context.ts`) bekommt
+  `getMainCSharp()`/`ensureCSharpEngine(loadEngine)` — exaktes Pendant zu
+  `getMainPython()`/`ensurePythonEngine(loadPyodide)`: lädt einmalig,
+  cached danach, ein einziger geteilter Engine (keine separate
+  Disposable-Variante, da jeder `exec()`-Aufruf wie bei Python zustandslos
+  ist). `ensureCSharpEngine` nimmt bewusst eine parameterlose
+  `loadEngine`-Closure statt direkt eine `baseUrl`, damit die Factory
+  weiterhin unabhängig davon bleibt, woher das Blazor-Bundle kommt (diese
+  Entscheidung ist weiterhin offen) — ein echter Aufrufer würde später
+  `() => loadCSharpEngineFromServer(baseUrl)` übergeben. 6 neue Tests in
+  `context.test.ts`, gleiche Struktur wie die bestehenden Python-Tests
+  (Laden+Caching, `exec()`-Delegation, Retry nach fehlgeschlagenem Laden).
+
+- **Mechanischer Nebenaufwand:** 16 Testdateien bauen sich jeweils eine
+  eigene Fake-`EngineFactory` für andere UI-Tests — alle mussten um einen
+  ablehnenden `ensureCSharpEngine`-Stub ergänzt werden, um das jetzt
+  größere Interface zu erfüllen (gleiches Muster wie ihr bestehender
+  `ensurePythonEngine`-Stub). Reine Mechanik, keine Verhaltensänderung an
+  diesen Tests.
+
+- **Bewusst nicht getan:** Keine Aufrufstelle ruft `ensureCSharpEngine`
+  tatsächlich auf (anders als Pythons `ensurePythonEngineLoaded` in
+  `src/ui/state/actions.ts`, ausgelöst beim Öffnen einer Python-Challenge)
+  — es gibt keine C#-Challenge in der Registry, die das auslösen könnte.
+  Eine echte Aufrufstelle jetzt zu bauen wäre toter Code ohne Trigger.
+  Verbleibende Lücken: der Registry-Eintrag selbst, und die Serving-
+  Entscheidung für das Blazor-Bundle in Dev/Prod (Letztere muss zuerst
+  stehen, bevor eine echte Aufrufstelle eine funktionierende `baseUrl`
+  übergeben kann).
+
+- **Tests:** Volle Testsuite 986 → 990 (6 neue Tests, abzüglich der
+  entfernten Redundanz keine — reine Addition). `typecheck`, `npm run
+  build` grün (632,59 kB, geringfügig gewachsen, da `csharpEngine.ts`
+  jetzt auch vom Produktions-Bundle importiert wird, nicht nur von
+  Tests). `knip`: unverändert 10 Funde. Coverage: 92,31 % / 73,15 % /
+  99,14 % / 92,31 %.

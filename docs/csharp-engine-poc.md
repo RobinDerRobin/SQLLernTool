@@ -520,6 +520,34 @@ Roughly in dependency order:
    served from in dev/production (the COOP/COEP `coi-serviceworker`
    question from step 1 is resolved in principle but not yet implemented
    as an actual dev-server/build step).
+
+   **Update (2026-08-10, second increment): the `ctx.engines`/`AppContext`
+   gap is now closed too.** `EngineFactory` (`src/ui/context.ts`) gained
+   `getMainCSharp()`/`ensureCSharpEngine(loadEngine)`, mirroring
+   `getMainPython()`/`ensurePythonEngine(loadPyodide)` exactly: lazy,
+   load-once-and-cache, single shared engine (no separate disposable
+   engine, since — like Python — every `exec()` is a fresh, stateless run).
+   `ensureCSharpEngine` takes a zero-argument `loadEngine` closure rather
+   than a `baseUrl` directly, so the factory itself stays agnostic of
+   where the Blazor bundle is served from (that decision is still open) —
+   a real call site would pass `() => loadCSharpEngineFromServer(baseUrl)`.
+   6 new unit tests in `context.test.ts`, same shape as the existing
+   Python engine tests (load-once/caching, exec() delegation, retry after
+   a failed load). All 16 test files that build a fake `EngineFactory` for
+   other UI tests were updated to satisfy the now-larger interface (a
+   rejecting `ensureCSharpEngine` stub, matching how each already stubs
+   `ensurePythonEngine`) — pure mechanical follow-through, no behavior
+   changes to those tests.
+
+   **Deliberately not done in this increment:** no call site anywhere
+   actually calls `ensureCSharpEngine` yet (unlike Python's
+   `ensurePythonEngineLoaded` in `src/ui/state/actions.ts`, triggered when
+   a Python-track challenge opens) — there is no C#-track challenge that
+   could trigger it, since the registry line is still the deliberately-
+   withheld piece. Wiring a real call site now would be dead code with
+   nothing to invoke it. Two gaps remain: the registry line itself, and
+   the Blazor bundle's dev/production serving location — the latter has
+   to land before a real call site can pass it a working `baseUrl`.
 6. ~~**Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
    mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
    feasible now that `dotnet` works in this sandbox; likely just

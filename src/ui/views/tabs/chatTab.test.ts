@@ -15,7 +15,7 @@ import { mountChatTab } from './chatTab';
 
 function testEngineFactory(): EngineFactory {
   const main = createNodeSqliteEngine();
-  return { getMain: () => main, setMainFromSqlJs: () => {}, createDisposable: () => createNodeSqliteEngine(), getMainPython: () => null, ensurePythonEngine: () => Promise.reject(new Error("python engine not available in this test fixture")) };
+  return { getMain: () => main, setMainFromSqlJs: () => {}, createDisposable: () => createNodeSqliteEngine(), getMainPython: () => null, ensurePythonEngine: () => Promise.reject(new Error("python engine not available in this test fixture")), getMainCSharp: () => null, ensureCSharpEngine: () => Promise.reject(new Error("csharp engine not available in this test fixture")) };
 }
 
 function makeCtx(progress: ProgressState = createDefaultProgressState(), reply = 'Antwort mit `code`.') {
