@@ -548,6 +548,57 @@ Roughly in dependency order:
    nothing to invoke it. Two gaps remain: the registry line itself, and
    the Blazor bundle's dev/production serving location — the latter has
    to land before a real call site can pass it a working `baseUrl`.
+
+   **Design revision needed (2026-08-10, analysis only, no code changed):**
+   re-examining the still-open serving-location gap surfaced a real problem
+   with the hosting plan as currently written. The COOP/COEP decision
+   above (`coi-serviceworker`, "scoped to the C# engine's own route") was
+   written assuming there'd be a literal separate route/page for the C#
+   engine. There isn't one, and can't easily be one: this app is a single-
+   page app with **no client-side routing at all** — `vite.config.ts` uses
+   `vite-plugin-singlefile` to inline the entire SQL/Python/(future C#) UI
+   into one `index.html`, and `loadCSharpEngineFromServer` in
+   `src/runtime/csharp/csharpEngine.ts` (confirmed by re-reading the
+   current code, not just the plan) injects Blazor's `<script>` tag
+   directly into `document.body` of that *same* document. COOP/COEP are
+   enforced per-document, decided by that document's own response headers
+   — there is no way to apply them to "only the C# part" of a single HTML
+   document. Applying them to the whole document to satisfy multithreaded
+   WASM's `SharedArrayBuffer` requirement would put every other track's
+   asset loads under `Cross-Origin-Embedder-Policy: require-corp` too —
+   including SQL/Python's CDN-hosted `sql.js`/Pyodide `<script>` loads in
+   production, and this project's own `context.route()`-served local
+   copies in every Playwright bug-hunt pass — neither of which currently
+   sends a `Cross-Origin-Resource-Policy` header, and both would silently
+   start failing to load. This is exactly the kind of regression risk the
+   "never leave the repo in a broken intermediate state" rule in the
+   standing routine mandate exists to prevent, so it's flagged here rather
+   than implemented under time pressure.
+
+   **Proposed fix, not yet implemented or live-verified:** host the Blazor
+   engine inside a dedicated **same-origin iframe** (e.g.
+   `csharp-engine.html`, served from its own path) instead of loading it
+   into the main document. A child frame can carry its own COOP+COEP
+   response headers and become cross-origin-isolated independently of its
+   parent — this is the standard pattern several production WASM SDKs use
+   specifically to avoid forcing isolation onto a host page that embeds
+   them (e.g. StackBlitz's WebContainers). Under this design: (1)
+   `coi-serviceworker` (or the dev-server headers, respectively) apply
+   only to requests for `csharp-engine.html` and its own subresources,
+   never to `index.html` itself; (2) `csharpEngine.ts`'s loader changes
+   from injecting a `<script>` tag into the current document to creating
+   a hidden `<iframe src="csharp-engine.html">` and communicating via
+   `postMessage` (request user code in, `{stdout, error}` JSON back) —
+   the `CSharpRuntime`/`CSharpExecResult` public shape decided in step 4
+   does not need to change, only the transport underneath
+   `loadCSharpEngineFromServer`/`createCSharpEngine`; (3) SQL/Python are
+   completely unaffected, since the main document's headers never change.
+   This needs a real Playwright check (does a same-origin iframe with its
+   own COOP+COEP actually reach `crossOriginIsolated === true` in the
+   Chromium version this project's tooling uses, independent of the
+   parent's headers?) before committing to it as the final design — that
+   verification, plus the actual dev-server middleware and iframe host
+   page, is the next concrete C# increment for a future firing.
 6. ~~**Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
    mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
    feasible now that `dotnet` works in this sandbox; likely just

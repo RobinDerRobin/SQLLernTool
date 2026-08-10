@@ -2974,3 +2974,44 @@ sondern pro PR direkt in den Checks sichtbar.
   (990/990, 92,31 % / 73,15 % / 99,14 % / 92,31 %, 632,59 kB). Kein neuer
   Commit, keine Artifact-Republikation nötig (keine Zahl hat sich
   bewegt).
+
+### 2026-08-10 — Stündliche Routine: C#-Hosting-Plan überarbeitet (Analyse, kein Code)
+
+- **Umfang:** Baseline sauber (990/990, typecheck/build/knip grün, HEAD
+  `fbee26f`). SQL/Python weiterhin an der permanenten Scope-Grenze. Statt
+  den letzten Durchgang zu wiederholen (Live-Bug-Hunt, gerade erst
+  sauber durchgelaufen — das wäre reine Wiederholung ohne neuen Wert),
+  diesmal der als nächstes anstehende C#-Schritt: die noch offene
+  Blazor-Serving-Entscheidung aus `docs/csharp-engine-poc.md` genauer
+  geprüft, bevor sie implementiert wird.
+
+- **Fund:** Der bisherige Hosting-Plan ("`coi-serviceworker`, beschränkt
+  auf die eigene Route des C#-Motors") geht von einer eigenen Seite/Route
+  für den C#-Motor aus — die es in dieser Single-Page-App gar nicht gibt.
+  `vite-plugin-singlefile` fasst SQL/Python/(künftig C#) in eine einzige
+  `index.html` zusammen, und `loadCSharpEngineFromServer` (bestätigt im
+  aktuellen Code, nicht nur im Plan) injiziert Blazors `<script>`-Tag
+  direkt in genau dieses eine Dokument. COOP/COEP gelten pro Dokument —
+  "nur für den C#-Teil" gibt es nicht. Sie fürs ganze Dokument zu setzen
+  würde SQL/Pythons CDN-Ladevorgänge (Produktion) und die lokal per
+  `context.route()` ausgelieferten Kopien (jeder Playwright-Bug-Hunt)
+  ohne `Cross-Origin-Resource-Policy`-Header verstummen lassen — eine
+  echte Regressionsgefahr, die das Mandat ("nie einen kaputten
+  Zwischenzustand hinterlassen") explizit vermeiden soll.
+
+- **Vorgeschlagene Korrektur (noch nicht implementiert, noch nicht live
+  verifiziert):** den Blazor-Motor in einem eigenen, same-origin
+  `<iframe>` hosten statt im Hauptdokument — ein Kind-Frame kann eigene
+  COOP/COEP-Header tragen und unabhängig vom Elternfenster cross-origin-
+  isoliert werden (dasselbe Muster wie z. B. StackBlitz WebContainers).
+  `CSharpRuntime`/`CSharpExecResult` (Schritt 4, bereits entschieden)
+  müssten sich dabei nicht ändern, nur der Transport darunter
+  (`postMessage` statt direktem `Blazor.start()`-Aufruf im Hauptdokument).
+  Braucht vor der Umsetzung noch eine echte Playwright-Prüfung, ob ein
+  same-origin-iframe mit eigenen COOP/COEP-Headern tatsächlich
+  `crossOriginIsolated === true` erreicht, unabhängig vom Elternfenster.
+
+- **Ergebnis:** Reine Analyse/Dokumentations-Änderung
+  (`docs/csharp-engine-poc.md`), kein Code geändert. Tests/Coverage/
+  Build-Größe unverändert (990/990, 92,31 % / 73,15 % / 99,14 % /
+  92,31 %, 632,59 kB) — keine Artifact-Republikation nötig.
