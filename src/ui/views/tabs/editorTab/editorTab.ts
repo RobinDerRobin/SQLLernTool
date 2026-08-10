@@ -1,4 +1,5 @@
 import { createDomEditor, type DomEditor } from '../../../../editor/domEditor';
+import { csharpLanguagePlugin } from '../../../../editor/languages/csharp/csharpLanguagePlugin';
 import type { LanguagePlugin } from '../../../../editor/languages/LanguagePlugin';
 import { pythonLanguagePlugin } from '../../../../editor/languages/python/pythonLanguagePlugin';
 import { sqlLanguagePlugin } from '../../../../editor/languages/sql/sqlLanguagePlugin';
@@ -79,20 +80,22 @@ function renderPythonEngineStatus(status: PythonEngineStatus): string {
 }
 
 function placeholderFor(title: string, trackId: string): string {
-  const comment = trackId === 'python' ? '#' : '--';
+  const comment = trackId === 'python' ? '#' : trackId === 'csharp' ? '//' : '--';
   return `${comment} Schreib hier deine Lösung für: ${title}\n`;
 }
 
 function pluginForTrack(trackId: string): LanguagePlugin {
-  return trackId === 'python' ? pythonLanguagePlugin : sqlLanguagePlugin;
+  if (trackId === 'python') return pythonLanguagePlugin;
+  if (trackId === 'csharp') return csharpLanguagePlugin;
+  return sqlLanguagePlugin;
 }
 
 /**
  * Owns the code editor instance. The editor's DOM (textarea/overlay/gutter) is
  * created once and never re-rendered — only its *content* is swapped when the
  * user opens a different challenge within the same track, so the caret,
- * scroll position and event bindings all survive. Switching *track* (SQL <->
- * Python) is the one case that needs a different `LanguagePlugin`; since
+ * scroll position and event bindings all survive. Switching *track* (SQL /
+ * Python / C#) is the one case that needs a different `LanguagePlugin`; since
  * `createDomEditor` takes its plugin once at construction, the underlying
  * editor instance is destroyed and recreated on the same DOM elements in that
  * case — behind a stable facade, so callers holding onto `editor` (task tab's

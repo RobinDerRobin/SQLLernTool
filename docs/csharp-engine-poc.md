@@ -848,6 +848,51 @@ Roughly in dependency order:
    line is still withheld — this closes the transport-design question
    completely, but wiring the actual UI trigger and making C# selectable
    remains the next increment.
+
+   **Update (2026-08-10, next firing): two more standalone UI pieces
+   built, following the same "build it, don't wire the registry yet"
+   pattern already used for the `EngineFactory` and `LanguagePlugin`
+   increments.** Investigating what a real `runQuery`-equivalent for C#
+   would need surfaced a real architectural fact worth recording:
+   `src/ui/state/actions.ts`'s `runQuery` is **synchronous** — SQL's
+   `executeAndValidate` and Python's `pythonExecuteAndValidate` both run
+   to completion without awaiting anything once the engine is loaded — but
+   `src/runtime/csharp/executeAndValidate.ts`'s C# equivalent is
+   **async** (`engine.exec()` always awaits a real Roslyn compile+run,
+   whether via the Node driver or the browser's iframe/postMessage
+   transport). Wiring C# into `runQuery` therefore isn't a same-shaped
+   drop-in the way Python's `python-loading` `RunOutcome` kind was — it
+   needs `runQuery` itself (or a parallel async entry point) to support an
+   awaited result, which touches every caller of `runQuery` (currently
+   assumes a synchronous return). That's real scope for whichever future
+   firing does it, flagged here rather than attempted under time
+   pressure this increment.
+
+   What *was* built, safely decoupled from that still-open question: (1)
+   `src/ui/views/tabs/editorTab/csharpResultsArea.ts` —
+   `renderCSharpRunOutcome`/`renderCSharpLoadingOutcome`, C#'s equivalent
+   of `pythonResultsArea.ts`, taking a `CSharpExecuteAndValidateOutcome`
+   directly (not routed through `RunOutcome`, since that union hasn't
+   been extended yet) and rendering status/stdout — no variables table,
+   since step 4's `validate()` decision already established C# locals
+   aren't reflectable after `Main` returns. 9 new tests, mirroring
+   `pythonResultsArea.test.ts`'s coverage (error/success/warning states,
+   empty-stdout empty-state, HTML-escaping). (2)
+   `src/ui/views/tabs/editorTab/editorTab.ts`'s `pluginForTrack` and
+   `placeholderFor` now handle `'csharp'` (routing to
+   `csharpLanguagePlugin`, `//` line-comment placeholders) alongside
+   `'sqlite'`/`'python'` — both are unreachable dead branches until the
+   registry line lands, exactly like `EngineFactory.ensureCSharpEngine`
+   was for two firings before its call site existed.
+
+   Tests 993 → 1002 (+9, all from `csharpResultsArea.test.ts`). `typecheck`
+   green. `npm run build` succeeds; size grew 632.59 kB → 635.90 kB (232 →
+   239 modules) — `csharpLanguagePlugin.ts` and its dependents (tokenizer,
+   highlighter, auto-indent, keyword tables) are now reachable from the
+   production entry point via `editorTab.ts`'s import, not just from their
+   own test files, so they're bundled for the first time even though
+   still unreachable at runtime. `knip`: unchanged, 10 findings. Coverage:
+   92.35 % / 73.18 % / 99.15 % / 92.35 %.
 6. ~~**Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
    mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
    feasible now that `dotnet` works in this sandbox; likely just

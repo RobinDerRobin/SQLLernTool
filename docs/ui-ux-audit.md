@@ -142,6 +142,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-10 | HEAD (C#-LanguagePlugin für den Editor: Tokenizer/Highlight/Auto-Indent) | 92.30 % | 73.11 % | 99.13 % | 92.30 % |
 | 2026-08-10 | HEAD (C#-Engine-Wiring: EngineFactory.ensureCSharpEngine) | 92.31 % | 73.15 % | 99.14 % | 92.31 % |
 | 2026-08-10 | HEAD (C#-Engine: iframe+postMessage-Transport statt direktem Script-Inject) | 92.33 % | 73.16 % | 99.14 % | 92.33 % |
+| 2026-08-10 | HEAD (C#-Editor-UI: csharpResultsArea + pluginForTrack('csharp')) | 92.35 % | 73.18 % | 99.15 % | 92.35 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -3316,3 +3317,45 @@ sondern pro PR direkt in den Checks sichtbar.
   ersetzen 7 alte Script-Inject-Tests). `typecheck`, `npm run build` grün
   (632,59 kB, unverändert). `knip`: unverändert 10 Funde. Coverage:
   92,33 % / 73,16 % / 99,14 % / 92,33 %.
+
+### 2026-08-10 — Stündliche Routine: C#-Editor-UI — Ergebnis-Rendering + LanguagePlugin-Routing
+
+- **Umfang:** Baseline sauber (993/993, typecheck/build/knip grün, HEAD
+  `26c39e9`). SQL/Python weiterhin an der permanenten Scope-Grenze. Der
+  letzte Durchgang hatte die Transport-Frage vollständig geschlossen und
+  "das eigentliche UI-Wiring" als nächsten Schritt benannt — beim Prüfen,
+  was dafür nötig wäre, einen echten architektonischen Fund gemacht: die
+  bestehende `runQuery`-Funktion in `actions.ts` ist **synchron** (SQL/
+  Python laufen ohne `await`, sobald die Engine geladen ist), aber C#s
+  `executeAndValidate` ist **async** (`engine.exec()` wartet immer auf
+  einen echten Roslyn-Compile+Run). C# vollständig in `runQuery`
+  einzubauen bräuchte eine echte Umstellung auf einen awaited Rückgabewert
+  — betrifft jeden Aufrufer von `runQuery`, zu groß für dieses Increment,
+  hier nur dokumentiert statt unter Zeitdruck versucht.
+
+- **Stattdessen gebaut, sauber von dieser offenen Frage entkoppelt:**
+  (1) `src/ui/views/tabs/editorTab/csharpResultsArea.ts` —
+  `renderCSharpRunOutcome`/`renderCSharpLoadingOutcome`, C#s Pendant zu
+  `pythonResultsArea.ts`, nimmt direkt ein
+  `CSharpExecuteAndValidateOutcome` (noch nicht über `RunOutcome`
+  geroutet, da diese Union noch nicht erweitert ist) und rendert Status/
+  stdout — keine Variablentabelle, da Schritt 4s `validate()`-Entscheidung
+  bereits festgelegt hat, dass C#-Lokale nach `Main` nicht reflektierbar
+  sind. 9 neue Tests, gleiche Abdeckung wie
+  `pythonResultsArea.test.ts` (Fehler/Erfolg/Warnung, leeres-stdout-
+  Empty-State, HTML-Escaping). (2) `editorTab.ts`s `pluginForTrack` und
+  `placeholderFor` behandeln jetzt `'csharp'` (routet zu
+  `csharpLanguagePlugin`, `//`-Kommentar-Platzhalter) — beide Zweige
+  unerreichbar, bis der Registry-Eintrag kommt, genau wie
+  `EngineFactory.ensureCSharpEngine` es zwei Durchgänge lang war, bevor
+  seine Aufrufstelle existierte.
+
+- **Ergebnis:** Tests 993 → 1002 (+9, komplett aus
+  `csharpResultsArea.test.ts`). `typecheck` grün. `npm run build`
+  erfolgreich, Größe 632,59 kB → 635,90 kB (232 → 239 Module) —
+  `csharpLanguagePlugin.ts` und seine Abhängigkeiten (Tokenizer,
+  Highlighter, Auto-Indent, Keyword-Tabellen) sind jetzt vom
+  Produktions-Einstiegspunkt über `editorTab.ts`s Import erreichbar,
+  nicht mehr nur von ihrer eigenen Testdatei — deshalb erstmals gebündelt,
+  obwohl zur Laufzeit weiterhin unerreichbar. `knip`: unverändert 10
+  Funde. Coverage: 92,35 % / 73,18 % / 99,15 % / 92,35 %.
