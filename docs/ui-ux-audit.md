@@ -130,6 +130,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-10 | HEAD (C# Challenge 08: B7 vollständig, 38/86) | 91.92 % | 72.85 % | 99.10 % | 91.92 % |
 | 2026-08-10 | HEAD (Live-Bug-Hunt sauber + C# Challenge 09: B8 vollständig, 42/86) | 91.95 % | 72.82 % | 99.10 % | 91.95 % |
 | 2026-08-10 | HEAD (C# Challenge 10: B9 Teil 1, 46/86) | 91.99 % | 72.81 % | 99.10 % | 91.99 % |
+| 2026-08-10 | HEAD (C# Challenge 11: B9 7/8, 49/86) | 92.02 % | 72.79 % | 99.10 % | 92.02 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -2440,3 +2441,40 @@ sondern pro PR direkt in den Checks sichtbar.
   Gate 2 für Challenge 10, alle drei Distraktoren grün). Volle Testsuite
   918 → 922, alle grün. `typecheck`, `npm run build` grün. `knip`:
   unverändert 10 Funde. Coverage: 91,99 % / 72,81 % / 99,10 % / 91,99 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 11 (B9 fast vollständig, 7/8)
+
+- **Umfang:** Baseline sauber (922/922, typecheck/build/knip grün, HEAD
+  `350bebf`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr in diesen beiden Tracks.
+  C# hat nach Challenge 10 klaren Schwung, nächster Schritt: die drei
+  verbleibenden aktionablen B9-Tags (`method-overloading` bleibt wie im
+  letzten Durchgang begründet zurückgestellt).
+
+- **Content:** Challenge 11 deckt `optional-parameters`,
+  `ref-out-parameters`, `params-array` ab. Szenario: vier eigene
+  Methoden — `Steigern(int zahl, int schritt = 1)` (Standardwert),
+  `Verdoppeln(ref int zahl)` (ändert die Aufrufer-Variable direkt),
+  `TryDurchTeilen(int zahl, int teiler, out int ergebnis)` (das
+  idiomatische C#-`Try`-Muster: `bool`-Erfolgs-Rückgabewert plus
+  `out`-Parameter), und `Summiere(params int[] zahlen)` (beliebig viele
+  Argumente in einem Array gesammelt).
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** fehlender Standardwert bei `schritt` — `Steigern(5)`
+  mit nur einem Argument hat dann keinen passenden Aufruf mehr
+  (Compilerfehler `CS7036`); `Verdoppeln(wert)` ohne das
+  `ref`-Schlüsselwort beim Aufruf, obwohl die Methode `ref int zahl`
+  erwartet (Compilerfehler `CS1620`); `Summiere` gibt `zahlen.Length`
+  statt der aufsummierten Werte zurück — verwechselt Anzahl mit Summe
+  (kompiliert, falsches Ergebnis).
+
+- **Ergebnis:** C#-Tag-Bilanz 46/86 → 49/86 (≈57 %). B9 zu 7 von 8 Tags
+  abgedeckt — nur `method-overloading` bleibt offen (zurückgestellt bis
+  `class-definition`/B10 verfügbar ist). Build-Größe unverändert
+  (632,33 kB) — Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 296 → 300 (Gate 1 +
+  Gate 2 für Challenge 11, alle drei Distraktoren grün). Volle Testsuite
+  922 → 926, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 92,02 % / 72,79 % / 99,10 % / 92,02 %.

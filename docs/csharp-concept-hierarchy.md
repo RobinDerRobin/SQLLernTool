@@ -798,6 +798,33 @@ abgedeckt (`method-overloading`, `optional-parameters`,
 `ref-out-parameters`, `params-array` offen) — kein Zweig komplett neu
 geschlossen, aber über die Hälfte aller 86 Tags erreicht.*
 
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 11
+ergänzt — deckt die restlichen 3 aktionablen B9-Tags ab (`method-
+overloading` bleibt wie oben beschrieben zurückgestellt):
+`optional-parameters`, `ref-out-parameters`, `params-array`. Szenario:
+vier eigene Methoden — `Steigern(int zahl, int schritt = 1)` (Standard-
+wert), `Verdoppeln(ref int zahl)` (ändert die Aufrufer-Variable direkt),
+`TryDurchTeilen(int zahl, int teiler, out int ergebnis)` (das
+idiomatische C#-`Try`-Muster: `bool`-Erfolgs-Rückgabewert plus `out`-
+Parameter für den eigentlichen Wert), und `Summiere(params int[]
+zahlen)` (beliebig viele Argumente in einem Array gesammelt). Drei
+Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: fehlender Standardwert bei `schritt` — `Steigern(5)` mit
+nur einem Argument hat dann keinen passenden Aufruf mehr
+(Compilerfehler `CS7036`); `Verdoppeln(wert)` ohne das `ref`-Schlüsselwort
+beim Aufruf, obwohl die Methode `ref int zahl` erwartet
+(Compilerfehler `CS1620`); `Summiere` gibt `zahlen.Length` statt der
+aufsummierten Werte zurück — verwechselt die Anzahl der Argumente mit
+ihrer Summe (kompiliert, falsches Ergebnis).
+
+**Tag-Bilanz: 49 von 86 (≈ 57 %).** B9 ist damit zu 7 von 8 Tags
+abgedeckt — nur `method-overloading` bleibt offen (zurückgestellt bis
+`class-definition`/B10 verfügbar ist, siehe oben). B0 bis B8 weiterhin
+vollständig, B9 praktisch abgeschlossen. Nächster Fokus: entweder eine
+Lösung für `method-overloading` finden, oder direkt mit B10
+(Objektorientierung) weitermachen, was `method-overloading` über den
+Klassen-Container gleich mitlösen würde.*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt
