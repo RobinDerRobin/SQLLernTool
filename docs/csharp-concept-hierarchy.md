@@ -1004,6 +1004,37 @@ vollständig abgedeckt** — B0 bis B12 sind jetzt komplett. Nächster
 offener Zweig: B13 (Fehlerbehandlung, nach der Branch-Übersicht in
 Abschnitt 5).*
 
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 18
+ergänzt — deckt 4 der 6 Tags aus B13 (Fehlerbehandlung) ab:
+`runtime-exceptions-concept`, `try-catch`, `specific-exception-types`,
+`finally-block`. Szenario, zweigeteilt: ein Array-Zugriff außerhalb der
+Grenzen (`zahlen[5]` bei nur drei Elementen) in einem
+`try`/`catch (IndexOutOfRangeException)`/`finally`-Block — der
+`finally`-Block hängt unabhängig vom Ausgang einen Status-Suffix an;
+und eine Ganzzahl-Division durch 0 in einem separaten
+`try`/`catch (DivideByZeroException)`-Block, ohne `finally`. Beide
+Blöcke fangen ihren jeweiligen Exception-Typ gezielt, nicht die
+allgemeine Basisklasse `Exception`.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `finally`-Block komplett weggelassen (kompiliert, aber der
+Status-Suffix fehlt in der Ausgabe); `catch (FormatException)` statt
+`catch (IndexOutOfRangeException)` — der falsche Exception-Typ passt
+nicht, die tatsächlich geworfene Ausnahme bleibt ungefangen und das
+Programm stürzt komplett ab, noch bevor irgendeine Ausgabe erfolgt
+(bestätigt: der Treiber liefert eine echte `TargetInvocationException`
+mit `IndexOutOfRangeException` als innerer Ausnahme); `b / a` statt
+`a / b` bei der Division — `0 / 10` wirft keine Exception (nur ein
+Nenner von 0 ist das Problem, nicht der Zähler), `divisionStatus`
+bleibt fälschlich `"Erfolg"`.
+
+**Tag-Bilanz: 72 von 86 (≈ 84 %).** B13 ist damit zu 4 von 6 Tags
+abgedeckt (`throw-statement`, `custom-exceptions` offen). B0 bis B12
+weiterhin vollständig. Nächster Schritt: die restlichen B13-Tags
+(eigene Exceptions werfen und definieren, letzteres baut auf
+`inheritance` aus B11 auf, das bereits verfügbar ist) in einer
+künftigen Challenge.*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt

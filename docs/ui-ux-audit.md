@@ -137,6 +137,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-10 | HEAD (Live-Bug-Hunt sauber + C# Challenge 15: B11 Teil 1, 62/86) | 92.16 % | 72.69 % | 99.11 % | 92.16 % |
 | 2026-08-10 | HEAD (C# Challenge 16: B11 vollständig, 65/86) | 92.19 % | 72.65 % | 99.11 % | 92.19 % |
 | 2026-08-10 | HEAD (C# Challenge 17: B12 vollständig, B0–B12 komplett, 68/86) | 92.17 % | 72.64 % | 99.12 % | 92.17 % |
+| 2026-08-10 | HEAD (C# Challenge 18: B13 Teil 1, 72/86) | 92.21 % | 72.62 % | 99.12 % | 92.21 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -2750,3 +2751,40 @@ sondern pro PR direkt in den Checks sichtbar.
   Gate 2 für Challenge 17, alle drei Distraktoren grün). Volle Testsuite
   946 → 950, alle grün. `typecheck`, `npm run build` grün. `knip`:
   unverändert 10 Funde. Coverage: 92,17 % / 72,64 % / 99,12 % / 92,17 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 18 (B13 Teil 1)
+
+- **Umfang:** Baseline sauber (950/950, typecheck/build/knip grün, HEAD
+  `2cf0edd`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. C# hat nach Challenge 17
+  klaren Schwung, nächster Zweig: B13 (Fehlerbehandlung, 6 Tags — auf
+  zwei Challenges aufgeteilt wie schon B9/B10/B11).
+
+- **Content:** Challenge 18 deckt 4 der 6 B13-Tags ab:
+  `runtime-exceptions-concept`, `try-catch`, `specific-exception-types`,
+  `finally-block`. Szenario, zweigeteilt: ein Array-Zugriff außerhalb
+  der Grenzen in einem `try`/`catch (IndexOutOfRangeException)`/
+  `finally`-Block — der `finally`-Block hängt unabhängig vom Ausgang
+  einen Status-Suffix an; und eine Ganzzahl-Division durch 0 in einem
+  separaten `try`/`catch (DivideByZeroException)`-Block, ohne
+  `finally`. Beide Blöcke fangen ihren jeweiligen Exception-Typ gezielt.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** `finally`-Block komplett weggelassen (kompiliert, aber
+  der Status-Suffix fehlt); `catch (FormatException)` statt
+  `catch (IndexOutOfRangeException)` — der falsche Exception-Typ passt
+  nicht, die tatsächlich geworfene Ausnahme bleibt ungefangen und das
+  Programm stürzt komplett ab (bestätigt: echte
+  `TargetInvocationException` mit `IndexOutOfRangeException` als
+  innerer Ausnahme); `b / a` statt `a / b` bei der Division — `0 / 10`
+  wirft keine Exception, `divisionStatus` bleibt fälschlich `"Erfolg"`.
+
+- **Ergebnis:** C#-Tag-Bilanz 68/86 → 72/86 (≈84 %). B13 zu 4 von 6
+  Tags abgedeckt (`throw-statement`, `custom-exceptions` offen). B0 bis
+  B12 weiterhin vollständig. Build-Größe unverändert (632,33 kB) —
+  Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 324 → 328 (Gate 1 +
+  Gate 2 für Challenge 18, alle drei Distraktoren grün). Volle Testsuite
+  950 → 954, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 92,21 % / 72,62 % / 99,12 % / 92,21 %.
