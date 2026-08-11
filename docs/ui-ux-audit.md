@@ -4844,3 +4844,51 @@ sondern pro PR direkt in den Checks sichtbar.
   Schutzfunktion — nicht nur eine Coverage-Zahl verbessert. Kein
   Artifact-Republish nötig (kein Content, keine Konzept-Zahlen
   geändert).
+
+### 2026-08-11 — Stündliche Routine: C#-Boot-Bug — GitHub-Kommentar-Threads jetzt lesbar, aber kein Treffer; keine weiteren Befunde
+
+- **Umfang:** Baseline sauber (1052/1052, typecheck/build/knip grün, HEAD
+  `853b23f`). SQL/Python bei 81/82 (nur permanente Ausnahmen offen), C#
+  bei 86/86 — kein aktionabler Content-Task. Letzter Firing fand über
+  Coverage-Analyse einen echten Bug; diesmal dieselbe Coverage-Tabelle
+  (nicht neu erzeugt, da unverändert) nochmal auf verbleibende Nicht-
+  Content-Lücken geprüft (`actions.ts` Chat-Helfer — bewusst nicht live
+  getestet, s. frühere Begründung; leerer `catch`-Block in
+  `localStorageProgressStore.ts` — trivial; C#/Python-Tokenizer — rein
+  kosmetisch, betrifft keine Ausführung/Bewertung) — nichts Neues
+  gefunden. Daher diesen Durchgang stattdessen den C#-Boot-Bug mit einem
+  bislang ungenutzten Werkzeug angegangen.
+
+- **Neue Fähigkeit entdeckt:** die frühere Einschränkung "GitHub-
+  Kommentar-Threads sind für dieses Sandbox-Fetch-Tooling nicht lesbar"
+  betraf nur die gerenderte Issue-Seite (Kommentare laden per Client-
+  JavaScript nach). GitHubs einfache REST-API
+  (`https://api.github.com/repos/<owner>/<repo>/issues/<n>/comments`)
+  liefert Kommentare als statisches JSON — `WebFetch` funktioniert damit
+  einwandfrei. Bislang in keinem der beiden vorherigen Durchgänge
+  probiert.
+
+- **Ergebnis der eigentlichen Recherche: kein neuer Treffer.** Alle 12
+  Kommentare zu `dotnet/runtime#87690` gelesen — stellte sich als
+  komplett anderer Bug heraus (`JSHost.ImportAsync()`-Timing in Razor-
+  Komponenten, die vor Abschluss eines async Imports rendern) und ist
+  hier nicht anwendbar, da `CSharpEngine.RunCode` eine reine
+  `[JSExport]`-statische Methode ohne jede Razor-Komponente ist. Gezielte
+  GitHub-Suchen (`"JavaScriptExports" bindings_init`,
+  `"Can't find" "JavaScriptExports" repo:dotnet/runtime`) fanden nur
+  unrelated gemergte PRs zu WASM-Threading/Rendering, alle für **.NET 9**
+  gezielt, nicht 8. Zusätzlich geprüft, ob die Playwright/Chromium-Version
+  selbst seit dem funktionierenden 2026-08-10-Stand gedriftet ist (ein
+  bislang nicht betrachteter Kandidat) — hat sie nicht: derselbe gecachte
+  `chromium-1194`-Build (per `executablePath` fixiert) war schon am
+  2026-08-10 im Einsatz, dokumentiert im selben Abschnitt.
+
+- **Fazit:** die "Kommentare nicht lesbar"-Einschränkung ist behoben,
+  aber die eigentliche Recherche bringt weiterhin keinen Fix — sauber als
+  ausgeschöpft dokumentiert, damit kein künftiger Durchgang dieselbe
+  jetzt-beantwortete Frage nochmal stellt. Kein spekulativer Code-Fix
+  verschickt. Vollständig in `docs/csharp-engine-poc.md` festgehalten.
+
+- **Ergebnis:** reiner Recherche-/Dokumentations-Durchgang, keine Code-
+  Änderung. Tests/typecheck/build unverändert grün (1052/1052, 829.51 kB).
+  Kein Artifact-Republish nötig.

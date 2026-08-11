@@ -1460,14 +1460,36 @@ SDK-version test doesn't explain it either (to the extent apt makes a
 clean test of "genuinely older, fully consistent SDK" practical in this
 sandbox at all).
 
+**Update (2026-08-11, next firing): the "can't read comment threads"
+blocker is gone — tried it, still no fix.** The earlier limitation was
+specific to fetching the *rendered* GitHub issue page (comments load via
+client-side JS, invisible to this session's fetch tooling). GitHub's
+plain REST API (`https://api.github.com/repos/<owner>/<repo>/issues/<n>/
+comments`) returns comments as static JSON instead, and `WebFetch`
+retrieves it fine — a genuinely new capability for this sandbox, not
+tried in either prior firing. Read the full comment threads on `#87690`
+(12 comments) this way: turned out to be about a *different* bug entirely
+— `JSHost.ImportAsync()`/`OnInitializedAsync` timing in Razor components
+that render before an async import finishes — inapplicable here, since
+this project's `CSharpEngine.RunCode` is a bare `[JSExport]` static
+method with no Razor component involved at all. Also ran targeted GitHub
+code/issue searches (`"JavaScriptExports" bindings_init`,
+`"Can't find" "JavaScriptExports" repo:dotnet/runtime`) — the only hits
+were unrelated merged PRs (WASM threading/rendering work targeting *.NET
+9*, not 8). No exact-match report or maintainer-confirmed fix for this
+specific error text exists in what's searchable this way. Separately
+checked whether the Playwright/Chromium build itself drifted since the
+2026-08-10 working state (a genuinely new candidate, not previously
+considered) — it hasn't: that entry already pinned the exact same cached
+`chromium-1194` build (documented via the same `executablePath` fix) that
+every check this session has used, so browser version isn't the variable
+either.
+
 **Still not checked:** whether a different, non-headless or
 non-Playwright-automated browser context changes anything (this sandbox
-has no display, so untested); reading the *actual* comment threads on the
-GitHub issues above (blocked by this session's fetch tooling only
-returning issue bodies, not dynamically-loaded comments) for a maintainer-
-confirmed fix or an exact-match report; whether a *newer* .NET 8 SDK
-patch/workload version (past `8.0.29`) resolves it — not available via
-apt in this sandbox to test.
+has no display, so untested); whether a *newer* .NET 8 SDK patch/workload
+version (past `8.0.29`) resolves it — not available via apt in this
+sandbox to test.
 
 **Practical severity, calibrated:** this is **not currently a live
 production incident** — `deploy-pages.yml` still doesn't publish the C#
