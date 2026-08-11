@@ -80,6 +80,36 @@ describe('findUnboundedRecursion', () => {
     expect(findUnboundedRecursion('SELECT * FROM users;')).toBeNull();
   });
 
+  it('is not fooled by a WHERE that only appears inside a line comment in the recursive member', () => {
+    const sql = `WITH RECURSIVE seq(n) AS (
+      SELECT 1
+      UNION ALL
+      SELECT n + 1 FROM seq -- WHERE n < 100
+    )
+    SELECT * FROM seq;`;
+    expect(findUnboundedRecursion(sql)).not.toBeNull();
+  });
+
+  it('is not fooled by a LIMIT that only appears inside a block comment after the CTE', () => {
+    const sql = `WITH RECURSIVE seq(n) AS (
+      SELECT 1
+      UNION ALL
+      SELECT n + 1 FROM seq
+    )
+    SELECT * FROM seq; /* LIMIT 10 */`;
+    expect(findUnboundedRecursion(sql)).not.toBeNull();
+  });
+
+  it('is not thrown off by an unbalanced paren inside a comment in the recursive member', () => {
+    const sql = `WITH RECURSIVE seq(n) AS (
+      SELECT 1
+      UNION ALL
+      SELECT n + 1 FROM seq -- a stray ( paren in a comment
+    )
+    SELECT * FROM seq;`;
+    expect(findUnboundedRecursion(sql)).not.toBeNull();
+  });
+
   it('handles multiple statements, flagging only the unbounded one', () => {
     const sql = `WITH RECURSIVE bounded(n) AS (
       SELECT 1 UNION ALL SELECT n + 1 FROM bounded WHERE n < 10

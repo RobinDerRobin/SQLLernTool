@@ -11,14 +11,16 @@ interface SqlStatement {
  * throws a raw string ("Nothing to prepare") for it, not an `Error`, which
  * otherwise surfaces to the user as a nonsensical "Zeile N: undefined"
  * instead of running (or correctly ignoring) the surrounding real SQL.
- * Mirrors `splitStatements`' own comment/string tokenizing rules exactly, so
- * a quote character is treated as real content the moment it's seen (a
- * string literal can't consist of nothing but whitespace). A bare `;` is
- * *not* content on its own — a fragment's own terminating semicolon
- * shouldn't make an otherwise comment-only fragment look non-empty.
+ * Mirrors `splitStatements`' own comment tokenizing rules exactly. A quote
+ * character is treated as real content the moment it's seen (a string
+ * literal can't consist of nothing but whitespace), so unlike
+ * `splitStatements` this never needs to track *how far into* a string it
+ * is — finding the opening quote is already enough to return `true`. A
+ * bare `;` is *not* content on its own — a fragment's own terminating
+ * semicolon shouldn't make an otherwise comment-only fragment look
+ * non-empty.
  */
 export function hasSqlContent(text: string): boolean {
-  let inString: string | null = null;
   let inLineComment = false;
   let inBlockComment = false;
 
@@ -37,18 +39,7 @@ export function hasSqlContent(text: string): boolean {
       }
       continue;
     }
-    if (inString) {
-      if (ch === inString) {
-        if (next === inString) {
-          i++;
-        } else {
-          inString = null;
-        }
-      }
-      continue;
-    }
     if (ch === "'" || ch === '"' || ch === '`') {
-      inString = ch;
       return true;
     }
     if (ch === '-' && next === '-') {

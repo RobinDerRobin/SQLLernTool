@@ -4769,3 +4769,78 @@ sondern pro PR direkt in den Checks sichtbar.
   Änderung, working tree sauber vor und nach dem Experiment). Kein
   Artifact-Republish nötig (keine Zahlenänderung, reiner Diagnose-
   Durchgang).
+
+### 2026-08-11 — Stündliche Routine: Echter Bug gefunden und behoben — SQL-Kommentare konnten den Endlosrekursions-Schutz aushebeln
+
+- **Umfang:** Baseline sauber (1049/1049, typecheck/build/knip grün, HEAD
+  `cf915c8`). SQL/Python-Content ist bei 81/82 (nur permanente Ausnahmen
+  offen), C# bei 86/86 — kein aktionabler Content-Task mehr verfügbar.
+  Statt eines weiteren generischen Live-Bug-Hunts (bereits mehrfach in
+  Folge "sauber" ohne Befund) diesmal gezielt `npx vitest run --coverage`
+  laufen lassen, um echte Coverage-Lücken in echtem Source-Code (nicht
+  Content-Dateien) zu finden — Priorität-2-Arbeit, aber datengetrieben
+  statt Klick-für-Klick.
+
+- **Befund:** `src/domain/sql/unboundedRecursionCheck.ts` (der
+  Sicherheitscheck, der `WITH RECURSIVE`-Abfragen ohne `WHERE`/`LIMIT`
+  vor der Ausführung abfängt, weil sql.js 1.10.2 keine Möglichkeit hat,
+  eine einmal gestartete Endlosrekursion abzubrechen — würde den Tab
+  einfrieren) hatte niedrige Branch-Coverage (88 %) auf genau den Zeilen,
+  die Kommentare behandeln. Empirisch verifiziert, dass das ein echter
+  Bug ist, kein Coverage-Kosmetikproblem: `findUnboundedRecursion()`
+  prüfte `WHERE`/`LIMIT` per Regex direkt auf dem Rohtext, ohne SQL-
+  Kommentare vorher zu entfernen. Eine Abfrage wie
+  ```sql
+  WITH RECURSIVE cnt(n) AS (
+    SELECT 1
+    UNION ALL
+    SELECT n+1 FROM cnt -- WHERE n < 100
+  )
+  SELECT n FROM cnt;
+  ```
+  (ein `WHERE` nur als Kommentartext, z. B. eine Lernende Notiz-an-sich-
+  selbst oder ein auskommentierter Versuch) wurde fälschlich als
+  "sicher" durchgelassen — obwohl die tatsächliche Rekursion komplett
+  unbeschränkt ist. Dasselbe für ein `LIMIT` nur in einem Kommentar nach
+  der CTE. Genau das Szenario, das dieser Check verhindern soll, konnte
+  ihn also durch einen völlig harmlosen Kommentar aushebeln.
+
+- **Fix:** neue private Funktion `stripStringsAndComments()` (gleiches
+  Zeichen-für-Zeichen-Tracking-Muster wie `findParenBody`/
+  `statementSplitter.ts`, das dieses Modul schon durchgängig verwendet)
+  ersetzt String-Literale und Kommentare durch Leerzeichen (Offsets
+  bleiben erhalten), bevor die `WHERE`/`LIMIT`-Prüfungen laufen. Auf den
+  CTE-Body selbst angewendet, bevor `recursiveMemberOf()` dessen eigene
+  (kommentarblinde) Klammer-Tiefenzählung durchführt — sonst hätte ein
+  unausgeglichener Klammer-Kommentar dieselbe Tiefenzählung durcheinander
+  bringen können. `recursiveMemberOf()`s eigenes String-Tracking wurde
+  dabei entfernt, da es nach dem Strippen nie mehr erreichbar war (hätte
+  sonst denselben toten-Code-Zustand erzeugt, den der nächste Punkt in
+  `statementSplitter.ts` beschreibt). Drei neue Regressionstests decken
+  Kommentar-`WHERE`, Kommentar-`LIMIT` und einen unausgeglichenen
+  Klammer-Kommentar ab; alle bisherigen Tests (String-Literal-Fälle,
+  echtes `WHERE`/`LIMIT` usw.) bleiben unverändert grün — empirisch mit
+  einem eigenen Vorher/Nachher-Skript gegen sieben Fallunterscheidungen
+  verifiziert, nicht nur angenommen.
+
+- **Nebenfund beim Lesen der Coverage-Tabelle:** `statementSplitter.ts`s
+  `hasSqlContent()` hatte ebenfalls eine Coverage-Lücke (Zeilen 41-49) —
+  hier aber echter toter Code, kein Bug: die Funktion `return`et sofort
+  `true`, sobald sie das erste Anführungszeichen sieht, sodass der
+  `inString`-Zweig (der das Ende eines Strings verfolgen würde) niemals
+  in einer späteren Iteration erreicht werden kann. Verhalten war schon
+  immer korrekt, nur unnötig verschachtelt. Bereinigt (String-Tracking-
+  Variable und -Zweig entfernt, Kommentar erklärt jetzt explizit, warum
+  das hier anders ist als in `splitStatements`, das dieselbe String-
+  Erkennung tatsächlich über mehrere Iterationen braucht).
+
+- **Tests:** 1049 → 1052 (+3, alle in
+  `unboundedRecursionCheck.test.ts`). `npx tsc --noEmit` fehlerfrei,
+  volle Testsuite 1052/1052 grün, `npm run build` grün (829.51 kB),
+  `npx knip` unverändert (10 Funde, alle bereits bekannt).
+
+- **Ergebnis:** echter, ausnutzbarer (wenn auch nicht böswillig
+  gemeinter) Sicherheitslücken-Fix in einer produktionsrelevanten
+  Schutzfunktion — nicht nur eine Coverage-Zahl verbessert. Kein
+  Artifact-Republish nötig (kein Content, keine Konzept-Zahlen
+  geändert).
