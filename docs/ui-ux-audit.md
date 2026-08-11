@@ -3736,3 +3736,44 @@ sondern pro PR direkt in den Checks sichtbar.
   B15 zu 4 von 5 Tags abgedeckt — nur `linq-deferred-execution` bleibt
   offen, der letzte Tag im gesamten C#-Dokument. B0 bis B14 bleiben
   komplett.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt (sauber), kein aktionabler Schritt
+
+- **Umfang:** Baseline sauber (1026/1026, typecheck/build/knip grün, HEAD
+  `013629e`). Vier Durchgänge in Folge hatten C#-Content gebaut
+  (Challenges 22–25) — laut Mandat-Priorität diesmal wieder Priorität 2
+  statt eines weiteren C#-Increments.
+
+- **Vorgehen:** Dev-Server gestartet, sql.js lokal per `context.route()`
+  statt der blockierten CDN-Domain serviert. Diesmal gezielt Zustands-
+  übergänge geprüft, die in früheren Durchgängen noch nicht live
+  abgedeckt waren: Study-/Exam-Modus-Umschaltung inklusive des
+  gemeinsamen Exam-Tipp-Pools — nach einer Tipp-Anforderung im
+  Exam-Modus sinkt der Pool korrekt von 3 auf 2, das Label
+  aktualisiert sich sofort; Schema-Zurücksetzen-Bestätigungsfluss —
+  öffnet sich per echtem `.click()`, schließt sauber bei "Abbrechen"
+  ohne zurückzusetzen, schließt sauber bei "Ja, löschen" nach
+  tatsächlichem Zurücksetzen; ein echter End-to-End-Abschluss von SQL
+  Challenge 01 mit der tatsächlichen Musterlösung — vor dem Lösen leere
+  Sterne-Anzeige, nach erfolgreichem Lauf korrekt drei Sterne (keine
+  Tipps verwendet) und `active`-Klasse gesetzt. Alle Prüfungen liefen
+  wie erwartet durch.
+
+- **Eine CONSOLE-ERROR-Meldung aufgetreten, aber kein neuer Fund:**
+  dieselbe bereits dokumentierte `net::ERR_CERT_AUTHORITY_INVALID` von
+  `api.anthropic.com` (Claude-Chat-Elaboration beim Tipp-Anfordern,
+  vom Sandbox-Netzwerk blockiert) aus einem früheren Durchgang — kein
+  Produktbug, keine neue Untersuchung nötig.
+
+- **Lehre aus dem vorletzten Durchgang beherzigt:** der Dev-Server
+  wurde diesmal über die exakten PIDs beendet (`ps aux | grep -E
+  "vite$|npm run dev"`, gezielt `kill`), statt eines breiten
+  `pkill -f "vite"`, das beim letzten Mal versehentlich auch den
+  parallel laufenden `vitest`-Hintergrundlauf getroffen hatte. Der
+  Testlauf blieb diesmal ungestört.
+
+- **Ergebnis:** Keine echten Bugs gefunden. Keine Code-Änderung nötig.
+  Tests/typecheck/build unverändert bei 1026/1026 grün. Nächster
+  offener Schritt: letzter C#-Content-Schritt für B15
+  (`linq-deferred-execution`) oder B16, oder der nächste
+  Live-Bug-Hunt in ein paar Durchgängen.
