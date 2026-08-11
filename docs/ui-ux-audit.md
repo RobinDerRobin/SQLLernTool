@@ -3830,3 +3830,52 @@ sondern pro PR direkt in den Checks sichtbar.
   sinnvoll in das aktuelle Single-File-`dotnet exec`-Engine-Modell
   einpassen lässt, oder ob es wie `updatable-view` (SQL) und
   `own-modules` (Python) eine dauerhafte Scope-Ausnahme bleibt.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt (sauber), kein aktionabler Schritt
+
+- **Umfang:** Baseline sauber (1030/1030, typecheck/build/knip grün, HEAD
+  `254ea3d`). Der letzte Durchgang hatte C#-Content (Challenge 26)
+  abgeschlossen und B15 vollständig gemacht — laut Mandat-Priorität
+  diesmal wieder Priorität 2, zumal SQL/Python weiterhin an der
+  permanenten Scope-Grenze stehen (nur die dokumentierten
+  Ausnahmen `updatable-view`/`own-modules` offen) und der einzige
+  verbleibende C#-Schritt (B16 `own-namespaces`) noch eine offene
+  architektonische Frage ist statt eines klar begrenzten nächsten
+  Schritts.
+
+- **Vorgehen:** Dev-Server gestartet, sql.js lokal per `context.route()`
+  statt der blockierten CDN-Domain serviert. Diesmal gezielt drei
+  bisher nicht live abgedeckte Bereiche geprüft: der
+  Endlosrekursions-Schutz (`findUnboundedRecursion`) — eine echte
+  `WITH RECURSIVE`-CTE ohne `WHERE` im rekursiven Teil und ohne
+  `LIMIT` danach wurde im Editor ausgeführt; die Seite blieb reaktionsfähig
+  (kein Einfrieren), der Run-Klick kehrte in ~660ms zurück statt zu
+  hängen, und die exakte deutsche Warnmeldung
+  ("... ohne eine der beiden Abbruchbedingungen läuft die Rekursion
+  unendlich weiter ...") erschien korrekt mit `status-err`-Klasse;
+  fehlerhaftes SQL (`SELEKT * FROM nichts WO id = ;`) zeigte ebenfalls
+  korrekt eine nicht-leere Fehlermeldung mit `status-err`-Klasse; und
+  `localStorage`-Persistenz über einen echten Seiten-Reload hinweg —
+  Challenge 01 gelöst (drei Sterne), zu Challenge 02 gewechselt, dann
+  `page.reload()`: nach dem Reload zeigte Challenge 01 weiterhin
+  korrekt drei Sterne und Challenge 02 blieb als zuletzt geöffnete
+  Challenge aktiv (`active`-Klasse gesetzt) — Fortschritt und
+  Navigationszustand überleben einen echten Browser-Reload korrekt.
+
+- **Ein Fehlalarm im eigenen Testskript, kein Produktbug:** die ersten
+  beiden Prüfungen (`status-error`-Selektor) schlugen zunächst fehl,
+  weil die tatsächliche CSS-Klasse `status-err` heißt (siehe
+  `src/ui/views/tabs/editorTab/resultsArea.ts`), nicht `status-error`
+  — nach Korrektur des Selektors liefen beide Prüfungen sauber durch.
+  Derselbe wiederkehrende Fehlerklasse wie in früheren Durchgängen
+  (falsch geratene Selektoren im eigenen Skript statt echter Bugs).
+
+- **Dev-Server sauber über exakte PIDs beendet** (`ps aux | grep -E
+  "vite$|npm run dev"`, gezielt `kill`), kein breiter `pkill`.
+
+- **Ergebnis:** Keine echten Bugs gefunden. Keine Code-Änderung nötig.
+  Tests/typecheck/build unverändert bei 1030/1030 grün. Nächster
+  offener Schritt: B16 (`own-namespaces`) — klären, ob/wie es ins
+  Single-File-`dotnet exec`-Engine-Modell passt, oder ob es eine
+  dauerhafte Scope-Ausnahme bleibt — oder der nächste Live-Bug-Hunt in
+  ein paar Durchgängen.
