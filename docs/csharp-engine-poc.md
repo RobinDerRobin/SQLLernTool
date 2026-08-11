@@ -1418,15 +1418,56 @@ to something more specific than initially framed.**
   web research above: a genuine interop-plumbing issue in this specific
   .NET 8.0.29 runtime-pack build, not a project misconfiguration.
 
+**Update (2026-08-11, next firing): a different .NET 8 SDK patch version
+tested — ruled out, and a genuine environment-consistency limitation
+found in the process.** The previous update above flagged "different SDK
+version" as untested. Tried it this firing: downgraded the apt
+`dotnet-sdk-8.0` package from the installed `8.0.129-0ubuntu1~24.04.1` to
+the older `8.0.104-0ubuntu1` (available from the base `noble` repo, vs.
+`noble-updates`/`noble-security` for the newer one). `dotnet workload
+list` auto-reinstalled `wasm-tools` at a correspondingly older runtime
+pack, `8.0.4` (vs. `8.0.29` used throughout every check above).
+
+A clean `rm -rf bin obj wwwroot/refs && dotnet publish -c Release` under
+this older toolchain **failed outright before ever reaching the boot
+test**: `CSharpEngineRefPackDir` resolved to
+`/usr/lib/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.4/ref/net8.0/`,
+which doesn't exist — only `8.0.29`'s ref pack is present on disk. The
+apt-installed `dotnet-sdk-8.0` downgrade moved the SDK CLI and (via the
+workload manager) the wasm runtime pack to `8.0.4`, but the separate
+`Microsoft.NETCore.App.Ref` targeting pack (laid down earlier, not
+tracked by the `dotnet-sdk-8.0` apt package itself) stayed at `8.0.29` —
+an orphaned, inconsistent environment, not a clean "older SDK" test.
+Pursuing a fully consistent older toolchain would mean manually sourcing
+a matching ref pack from elsewhere (not available via apt in this
+sandbox), which is a materially bigger, less-bounded side effort than
+this experiment was meant to be.
+
+Rolled the SDK back to the original `8.0.129-0ubuntu1~24.04.1` via
+`apt-get install --allow-downgrades`, then `dotnet workload install
+wasm-tools --skip-manifest-update` restored `wasm-tools` to `8.0.29`
+(confirmed via `dotnet workload list`). A clean rebuild under the
+restored, original toolchain published successfully (as it always has),
+and the canonical direct-boot repro
+(`http://localhost:5173/csharp-engine/host.html`) was re-run against it
+to confirm nothing about the sandbox itself had drifted:
+`git status`/`git diff` on `csharp-engine/` show zero changes — the
+environment is back to exactly its committed baseline, and the identical
+failure (`Can't find … JavaScriptExports class`, `Failed to start
+platform`) reproduces exactly as before. So: **not an SDK-8.0.29-vs-older
+issue** — same failure at both tested runtime-pack versions, so a genuine
+SDK-version test doesn't explain it either (to the extent apt makes a
+clean test of "genuinely older, fully consistent SDK" practical in this
+sandbox at all).
+
 **Still not checked:** whether a different, non-headless or
 non-Playwright-automated browser context changes anything (this sandbox
 has no display, so untested); reading the *actual* comment threads on the
 GitHub issues above (blocked by this session's fetch tooling only
 returning issue bodies, not dynamically-loaded comments) for a maintainer-
-confirmed fix or an exact-match report; whether a different .NET 8 SDK
-patch/workload version (older or newer than `8.0.29`) resolves it —
-untested because changing the pinned version without a way to verify the
-fix actually works would just trade one unverified state for another.
+confirmed fix or an exact-match report; whether a *newer* .NET 8 SDK
+patch/workload version (past `8.0.29`) resolves it — not available via
+apt in this sandbox to test.
 
 **Practical severity, calibrated:** this is **not currently a live
 production incident** — `deploy-pages.yml` still doesn't publish the C#

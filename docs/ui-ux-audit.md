@@ -4711,3 +4711,61 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Ergebnis:** Tests/typecheck/build/knip unverändert grün. Kein
   Artifact-Republish nötig (keine Zahlenänderung). Dev-Server sauber
   beendet.
+
+### 2026-08-11 — Stündliche Routine: C#-Boot-Bug — anderer SDK-Patch getestet, ausgeschlossen; Sandbox-Umgebung wiederhergestellt
+
+- **Umfang:** Baseline vor Beginn geprüft (HEAD `d5e9783`, 1049/1049
+  Tests, typecheck/build grün, `git status` sauber). Letzter noch offener,
+  konkret umsetzbarer Kandidat aus den vorherigen zwei C#-Boot-Bug-
+  Durchgängen: ein anderer .NET-8-SDK-Patch könnte den Fehler
+  (`Can't find … JavaScriptExports class`, `Failed to start platform`)
+  beheben — bisher ungetestet, da eine Versionsänderung ohne Verifikation
+  nur einen unverifizierten Zustand gegen einen anderen getauscht hätte.
+  Diesen Durchgang tatsächlich getestet.
+
+- **Vorgehen:** `dotnet-sdk-8.0` per apt von `8.0.129-0ubuntu1~24.04.1`
+  auf die ältere `8.0.104-0ubuntu1` (aus dem Basis-`noble`-Repo statt
+  `noble-updates`) downgraded. `dotnet workload list` installierte
+  daraufhin automatisch `wasm-tools` auf dem passenden älteren
+  Runtime-Pack `8.0.4` (statt der bisher durchgängig verwendeten
+  `8.0.29`) neu.
+
+- **Befund — Umgebungsinkonsistenz statt sauberem Test:** ein
+  Clean-Rebuild (`rm -rf bin obj wwwroot/refs && dotnet publish -c
+  Release`) unter diesem älteren Toolchain schlug schon vor dem
+  eigentlichen Boot-Test fehl: `CSharpEngineRefPackDir` zeigte auf
+  `.../Microsoft.NETCore.App.Ref/8.0.4/ref/net8.0/`, das es auf der
+  Platte nicht gibt — nur das `8.0.29`-Ref-Pack ist vorhanden. Das
+  apt-Downgrade hat SDK-CLI und (über den Workload-Manager) das
+  Wasm-Runtime-Pack auf `8.0.4` verschoben, aber das separate
+  `Microsoft.NETCore.App.Ref`-Targeting-Pack (nicht vom
+  `dotnet-sdk-8.0`-Paket selbst verwaltet) blieb bei `8.0.29` —
+  ein verwaistes, inkonsistentes Sandbox-Environment, kein sauberer
+  "älteres SDK"-Test. Ein wirklich konsistentes älteres Toolchain hätte
+  ein manuell beschafftes, passendes Ref-Pack erfordert, das über apt in
+  dieser Sandbox nicht verfügbar ist — ein deutlich größerer, weniger
+  begrenzter Nebenaufwand als für dieses Experiment vorgesehen.
+
+- **Wiederherstellung:** SDK zurück auf `8.0.129-0ubuntu1~24.04.1`
+  (`apt-get install --allow-downgrades`), danach `dotnet workload install
+  wasm-tools --skip-manifest-update` — stellte `wasm-tools` korrekt auf
+  `8.0.29` wieder her (per `dotnet workload list` bestätigt). Clean-Build
+  unter dem wiederhergestellten Original-Toolchain publiziert wieder
+  fehlerfrei. Der kanonische Boot-Repro-Check
+  (`http://localhost:5173/csharp-engine/host.html`) wurde erneut
+  ausgeführt, um sicherzustellen, dass die Sandbox selbst nicht
+  driftete: `git status`/`git diff` auf `csharp-engine/` zeigen null
+  Änderungen — Umgebung exakt auf committetem Stand — und derselbe Fehler
+  reproduziert exakt wie zuvor.
+
+- **Schlussfolgerung:** kein SDK-`8.0.29`-vs-älter-Problem — derselbe
+  Fehler bei beiden getesteten Runtime-Pack-Versionen, soweit ein
+  wirklich sauberer, konsistenter SDK-Versionstest über apt in dieser
+  Sandbox überhaupt praktikabel ist. Kein spekulativer Code-Fix
+  verschickt. Vollständig dokumentiert in
+  `docs/csharp-engine-poc.md`s "CRITICAL, currently unresolved"-Abschnitt.
+
+- **Ergebnis:** Tests/typecheck/build unverändert grün (keine Code-
+  Änderung, working tree sauber vor und nach dem Experiment). Kein
+  Artifact-Republish nötig (keine Zahlenänderung, reiner Diagnose-
+  Durchgang).
