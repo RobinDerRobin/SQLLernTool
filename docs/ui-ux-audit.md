@@ -4153,3 +4153,73 @@ sondern pro PR direkt in den Checks sichtbar.
   Ändern des Produktions-Deploy-Workflows das riskanteste Teilstück des
   gesamten Vorhabens ist und ein eigenes, in sich abgeschlossenes
   Increment verdient.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt (sauber) + Dev-Server-Erkenntnis zu `coi-serviceworker`
+
+- **Umfang:** Baseline sauber (1037/1037, typecheck/build/knip grün, HEAD
+  `02e6590`). SQL (81/82) und Python (81/82) haben beide nur noch ihre
+  permanente Scope-Ausnahme offen — kein aktionabler Content-Tag mehr
+  vorhanden — und C# ist bei 86/86 (100 %). Der letzte Durchgang hat
+  bereits das Firing-Kontingent für C# (Mandat-Punkt 4: genau EIN
+  Increment) mit dem `coi-serviceworker`-Schritt verbraucht. Damit bleibt
+  für diesen Durchgang Priorität 2: ein Live-Bug-Hunt gegen den echten
+  Dev-Server.
+
+- **Erkenntnis zu `coi-serviceworker.js` im Dev-Modus (kein Bug, aber
+  eine Korrektur der eigenen Annahme aus dem letzten Durchgang):** Der
+  Kommentar in `index.html` ging davon aus, dass die Datei im
+  `npm run dev`-Betrieb "harmlos 404et", weil sie nicht in `public/`
+  liegt. Tatsächlich liefert Vites Dev-Server jede Datei im Projekt-Root
+  statisch aus (nicht nur `public/`), daher antwortet
+  `GET /coi-serviceworker.js` im Dev-Betrieb mit echtem 200 und dem
+  echten Skriptinhalt. Per echtem Playwright-Check gegen `localhost:5173`
+  bestätigt: `crossOriginIsolated` ist im Dev-Betrieb bereits `true` —
+  allerdings **nicht** wegen des Service Workers (dessen Controller war
+  in der Messung `false`), sondern weil `vite.config.ts`s eigene
+  COOP/COEP-Middleware (siehe letzter `/csharp-engine/`-Durchgang) für
+  die ganze Dev-App bereits reale Response-Header setzt. Der
+  Service-Worker-Trick bleibt also weiterhin ausschließlich für die
+  Produktions-Hosting-Lücke relevant (GitHub Pages, keine eigenen
+  Header) — im Dev-Betrieb ist er ein wirkungsloser, aber unschädlicher
+  No-Op. Keine Code-Änderung nötig, nur die Kommentar-Annahme war
+  ungenau; nicht korrigiert, da sie den Kern (dist/-Constraint) korrekt
+  beschreibt und die Dev-Server-Feinheit für die Produktionsentscheidung
+  irrelevant ist.
+
+- **Vorgehen:** Tastaturnavigation durch die Sidebar (erster Tab-Stopp
+  korrekt der Sidebar-Toggle-Button), Track-Dropdown-Optionen geprüft
+  (alle drei Tracks korrekt gelistet), Theme-Picker (öffnen über
+  `.theme-btn`, 22 Theme-Optionen im Grid, Schließen per Escape-Taste
+  funktioniert — echter `keydown`-Listener in `themePicker.ts`, kein
+  Zufallstreffer), mobiles Layout bei 375px (Sidebar korrekt als
+  Overlay-Drawer mit Backdrop sichtbar, entspricht der dokumentierten
+  Standard-offen-Vorgabe in `themes.css`, kein Bug).
+
+- **Ein aufwendiger Fehlalarm im eigenen Testskript, kein Produktbug:**
+  ein End-to-End-Smoke-Test (Challenge 1 je Track öffnen, Editor-Tab
+  wechseln, Run-Button klicken) zeigte für SQL und Python leere
+  Ergebnis-Panels und — genauer untersucht — dass `.challenge-item`-
+  Klicks gar keine `active`-Klasse setzten. Ursache gefunden:
+  `selectChallenge()` (`src/ui/state/actions.ts:220-222`) bricht für
+  SQL still ab, wenn `ctx.engines.getMain()` noch `undefined` ist (SQL-
+  Engine noch nicht geladen) — und sql.js/Pyodide laden per CDN-
+  `<script>`, das dieser Sandbox aus Netzwerkgründen (`ERR_TUNNEL_
+  CONNECTION_FAILED`, bereits mehrfach dokumentiert) nicht erreichbar
+  ist. Frühere Durchgänge haben genau deshalb sql.js in ihren
+  Playwright-Skripten per `context.route()` lokal umgeleitet — dieser
+  Durchgangs-Skript tat das nicht, daher der Fehlalarm. C# (lädt lokal,
+  keine CDN-Abhängigkeit) lief im selben Skript einwandfrei durch und
+  lieferte über den echten Compiler einen echten `CS5001`-Fehler
+  (fehlende `Main`-Methode im Platzhaltertext) — bestätigt also, dass
+  Editor-Laden, Tab-Wechsel, Run-Button und Fehler-Rendering für den
+  Track, der ohne CDN funktioniert, sauber durchlaufen. Keine
+  Code-Änderung, da die Ursache vollständig im Testskript liegt, nicht
+  im Produkt.
+
+- **Dev-Server sauber beendet.**
+
+- **Ergebnis:** Keine echten Bugs gefunden. Tests/typecheck/build/knip
+  unverändert bei 1037/1037 grün, kein Artifact-Republish nötig (keine
+  Zahlenänderung). Nächster offener Schritt bleibt der bereits benannte
+  Deploy-Workflow (`deploy-pages.yml` + C#-`dotnet publish`-CI-Schritt)
+  als eigenes Increment, oder der nächste Live-Bug-Hunt.
