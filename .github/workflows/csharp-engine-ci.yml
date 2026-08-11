@@ -46,11 +46,21 @@ jobs:
       # Sanity-checks the exact files the dev-server middleware (vite.config.ts)
       # and the eventual production deploy step both need: the Blazor loader
       # script and the reference-assembly DLLs CSharpEngine.cs resolves types
-      # against at runtime.
+      # against at runtime. Diagnostic-first: this exact check has failed twice
+      # on a real runner for reasons this sandbox's own (always-consistent
+      # SDK+workload) local testing couldn't reproduce, so print what's
+      # actually on disk *before* asserting, rather than guessing again blind.
       - name: Verify published output has the files the app loader needs
         run: |
-          set -e
           PUBLISH_DIR="csharp-engine/bin/Release/net8.0/publish/wwwroot"
+          echo "--- publish dir tree (2 levels) ---"
+          find "csharp-engine/bin/Release/net8.0/publish" -maxdepth 2 || echo "publish dir itself is missing"
+          echo "--- _framework contents (if present) ---"
+          ls -la "$PUBLISH_DIR/_framework" 2>&1 || echo "_framework dir is missing"
+          echo "--- refs contents (if present) ---"
+          ls -la "$PUBLISH_DIR/refs" 2>&1 || echo "refs dir is missing"
+          echo "--- assertions ---"
+          set -e
           test -f "$PUBLISH_DIR/_framework/blazor.webassembly.js"
           test -f "$PUBLISH_DIR/_framework/CSharpEngineBlazor.wasm.gz"
           test -d "$PUBLISH_DIR/refs"
