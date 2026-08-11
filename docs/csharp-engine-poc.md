@@ -1276,19 +1276,31 @@ Roughly in dependency order:
    `curl` against `/csharp-engine/refs/System.Console.dll` → 200) — the
    fix benefits the local dev path too, not just the new CI check.
 
+   **Update, fifth real CI run: fully green.** After the publish-output
+   fix, the workflow ran again for real and every step succeeded —
+   `actions/setup-dotnet@v4`, the wasm-tools workload install (correctly
+   targeting 8.0.x this time), `dotnet publish -c Release` (the real
+   optimized pipeline, ~70s), and the verify step, all `conclusion:
+   success`. Four real CI round-trips, four different real environment
+   gaps found and fixed (SDK version resolution twice, then the
+   `wwwroot/refs/` publish-manifest timing bug) — none of which this
+   sandbox's own local testing could have caught on its own, and one of
+   which (the `refs/` bug) turned out to be a genuine, long-standing
+   product bug rather than a CI-only quirk, since the same publish
+   output is what the local dev-server middleware serves too.
+
    **Still deliberately not done:** actually wiring this into
    `deploy-pages.yml` and copying the published output into `gh-pages`
    under `/csharp-engine/`. That remains its own increment — this
    firing's job was narrowly "prove a clean GitHub Actions runner can
-   build this at all," and it now has, with a real fix for a real
-   environment gap, not just a green checkmark. The next step, once this
-   workflow's *next* real run (triggered by the `global.json` fix
-   itself, since it touches `csharp-engine/**`) is confirmed green, is
-   extending `deploy-pages.yml` with the same pinned-SDK publish step
-   plus a copy into `gh-pages`, and verifying the deployed page's
-   `/csharp-engine/` route actually boots under production COOP/COEP
-   (service-worker-provided, not the dev-server's real headers) — a
-   materially different test than anything done so far.
+   build this at all," and it now has, confirmed green for real, with
+   two real bugs fixed along the way rather than just a lucky green
+   checkmark. The next step is extending `deploy-pages.yml` with the
+   same pinned-SDK publish step plus a copy into `gh-pages`, and
+   verifying the deployed page's `/csharp-engine/` route actually boots
+   under production COOP/COEP (service-worker-provided, not the
+   dev-server's real headers) — a materially different test than
+   anything done so far.
 6. ~~**Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
    mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
    feasible now that `dotnet` works in this sandbox; likely just

@@ -4539,3 +4539,16 @@ sondern pro PR direkt in den Checks sichtbar.
   (beide Male alle 11 Referenz-DLLs korrekt vorhanden), zusätzlich live
   gegen den echten Dev-Server bestätigt (`curl` auf
   `/csharp-engine/refs/System.Console.dll` → 200).
+
+- **Vierter Nachtrag, gleicher Durchgang — fünfter echter CI-Lauf,
+  vollständig grün:** Nach dem Publish-Output-Fix lief der Workflow
+  erneut real durch — alle Schritte erfolgreich (`setup-dotnet`,
+  Workload-Installation korrekt für 8.0.x, `dotnet publish -c Release`
+  mit der echten optimierten Pipeline, ~70 s, und die Verifikation).
+  Vier echte CI-Durchläufe, vier verschiedene echte Umgebungslücken
+  gefunden und behoben (SDK-Auflösung zweimal, dann der
+  `wwwroot/refs/`-Publish-Timing-Bug) — keine davon hätte diese Sandbox
+  allein finden können, und eine davon (der `refs/`-Bug) war ein echter,
+  seit Projektbeginn bestehender Produktbug, kein reines CI-Artefakt.
+  Genau das war der Sinn dieses Durchgangs: CI-Machbarkeit real
+  bewiesen, nicht nur angenommen — mit zwei echten Bugfixes als Nebenertrag.
