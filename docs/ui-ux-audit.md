@@ -4447,3 +4447,27 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Ergebnis:** Tests unverändert 1049/1049 grün (keine `src/`-Änderung,
   reine Workflow-Datei). Typecheck/Build/Knip unverändert grün. Keine
   Coverage-Änderung, kein Artifact-Republish nötig.
+
+- **Nachtrag, gleicher Durchgang — der neue Workflow lief tatsächlich und
+  fand einen echten Bug:** Direkt nach dem Push (Pfadfilter greift auch
+  auf die Workflow-Datei selbst) lief `csharp-engine-ci.yml` real auf
+  einem GitHub-Actions-Runner — und scheiterte nach nur 37 Sekunden,
+  viel zu schnell für einen echten Build-Fehler. Ursache: `ubuntu-latest`
+  bringt **mehrere** .NET-SDKs gleichzeitig mit (Feature-Bands für 8.0,
+  9.0 **und** 10.0 im Log sichtbar), und dieses Repo hatte kein
+  `global.json`, das festlegt, welches `dotnet` tatsächlich verwendet.
+  `dotnet workload install`/`dotnet publish` griffen dadurch auf die
+  neueste SDK (10.0.10) zu, obwohl das Projekt `net8.0` als Target hat —
+  die MSBuild-Eigenschaft, aus der der Referenz-Pfad gebaut wird, zeigte
+  dadurch auf einen nicht existierenden `10.0.10/ref/net8.0/`-Pfad. Diese
+  Sandbox hat nur eine SDK-Version installiert und hätte diesen Fehler
+  nie finden können — genau der Grund, warum dieser Durchgang bewusst
+  einen echten CI-Lauf statt nur lokaler Verifikation eingeplant hatte.
+  **Fix:** `csharp-engine/global.json` pinnt jedes `dotnet`-Kommando aus
+  `csharp-engine/` (und dem verschachtelten `driver/`-Unterprojekt) auf
+  die neueste installierte 8.0.x-SDK. Lokal erneut verifiziert (frischer
+  `dotnet publish -c Release` und `driver/`s `dotnet build -c Release`,
+  beide sauber, alle drei CI-Prüfungen weiterhin erfüllt) und mitgepusht
+  — der nächste reale CI-Lauf (durch genau diesen Fix selbst getriggert,
+  da er `csharp-engine/**` berührt) wird zeigen, ob das Problem behoben
+  ist.

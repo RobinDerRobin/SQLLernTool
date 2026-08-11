@@ -1151,17 +1151,51 @@ Roughly in dependency order:
    `/csharp-engine/` locally, and the shape the eventual production step
    would need to copy into `gh-pages`.
 
+   **Update, same firing: the real CI run caught a genuine environment
+   bug this sandbox could never have surfaced.** The workflow ran for
+   real immediately after pushing (the path filter includes the workflow
+   file itself) — and failed in 37 seconds, far too fast to be a real
+   build failure. The actual error, from `CopyCSharpEngineRefAssemblies`'s
+   own diagnostic message: `CSharpEngineRefPackDir ('/usr/share/dotnet/
+   packs/Microsoft.NETCore.App.Ref/10.0.10/ref/net8.0/') does not exist`.
+   Root cause: GitHub's `ubuntu-latest` runner image ships **multiple**
+   preinstalled .NET SDKs side by side (the log showed feature bands for
+   8.0, 9.0, *and* 10.0), and this repo had no `global.json` pinning
+   which one `dotnet` resolves to. `dotnet workload install` and `dotnet
+   publish` both picked the newest SDK on the machine (10.0.10) by
+   default — so `$(BundledNETCoreAppPackageVersion)` (the MSBuild
+   property the ref-copy target's path is built from) resolved to
+   `10.0.10`, while the project itself targets `net8.0`, producing a
+   path that doesn't exist. This sandbox never hits it: only one SDK
+   (8.0.129) is installed here, so there was never anything to pick
+   *wrong*. Exactly the kind of gap this increment's real-CI step was
+   for — no amount of local `dotnet publish` re-runs would have found
+   it.
+
+   **Fix:** `csharp-engine/global.json` — `{"sdk": {"version":
+   "8.0.100", "rollForward": "latestFeature"}}`, pinning every `dotnet`
+   command run from `csharp-engine/` (and its `driver/` subproject,
+   which inherits the same `global.json`) to the newest installed 8.0.x
+   SDK, never rolling forward to 9 or 10. Verified locally afterward
+   (`dotnet --version` inside `csharp-engine/` correctly reports
+   `8.0.129`, the only 8.0.x SDK here), then a fresh `rm -rf bin obj &&
+   dotnet publish -c Release` and `driver/`'s own `dotnet build -c
+   Release` both still succeed, and all three of the new CI step's
+   assertions still pass against the rebuilt output.
+
    **Still deliberately not done:** actually wiring this into
    `deploy-pages.yml` and copying the published output into `gh-pages`
    under `/csharp-engine/`. That remains its own increment — this
    firing's job was narrowly "prove a clean GitHub Actions runner can
-   build this at all," not "ship it." The next step, once this workflow
-   has run for real in CI and been observed to pass, is extending
-   `deploy-pages.yml` itself with the same publish step plus a copy into
-   `gh-pages`, and verifying the deployed page's `/csharp-engine/` route
-   actually boots under production COOP/COEP (service-worker-provided,
-   not the dev-server's real headers) — a materially different test than
-   anything done so far.
+   build this at all," and it now has, with a real fix for a real
+   environment gap, not just a green checkmark. The next step, once this
+   workflow's *next* real run (triggered by the `global.json` fix
+   itself, since it touches `csharp-engine/**`) is confirmed green, is
+   extending `deploy-pages.yml` with the same pinned-SDK publish step
+   plus a copy into `gh-pages`, and verifying the deployed page's
+   `/csharp-engine/` route actually boots under production COOP/COEP
+   (service-worker-provided, not the dev-server's real headers) — a
+   materially different test than anything done so far.
 6. ~~**Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
    mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
    feasible now that `dotnet` works in this sandbox; likely just
