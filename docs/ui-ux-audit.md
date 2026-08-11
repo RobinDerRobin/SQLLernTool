@@ -3655,3 +3655,48 @@ sondern pro PR direkt in den Checks sichtbar.
   `docs/csharp-concept-hierarchy.md`: Tag-Bilanz 80/86 → 81/86 (≈ 94 %),
   B15 zu 3 von 5 Tags abgedeckt (`linq-ordering-grouping`,
   `linq-deferred-execution` offen). B0 bis B14 bleiben komplett.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt (sauber), kein aktionabler Schritt
+
+- **Umfang:** Baseline sauber (1022/1022, typecheck/build/knip grün, HEAD
+  `59b9044`). Drei Durchgänge in Folge hatten C#-Content gebaut
+  (Challenges 22–24) — laut Mandat-Priorität diesmal wieder Priorität 2
+  statt eines weiteren C#-Increments.
+
+- **Vorgehen:** Dev-Server gestartet, sql.js/Pyodide lokal per
+  `context.route()` statt der blockierten CDN-Domains serviert. Diesmal
+  gezielt Bereiche geprüft, die in früheren Durchgängen noch nicht
+  live abgedeckt waren: `compareView.ts` — "Mit Musterlösung
+  vergleichen" per echtem `.click()`, beide Spalten (eigener Code,
+  Musterlösung) zeigen tatsächlichen Inhalt; `hintsSection.ts` — ein
+  Tipp per echtem `.click()` angefordert, Tipptext erscheint korrekt;
+  Tastatur-Bedienbarkeit der Challenge-Liste — ein echtes `Enter`-
+  `KeyboardEvent` auf einem fokussierten `.challenge-item` wählt die
+  Challenge aus (Regressionscheck für die frühe Tastatur-Arbeit); ein
+  echter End-to-End-Lauf mit der tatsächlichen Musterlösung von Python
+  Challenge 01 (`print(...)`-Doppelzeile) über den echten Pyodide-Motor.
+  Alle vier Prüfungen liefen wie erwartet durch.
+
+- **Eine CONSOLE-ERROR-Meldung aufgetreten, aber kein Produktbug:**
+  `net::ERR_CERT_AUTHORITY_INVALID` beim Tipp-Anfordern. Nachverfolgt
+  auf den Netzwerk-Request dahinter: ein Aufruf an
+  `api.anthropic.com/v1/messages` — das ist `revealHint`s zusätzlicher
+  Claude-Chat-Elaborations-Call (siehe Kommentar in `hintsSection.ts`),
+  vom Sandbox-Netzwerk blockiert, dieselbe Kategorie wie die bereits
+  dokumentierte CDN-Sperre. Der eigentliche Tipptext wird davon
+  unabhängig sofort und korrekt angezeigt (bestätigt) — die App
+  degradiert hier bereits sauber, kein Fix nötig.
+
+- **Eigener Bedienfehler während des Durchgangs, kein Produktbug:**
+  ein `pkill -f "vite"` zum Beenden des Dev-Servers traf per
+  Substring-Match auch den parallel laufenden `vitest`-Hintergrundlauf
+  (der Prozessname enthält ebenfalls "vite") und brach ihn mitten im
+  Lauf ab. Erkannt am unerwarteten Exit-Code, sauber durch einen
+  zweiten vollständigen Testlauf behoben — für künftige Durchgänge
+  festgehalten: `pkill -f "vite"` ist zu unspezifisch, wenn parallel
+  ein `vitest`-Lauf aktiv sein könnte.
+
+- **Ergebnis:** Keine echten Bugs gefunden. Keine Code-Änderung nötig.
+  Tests/typecheck/build unverändert bei 1022/1022 grün. Nächster
+  offener Schritt: weiterer C#-Content (B15-Rest oder B16) oder der
+  nächste Live-Bug-Hunt in ein paar Durchgängen.
