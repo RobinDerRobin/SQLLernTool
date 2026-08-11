@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createNodeCSharpEngine } from '../../../../../test/helpers/nodeCSharpEngine';
 import { createNodePythonEngine } from '../../../../../test/helpers/nodePythonEngine';
 import { createNodeSqliteEngine } from '../../../../../test/helpers/nodeSqliteEngine';
 import type { ClaudeChatClient } from '../../../../chat/claudeChatClient';
 import { TRACKS } from '../../../../content/registry';
+import { csharpGrundlagenCourse } from '../../../../content/tracks/csharp/courses/csharpGrundlagen/course';
 import { pythonGrundlagenCourse } from '../../../../content/tracks/python/courses/pythonGrundlagen/course';
 import { sqlLernenToolCourse } from '../../../../content/tracks/sqlite/courses/sqlLernenTool/course';
 import {
@@ -18,6 +20,7 @@ import { mountEditorTab } from './editorTab';
 
 const c01 = sqlLernenToolCourse.challenges.find((c) => c.num === '01')!;
 const py01 = pythonGrundlagenCourse.challenges.find((c) => c.num === '01')!;
+const cs01 = csharpGrundlagenCourse.challenges.find((c) => c.num === '01')!;
 
 function testEngineFactory(): EngineFactory {
   const main = createNodeSqliteEngine();
@@ -38,6 +41,20 @@ function testEngineFactoryWithPython(): EngineFactory {
   };
 }
 
+function testEngineFactoryWithCSharp(): EngineFactory {
+  const main = createNodeSqliteEngine();
+  const cs = createNodeCSharpEngine();
+  return {
+    getMain: () => main,
+    setMainFromSqlJs: () => {},
+    createDisposable: () => createNodeSqliteEngine(),
+    getMainPython: () => null,
+    ensurePythonEngine: () => Promise.reject(new Error('python engine not available in this test fixture')),
+    getMainCSharp: () => cs,
+    ensureCSharpEngine: () => Promise.resolve(cs),
+  };
+}
+
 function makeCtx(progress: ProgressState = createDefaultProgressState()): AppContext {
   const progressStore: ProgressStore = { load: () => progress, save: () => {} };
   const chatClient: ClaudeChatClient = { sendMessage: vi.fn().mockResolvedValue('ok') };
@@ -51,6 +68,14 @@ function makeCtxWithPython(progress: ProgressState = createDefaultProgressState(
   const chatClient: ClaudeChatClient = { sendMessage: vi.fn().mockResolvedValue('ok') };
   const ctx = createAppContext({ progressStore, chatClient, registry: TRACKS });
   ctx.engines = testEngineFactoryWithPython();
+  return ctx;
+}
+
+function makeCtxWithCSharp(progress: ProgressState = createDefaultProgressState()): AppContext {
+  const progressStore: ProgressStore = { load: () => progress, save: () => {} };
+  const chatClient: ClaudeChatClient = { sendMessage: vi.fn().mockResolvedValue('ok') };
+  const ctx = createAppContext({ progressStore, chatClient, registry: TRACKS });
+  ctx.engines = testEngineFactoryWithCSharp();
   return ctx;
 }
 
@@ -120,26 +145,28 @@ describe('mountEditorTab', () => {
     expect(saved).toBe('-- meine Arbeit\nSELECT 1;');
   });
 
-  it('running a correct solution shows a success status with stars', () => {
+  it('running a correct solution shows a success status with stars', async () => {
     const ctx = makeCtx();
     const { editor } = mountEditorTab(root, ctx);
     selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
     editor.setValue(c01.solution);
 
     root.querySelector('.run-btn')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
 
     expect(root.querySelector('.status-ok')).not.toBeNull();
     expect(root.querySelector('.status-stars')?.textContent).toBe('★★★');
     expect(root.querySelector('.result-table')).not.toBeNull();
   });
 
-  it('running invalid SQL shows the error status with the line number', () => {
+  it('running invalid SQL shows the error status with the line number', async () => {
     const ctx = makeCtx();
     const { editor } = mountEditorTab(root, ctx);
     selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
     editor.setValue('SELEKT nope;');
 
     root.querySelector('.run-btn')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
 
     expect(root.querySelector('.status-err')?.textContent).toContain('Zeile 1');
   });
@@ -168,27 +195,64 @@ describe('mountEditorTab', () => {
     expect(banner.textContent).toContain('Python-Umgebung konnte nicht geladen werden');
   });
 
-  it('running a Python challenge while the engine is still loading shows the loading placeholder', () => {
+  it('running a Python challenge while the engine is still loading shows the loading placeholder', async () => {
     const ctx = makeCtx();
     const { editor } = mountEditorTab(root, ctx);
     selectChallenge(ctx, 'python', 'pythonGrundlagen', '01');
     editor.setValue(py01.solution);
 
     root.querySelector('.run-btn')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
 
     expect(root.querySelector('.results-body')?.textContent).toContain('Python-Umgebung wird geladen');
   });
 
-  it('running a correct Python solution shows a success status with stdout', () => {
+  it('running a correct Python solution shows a success status with stdout', async () => {
     const ctx = makeCtxWithPython();
     const { editor } = mountEditorTab(root, ctx);
     selectChallenge(ctx, 'python', 'pythonGrundlagen', '01');
     editor.setValue(py01.solution);
 
     root.querySelector('.run-btn')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
 
     expect(root.querySelector('.status-ok')).not.toBeNull();
     expect(root.querySelector('.results-body pre')).not.toBeNull();
+  });
+
+  it(
+    'running a correct C# solution shows a success status with stdout',
+    async () => {
+      const ctx = makeCtxWithCSharp();
+      const { editor } = mountEditorTab(root, ctx);
+      selectChallenge(ctx, 'csharp', 'csharpGrundlagen', '01');
+      editor.setValue(cs01.solution);
+
+      root.querySelector('.run-btn')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+      // A real `dotnet exec` compile+run (via createNodeCSharpEngine), unlike SQL/Python's
+      // synchronous engines — poll instead of a single microtask flush.
+      const deadline = Date.now() + 15_000;
+      while (!root.querySelector('.status-ok') && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      expect(root.querySelector('.status-ok')).not.toBeNull();
+      expect(root.querySelector('.results-body pre')).not.toBeNull();
+    },
+    20_000,
+  );
+
+  it('running a C# challenge while the engine is still loading shows the loading placeholder', async () => {
+    const ctx = makeCtx();
+    const { editor } = mountEditorTab(root, ctx);
+    selectChallenge(ctx, 'csharp', 'csharpGrundlagen', '01');
+    editor.setValue(cs01.solution);
+
+    root.querySelector('.run-btn')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
+
+    expect(root.querySelector('.results-body')?.textContent).toContain('C#-Umgebung wird geladen');
   });
 
   it('shows a track-appropriate empty-state before the first run — "Query" for SQL, "Code" for Python', () => {

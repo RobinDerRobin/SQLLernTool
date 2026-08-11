@@ -151,6 +151,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-11 | HEAD (C# Challenge 25: B15 Teil 4 — LINQ Ordering/Grouping, 82/86) | 92.53 % | 73.13 % | 99.16 % | 92.53 % |
 | 2026-08-11 | HEAD (C# Challenge 26: B15 vollständig — LINQ Deferred Execution, 83/86) | 92.56 % | 73.13 % | 99.16 % | 92.56 % |
 | 2026-08-11 | HEAD (C# Challenge 27: B16 vollständig — Namespaces & Imports, 86/86, C#-Dokument komplett) | 92.59 % | 73.12 % | 99.16 % | 92.59 % |
+| 2026-08-11 | HEAD (C#-Engine live verdrahtet: TRACKS-Eintrag, async runQuery, iframe-Transport im echten Dev-Server E2E-verifiziert) | 92.63 % | 73.44 % | 99.37 % | 92.63 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -3940,3 +3941,77 @@ sondern pro PR direkt in den Checks sichtbar.
   Content mehr, sondern die Engine-Integration selbst live spielbar zu
   machen (`runQuery`-Async-Umstellung, Registry-Eintrag,
   `coi-serviceworker` für Produktion — siehe `docs/csharp-engine-poc.md`).
+
+### 2026-08-11 — Stündliche Routine: C#-Engine live verdrahtet (Registry-Eintrag, async runQuery, iframe-Transport E2E-verifiziert)
+
+- **Umfang:** Baseline sauber (1034/1034, typecheck/build/knip grün, HEAD
+  `e938d8a`). C#-Content ist seit dem letzten Durchgang vollständig
+  (86/86 Tags) und SQL/Python stehen an der permanenten Scope-Grenze —
+  laut Mandat-Priorität diesmal C#-Engine-Integration, mit klarem
+  nächstem Schritt laut `docs/csharp-engine-poc.md`: den letzten
+  verbliebenen Wiring-Schritt (`runQuery`-Async-Umstellung +
+  Registry-Eintrag) schließen, um C# im Dev-Server tatsächlich spielbar
+  zu machen.
+
+- **`runQuery` async gemacht:** einziger Aufrufer außerhalb der Tests ist
+  `editorTab.ts`s `run()` — geringer Streuradius. `RunOutcome` um
+  `csharp`/`csharp-loading` erweitert (Spiegelbild von
+  `python`/`python-loading`). `ensureCSharpEngineLoaded` (Spiegel von
+  `ensurePythonEngineLoaded`) lädt `loadCSharpEngineFromServer('/csharp-engine/')`
+  beim Öffnen einer C#-Challenge, mit `withTimeout`-Absicherung und
+  neuem `session.csharpStatus`-Feld. `renderPythonEngineStatus` zu
+  `renderEngineStatus(status, label)` verallgemeinert statt dupliziert
+  (Python/C#-Banner sind identisch bis auf den Namen).
+  `csharpGrundlagenCourse` jetzt in `TRACKS` registriert — der zuvor in
+  jedem Durchgang bewusst zurückgehaltene letzte Baustein.
+
+- **Ein echter Bug gefunden und behoben, bevor committet wurde:** da
+  jetzt auch SQL/Python durch ein `await` laufen (obwohl beide intern
+  nichts asynchrones tun), verschiebt sich ihr DOM-Render um einen
+  Mikrotask — unsichtbar für Menschen, aber vier bestehende
+  `editorTab.test.ts`-Tests prüften synchron direkt nach dem
+  Klick-Dispatch und schlugen fehl. Behoben durch `await
+  Promise.resolve();` in diesen Tests, nach demselben Muster, das die
+  Datei für den Pyodide-Ladefehler-Test schon nutzte. Zusätzlich ein
+  Race-Guard in `run()` ergänzt: da C#s echter Compile+Run jetzt der
+  einzige Zweig ist, der langsam genug ist, dass Nutzer währenddessen
+  wegnavigieren könnten, prüft `run()` nach dem `await runQuery(...)`
+  erneut die aktuelle Auswahl und verwirft das Ergebnis, falls sich die
+  Auswahl inzwischen geändert hat.
+
+- **Live-E2E-verifiziert gegen den echten Dev-Server** (Playwright, nicht
+  nur Unit-Tests): C#-Track im Sidebar-Dropdown ausgewählt, alle 27
+  Challenges gelistet, Challenge 01 geöffnet, Editor nutzt korrekt
+  `csharpLanguagePlugin` (Toolbar zeigt "C#", Syntax-Highlighting aktiv),
+  echte Musterlösung ausgeführt — echter Roslyn-Compile + WASM-Ausführung
+  über den iframe-Transport, `validate()` lief, UI zeigte `✓ Aufgabe
+  erfüllt`, drei Sterne, korrektes stdout, Sidebar-Sternebadge
+  aktualisierte sich. Zweiter Lauf derselben Challenge brauchte nur
+  ~30ms (Engine bereits gecacht — bestätigt `ensureCSharpEngine`s
+  Load-once-Verhalten unter dem echten iframe-Transport). SQL lief auf
+  derselben Seite unverändert korrekt weiter — keine Regression. Die
+  eine beobachtete Konsolen-Meldung (`ManagedError: ... Could not find
+  any element matching selector '#app'`) ist dieselbe bereits
+  dokumentierte harmlose Blazor-Root-Component-Suche, kein neuer Fund.
+
+- **Ergebnis:** Tests 1034 → 1037 (+3: `csharp-loading`-Fall in
+  `actions.test.ts`, echter C#-Erfolgs-Test + Lade-Platzhalter-Test in
+  `editorTab.test.ts`). `typecheck` grün. `npm run build` erfolgreich —
+  Größe wächst 635,90 kB → 827,57 kB gzip 192,41 kB (239 → 269 Module):
+  erster Build, in dem C#-Content tatsächlich vom Produktions-Entry-Point
+  erreichbar ist (bestätigt per Grep auf `dist/index.html` nach
+  Challenge-Text wie "Kiste"/"Lager" — vorher abwesend, jetzt vorhanden).
+  `knip`: unverändert 10 Funde. Coverage: 92,63 % / 73,44 % / 99,37 % /
+  92,63 % — spürbarer Sprung bei Branch- und Function-Abdeckung, weil
+  C#-UI-Codepfade jetzt tatsächlich erreichbar und durchlaufen werden
+  statt totem Code zu sein.
+
+- **Bewusst offen gelassen:** Produktions-Hosting. `CSHARP_ENGINE_BASE_URL`
+  (`/csharp-engine/`) funktioniert nur, weil die Vite-Dev-Server-
+  Middleware lokal einen von Hand gebauten `dotnet publish`-Output
+  ausliefert — für GitHub Pages (oder wo auch immer produktiv gehostet
+  wird) gibt es noch kein Äquivalent. Ein frischer Checkout ohne .NET-SDK
+  oder ein Produktions-Build würde C# als wählbaren Track zeigen, dessen
+  Challenges beim Ausführen 404en. Das ist der letzte verbleibende
+  Schritt: `coi-serviceworker` (oder ein äquivalenter Build-Schritt) für
+  den echten Produktions-Host.

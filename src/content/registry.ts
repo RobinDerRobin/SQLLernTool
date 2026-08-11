@@ -1,6 +1,7 @@
 import type { ZodTypeAny } from 'zod';
 import type { Course } from '../domain/challenge.types';
-import { pythonChallengeSchema, sqliteChallengeSchema } from './schema';
+import { csharpChallengeSchema, pythonChallengeSchema, sqliteChallengeSchema } from './schema';
+import { csharpGrundlagenCourse } from './tracks/csharp/courses/csharpGrundlagen/course';
 import { pythonGrundlagenCourse } from './tracks/python/courses/pythonGrundlagen/course';
 import { sqlLernenToolCourse } from './tracks/sqlite/courses/sqlLernenTool/course';
 
@@ -31,5 +32,11 @@ export const TRACKS: Record<string, ContentTrack> = {
     label: 'Python',
     courses: [pythonGrundlagenCourse as Course<unknown>],
     schema: pythonChallengeSchema,
+  },
+  csharp: {
+    id: 'csharp',
+    label: 'C#',
+    courses: [csharpGrundlagenCourse as Course<unknown>],
+    schema: csharpChallengeSchema,
   },
 };

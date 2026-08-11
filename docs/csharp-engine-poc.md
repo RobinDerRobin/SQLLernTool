@@ -893,6 +893,80 @@ Roughly in dependency order:
    own test files, so they're bundled for the first time even though
    still unreachable at runtime. `knip`: unchanged, 10 findings. Coverage:
    92.35 % / 73.18 % / 99.15 % / 92.35 %.
+
+   **Update (2026-08-11, next firing): the final gap is closed — C# is
+   now live-playable in the app, not just authored and Gate-1/2-verified.**
+   The async-`runQuery` question flagged above turned out to have a small
+   blast radius: `runQuery` has exactly one call site outside tests
+   (`editorTab.ts`'s `run()`), so making it `async function runQuery(...):
+   Promise<RunOutcome>` and awaiting it at that one call site was a
+   contained change, not the wide refactor the earlier flag worried about.
+   `RunOutcome` gained `csharp`/`csharp-loading` kinds (mirroring
+   `python`/`python-loading` exactly); `ensureCSharpEngineLoaded` (mirrors
+   `ensurePythonEngineLoaded`, same `withTimeout`-wrapped load-once-and-
+   cache shape, triggered from `selectChallenge` for `trackId === 'csharp'`)
+   passes `loadCSharpEngineFromServer('/csharp-engine/')` — the exact path
+   the dev-server middleware from two firings ago already serves. A new
+   `session.csharpStatus` field (`withCSharpStatus`) mirrors `pythonStatus`;
+   `editorTab.ts`'s `renderPythonEngineStatus` was generalized to
+   `renderEngineStatus(status, label)` (Python and C#'s banners are
+   otherwise identical) rather than duplicated. `csharpGrundlagenCourse`
+   is now registered in `TRACKS` (`src/content/registry.ts`) — the
+   deliberately-withheld piece from every prior increment.
+
+   One real bug surfaced and fixed before committing: because SQL/Python's
+   branches of `runQuery` now also go through one `await` (even though
+   neither does any async work internally), a synchronous DOM click ->
+   result render turned into a one-microtask-later render — invisible to a
+   human, but four existing `editorTab.test.ts` tests asserted on the DOM
+   synchronously right after dispatching the click and started failing.
+   Fixed by awaiting one microtask tick in those tests (`await
+   Promise.resolve()`), matching a pattern this file already used for the
+   Pyodide-load-failure test. Also added a race guard in `run()`: since C#'s
+   real compile+run is now the one branch slow enough for a user to
+   navigate to a different challenge before it resolves, `run()` re-checks
+   the current selection after `await runQuery(...)` and drops the result
+   if the user has since moved on, instead of overwriting whatever
+   challenge is now open.
+
+   **Live-verified end-to-end against the real dev server** (Playwright,
+   not just unit tests): selected the C# track from the sidebar's
+   track/course dropdown, confirmed all 27 challenges list, opened
+   Challenge 01, confirmed the editor picked up `csharpLanguagePlugin`
+   (toolbar shows "C#", syntax highlighting active), ran the actual
+   solution — a real Roslyn compile + WASM execution over the iframe
+   transport completed, `validate()` ran, the UI showed `✓ Aufgabe
+   erfüllt`, three stars, and the correct stdout, and the sidebar's
+   challenge-list star badge updated to match. A second run against the
+   same challenge completed in ~30ms (engine cached from the first load,
+   confirming `ensureCSharpEngine`'s load-once behavior holds under the
+   real iframe transport, not just in unit tests). Confirmed no
+   regression: SQL still runs and shows success correctly on the same
+   page. The one console message observed (`ManagedError: ... Could not
+   find any element matching selector '#app'`) is the same harmless
+   Blazor-root-component-search noise documented since step 3 above — not
+   a new issue.
+
+   Tests 1034 → 1037 (+3: a `csharp-loading` case in `actions.test.ts`, a
+   real end-to-end C# success test and a C#-loading-placeholder test in
+   `editorTab.test.ts`). `typecheck` green. `npm run build` succeeds; size
+   grew 635.90 kB → 827.57 kB gzip 192.41 kB (239 → 269 modules) — this is
+   the first build where C# content is actually reachable from the
+   production entry point, not just bundled-but-dead code, confirmed by
+   grepping the built `dist/index.html` for challenge text (`Kiste`,
+   `Lager`, etc. — previously absent, now present). `knip`: unchanged, 10
+   findings.
+
+   **Still open, deliberately out of scope for this increment:**
+   production hosting. `CSHARP_ENGINE_BASE_URL = '/csharp-engine/'` in
+   `actions.ts` only resolves because the Vite dev-server middleware
+   (`csharpEngineDevServer()`) serves it locally from a `dotnet publish`
+   output that has to be built by hand first — GitHub Pages (or wherever
+   this ships) has no equivalent yet. A fresh clone without the .NET SDK,
+   or a production build, will show C# as a selectable track whose
+   challenges 404 when run. That's the next and last remaining piece:
+   `coi-serviceworker` (or an equivalent build step) wiring for whatever
+   the real production host is.
 6. ~~**Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
    mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
    feasible now that `dotnet` works in this sandbox; likely just

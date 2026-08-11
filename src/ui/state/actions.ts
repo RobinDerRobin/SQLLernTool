@@ -21,6 +21,10 @@ import type { SqlChallenge } from '../../content/tracks/sqlite/types';
 import { executeAndValidate as executeAndValidateSql, type ExecuteAndValidateOutcome } from '../../runtime/sql/executeAndValidate';
 import { getGivenTableNames, prepareChallenge } from '../../runtime/sql/prepareChallenge';
 import type { SqlJsStatic } from '../../runtime/sql/sqlJsEngine';
+import type { CSharpChallenge } from '../../content/tracks/csharp/types';
+import { loadCSharpEngineFromServer } from '../../runtime/csharp/csharpEngine';
+import { executeAndValidate as executeAndValidateCSharp } from '../../runtime/csharp/executeAndValidate';
+import type { CSharpExecuteAndValidateOutcome } from '../../runtime/csharp/executeAndValidate';
 import type { AppContext } from '../context';
 import {
   getCourseChallenges as getCourseChallengesFromRegistry,
@@ -31,6 +35,7 @@ import {
   withActiveTab,
   withChatDraftPrefill,
   withChatUnread,
+  withCSharpStatus,
   withGivenTableNames,
   withInitStatus,
   withPlayResult,
@@ -46,7 +51,12 @@ export type RunOutcome =
   | ({ kind: 'sql' } & ExecuteAndValidateOutcome)
   | ({ kind: 'python' } & PythonExecuteAndValidateOutcome)
   | { kind: 'python-loading' }
+  | ({ kind: 'csharp' } & CSharpExecuteAndValidateOutcome)
+  | { kind: 'csharp-loading' }
   | { kind: 'none' };
+
+/** Where the Vite dev-server middleware (csharpEngineDevServer in vite.config.ts) serves the published Blazor bundle from. Production hosting location is still undecided (docs/csharp-engine-poc.md), so this is dev-only for now. */
+const CSHARP_ENGINE_BASE_URL = '/csharp-engine/';
 
 const SQL_TOOL_DESCRIPTION =
   'Kontext zum Tool, in dem ich gerade arbeite: Eine browserbasierte SQL-Sandbox mit SQLite (sql.js) für Lern-Challenges. ' +
@@ -127,6 +137,37 @@ async function ensurePythonEngineLoaded(ctx: AppContext): Promise<void> {
     ctx.store.update((s) => ({ ...s, session: withPythonStatus(s.session, 'ready') }));
   } catch (e) {
     ctx.store.update((s) => ({ ...s, session: withPythonStatus(s.session, { error: (e as Error).message }) }));
+  }
+}
+
+const CSHARP_ENGINE_LOAD_TIMEOUT_MS = 15_000;
+const CSHARP_ENGINE_TIMEOUT_MESSAGE =
+  'Die C#-Umgebung hat nach 15 Sekunden nicht geantwortet. Vermutlich blockiert eine Browser-Erweiterung ' +
+  'oder eine Content-Security-Policy das Laden des Blazor-Bundles. Prüfe die Browser-Konsole (F12) auf eine ' +
+  'Fehlermeldung und versuche es notfalls in einem Inkognito-Fenster ohne Erweiterungen.';
+
+/**
+ * Loads the C# engine exactly once (cached by EngineFactory itself) and
+ * reflects progress in session.csharpStatus so the UI can show a loading
+ * banner — same shape as ensurePythonEngineLoaded. Wrapped in a timeout for
+ * the same reason: an iframe that never fires its ready message would
+ * otherwise leave this pending forever with the UI stuck on "wird geladen".
+ */
+async function ensureCSharpEngineLoaded(ctx: AppContext): Promise<void> {
+  if (ctx.engines.getMainCSharp()) {
+    ctx.store.update((s) => ({ ...s, session: withCSharpStatus(s.session, 'ready') }));
+    return;
+  }
+  ctx.store.update((s) => ({ ...s, session: withCSharpStatus(s.session, 'loading') }));
+  try {
+    await withTimeout(
+      ctx.engines.ensureCSharpEngine(() => loadCSharpEngineFromServer(CSHARP_ENGINE_BASE_URL)),
+      CSHARP_ENGINE_LOAD_TIMEOUT_MS,
+      CSHARP_ENGINE_TIMEOUT_MESSAGE,
+    );
+    ctx.store.update((s) => ({ ...s, session: withCSharpStatus(s.session, 'ready') }));
+  } catch (e) {
+    ctx.store.update((s) => ({ ...s, session: withCSharpStatus(s.session, { error: (e as Error).message }) }));
   }
 }
 
@@ -218,6 +259,9 @@ export function selectChallenge(
   if (trackId === 'python') {
     void ensurePythonEngineLoaded(ctx);
   }
+  if (trackId === 'csharp') {
+    void ensureCSharpEngineLoaded(ctx);
+  }
 }
 
 /**
@@ -296,8 +340,15 @@ export function resetSchema(ctx: AppContext): void {
   persist(ctx);
 }
 
-/** Runs code against the currently open challenge's track and returns the outcome for the view to render. */
-export function runQuery(ctx: AppContext, code: string): RunOutcome {
+/**
+ * Runs code against the currently open challenge's track and returns the
+ * outcome for the view to render. Async because C#'s executeAndValidate is
+ * (real Roslyn compile + WASM run via the iframe transport, never
+ * synchronous the way sql.js/CPython-subprocess calls are) — SQL and Python
+ * themselves stay synchronous internally, this only awaits the one branch
+ * that needs it.
+ */
+export async function runQuery(ctx: AppContext, code: string): Promise<RunOutcome> {
   const selection = ctx.store.getState().session.selection;
   if (!selection) return { kind: 'none' };
   const challenge = findChallengeInRegistry(ctx.registry, selection.trackId, selection.courseId, selection.challengeNum);
@@ -319,6 +370,14 @@ export function runQuery(ctx: AppContext, code: string): RunOutcome {
     const outcome = executeAndValidatePython(engine, code, (challenge as PythonChallenge).validate);
     recordOutcome(ctx, selection.trackId, selection.courseId, selection.challengeNum, !outcome.error && outcome.ok);
     return { kind: 'python', ...outcome };
+  }
+
+  if (selection.trackId === 'csharp') {
+    const engine = ctx.engines.getMainCSharp();
+    if (!engine) return { kind: 'csharp-loading' };
+    const outcome = await executeAndValidateCSharp(engine, code, (challenge as CSharpChallenge).validate);
+    recordOutcome(ctx, selection.trackId, selection.courseId, selection.challengeNum, !outcome.error && outcome.ok);
+    return { kind: 'csharp', ...outcome };
   }
 
   return { kind: 'none' };

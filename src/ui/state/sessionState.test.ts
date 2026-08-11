@@ -25,6 +25,7 @@ describe('createDefaultSessionState', () => {
       chatDraftPrefill: null,
       themePickerOpen: false,
       pythonStatus: 'idle',
+      csharpStatus: 'idle',
     });
   });
 });

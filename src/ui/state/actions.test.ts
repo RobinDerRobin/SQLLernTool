@@ -245,11 +245,11 @@ describe('resetSchema', () => {
 });
 
 describe('runQuery', () => {
-  it('runs SQL against the main engine and awards stars on success', () => {
+  it('runs SQL against the main engine and awards stars on success', async () => {
     const { ctx } = makeCtx();
     selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
 
-    const outcome = runQuery(ctx, c01.solution);
+    const outcome = await runQuery(ctx, c01.solution);
     if (outcome.kind !== 'sql') throw new Error('expected a sql outcome');
 
     expect(outcome.ok).toBe(true);
@@ -259,26 +259,26 @@ describe('runQuery', () => {
     expect(ctx.store.getState().session.playResults['sqlite:sqlLernenTool:01']).toBe('ok');
   });
 
-  it('returns a SQL error and marks the play result "err"', () => {
+  it('returns a SQL error and marks the play result "err"', async () => {
     const { ctx } = makeCtx();
     selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
 
-    const outcome = runQuery(ctx, 'SELEKT nope;');
+    const outcome = await runQuery(ctx, 'SELEKT nope;');
     if (outcome.kind !== 'sql') throw new Error('expected a sql outcome');
 
     expect(outcome.error).toMatch(/Zeile/);
     expect(ctx.store.getState().session.playResults['sqlite:sqlLernenTool:01']).toBe('err');
   });
 
-  it('refreshes the cached tables info after running', () => {
+  it('refreshes the cached tables info after running', async () => {
     const { ctx } = makeCtx();
     selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
-    runQuery(ctx, c01.solution);
+    await runQuery(ctx, c01.solution);
     const names = ctx.store.getState().session.tablesInfo?.map((t) => t.name) ?? [];
     expect(names).toContain('users');
   });
 
-  it('runs Python against the Python engine and awards stars on success', () => {
+  it('runs Python against the Python engine and awards stars on success', async () => {
     const { ctx } = makeCtx();
     ctx.engines = {
       ...createTestEngineFactory(),
@@ -286,7 +286,7 @@ describe('runQuery', () => {
     };
     selectChallenge(ctx, 'python', 'pythonGrundlagen', '01');
 
-    const outcome = runQuery(ctx, py01.solution);
+    const outcome = await runQuery(ctx, py01.solution);
     if (outcome.kind !== 'python') throw new Error('expected a python outcome');
 
     expect(outcome.ok).toBe(true);
@@ -296,16 +296,16 @@ describe('runQuery', () => {
     expect(ctx.store.getState().session.playResults['python:pythonGrundlagen:01']).toBe('ok');
   });
 
-  it('returns "python-loading" when the Python engine has not finished loading yet', () => {
+  it('returns "python-loading" when the Python engine has not finished loading yet', async () => {
     const { ctx } = makeCtx();
     selectChallenge(ctx, 'python', 'pythonGrundlagen', '01');
 
-    const outcome = runQuery(ctx, py01.solution);
+    const outcome = await runQuery(ctx, py01.solution);
 
     expect(outcome.kind).toBe('python-loading');
   });
 
-  it('marks a failing Python script\'s play result "err" without throwing', () => {
+  it('marks a failing Python script\'s play result "err" without throwing', async () => {
     const { ctx } = makeCtx();
     ctx.engines = {
       ...createTestEngineFactory(),
@@ -313,11 +313,20 @@ describe('runQuery', () => {
     };
     selectChallenge(ctx, 'python', 'pythonGrundlagen', '01');
 
-    const outcome = runQuery(ctx, 'raise ValueError("boom")');
+    const outcome = await runQuery(ctx, 'raise ValueError("boom")');
     if (outcome.kind !== 'python') throw new Error('expected a python outcome');
 
     expect(outcome.error).toContain('ValueError');
     expect(ctx.store.getState().session.playResults['python:pythonGrundlagen:01']).toBe('err');
+  });
+
+  it('returns "csharp-loading" when the C# engine has not finished loading yet', async () => {
+    const { ctx } = makeCtx();
+    selectChallenge(ctx, 'csharp', 'csharpGrundlagen', '01');
+
+    const outcome = await runQuery(ctx, 'Console.WriteLine("hi");');
+
+    expect(outcome.kind).toBe('csharp-loading');
   });
 });
 

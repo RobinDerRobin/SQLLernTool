@@ -12,6 +12,7 @@ import { findChallengeInRegistry } from '../../../state/challengeLookup';
 import type { ChallengeSelection, PythonEngineStatus } from '../../../state/sessionState';
 import type { Unsubscribe } from '../../../state/store';
 import { on } from '../../../util/delegate';
+import { renderCSharpLoadingOutcome, renderCSharpRunOutcome } from './csharpResultsArea';
 import { renderPythonLoadingOutcome, renderPythonRunOutcome } from './pythonResultsArea';
 import { renderRunOutcome } from './resultsArea';
 import { mountTablesPanel } from './tablesPanel';
@@ -69,14 +70,17 @@ function renderExpectedResult(successCriteria: string | undefined): string {
 }
 
 /**
- * Surfaces Pyodide's load state right in the editor — without this, a failed
- * or CSP-blocked Pyodide load was previously invisible until the user
- * happened to click "Ausführen" and saw a generic "wird geladen" result.
+ * Surfaces a lazily-loaded engine's load state right in the editor — without
+ * this, a failed or CSP-blocked Pyodide/C#-engine load was previously
+ * invisible until the user happened to click "Ausführen" and saw a generic
+ * "wird geladen" result. `label` is the German name shown in the banner
+ * ("Python"/"C#"); shared by both Python and C# since the status shape and
+ * rendering are otherwise identical.
  */
-function renderPythonEngineStatus(status: PythonEngineStatus): string {
+function renderEngineStatus(status: PythonEngineStatus, label: string): string {
   if (status === 'idle' || status === 'ready') return '';
-  if (status === 'loading') return '<div class="loading-banner">Python-Umgebung wird geladen …</div>';
-  return `<div class="loading-banner loading-banner-error">Python-Umgebung konnte nicht geladen werden: ${escapeHtml(status.error)}</div>`;
+  if (status === 'loading') return `<div class="loading-banner">${label}-Umgebung wird geladen …</div>`;
+  return `<div class="loading-banner loading-banner-error">${label}-Umgebung konnte nicht geladen werden: ${escapeHtml(status.error)}</div>`;
 }
 
 function placeholderFor(title: string, trackId: string): string {
@@ -118,14 +122,28 @@ export function mountEditorTab(root: HTMLElement, ctx: AppContext): MountedEdito
     resultsBody.innerHTML = html;
   }
 
-  function run(): void {
+  async function run(): Promise<void> {
     const state = ctx.store.getState();
     const selection = state.session.selection;
     if (!selection) return;
     const code = activeEditor.getValue();
     if (!code.trim()) return;
 
-    const outcome = runQuery(ctx, code);
+    const outcome = await runQuery(ctx, code);
+
+    // C#'s real compile+run is the only branch slow enough for the user to
+    // have navigated elsewhere by the time it resolves — dropping a stale
+    // result here instead of overwriting whatever challenge is now open.
+    const currentSelection = ctx.store.getState().session.selection;
+    if (
+      !currentSelection ||
+      currentSelection.trackId !== selection.trackId ||
+      currentSelection.courseId !== selection.courseId ||
+      currentSelection.challengeNum !== selection.challengeNum
+    ) {
+      return;
+    }
+
     const progress = getChallengeProgress(
       ctx.store.getState().progress,
       selection.trackId,
@@ -139,6 +157,10 @@ export function mountEditorTab(root: HTMLElement, ctx: AppContext): MountedEdito
       showResults(renderPythonRunOutcome(outcome, stars));
     } else if (outcome.kind === 'python-loading') {
       showResults(renderPythonLoadingOutcome());
+    } else if (outcome.kind === 'csharp') {
+      showResults(renderCSharpRunOutcome(outcome, stars));
+    } else if (outcome.kind === 'csharp-loading') {
+      showResults(renderCSharpLoadingOutcome());
     }
   }
 
@@ -169,7 +191,7 @@ export function mountEditorTab(root: HTMLElement, ctx: AppContext): MountedEdito
 
   function syncChromeForTrack(trackId: string): void {
     const isSql = trackId === 'sqlite';
-    toolbarLabel.textContent = isSql ? 'SQL' : 'Python';
+    toolbarLabel.textContent = isSql ? 'SQL' : trackId === 'csharp' ? 'C#' : 'Python';
     tablesToggleBtn.style.display = isSql ? '' : 'none';
     if (!isSql) tablesPanel.classList.remove('open');
   }
@@ -220,21 +242,27 @@ export function mountEditorTab(root: HTMLElement, ctx: AppContext): MountedEdito
     showResults(emptyResultsPlaceholder(selection.trackId));
   }
 
-  let lastRenderedPythonStatus: PythonEngineStatus | null = null;
-  function syncPythonEngineStatus(): void {
+  let lastRenderedEngineStatusHtml: string | null = null;
+  function syncEngineStatus(): void {
     const state = ctx.store.getState();
-    const status: PythonEngineStatus = state.session.selection?.trackId === 'python' ? state.session.pythonStatus : 'idle';
-    if (status === lastRenderedPythonStatus) return;
-    lastRenderedPythonStatus = status;
-    pythonEngineStatusEl.innerHTML = renderPythonEngineStatus(status);
+    const trackId = state.session.selection?.trackId;
+    const html =
+      trackId === 'python'
+        ? renderEngineStatus(state.session.pythonStatus, 'Python')
+        : trackId === 'csharp'
+          ? renderEngineStatus(state.session.csharpStatus, 'C#')
+          : '';
+    if (html === lastRenderedEngineStatusHtml) return;
+    lastRenderedEngineStatusHtml = html;
+    pythonEngineStatusEl.innerHTML = html;
   }
 
   const unsubscribe = ctx.store.subscribe(() => {
     syncEditorToSelection();
-    syncPythonEngineStatus();
+    syncEngineStatus();
   });
   syncEditorToSelection();
-  syncPythonEngineStatus();
+  syncEngineStatus();
 
   return {
     editor: editorFacade,
