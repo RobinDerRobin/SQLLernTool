@@ -4552,3 +4552,79 @@ sondern pro PR direkt in den Checks sichtbar.
   seit Projektbeginn bestehender Produktbug, kein reines CI-Artefakt.
   Genau das war der Sinn dieses Durchgangs: CI-Machbarkeit real
   bewiesen, nicht nur angenommen — mit zwei echten Bugfixes als Nebenertrag.
+
+### 2026-08-11 — Stündliche Routine: KRITISCH — C#-Engine bootet aktuell überhaupt nicht mehr im echten Browser (Ursache ungeklärt)
+
+- **Umfang:** Baseline sauber (1049/1049, typecheck/build/knip grün, HEAD
+  `19ff91b`). Kein aktionabler SQL/Python-Content-Schritt, letzte
+  Durchgänge haben bereits einen C#-CI-Meilenstein erreicht — also Live-
+  Bug-Hunt gegen den echten Dev-Server (volles CDN-Workaround für sql.js/
+  Pyodide, dazu ein frisches `npm install sql.js pyodide playwright
+  --no-save`, da `npm ci` aus dem letzten Hauptmerge diese Ad-hoc-Pakete
+  wieder entfernt hatte).
+
+- **SQL/Python sauber, Regressionschecks bestätigt:** kanonische Python-
+  Lösung inkl. abschließendem Kommentar → `status-ok` (kein Analogon zum
+  früheren SQL-Bug); der SQL-Endkommentar-Fix aus einem früheren
+  Durchgang hält weiterhin (`status-ok`, `users enthält 5 Zeilen.`);
+  Track-Wechsel-Stress (SQL → Python → C# → SQL) hält Toolbar/Zustand
+  korrekt synchron.
+
+- **Kritischer Fund beim C#-Teil:** Die WASM-Engine bootet im echten
+  Browser nicht mehr — `MONO_WASM: Error in bindings_init Can't find
+  System.Runtime.InteropServices.JavaScript.JavaScriptExports class`,
+  `Failed to start platform`. Acht mögliche Ursachen einzeln geprüft und
+  ausgeschlossen (siehe ausführliche Analyse in
+  `docs/csharp-engine-poc.md`, neuer Abschnitt "CRITICAL, currently
+  unresolved"): alte Build-Artefakte (Juni-Zeitstempel, echt frisch
+  neugebaut — gleicher Fehler), der `wwwroot/refs/`-Fix aus früheren
+  Durchgängen (direkt gegen die rohe `host.html` getestet, umgeht die App
+  komplett — gleicher Fehler), fehlende Dateien (alle 200), COOP/COEP/
+  `crossOriginIsolated`/`SharedArrayBuffer`/Worker-Erzeugung (alle
+  korrekt), `wasm-tools`-Workload-Drift (frisch deinstalliert und neu
+  installiert, identische Version), NuGet-Paketversionen (`project.assets.
+  json` direkt geprüft, exakt gepinnt), Quellcode-Korruption (kein Diff
+  gegen HEAD), veraltete Integrity-Hashes in `blazor.boot.json` (frisch,
+  keine SRI-Fehlermeldung).
+
+- **Roslyn/Compiler-Ebene bestätigt unbetroffen:** der Desktop-.NET-
+  Treiber (`test/helpers/nodeCSharpEngine.test.ts`, strukturell
+  identische `CSharpCompilation`-Pipeline, nur nicht unter Blazor/WASM)
+  läuft weiterhin 5/5 grün — der Fehler sitzt spezifisch im Blazor-WASM-
+  JS-Interop-Bootstrap, nicht im C#-Compiler oder Content.
+
+- **Einordnung:** Dieses Dokument selbst belegt (Eintrag vom 2026-08-10),
+  dass exakt dieselbe Kombination (`WasmEnableThreads=true` +
+  `credentialless` + echter Publish-Output) damals erfolgreich gebootet
+  und echten C#-Code ausgeführt hat. Seitdem hat sich etwas geändert —
+  vermutlich eine für diese Sandbox nicht weiter introspizierbare
+  Umgebungsänderung, da alles version-gepinnte lokal exakt nachgeprüft
+  sauber ist.
+
+- **Praktischer Schweregrad:** **kein aktueller Produktions-Vorfall** —
+  `deploy-pages.yml` liefert die C#-Engine noch gar nicht nach
+  `gh-pages` aus, kein echter Nutzer kann diesen Pfad aktuell erreichen.
+  Betrifft nur `npm run dev` und den noch nicht produktiv verdrahteten
+  CI-Check. Ist aber ein harter Blocker für den nächsten geplanten
+  Schritt (`deploy-pages.yml`-Verdrahtung) und für jede weitere C#-Arbeit,
+  da nichts an der Engine gerade end-to-end im echten Browser verifizierbar
+  ist. Der bereits vorher eingebaute 15-Sekunden-Timeout in
+  `ensureCSharpEngineLoaded` (aus einem früheren, nicht mit diesem Bug
+  zusammenhängenden Durchgang) fängt das UX-seitig ab — Nutzer sähen nach
+  15s einen Fehler statt eines endlosen Ladezustands, auch wenn die
+  Fehlermeldung aktuell fälschlich Browser-Erweiterungen/CSP nennt.
+
+- **Bewusst kein Code-Fix versucht:** jede geprüfte Hypothese kam negativ
+  zurück; ein ungetesteter, spekulativer Eingriff (`WasmEnableThreads`,
+  Paketversionen, Toolchain) hätte riskiert, ein bekanntes, gut
+  dokumentiertes Problem gegen ein unbekanntes einzutauschen. Kein
+  Working-Tree-Change begleitet diesen Log-Eintrag — reine Diagnose.
+
+- **Ergebnis:** Tests/typecheck/build/knip unverändert grün (keine
+  Code-Änderung). Kein Artifact-Republish nötig (keine Zahlenänderung).
+  **Nächster Schritt für eine künftige Sitzung:** in
+  `docs/csharp-engine-poc.md`s neuem Abschnitt dokumentierte
+  Kandidaten prüfen (testweise `WasmEnableThreads` deaktivieren, um zu
+  isolieren, ob spezifisch der Multithreading-Pfad betroffen ist;
+  externe Recherche zu bekannten Issues für diese exakte SDK/
+  Workload-Kombination, sobald Netzwerkzugriff das erlaubt).
