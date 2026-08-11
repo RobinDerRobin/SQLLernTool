@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { csharpChallengeSchema } from '../../../../schema';
 import { csharpGrundlagenCourse } from './course';
 
 describe('csharpGrundlagenCourse', () => {
@@ -7,7 +8,21 @@ describe('csharpGrundlagenCourse', () => {
     expect(csharpGrundlagenCourse.title.length).toBeGreaterThan(0);
   });
 
-  it('has no challenges yet — content lands once the Node-side test engine (step 6) exists', () => {
-    expect(csharpGrundlagenCourse.challenges).toEqual([]);
+  it('has at least one challenge now that step 7 (actual content) has begun', () => {
+    expect(csharpGrundlagenCourse.challenges.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * This course isn't wired into TRACKS yet (see course.ts and
+   * docs/csharp-engine-poc.md step 5), so registry.test.ts's generic
+   * "every challenge passes its track's schema" check never sees it —
+   * validated here directly instead, so content shape mistakes surface now
+   * rather than only once the track is registered.
+   */
+  it('every challenge passes csharpChallengeSchema', () => {
+    for (const challenge of csharpGrundlagenCourse.challenges) {
+      const result = csharpChallengeSchema.safeParse(challenge);
+      expect(result.success, result.success ? '' : result.error?.message).toBe(true);
+    }
   });
 });

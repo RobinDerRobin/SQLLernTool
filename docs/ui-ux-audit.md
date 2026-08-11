@@ -25,6 +25,9 @@ wie gut das jeweils testabgedeckt ist.
    nach einer Interaktion tatsächlich klickbar sind (nicht nur laut
    `isVisible()`, das reine Overlap-/Z-Index-Verdeckung nicht erkennt —
    ein echter `.click()`-Versuch deckt das auf, siehe F-020).
+   Der Stand und die geplante Reihenfolge der Mobile-Arbeit stehen in
+   `docs/mobile-roadmap.md` — dort auch die noch offene Richtungsfrage
+   (Read-and-Run vs. vollwertiges Authoring), die M2 blockiert.
 2. Findings gegen die Tabelle unten prüfen: schon bekannt (Status
    aktualisieren) oder neu (neue Zeile, neue ID `F-0xx`)?
 3. Für jedes neue Finding vor dem Fix kurz durchdenken: was genau ist der
@@ -66,6 +69,8 @@ wie gut das jeweils testabgedeckt ist.
 | F-018 | Bug | Mittel | `test/helpers/nodeSqliteEngine.ts` (der Node-Testmotor für SQL-Content, benutzt von `challengeRunner.test.ts` für Gate 1/Gate 2) übernahm stillschweigend `node:sqlite`s eigenen Default für `PRAGMA foreign_keys` (**ON**) — echtes SQLite und `sql.js` (der Browser-Motor, den die App tatsächlich nutzt) defaulten dagegen beide auf **OFF**. Entdeckt beim Entwurf der neuen `foreign-key-constraint`-Challenge (20.2): ein Distraktor, der `PRAGMA foreign_keys = ON;` vergisst, hätte in Node fälschlich trotzdem FK-Verletzungen abgelehnt (weil `node:sqlite` sie ohnehin immer prüft), im echten Browser aber nicht — der Gate-2-Test hätte also einen Distraktor "bestätigt fehlschlagend" gemeldet, der im echten Produkt tatsächlich durchgekommen wäre. Kein Bestandscontent betroffen (FOREIGN KEY wurde vorher nirgends im Kurs verwendet), aber eine echte Falle für jeden künftigen FK-Content. | ✅ Fixed | `PRAGMA foreign_keys = OFF;` explizit nach jedem `new DatabaseSync(...)` (Konstruktion und `reset()`) gesetzt, um `node:sqlite` auf denselben Default wie sql.js/echtes SQLite zu bringen. Manuell verifiziert: ohne PRAGMA-ON-Zeile im Testcode wird eine ungültige FK-Referenz jetzt (korrekterweise) nicht mehr abgelehnt; mit `PRAGMA foreign_keys = ON;` weiterhin doch. Kein bestehender Test verließ sich auf das alte (falsche) Default-Verhalten — volle Suite weiterhin grün. |
 | F-019 | Bug | Hoch | `test/helpers/nodeSqliteEngine.ts` las SELECT-Zeilen über `node:sqlite`s `prepared.all()` **ohne** `setReturnArrays(true)` — die Methode liefert dann Zeilen als Objekte, die pro **Spaltenname** (nicht pro Spaltenposition) indiziert sind. Eine Abfrage, die zwei gleichnamige Spalten aus verschiedenen Tabellen selektiert (z. B. ein unaliaster Self-Join `SELECT a.name, b.name FROM t a, t b`, oder jeder JOIN zweier Tabellen mit gemeinsamem Spaltennamen ohne `AS`) kollabierte dadurch beide Werte auf denselben (den zuletzt geschriebenen) — der andere ging spurlos verloren, obwohl `SqlResultSet.columns` beide Spaltennamen korrekt zweimal auflistete. `sqlJsEngine.ts` (der echte Browser-Motor) liest Zeilen dagegen schon immer positionsbasiert über `stmt.get()` und war nie betroffen — reiner Node-Testmotor-Bug, live beim Schreiben des Validators für die neue `right-join`-Challenge (21.1) entdeckt: eine unabhängige Nachrechnung mit zwei `k.name`/`p.name`-Spalten lieferte in der Prüfung für beide Spalten denselben Wert. | ✅ Fixed | `prepared.setReturnArrays(true)` gesetzt, sodass Zeilen wie bei sql.js positionsbasiert (Array) statt namensbasiert (Objekt) gelesen werden. Neuer Regressionstest in `nodeSqliteEngine.test.ts` (`keeps both values distinct when a join selects two columns with the same name`) — vor dem Fix per `git stash` auf die alte Implementierung rot reproduziert (beide Werte kollabierten auf "Ben"), nach dem Fix grün. |
 | F-020 | Bug | Hoch | Auf schmalen Viewports (≤760px, `challengeList.ts` + `sidebarShell.ts`s mobiles Sidebar-Overlay) blieb die Sidebar-Drawer nach Auswahl einer Challenge **offen** liegen, statt sich zu schließen — sie deckte dabei (fixed position, z-index 41, mit Backdrop) den kompletten Hauptinhalt ab, inklusive Tabs und Editor. Ein Tap auf eine Challenge zeigte dadurch scheinbar nichts (der Nutzer musste erst manuell den Toggle-Button oder den Backdrop antippen, um die Drawer zu schließen, bevor er die Aufgabe überhaupt sehen konnte) — auf Desktop-Breite unsichtbar, da die Sidebar dort permanent als Flow-Element neben dem Inhalt steht, nie als Overlay. Gefunden beim ersten gezielten Live-Playwright-Durchlauf mit einem schmalen Viewport (375px) seit langer Zeit — ein realer `page.locator(...).click()`-Versuch auf den Task-Tab schlug mit "element intercepts pointer events" fehl, weil die (fälschlich offene) Sidebar darüber lag. | ✅ Fixed | `challengeList.ts`: Nach `selectChallenge(...)` (Maus-Klick und Enter/Space) wird jetzt `closeSidebarIfMobileOverlay(ctx)` aufgerufen — schließt die Sidebar nur, wenn `window.matchMedia('(max-width: 760px)').matches` (identischer Breakpoint wie `themes.css`) und sie aktuell nicht schon eingeklappt ist. `window.matchMedia` existiert in jsdom nicht — defensiv mit `typeof window.matchMedia !== 'function'` abgefangen, statt zu werfen. 4 neue Tests in `challengeList.test.ts` (schließt bei schmalem Viewport, bleibt offen bei breitem Viewport, kein redundanter Toggle bei bereits eingeklappter Sidebar, schließt auch bei Tastatur-Auswahl). Live gegen den echten Dev-Server bei 375×667 bestätigt: Sidebar-Klasse wechselt nach Auswahl zu `sidebar collapsed`, Task-Tab/Editor/Run-Button danach tatsächlich klickbar, kein horizontales Overflow, keine Konsolenfehler. |
+| F-021 | Bug | Mittel | Ein Ergebnis mit vielen/breiten Spalten ist breiter als das Ergebnis-Panel. `.results-body` hatte **keine** `overflow-x`-Regel (Default `visible`), und ein Vorfahr (`.main`) hat `overflow: hidden` — die Tabelle wurde dadurch schlicht **abgeschnitten, ohne Scrollbar irgendwo**. Die rechten Spalten waren damit nicht nur außerhalb des Sichtfelds, sondern buchstäblich **unerreichbar**: kein Scrollen, kein Wischen, keine Möglichkeit an die Werte zu kommen. Auf Mobile akut (bei 375px passen ~2 Spalten), auf schmalen Desktop-Fenstern derselbe Effekt. Empirisch gemessen mit einer 6-Spalten-Abfrage bei 375px: `.results-body` scrollWidth 618px vs. clientWidth 281px, `overflow-x: visible` — Spalten 3–6 unerreichbar. **Meine ursprüngliche Vermutung war falsch**: ich hatte horizontales Seiten-Scrollen erwartet; die Seite scrollte gar nicht (375 == 375), weil der Vorfahr clippt — der tatsächliche Fehler ist schlimmer als der vermutete. | ✅ Fixed | `.results-body { overflow-x: auto; }` (global, nicht mobil-only — schmale Desktop-Fenster haben dasselbe Problem). Live bei 375px und 1280px verifiziert: `overflow-x: auto`, `scrollLeft` lässt sich tatsächlich bewegen (Spalten erreichbar), und die **Seite** scrollt weiterhin nicht horizontal. Kein Unit-Test (reines CSS-Layout, analog F-001/F-007). |
+| F-022 | Bug | Mittel | `textarea.editor` hat `font-size: 13px`. iOS Safari zoomt die **gesamte Seite** automatisch hinein, sobald ein Textfeld mit einer Schriftgröße **unter 16px** den Fokus bekommt — und zoomt danach **nicht** wieder heraus. Jeder Tap in den Editor hätte den Lernenden also in einem hineingezoomten Viewport zurückgelassen, aus dem er sich von Hand herauszoomen muss. Betrifft beide Tracks (SQL und Python teilen denselben Editor). | ✅ Fixed | Im ≤760px-Breakpoint `font-size: 16px` — **für alle drei Editor-Schichten gemeinsam**: `textarea.editor` ist `color: transparent` und liefert nur den Cursor, die sichtbaren Glyphen kommen aus `.highlight-layer` darüber, `.line-numbers` ist die dritte Spalte. Nur die Textarea zu ändern hätte den Cursor pro Zeichen ~3px gegen den sichtbaren Text driften lassen. `.line-numbers` zusätzlich von 36px auf 42px (3 Ziffern passen bei 16px sonst nicht). **Erster Fix-Versuch war wirkungslos** und wurde erst durch die Live-Messung entdeckt: der Override lag im früheren Narrow-Viewport-Block (Zeile ~270), aber `textarea.editor` dort hat dieselbe Spezifität wie die Basisregel bei Zeile ~547 — Media Queries erhöhen die Spezifität nicht, also gewann die spätere Basisregel per Quellreihenfolge. Der Block liegt jetzt **nach** den Editor-Regeln, mit Kommentar, der genau diese Falle festhält. Live verifiziert: mobil alle drei Schichten 16px mit identischen Typografie-Metriken und Ursprungs-Delta {x:0, y:0} (Cursor-Alignment intakt), Desktop unverändert 13px. Kein Unit-Test (reines CSS-Layout). |
 
 **Hinweis zu 0%-Dateien in der Coverage:** `ProgressStore.ts`, `Runtime.ts`,
 `SqlEngine.ts`, `editorBridge.ts`, `LanguagePlugin.ts`, `PythonRuntime.ts`
@@ -110,6 +115,44 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-09 | HEAD (Live-Bug-Hunt sauber + SQL B3 DQL abgeschlossen: 22-22.1) | 91.86 % | 73.23 % | 99.05 % | 91.86 % |
 | 2026-08-09 | HEAD (SQL B4 Funktionen abgeschlossen: 23-23.2) | 91.80 % | 73.06 % | 99.06 % | 91.80 % |
 | 2026-08-09 | HEAD (F-020 Fix: Mobile-Sidebar-Overlay blockierte Inhalt nach Auswahl) | 91.81 % | 73.15 % | 99.06 % | 91.81 % |
+| 2026-08-09 | HEAD (F-021/F-022: Ergebnis-Tabelle unerreichbar + iOS-Zoom im Editor) | 91.81 % | 73.15 % | 99.06 % | 91.81 % |
+| 2026-08-09 | HEAD (SQL B8 Mengenoperationen abgeschlossen: 24-24.2) | 91.76 % | 73.05 % | 99.06 % | 91.76 % |
+| 2026-08-09 | HEAD (Python B2/B5/B6 Restlücken abgeschlossen: 20-20.3) | 91.77 % | 72.88 % | 99.07 % | 91.77 % |
+| 2026-08-09 | HEAD (SQL upsert-on-conflict abgeschlossen: 25) | 91.72 % | 72.81 % | 99.08 % | 91.72 % |
+| 2026-08-09 | HEAD (Live-Bug-Hunt sauber + C# Schritt 7 gestartet: Challenge 01) | 91.76 % | 72.87 % | 99.08 % | 91.76 % |
+| 2026-08-09 | HEAD (C# Challenge 02: B2-Grundtypen, int/double-Division) | 91.79 % | 72.86 % | 99.08 % | 91.79 % |
+| 2026-08-09 | HEAD (Syntax-Highlighting in Tutorial/Tipps/Erklärung/Lösung) | 91.82 % | 72.95 % | 99.09 % | 91.82 % |
+| 2026-08-09 | HEAD (C# Challenge 03: B2 vollständig, 15/86) | 91.80 % | 72.92 % | 99.09 % | 91.80 % |
+| 2026-08-09 | HEAD (Live-Bug-Hunt sauber + C# Challenge 04: B3 vollständig, 21/86) | 91.83 % | 72.90 % | 99.09 % | 91.83 % |
+| 2026-08-09 | HEAD (C# Challenge 05: B4 vollständig, 24/86) | 91.87 % | 72.89 % | 99.09 % | 91.87 % |
+| 2026-08-09 | HEAD (C# Challenge 06: B5 vollständig, 28/86) | 91.85 % | 72.88 % | 99.09 % | 91.85 % |
+| 2026-08-10 | HEAD (C# Challenge 07: B6 vollständig, 33/86) | 91.88 % | 72.86 % | 99.10 % | 91.88 % |
+| 2026-08-10 | HEAD (C# Challenge 08: B7 vollständig, 38/86) | 91.92 % | 72.85 % | 99.10 % | 91.92 % |
+| 2026-08-10 | HEAD (Live-Bug-Hunt sauber + C# Challenge 09: B8 vollständig, 42/86) | 91.95 % | 72.82 % | 99.10 % | 91.95 % |
+| 2026-08-10 | HEAD (C# Challenge 10: B9 Teil 1, 46/86) | 91.99 % | 72.81 % | 99.10 % | 91.99 % |
+| 2026-08-10 | HEAD (C# Challenge 11: B9 7/8, 49/86) | 92.02 % | 72.79 % | 99.10 % | 92.02 % |
+| 2026-08-10 | HEAD (C# Challenge 12: B10 Teil 1, erste Klasse, 53/86) | 92.06 % | 72.78 % | 99.11 % | 92.06 % |
+| 2026-08-10 | HEAD (C# Challenge 13: B10 vollständig, 57/86) | 92.09 % | 72.74 % | 99.11 % | 92.09 % |
+| 2026-08-10 | HEAD (C# Challenge 14: B9 vollständig, B0–B10 komplett, 58/86) | 92.13 % | 72.74 % | 99.11 % | 92.13 % |
+| 2026-08-10 | HEAD (Live-Bug-Hunt sauber + C# Challenge 15: B11 Teil 1, 62/86) | 92.16 % | 72.69 % | 99.11 % | 92.16 % |
+| 2026-08-10 | HEAD (C# Challenge 16: B11 vollständig, 65/86) | 92.19 % | 72.65 % | 99.11 % | 92.19 % |
+| 2026-08-10 | HEAD (C# Challenge 17: B12 vollständig, B0–B12 komplett, 68/86) | 92.17 % | 72.64 % | 99.12 % | 92.17 % |
+| 2026-08-10 | HEAD (C# Challenge 18: B13 Teil 1, 72/86) | 92.21 % | 72.62 % | 99.12 % | 92.21 % |
+| 2026-08-10 | HEAD (C# Challenge 19: B13 vollständig, B0–B13 komplett, 74/86) | 92.24 % | 72.60 % | 99.12 % | 92.24 % |
+| 2026-08-10 | HEAD (C#-LanguagePlugin für den Editor: Tokenizer/Highlight/Auto-Indent) | 92.30 % | 73.11 % | 99.13 % | 92.30 % |
+| 2026-08-10 | HEAD (C#-Engine-Wiring: EngineFactory.ensureCSharpEngine) | 92.31 % | 73.15 % | 99.14 % | 92.31 % |
+| 2026-08-10 | HEAD (C#-Engine: iframe+postMessage-Transport statt direktem Script-Inject) | 92.33 % | 73.16 % | 99.14 % | 92.33 % |
+| 2026-08-10 | HEAD (C#-Editor-UI: csharpResultsArea + pluginForTrack('csharp')) | 92.35 % | 73.18 % | 99.15 % | 92.35 % |
+| 2026-08-11 | HEAD (C# Challenge 20: B14 Teil 1 — Delegates/Lambda/Func<>, 77/86) | 92.38 % | 73.17 % | 99.15 % | 92.38 % |
+| 2026-08-11 | HEAD (C# Challenge 21: B14 vollständig — Events, 78/86) | 92.41 % | 73.17 % | 99.15 % | 92.41 % |
+| 2026-08-11 | HEAD (C# Challenge 22: B15 Teil 1 — LINQ Where/Select, 79/86) | 92.44 % | 73.17 % | 99.15 % | 92.44 % |
+| 2026-08-11 | HEAD (C# Challenge 23: B15 Teil 2 — LINQ Aggregation, 80/86) | 92.47 % | 73.14 % | 99.15 % | 92.47 % |
+| 2026-08-11 | HEAD (C# Challenge 24: B15 Teil 3 — LINQ Query-Syntax, 81/86) | 92.50 % | 73.14 % | 99.15 % | 92.50 % |
+| 2026-08-11 | HEAD (C# Challenge 25: B15 Teil 4 — LINQ Ordering/Grouping, 82/86) | 92.53 % | 73.13 % | 99.16 % | 92.53 % |
+| 2026-08-11 | HEAD (C# Challenge 26: B15 vollständig — LINQ Deferred Execution, 83/86) | 92.56 % | 73.13 % | 99.16 % | 92.56 % |
+| 2026-08-11 | HEAD (C# Challenge 27: B16 vollständig — Namespaces & Imports, 86/86, C#-Dokument komplett) | 92.59 % | 73.12 % | 99.16 % | 92.59 % |
+| 2026-08-11 | HEAD (C#-Engine live verdrahtet: TRACKS-Eintrag, async runQuery, iframe-Transport im echten Dev-Server E2E-verifiziert) | 92.63 % | 73.44 % | 99.37 % | 92.63 % |
+| 2026-08-11 | HEAD (Bugfix: SQL-Endkommentar-Fehler, `hasSqlContent()` + 12 Tests) | 92.57 % | 73.65 % | 99.37 % | 92.57 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -1683,3 +1726,2641 @@ sondern pro PR direkt in den Checks sichtbar.
   Coverage: 91,80 % → 91,81 % Statements, 73,06 % → 73,15 % Branches,
   99,06 % Functions unverändert. `knip` bestätigt: keine neuen toten
   Exporte.
+
+### 2026-08-09 — Stündliche Routine: F-021 + F-022 (die zwei vermuteten Mobile-Bugs bestätigt und behoben)
+
+- **Umfang:** Baseline grün (849/849, typecheck, build). Im letzten
+  Durchgang hatte ich beim Beantworten der Mobile-Frage zwei Probleme als
+  **vermutet, aber unbestätigt** notiert. Diese Runde bestand genau darin,
+  sie empirisch zu prüfen statt sie anzunehmen — beide bestätigten sich,
+  einer aber **anders als vermutet**.
+- **F-021 (Ergebnis-Tabelle):** Vermutet hatte ich horizontales
+  Seiten-Scrollen. Gemessen bei 375px mit einer 6-Spalten-Abfrage: Die
+  Seite scrollt gar **nicht** (scrollWidth 375 == clientWidth 375) — meine
+  Vermutung war falsch. Der echte Befund ist schlimmer: `.results-body`
+  hat scrollWidth 618px vs. clientWidth 281px bei `overflow-x: visible`,
+  und ein Vorfahr (`.main`) clippt mit `overflow: hidden`. Die Spalten 3–6
+  waren damit **unerreichbar** — nicht scrollbar, nicht wischbar, gar
+  nicht an die Werte heranzukommen. Fix: `.results-body { overflow-x:
+  auto; }`, bewusst global statt mobil-only, da schmale Desktop-Fenster
+  denselben Effekt haben.
+- **F-022 (iOS-Zoom im Editor):** Bestätigt — `textarea.editor` steht auf
+  13px, unterhalb der 16px-Schwelle, ab der iOS Safari beim Fokussieren
+  die ganze Seite hineinzoomt und **nicht** wieder herauszoomt. Fix im
+  ≤760px-Breakpoint auf 16px, aber zwingend **für alle drei
+  Editor-Schichten gemeinsam**: die Textarea ist `color: transparent` und
+  liefert nur den Cursor, die sichtbaren Glyphen kommen aus
+  `.highlight-layer`, `.line-numbers` ist die dritte Spalte — nur die
+  Textarea zu ändern hätte den Cursor gegen den sichtbaren Text driften
+  lassen.
+
+  **Der erste Fix-Versuch war wirkungslos**, und das fiel nur auf, weil
+  live nachgemessen statt auf „CSS geschrieben, also erledigt" vertraut
+  wurde: Der Override lag zunächst im früheren Narrow-Viewport-Block
+  (Zeile ~270), aber Media Queries erhöhen die Spezifität nicht — dort
+  hat `textarea.editor` dieselbe Spezifität wie die Basisregel bei Zeile
+  ~547, und die spätere Regel gewinnt per Quellreihenfolge. Der mobile
+  Block liegt jetzt **nach** den Editor-Regeln, mit einem Kommentar, der
+  genau diese Falle für die Zukunft festhält.
+- **Verifikation:** Beide Fixes live bei 375×667 **und** 1280×900
+  gegengemessen. Mobil: alle drei Editor-Schichten 16px mit identischen
+  Typografie-Metriken (fontSize/lineHeight/fontFamily/padding/
+  letterSpacing/tabSize) und Ursprungs-Delta {x:0, y:0} — das
+  Cursor-Alignment ist nachweislich intakt, nicht nur vermutlich.
+  Ergebnis-Tabelle: `overflow-x: auto`, `scrollLeft` lässt sich
+  tatsächlich bewegen, Seite scrollt weiterhin nicht horizontal. Desktop:
+  unverändert 13px, Layout unberührt.
+- **Ergebnis:** Zwei echte Mobile-Bugs behoben, davon einer (F-021) in
+  einer schlimmeren Ausprägung als ursprünglich vermutet. Beide sind
+  reine CSS-Layout-Fixes und daher wie F-001/F-007 nicht unit-testbar —
+  die Absicherung ist die Live-Messung, die jetzt Teil des Runbooks ist.
+  Damit sind die zwei konkreten Bugs aus dem Mobile-Plan erledigt; offen
+  bleiben die Design-lastigen Punkte (Touch-Targets ~44px, Compare-Ansicht
+  stapeln, Typo-Skala) — die hängen an der noch offenen Frage, ob Mobile
+  eine vollwertige Authoring-Umgebung oder ein Read-and-Run-Modus sein
+  soll, und werden deshalb bewusst nicht vorweggenommen.
+- **Tests:** 849 unverändert (reine CSS-Änderungen). `typecheck`, volle
+  Testsuite (849) und `npm run build` grün, `knip` ohne neue Funde.
+  Coverage unverändert (91,81 % / 73,15 % / 99,06 %).
+
+### 2026-08-09 — Stündliche Routine: SQL B8 (Mengenoperationen) abgeschlossen
+
+- **Umfang:** Challenges 24–24.2 für die drei restlichen B8-Tags entworfen,
+  implementiert und vollständig getestet (`union-distinct`, `intersect`,
+  `except-minus`). Damit ist die B8-Lücke geschlossen — nur noch 1 Tag
+  (`upsert-on-conflict`, B2 DML) und die bewusste Ausnahme
+  (`updatable-view`, B12 Views) bleiben offen.
+
+- **Szenario:** Zwei Regions-Tabellen (nord_sales, sued_sales) mit
+  Produktnamen. Realistisch für Set-Operations: UNION kombiniert beide
+  Ergebnisse (Dedup automatisch), INTERSECT zeigt nur gemeinsame Produkte,
+  EXCEPT zeigt Produkte nur in einer Tabelle. Live-Validator für jede
+  Challenge nutzt jeweils ein independently-phrased `engine.exec(...)`,
+  nicht das Benutzer-Ergebnis selbst re-executed.
+
+- **Distractors:** Pro Challenge 2 Distractors, per Gate 2 empirisch
+  verifiziert zu scheitern (nicht nur "alternative Schreibweise"):
+  - 24 (UNION): UNION ALL (behält Duplikate), WHERE IN-Subquery (zeigt nur
+    gemeinsame, nicht alle unterschiedlichen).
+  - 24.1 (INTERSECT): UNION (alle statt nur gemeinsame), EXCEPT in
+    Gegenrichtung (nur Nord statt nur Nord-Süd-Überschneidung).
+  - 24.2 (EXCEPT): EXCEPT in umgekehrter Richtung (nur Süd statt nur Nord),
+    INTERSECT (zeigt gemeinsame statt nur Nord-exklusiv).
+
+- **Tests:** Gate 1 (Lösung bestätigt, 251/251 Challenges bestehen Validierung),
+  Gate 2 (alle Distractors fallen wie erwartet). Volle Testsuite
+  (858 Tests), `typecheck`, `npm run build` grün. Keine Verbesserung der
+  Coverage-Werte erwartet (rein neue Challenge-Inhalte, kein Engine-Code
+  geändert) — wird mit nächster Measurements-Runde aktualisiert.
+
+- **Dokumentation:** `docs/sql-concept-hierarchy.md` Abschnitt 6 aktualisiert:
+  B8 markiert als seit 2026-08-09 vollständig abgedeckt. Bilanz: 80/82 Tags
+  (≈98 %), nur noch `upsert-on-conflict` (B2) und die bewusste Ausnahme
+  `updatable-view` (B12) offen — kein Zweig mehr zu 100 % Lücke.
+
+- **Ergebnis:** B8 komplett, SQL damit auf 80 von 82 Tags. Challenges 24,
+  24.1, 24.2 im Kurs registriert und live gegen dev server verifizierbar
+  (incl. mobile 375×667 Viewport).
+
+### 2026-08-09 — Stündliche Routine: Python B2/B5/B6-Restlücken abgeschlossen (81/82)
+
+- **Umfang:** Nach SQL B8 (Mengenoperationen, vorheriger Durchgang) war
+  Python die größere aktionable Lücke: 4 thematisch verstreute Einzeltags
+  in B2/B5/B6, die keiner B14-Abhängigkeit unterlagen (anders als die
+  vorherigen Restlücken in B10/B11), sondern schlicht noch nicht an der
+  Reihe waren. Challenges 20–20.3 geschrieben und registriert.
+
+- **Content:**
+  - 20 (`dynamic-typing`): dieselbe Variable wechselt per Neuzuweisung den
+    Typ (`int` → `str`), geprüft über `type(x).__name__`.
+  - 20.1 (`bool-conversion-truthiness`): `bool(0/""/[])` vs. Werte mit
+    Inhalt — sechs Ausdrücke, alle Falsy-Grundfälle abgedeckt.
+  - 20.2 (`truthiness-in-conditions`): `if liste:` direkt in der Bedingung,
+    ohne `bool()`-Wrapper oder Vergleich — mit einer leeren und einer
+    nicht-leeren Liste, damit beide Zweige tatsächlich geprüft werden.
+  - 20.3 (`ternary-expression`): `x if bedingung else y` als Ein-Zeilen-
+    Ausdruck.
+
+- **Distraktoren:** Alle vier Annahmen vor dem Schreiben mit echtem
+  `python3` verifiziert, nicht nur angenommen — u. a. `[] == True` → `False`
+  bestätigt (Grundlage für den 20.2-Distraktor: `if liste == True:` scheitert
+  bei jeder Liste, auch nicht-leeren, weil Listen nie gleich `True` sind).
+  20.1-Distraktor demonstriert die naheliegende Fehlannahme, jeder
+  "vorhandene" Wert (ein String, eine Liste) sei automatisch truthy,
+  unabhängig davon ob er leer ist.
+
+- **Ergebnis:** Alle vier aktionablen Python-Tags abgedeckt — 81 von 82
+  (nur noch `own-modules`, permanente Sandbox-Ausnahme, offen). Python
+  liegt damit erstmals **vor** SQL (80/82) statt gleichauf.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 251 → 259 (Gate 1 + Gate
+  2 für alle 4 neuen Challenges grün). Volle Testsuite 858 → 866, alle
+  grün. `typecheck`, `npm run build` grün. `knip`: unverändert 10 Funde
+  (dieselben strukturellen Interfaces wie zuvor, kein neuer durch reinen
+  Content). Coverage: 91,77 % / 72,88 % / 99,07 % / 91,77 % (marginal
+  verschoben durch neue, größtenteils gut getestete Validator-Zweige).
+
+### 2026-08-09 — Stündliche Routine: SQL upsert-on-conflict abgeschlossen (81/82, letzter aktionabler Tag)
+
+- **Umfang:** Nach den vorherigen Durchgängen (SQL B8, Python B2/B5/B6)
+  war `upsert-on-conflict` (B2 DML) der letzte noch offene, aktionable Tag
+  in SQL oder Python überhaupt — jeder andere offene Tag in beiden
+  Dokumenten ist eine permanente Scope-Ausnahme (`updatable-view` in SQL,
+  `own-modules` in Python), keine offene Aufgabe. Challenge 25 geschrieben
+  und registriert.
+
+- **Content:** Lager-Szenario (`lagerbestand`, PRIMARY KEY auf `sku`), das
+  in einem einzigen `INSERT` beide Upsert-Pfade gleichzeitig zeigt: eine
+  neue Lieferung für einen **bekannten** Artikel (`A100`) löst per
+  `ON CONFLICT(sku) DO UPDATE SET menge = menge + excluded.menge` eine
+  Bestandserhöhung statt eines Fehlers aus, während ein **neuer** Artikel
+  (`B200`) im selben Statement ganz normal eingefügt wird — beide Pfade
+  in einer Abfrage, kein künstlich getrenntes Beispiel.
+
+- **Distraktoren:** Beide empirisch mit `node:sqlite` verifiziert, bevor
+  geschrieben:
+  1. Kein `ON CONFLICT` — wirft einen echten `UNIQUE constraint
+     failed`-Fehler. Da `executeAndValidate` (`src/runtime/sql/
+     executeAndValidate.ts`) bei einem SQL-Fehler sofort `{ok: false,
+     error: ...}` zurückgibt, bevor `validate()` überhaupt aufgerufen
+     wird, erfüllt ein werfender Distraktor Gate 2 automatisch — ein
+     bestätigtes, wiederverwendbares Muster für Constraint-Verletzungen
+     als Distraktor.
+  2. `SET menge = excluded.menge` (überschreiben) statt `SET menge =
+     menge + excluded.menge` (addieren) — liefert A100 fälschlich mit
+     menge=15 statt der erwarteten 35, weil der alte Bestand verloren
+     geht. Ein echter, lehrreicher Upsert-Fallstrick (Ersetzen vs.
+     Addieren via `excluded`).
+
+- **Ergebnis:** Letzter aktionabler SQL-Tag geschlossen — 81 von 82 (nur
+  noch die permanente `updatable-view`-Ausnahme offen). SQL und Python
+  liegen jetzt praktisch gleichauf (81/82 bzw. 81/82), beide mit
+  ausschließlich permanenten Scope-Ausnahmen als Rest-Lücke. Die C#-Spur
+  (`docs/csharp-engine-poc.md`, Schritt 7: echte Challenges) ist damit
+  der einzige verbleibende Content-Umfang mit noch aktionablen Lücken.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 259 → 262 (Gate 1 +
+  Gate 2 für Challenge 25 grün, inklusive der beiden empirisch
+  verifizierten Distraktoren). Volle Testsuite 866 → 869, alle grün.
+  `typecheck`, `npm run build` grün. `knip`: unverändert 10 Funde
+  (dieselben strukturellen Interfaces, kein neuer Fund durch reinen
+  Content). Coverage: 91,72 % / 72,81 % / 99,08 % / 91,72 % (marginal
+  verschoben, reine Content-Ergänzung ohne Engine-Code-Änderung).
+
+### 2026-08-09 — Stündliche Routine: Live-Bug-Hunt (sauber) + C# Schritt 7 gestartet
+
+- **Umfang:** SQL und Python sind seit dem vorherigen Durchgang bei 81/82
+  Tags (nur permanente Scope-Ausnahmen offen) — keine aktionable
+  Content-Lücke mehr in Priorität 3. Also zuerst Priorität 2 (Live-Bug-Hunt
+  gegen den echten Dev-Server), danach Priorität 4 (C#), da diese laut
+  Mandat einen klaren nächsten kleinen Schritt hat.
+
+- **Live-Bug-Hunt (Priorität 2):** Alle seit den letzten drei
+  Content-Durchgängen neu geschriebenen Challenges (SQL 24, 24.1, 24.2, 25;
+  Python 20, 20.1, 20.2, 20.3) live gegen den echten Dev-Server verifiziert
+  — sowohl Lösung als auch Distraktor pro Challenge, über echtes
+  sql.js-WASM und echtes Pyodide (nicht nur die Node-Testmotoren). Alle 8
+  Lösungen bestehen, alle 8 Distraktoren scheitern korrekt, keine
+  Konsolenfehler. Zusätzlich ein mobiler Regressionscheck (375×667,
+  Standing Requirement seit F-020): kein horizontales Seiten-Overflow,
+  Sidebar-Drawer schließt nach Auswahl korrekt, Editor/Tab/Run-Button
+  echte `.click()`-Erreichbarkeit bestätigt, Editor-Schriftgröße weiterhin
+  16px (F-022 hält), `.results-body` weiterhin `overflow-x: auto` (F-021
+  hält). **Keine neuen Bugs gefunden** — sauberer Durchgang.
+
+- **C# Schritt 7 gestartet (Priorität 4):** Erste echte C#-Challenge.
+  Vorher nötige Plumbing ergänzt:
+  - `src/runtime/csharp/executeAndValidate.ts` (+ Test) — async-Pendant zu
+    Pythons `executeAndValidate.ts`, weil `CSharpRuntime.exec()` (echter
+    `dotnet exec`-Subprozess bzw. Blazor-WASM-Aufruf) nie synchron ist.
+  - `describeCSharpCourse` in `test/content/challengeRunner.test.ts` —
+    Gate-1/Gate-2-Harness für den C#-Track, async `it()`-Callbacks
+    (einziger struktureller Unterschied zu `describeSqlCourse`/
+    `describePythonCourse`).
+  - Challenge 01 (`Console.WriteLine`, deckt alle 5 B0-Tags ab —
+    `program-execution-model` und `comments` im Tutorial-Text erklärt,
+    genau wie Pythons Challenge 01 Kommentare nur im Tutorial einführt;
+    `top-level-statements`, `function-call-syntax`,
+    `member-access-dot-syntax` direkt über die zwei `Console.WriteLine(...)`-
+    Aufrufe — plus den einzigen B1-Tag `console-write-line`: B0+B1 damit
+    komplett, 6 Tags). `validate()` prüft exakte Zeilentrennung des stdout,
+    nicht nur Teilstring-Enthaltensein:
+    ein reiner `.includes()`-Check hätte den `Console.Write`-statt-
+    `WriteLine`-Distraktor fälschlich bestehen lassen, weil beide
+    erwarteten Texte auch ohne Zeilenumbruch dazwischen als Teilstrings
+    vorkommen. Live gegen den echten `dotnet`-Treiber verifiziert (Lösung
+    besteht, Distraktor scheitert).
+  - `csharpGrundlagenCourse` bleibt bewusst **nicht** in `TRACKS`
+    registriert (dieselben vier Live-UI-Lücken wie in
+    `docs/csharp-engine-poc.md` Schritt 5 dokumentiert: Engine-Fabrik,
+    Editor-Sprachplugin, servierte Blazor-Quelle — alle noch offen).
+    `registry.test.ts`s genereller Schema-Check erfasst diese Challenge
+    deshalb nicht automatisch; ein eigener Test in `course.test.ts`
+    validiert stattdessen direkt gegen `csharpChallengeSchema`. Kein
+    Live-Playwright-Test möglich, da C# noch nicht in der Kurs-Auswahl der
+    UI erscheint — nur Node-seitig (Gate 1/2) verifiziert.
+
+- **Ergebnis:** C#-Tag-Bilanz bewegt sich erstmals: 0/86 → 6/86 (≈7 %),
+  B0 (Grundlagen) und B1 (Ausgabe) komplett abgedeckt. Build-Größe
+  unverändert (631.73 kB) — bestätigt, dass der unregistrierte Track
+  weiterhin nicht ins Live-Bundle gezogen wird.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 262 → 264 (neue C#
+  Gate 1/2-Tests). Volle Testsuite 869 → 876, alle grün. `typecheck`,
+  `npm run build` grün. `knip`: unverändert 10 Funde. Coverage: 91,76 % /
+  72,87 % / 99,08 % / 91,76 %.
+
+### 2026-08-09 — Stündliche Routine: C# Challenge 02 (B2-Grundtypen)
+
+- **Umfang:** SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen), kein neuer Bug im letzten Live-Bug-Hunt gefunden — C# hat nach
+  dem vorherigen Durchgang (Plumbing + Challenge 01) klaren Schwung, also
+  ein weiteres begrenztes Increment: Challenge 02 für B2 (Variablen &
+  Typen).
+
+- **Content:** Szenario "7 Äpfel auf 2 Personen aufteilen" — deckt 6 der
+  9 B2-Tags in einem Durchgang ab: `static-typing-concept`,
+  `typed-variable-declaration`, `int-type`, `double-type`, `string-type`,
+  `bool-type`. Zeigt dabei einen echten C#-Stolperstein: `int`-Division
+  rundet immer ab (`7 / 2` → `3`), auch wenn das Ergebnis in eine
+  `double`-Variable geschrieben wird — erst wenn mindestens ein Operand
+  selbst `double` ist (`7.0 / 2.0` → `3.5`), wird tatsächlich genau
+  gerechnet.
+
+- **Design-Hürde vor dem Schreiben erkannt und umgangen:** Ein erster
+  Entwurf (jeden Typ mit einem passenden Wert deklarieren, direkt
+  ausgeben) wurde verworfen, nachdem eine Live-Probe zeigte: `string x =
+  "25";` und `int x = 25;` erzeugen über `Console.WriteLine` **denselben**
+  stdout ("25\n") — `ToString()` macht den Typunterschied unsichtbar,
+  sobald nur der reine Wert ausgegeben wird. Weil C#s `validate()`
+  ausschließlich stdout-basiert ist (Schritt-4-Entscheidung, kein
+  Variablen-Dict wie bei Python), musste die Aufgabe so konstruiert
+  werden, dass ein falscher Typ nachweislich einen **anderen Wert**
+  produziert — die int/double-Divisions-Aufgabe leistet das. Beide
+  Distraktoren (fehlendes `.0`; falscher `bool`-Wert) vor dem Schreiben
+  empirisch mit dem echten `dotnet`-Treiber verifiziert.
+
+- **Ergebnis:** C#-Tag-Bilanz 6/86 → 12/86 (≈14 %). `char-type`,
+  `var-type-inference`, `constants-readonly` bleiben als B2-Rest offen
+  (bewusst nicht mit untergebracht, um die Challenge nicht zu
+  überladen). Build-Größe weiterhin unverändert (631.73 kB) — Track
+  bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 264 → 270 (Gate 1 +
+  Gate 2 für Challenge 02, beide Distraktoren grün). Volle Testsuite
+  876 → 879, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 91,79 % / 72,86 % / 99,08 % / 91,79 %.
+
+### 2026-08-09 — Nutzer-Anfrage: Syntax-Highlighting in Tutorial/Tipps/Erklärung/Lösung
+
+- **Umfang:** Direkter Nutzer-Auftrag (nicht Teil der autonomen Routine):
+  "tutorial syntax needs to be colored as code is in the editor. also
+  color the words in the explanations accordingly." Vorher als Backlog-
+  Eintrag notiert (`docs/backlog.md`), jetzt auf expliziten Befehl
+  ("Do") umgesetzt.
+
+- **Befund vor der Umsetzung:** `tutorial`, `hints` und `syntaxExplanation`
+  sind authored HTML mit eingebetteten `<pre>`/`<code>`-Codebeispielen,
+  aber bislang komplett unstyled — eine feste `color: var(--gold)` in
+  `themes.css` färbte jeden Code-Textabschnitt einheitlich gold, obwohl
+  der Editor selbst (`textarea.editor` + `.highlight-layer`) für SQL und
+  Python längst einen echten Tokenizer mit Mehrfarben-Highlighting hat
+  (`src/editor/languages/{sql,python}/highlight.ts`, bereits vorhandene
+  globale `.tok-*`-CSS-Klassen).
+
+- **Umsetzung:** Neues Modul `src/ui/render/contentHighlight.ts`:
+  - `highlightCodeForTrack(code, trackId)` — für reinen Code-Text (z. B.
+    die Musterlösung), ruft direkt `highlightSql`/`highlightPython` aus
+    dem Editor-Modul auf.
+  - `highlightContentHtml(html, trackId)` — für authored HTML, das Prosa
+    (`<b>`, `<ul>`, ...) mit Code-Beispielen mischt: parst per
+    `document.createElement('div').innerHTML`, findet alle `<pre>`- und
+    (nicht bereits in einem `<pre>` verschachtelte) `<code>`-Elemente,
+    ersetzt deren `innerHTML` durch den tokenisierten, escapten Text.
+  - Fallback für Tracks ohne Tokenizer (aktuell nur `csharp`, noch nicht
+    live registriert): Rückgabe unverändert bzw. reines `escapeHtml`.
+  - Angewendet in `tutorialTab.ts` (Tutorial-Text + Erfolgskriterium),
+    `hintsSection.ts` (alle drei aufgedeckten Tipps),
+    `solutionSection.ts` (Musterlösungs-`<pre>` UND die "Syntax
+    erklärt"-Box).
+  - CSS (`themes.css`): die vier betroffenen `<pre>`/`<code>`-Regeln
+    (`.tutorial-text`, `.hint-revealed .hint-text`,
+    `.solution-explanation .se-text`) von der festen `color: var(--gold)`
+    auf `color: var(--input-text)` umgestellt — dieselbe Basisfarbe, die
+    der Editor für nicht extra eingefärbte Tokens (Satzzeichen,
+    Leerraum) nutzt. `.solution-panel pre` hatte diese Farbe bereits.
+  - Bewusst **nicht** angefasst: `pgAskPanel.ts` (`extra.pg`). Der Text
+    dort mischt unvorhersehbar Prosa und Code im selben String (z. B.
+    "In echtem Postgres reicht eine Zeile:\n\nINSERT INTO...") — ein
+    naives Voll-Highlighting des ganzen Strings hätte deutsche
+    Prosa-Wörter fälschlich als SQL-Bezeichner eingefärbt. Bleibt
+    unverändert mit reinem `escapeHtml`.
+
+- **Nebenbefund (echter, kleiner Bug, im selben Zug behoben):** Alle drei
+  betroffenen Views (`tutorialTab.ts`, `hintsSection.ts`,
+  `solutionSection.ts`) hatten `shouldUpdate` nur an `challenge.num`
+  geknüpft, nicht an den Track — ein Wechsel von z. B. SQL Challenge "01"
+  zu Python Challenge "01" (gleiche `num`, anderer Track) hätte den
+  Re-Render fälschlich übersprungen und den alten Tutorial-/Tipp-/
+  Lösungstext des vorherigen Tracks stehen lassen. Alle drei
+  `shouldUpdate`-Prüfungen um `prev.trackId !== next.trackId` ergänzt.
+
+- **Live-Verifikation:** Gegen den echten Dev-Server (sql.js + Pyodide
+  lokal geroutet). SQL Challenge 03 (Tutorial mit `WITH RECURSIVE`-Block):
+  33 hervorgehobene Tokens im Tutorial, 31 in den Tipps, 37 in der
+  Musterlösung, 26 in der Syntax-Erklärung — `Console.WriteLine`-Analoga
+  für SQL sichtbar korrekt eingefärbt (Keywords orange, Identifier hell,
+  Kommentare kursiv-grau, exakt wie im Editor). Python Challenge 14 (List
+  Comprehension): `for`/`in` als Keywords eingefärbt, deutsche
+  Platzhalterwörter in Inline-Code (`AUSDRUCK`, `VARIABLE`, `ITERABLE`)
+  bleiben unauffällig als Identifier eingefärbt statt zu brechen —
+  bestätigt, dass der Tokenizer robust mit unvollständigen/nicht-echten
+  Code-Fragmenten umgeht. Mobiler Durchlauf (375×667): kein horizontales
+  Overflow, 33 Tokens weiterhin korrekt hervorgehoben, keine
+  Konsolenfehler.
+
+- **Ergebnis:** Tutorial-, Tipp-, Erklärungs- und Lösungstexte zeigen
+  jetzt dieselbe Mehrfarben-Syntaxhervorhebung wie der Editor selbst,
+  für SQL und Python. `docs/backlog.md` aktualisiert (Eintrag von
+  "Offen" nach "Erledigt" verschoben).
+
+- **Tests:** 11 neue Tests in `contentHighlight.test.ts` (Kern-Logik:
+  Keyword-Highlighting, HTML-Escaping, Fallback ohne Tokenizer, korrekte
+  Verschachtelungs-Behandlung, mehrere unabhängige `<code>`-Snippets,
+  korrekte Escaping von `<` als Vergleichsoperator). Je eine neue
+  Integrations-Assertion in `tutorialTab.test.ts`, `hintsSection.test.ts`,
+  `solutionSection.test.ts` (prüft `.tok-keyword` tatsächlich im
+  gerenderten DOM). Volle Testsuite 879 → 893, alle grün. `typecheck`,
+  `npm run build` grün (+0,6 kB). `knip`: unverändert 10 Funde. Coverage:
+  91,82 % / 72,95 % / 99,09 % / 91,82 %.
+
+### 2026-08-09 — Stündliche Routine: C# Challenge 03 (B2 vollständig)
+
+- **Umfang:** Baseline sauber (893/893, typecheck/build/knip grün, HEAD
+  `2463d94` nach dem Nutzer-Syntax-Highlighting-Commit). SQL/Python bleiben
+  bei 81/82 (nur permanente Ausnahmen offen) — kein aktionabler
+  Content-Tag mehr in beiden Tracks. C# hat nach Challenge 01/02 klaren
+  Schwung, also das nächste begrenzte Increment: die drei restlichen
+  B2-Tags (`char-type`, `var-type-inference`, `constants-readonly`), die
+  Challenge 02 bewusst nicht mit abgedeckt hatte.
+
+- **Content:** Szenario "Prüfung mit 100 Punkten, 82 erreicht, Note B" —
+  eine Konstante (`const int maxPunkte`), eine per Typinferenz angelegte
+  Variable (`var erreichtePunkte`) und ein einzelnes Zeichen (`char
+  notenBuchstabe`) in einem Durchgang.
+
+- **C#-spezifisches Distraktor-Muster (neu für diesen Track):** Beide
+  Distraktoren sind bewusst **Compilerfehler**, nicht falsche
+  stdout-Ausgaben — anders als bei Challenge 02 lässt sich weder "eine
+  Konstante wurde verändert" noch "ein string wurde als char behandelt"
+  über unterschiedlichen stdout beobachten, weil beide Verstöße den
+  Compiler stoppen, bevor überhaupt etwas läuft. Das passt zum
+  stdout-only-`validate()`-Design (Schritt-4-Entscheidung): `
+  executeAndValidate` liefert bei einem Compilerfehler `{ ok: false,
+  error: ... }`, bevor `validate()` je aufgerufen wird — dasselbe Muster,
+  das schon bei SQL-Constraint-Verletzungen (z. B. `upsert-on-conflict`)
+  genutzt wurde. Beide Distraktoren vor dem Schreiben empirisch gegen den
+  echten `dotnet`-Treiber verifiziert: Neuzuweisung an die Konstante
+  erzeugt tatsächlich `CS0131` ("The left-hand side of an assignment must
+  be a variable, property or indexer"), `char notenBuchstabe = "B";`
+  tatsächlich `CS0029` ("Cannot implicitly convert type 'string' to
+  'char'").
+
+- **Ergebnis:** C#-Tag-Bilanz 12/86 → 15/86 (≈17 %). B0, B1 und B2 sind
+  damit vollständig abgedeckt — nächster offener Zweig ist B3
+  (Operatoren). Build-Größe unverändert (632,33 kB) — Track bleibt
+  unregistriert, wirkt sich nicht auf den Browser-Bundle aus.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 270 → 273 (Gate 1 +
+  Gate 2 für Challenge 03, beide Distraktoren grün, beide als echter
+  Compilerfehler bestätigt statt nur als abweichender stdout). Volle
+  Testsuite 893 → 896, alle grün. `typecheck`, `npm run build` grün.
+  `knip`: unverändert 10 Funde. Coverage: 91,80 % / 72,92 % / 99,09 % /
+  91,80 %.
+
+### 2026-08-09 — Stündliche Routine: Live-Bug-Hunt (sauber) + C# Challenge 04 (B3 vollständig)
+
+- **Umfang:** Baseline sauber (896/896, typecheck/build/knip grün, HEAD
+  `e115901`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr in beiden Tracks. Priorität 2
+  (Live-Bug-Hunt) zuerst, da der letzte gezielte Durchlauf zwei
+  Content-Durchgänge zurücklag; danach C#, das nach Challenge 01-03
+  klaren Schwung hat.
+
+- **Live-Bug-Hunt (Priorität 2):** Gegen den echten Dev-Server, sql.js
+  und Pyodide lokal geroutet. Alle 78 SQL- und alle 67
+  Python-Challenges per Sweep durchlaufen (Tutorial-Tab öffnen, Text
+  vorhanden prüfen) — 0 leere/fehlende Tutorials in beiden Tracks. Drei
+  SQL-Musterlösungen (01, 13, 25) und die erste Python-Musterlösung per
+  Editor tatsächlich ausgeführt — alle vier korrekt als
+  "✓ Aufgabe erfüllt" akzeptiert. Mobiler Durchlauf (375×667): kein
+  horizontales Overflow, keine Konsolenfehler. Keine neuen Bugs
+  gefunden.
+
+- **C# Content (Priorität 4):** Challenge 04 ergänzt — deckt alle 6 Tags
+  aus B3 (Operatoren) in einem Durchgang ab: `arithmetic-operators`,
+  `integer-division-modulo`, `comparison-operators`,
+  `boolean-logic-operators`, `compound-assignment-operators`,
+  `increment-decrement-operators`. Szenario: ein Punktestand-Tracker
+  (Start 10 Punkte) als gerade Anweisungsfolge ohne Schleife (`for`/
+  `while` aus B7 sind noch nicht freigeschaltet) — `+=`, `++`, `*`, `/`,
+  `%`, `>` und `&&` in Folge auf denselben Variablenwert angewendet.
+
+- **Distraktor-Muster diesmal wieder stdout-basiert, nicht
+  Compilerfehler** (anders als Challenge 03): beide Distraktoren
+  kompilieren fehlerfrei, liefern aber nachweislich falsche Werte —
+  `/` und `%` vertauscht (klassischer Verwechslungsfehler bei
+  Ganzzahl-Division: liefert `1`/`5` statt `5`/`1`) und das komplette
+  Weglassen von `punkte++` (verschiebt alle sechs Ausgabezeilen, u. a.
+  wird `bestanden` fälschlich `false` statt `true`, weil `15 > 15` nicht
+  mehr zutrifft). Beide vor dem Schreiben empirisch gegen den echten
+  `dotnet`-Treiber nachgerechnet statt nur angenommen — die Verkettung
+  aus `+=` und `++` auf denselben Wert macht Kopfrechnen fehleranfällig
+  genug, dass sich die Verifikation gelohnt hat.
+
+- **Ergebnis:** C#-Tag-Bilanz 15/86 → 21/86 (≈24 %). B0 bis B3 sind damit
+  vollständig abgedeckt — nächster offener Zweig ist B4 (Strings).
+  Build-Größe unverändert (632,33 kB) — Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 273 → 276 (Gate 1 +
+  Gate 2 für Challenge 04, beide Distraktoren grün). Volle Testsuite
+  896 → 899, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 91,83 % / 72,90 % / 99,09 % / 91,83 %.
+
+### 2026-08-09 — Stündliche Routine: C# Challenge 05 (B4 vollständig)
+
+- **Umfang:** Baseline sauber (899/899, typecheck/build/knip grün, HEAD
+  `8dd1562`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. C# hat nach Challenge 01-04
+  klaren Schwung, also das nächste begrenzte Increment: B4 (Strings), der
+  nächste offene Zweig nach B3.
+
+- **Content:** Challenge 05 deckt alle 3 Tags aus B4 in einem Durchgang
+  ab: `string-concatenation`, `string-interpolation`, `string-methods`.
+  Szenario: Vor- und Nachname per `+` zu einem vollen Namen verketten,
+  per `$"..."`-Interpolation begrüßen (inklusive `.Length` als
+  eingebundener Ausdruck) und per `.ToUpper()` großschreiben — alle drei
+  Tags kommen dadurch in einer zusammenhängenden Anweisungskette vor,
+  nicht isoliert nebeneinander in separaten Zeilen.
+
+- **Distraktoren wieder stdout-basiert** (wie bei Challenge 04, anders
+  als beim Compilerfehler-Muster aus Challenge 03): das Leerzeichen bei
+  der Verkettung vergessen (wirkt sich auf alle drei Ausgabezeilen aus,
+  da `vollerName` in Interpolation und Großschreibung wiederverwendet
+  wird — Length wird dadurch 11 statt 12) und `ToLower()` statt
+  `ToUpper()` (wirkt sich nur auf die letzte Zeile aus). Beide vor dem
+  Schreiben empirisch gegen den echten `dotnet`-Treiber verifiziert statt
+  nur angenommen.
+
+- **Ergebnis:** C#-Tag-Bilanz 21/86 → 24/86 (≈28 %). B0 bis B4 sind damit
+  vollständig abgedeckt — nächster offener Zweig ist B5 (Typumwandlung &
+  Nullability). Build-Größe unverändert (632,33 kB) — Track bleibt
+  unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 276 → 279 (Gate 1 +
+  Gate 2 für Challenge 05, beide Distraktoren grün). Volle Testsuite
+  899 → 902, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 91,87 % / 72,89 % / 99,09 % / 91,87 %.
+
+### 2026-08-09 — Stündliche Routine: C# Challenge 06 (B5 vollständig)
+
+- **Umfang:** Baseline sauber (902/902, typecheck/build/knip grün, HEAD
+  `fdf6b67`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. C# hat nach Challenge 01-05
+  klaren Schwung, nächstes begrenztes Increment: B5 (Typumwandlung &
+  Nullability), der nächste offene Zweig nach B4.
+
+- **Content:** Challenge 06 deckt alle 4 Tags aus B5 in einem Durchgang
+  ab: `explicit-type-casting`, `nullable-value-types`,
+  `null-conditional-operator`, `null-coalescing-operator`. Szenario: eine
+  Testauswertung mit roher Punktzahl (per `(int)`-Cast gerundet — schneidet
+  ab, `87.6` wird `87`), einer `int?`-Bonuspunktzahl (`null`, per `??` auf
+  `0` ersetzt) und einem `string?`-Spitznamen (`null`, per `?.` sicher auf
+  `.Length` zugegriffen).
+
+- **Nebenbefund (validate()-Musteränderung, kein Bug im bisherigen
+  Content):** Diese Challenge ist die erste mit einer **legitim leeren
+  Ausgabezeile** (`spitznameLaenge` ist `null`, `Console.WriteLine(null)`
+  gibt eine leere Zeile aus). Das bisherige Muster in allen C#-Challenges,
+  `stdout.split('\n').filter(line => line.length > 0)`, hätte diese Zeile
+  fälschlich verschluckt — es filtert *jede* leere Zeile weg, nicht nur
+  den Trailing-Newline-Artefakt am Stringende. Für Challenge 06 stattdessen
+  `stdout.split('\n').slice(0, -1)` verwendet — entfernt gezielt nur das
+  letzte, durch das abschließende `\n` erzeugte leere Element. Rückwirkend
+  äquivalent zum alten Muster bei allen fünf bisherigen Challenges (keine
+  hatte je eine legitime Leerzeile), also kein Fix an bestehendem Content
+  nötig, aber ein Präzedenzfall für künftige C#-Challenges mit
+  möglicherweise leerer Ausgabe.
+
+- **Drei statt der üblichen zwei Distraktoren:** Alle drei einzeln
+  empirisch gegen den echten `dotnet`-Treiber verifiziert. Fehlender Cast
+  (Compilerfehler CS0266); `.` statt `?.` (kompiliert, stürzt aber zur
+  Laufzeit mit `NullReferenceException` ab — demonstriert die Kernaussage
+  von `?.` an einem echten Absturz statt nur zu behaupten); fehlendes `?`
+  bei der `int?`-Deklaration (zwei Compilerfehler, CS0037 + CS0019, weil
+  ohne Nullable-Markierung weder die `null`-Zuweisung noch die
+  anschließende `??`-Verknüpfung typprüfen).
+
+- **Ergebnis:** C#-Tag-Bilanz 24/86 → 28/86 (≈33 %). B0 bis B5 sind damit
+  vollständig abgedeckt — nächster offener Zweig ist B6 (Kontrollfluss).
+  Build-Größe unverändert (632,33 kB) — Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 279 → 283 (Gate 1 +
+  Gate 2 für Challenge 06, alle drei Distraktoren grün). Volle Testsuite
+  902 → 906, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 91,85 % / 72,88 % / 99,09 % / 91,85 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 07 (B6 vollständig)
+
+- **Umfang:** Baseline sauber (906/906, typecheck/build/knip grün, HEAD
+  `e8cf85c`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. Kein neuer Coverage-Ausfall
+  gegenüber dem letzten Snapshot, keine SQL/Python/UI-Datei seit dem
+  letzten Live-Bug-Hunt geändert — ein erneuter Playwright-Durchlauf
+  hätte nichts Neues gefunden, also direkt zu C# weiter, das nach
+  Challenge 01-06 klaren Schwung hat: nächstes begrenztes Increment ist
+  B6 (Kontrollfluss).
+
+- **Content:** Challenge 07 deckt alle 5 Tags aus B6 in einem Durchgang
+  ab: `if-else-statement`, `else-if-chain`, `switch-statement`,
+  `ternary-operator`, `pattern-matching-switch`. Szenario: ein
+  Notenrechner (`int punkte = 78`), der dieselbe grobe Logik über vier
+  verschiedene Kontrollfluss-Formen ausdrückt — eine `if`/`else if`/
+  `else`-Kette, einen Ternär-Operator, ein klassisches `switch`/`case`/
+  `break` (mit bewusst leeren `case`-Fallthroughs) und einen modernen
+  Pattern-Matching-`switch`-Ausdruck mit relationalen Mustern.
+
+- **Drei Distraktoren, alle empirisch verifiziert:** die `if`/`else if`-
+  Kette in aufsteigender statt absteigender Reihenfolge geprüft (echter
+  Logikfehler bei sich überschneidenden Bereichen); ein fehlendes
+  `break;` im `switch` — in C# anders als in C/C++ **kein
+  stillschweigender Laufzeitfehler**, sondern ein vom Compiler
+  erzwungener Fehler (`CS0163`, "Control cannot fall through from one
+  case label to another"); die beiden Zweige des Ternär-Operators
+  vertauscht.
+
+- **Ergebnis:** C#-Tag-Bilanz 28/86 → 33/86 (≈38 %). B0 bis B6 sind damit
+  vollständig abgedeckt — nächster offener Zweig ist B7 (Schleifen).
+  Build-Größe unverändert (632,33 kB) — Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 283 → 287 (Gate 1 +
+  Gate 2 für Challenge 07, alle drei Distraktoren grün). Volle Testsuite
+  906 → 910, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 91,88 % / 72,86 % / 99,10 % / 91,88 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 08 (B7 vollständig)
+
+- **Umfang:** Baseline sauber (910/910, typecheck/build/knip grün, HEAD
+  `5fa3492`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr, kein neuer Coverage-Ausfall,
+  keine SQL/Python/UI-Datei seit dem letzten Live-Bug-Hunt geändert. C#
+  hat nach Challenge 01-07 klaren Schwung, nächstes begrenztes
+  Increment: B7 (Schleifen).
+
+- **Content:** Challenge 08 deckt alle 5 Tags aus B7 in einem Durchgang
+  ab: `while-loop`, `for-loop`, `do-while-loop`, `break-continue`,
+  `nested-loops`. Fünf unabhängige Berechnungen, je eine pro
+  Schleifenform: eine `for`-Schleife (Quadratsumme 1²–5²), eine
+  `while`-Schleife (Summe akkumulieren bis zur Grenze), eine
+  `do`-`while`-Schleife mit einer von Anfang an falschen Bedingung — zeigt
+  konkret, dass der Rumpf trotzdem mindestens einmal läuft, eine
+  `for`-Schleife mit sowohl `continue` als auch `break` im selben
+  Durchlauf, und zwei verschachtelte `for`-Schleifen.
+
+- **Drei Distraktoren, alle empirisch verifiziert:** `while` statt
+  `do`-`while` (Rumpf läuft dann gar nicht, 0 statt 1 — der
+  Kernunterschied der beiden Schleifenformen an einem echten Zahlenwert
+  demonstriert statt nur behauptet); das `continue` komplett weggelassen
+  (falsches Summenergebnis); dieselbe Schleifenvariable in innerer und
+  äußerer `for`-Schleife wiederverwendet — in C# kein stilles
+  Überschreiben, sondern ein Compilerfehler (`CS0136`).
+
+- **Ergebnis:** C#-Tag-Bilanz 33/86 → 38/86 (≈44 %). B0 bis B7 sind damit
+  vollständig abgedeckt — nächster offener Zweig ist B8 (Arrays &
+  Collections). Build-Größe unverändert (632,33 kB) — Track bleibt
+  unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 287 → 291 (Gate 1 +
+  Gate 2 für Challenge 08, alle drei Distraktoren grün). Volle Testsuite
+  910 → 914, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 91,92 % / 72,85 % / 99,10 % / 91,92 %.
+
+### 2026-08-10 — Stündliche Routine: Live-Bug-Hunt (sauber, `ERR_CERT`-Rätsel endlich geklärt) + C# Challenge 09 (B8 vollständig)
+
+- **Umfang:** Baseline sauber (914/914, typecheck/build/knip grün, HEAD
+  `a252250`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr in diesen beiden Tracks.
+  Dev-Server per Playwright gegen die echte Anwendung gefahren (CDN-
+  Workaround aus dem Runbook: `context.route()` fängt
+  `cdnjs.cloudflare.com/ajax/libs/sql.js/**` und
+  `cdn.jsdelivr.net/pyodide/**` ab und liefert die lokal per `npm --no-save`
+  installierten `sql.js`/`pyodide`-Pakete aus dem sandboxed CDN-Sperre
+  herum).
+
+- **Live-Bug-Hunt-Ergebnis:** Alle 78 SQL- und 67 Python-Challenges
+  durchlaufen (Tutorial-Text vorhanden, Hints aufdeckbar), Stichproben der
+  Syntax-Highlighting-Token-Zahlen (`.tok-*`) unauffällig, vier
+  End-to-End-Lösungsläufe (`.status-ok`-Erfolgsbadge) grün, Mobile-Viewport
+  (375×667) ohne horizontales Overflow. Keine neuen Funde.
+
+- **`ERR_CERT_AUTHORITY_INVALID`-Rätsel endgültig geklärt:** Frühere
+  Durchgänge hatten wiederholt eine Häufung von
+  `ERR_CERT_AUTHORITY_INVALID`-Konsolenfehlern in Playwright-Läufen
+  gesehen, aber nur vage als "vermutlich unabhängig" abgetan, ohne die
+  Ursache zu bestätigen. Zwei gezielte Untersuchungsskripte haben die
+  Ursache jetzt eindeutig belegt: Ein Klick auf `.hint-btn` löst über
+  `revealHint()` in `src/ui/state/actions.ts` einen echten
+  `fetch()`-POST an `https://api.anthropic.com/v1/messages` aus
+  (`sendChatMessage()` in derselben Datei) — vollständig beabsichtigt, wie
+  sowohl der Label-Text in `hintsSection.ts` ("Claude vertieft sie im
+  Chat") als auch ein Code-Kommentar dort bestätigen. In dieser
+  Sandbox-Umgebung schlägt dieser Request am HTTPS-abfangenden Proxy mit
+  `ERR_CERT_AUTHORITY_INVALID` fehl — ein reines Sandbox-Artefakt, kein
+  Anwendungsfehler. Der Aufruf ist bereits sauber mit try/catch
+  abgesichert (Fehler landet als Chat-Nachricht, blockiert nie die
+  Hint-Anzeige). Ein gezielter Grep
+  (`fetch(|XMLHttpRequest|new Image(`) über den ganzen `src/`-Baum
+  bestätigt, dass `claudeChatClient.ts` die einzige Netzwerk-Aufrufstelle
+  der gesamten Anwendung ist — kein verstecktes zweites Problem. Zwei
+  eigene Fehlalarme im Bug-Hunt-Skript selbst wurden im selben Zug
+  aufgeklärt: ein vermeintlich fehlendes "Chat-Tab nach Klick" beruhte auf
+  einem falsch geratenen Selektor im Testskript (`.chat-tab` statt des
+  tatsächlichen `.chat-section`) — mit dem korrekten Selektor rendert das
+  Chat-Panel wie erwartet.
+
+- **Content:** Challenge 09 deckt alle 4 Tags aus B8 (Arrays & Collections)
+  in einem Durchgang ab: `array-basics`, `foreach-loop`, `list-basics`,
+  `dictionary-basics`. Szenario: eine Punktzahl-Liste (Array mit
+  Index-Zugriff und `foreach`-Summierung), eine Einkaufsliste
+  (`List<string>` mit `.Add()`/`.Remove()`/`.Count`) und eine Preisliste
+  (`Dictionary<string, double>` mit `.ContainsKey()`).
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** ein vergessenes `.Remove(...)` (`einkaufsliste.Count`
+  fälschlich 4 statt 3); der direkte Dictionary-Indexer
+  `preise["Butter"]` statt `.ContainsKey("Butter")` auf einem nie
+  eingetragenen Schlüssel — kompiliert, stürzt aber zur Laufzeit mit einer
+  `KeyNotFoundException` ab, genau die Situation, für die `.ContainsKey()`
+  existiert; und ein Off-by-one beim Array-Index (`punkte[1]` statt
+  `punkte[0]`, Indizes beginnen bei 0).
+
+- **Ergebnis:** C#-Tag-Bilanz 38/86 → 42/86 (≈49 %). B0 bis B8 sind damit
+  vollständig abgedeckt — knapp die Hälfte aller 86 Tags. Nächster offener
+  Zweig ist B9 (Methoden). Build-Größe unverändert (632,33 kB) — Track
+  bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 291 → 292 (Gate 1 +
+  Gate 2 für Challenge 09, alle drei Distraktoren grün). Volle Testsuite
+  914 → 918, alle grün. `typecheck`, `npm run build` grün. Coverage:
+  91,95 % / 72,82 % / 99,10 % / 91,95 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 10 (B9 Teil 1) + Overloading-Einschränkung entdeckt
+
+- **Umfang:** Baseline sauber (918/918, typecheck/build/knip grün, HEAD
+  `b54e44e`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr in diesen beiden Tracks. C#
+  hat nach Challenge 01-09 klaren Schwung, nächster Zweig: B9 (Methoden,
+  8 Tags — größer als jeder bisherige C#-Zweig einzeln, deshalb analog zu
+  B2 auf zwei Challenges aufgeteilt).
+
+- **Content:** Challenge 10 deckt 4 der 8 B9-Tags ab: `method-definition`,
+  `method-parameters`, `return-statement`, `recursion`. Szenario: drei
+  eigene Methoden — `Quadrieren` (ein Parameter), `Rechteckflaeche` (zwei
+  typisierte Parameter), und die rekursive `Fakultaet` mit explizitem
+  Basisfall `n <= 1`.
+
+- **Empirischer Fund vor dem Schreiben des Contents:** Ein erster Entwurf
+  wollte auch `method-overloading` (den fünften B9-Tag) in Challenge 10
+  mitnehmen — zwei `Verdoppeln`-Überladungen (`int`/`double`). Das schlug
+  beim Testlauf gegen den echten `dotnet`-Treiber fehl:
+  `CS0128: A local variable or function named 'Verdoppeln' is already
+  defined in this scope`. Grund: Methoden, die nach den Top-Level-
+  Statements einer `.cs`-Datei stehen (wie in diesem gesamten Kurs
+  durchgehend verwendet), sind technisch **lokale Funktionen** der
+  implizit generierten `Main`-Methode — und lokale Funktionen können in
+  C#, anders als normale Klassenmethoden, nicht überladen werden. Echtes
+  Overloading bräuchte eine Klasse als Container, was inhaltlich ein
+  Vorgriff auf `class-definition` (B10) wäre. `method-overloading` bleibt
+  deshalb vorerst zurückgestellt (dokumentiert in
+  `docs/csharp-concept-hierarchy.md`); die verbleibenden B9-Tags
+  (`optional-parameters`, `ref-out-parameters`, `params-array`) sind
+  davon nicht betroffen und folgen in einer künftigen Challenge.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** fehlendes `return` in `Quadrieren` (Compilerfehler
+  CS0161, nicht alle Codepfade liefern einen Wert); `breite + hoehe`
+  statt `breite * hoehe` in `Rechteckflaeche` (kompiliert, falsches
+  Ergebnis); Rekursions-Basisfall liefert `0` statt `1` zurück, wodurch
+  die ganze Multiplikationskette mit 0 durchmultipliziert wird
+  (`Fakultaet(5)` liefert fälschlich `0` statt `120`).
+
+- **Ergebnis:** C#-Tag-Bilanz 42/86 → 46/86 (≈53 %). B9 zu 4 von 8 Tags
+  abgedeckt, kein Zweig komplett neu geschlossen, aber über die Hälfte
+  aller 86 Tags erreicht. Build-Größe unverändert (632,33 kB) — Track
+  bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 292 → 296 (Gate 1 +
+  Gate 2 für Challenge 10, alle drei Distraktoren grün). Volle Testsuite
+  918 → 922, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 91,99 % / 72,81 % / 99,10 % / 91,99 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 11 (B9 fast vollständig, 7/8)
+
+- **Umfang:** Baseline sauber (922/922, typecheck/build/knip grün, HEAD
+  `350bebf`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr in diesen beiden Tracks.
+  C# hat nach Challenge 10 klaren Schwung, nächster Schritt: die drei
+  verbleibenden aktionablen B9-Tags (`method-overloading` bleibt wie im
+  letzten Durchgang begründet zurückgestellt).
+
+- **Content:** Challenge 11 deckt `optional-parameters`,
+  `ref-out-parameters`, `params-array` ab. Szenario: vier eigene
+  Methoden — `Steigern(int zahl, int schritt = 1)` (Standardwert),
+  `Verdoppeln(ref int zahl)` (ändert die Aufrufer-Variable direkt),
+  `TryDurchTeilen(int zahl, int teiler, out int ergebnis)` (das
+  idiomatische C#-`Try`-Muster: `bool`-Erfolgs-Rückgabewert plus
+  `out`-Parameter), und `Summiere(params int[] zahlen)` (beliebig viele
+  Argumente in einem Array gesammelt).
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** fehlender Standardwert bei `schritt` — `Steigern(5)`
+  mit nur einem Argument hat dann keinen passenden Aufruf mehr
+  (Compilerfehler `CS7036`); `Verdoppeln(wert)` ohne das
+  `ref`-Schlüsselwort beim Aufruf, obwohl die Methode `ref int zahl`
+  erwartet (Compilerfehler `CS1620`); `Summiere` gibt `zahlen.Length`
+  statt der aufsummierten Werte zurück — verwechselt Anzahl mit Summe
+  (kompiliert, falsches Ergebnis).
+
+- **Ergebnis:** C#-Tag-Bilanz 46/86 → 49/86 (≈57 %). B9 zu 7 von 8 Tags
+  abgedeckt — nur `method-overloading` bleibt offen (zurückgestellt bis
+  `class-definition`/B10 verfügbar ist). Build-Größe unverändert
+  (632,33 kB) — Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 296 → 300 (Gate 1 +
+  Gate 2 für Challenge 11, alle drei Distraktoren grün). Volle Testsuite
+  922 → 926, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 92,02 % / 72,79 % / 99,10 % / 92,02 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 12 (B10 Teil 1, erste Klasse)
+
+- **Umfang:** Baseline sauber (926/926, typecheck/build/knip grün, HEAD
+  `a55e103`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr in diesen beiden Tracks.
+  Kein SQL/Python/UI/Editor-Code seit dem letzten Live-Bug-Hunt (2
+  Durchgänge zuvor, sauber) geändert — reiner Content seither, ein
+  erneuter Playwright-Durchlauf hätte keinen neuen Signal-Wert erwartet.
+  C# hat nach Challenge 10/11 klaren Schwung, nächster Zweig: B10
+  (Objektorientierung, 8 Tags — analog zu B2/B9 auf mehrere Challenges
+  aufgeteilt).
+
+- **Content:** Challenge 12 deckt 4 der 8 B10-Tags ab: `class-definition`,
+  `fields`, `constructors`, `this-keyword`. Erste Challenge mit einer
+  echten Klasse. Szenario: eine `Konto`-Klasse mit den Feldern `name`
+  (`string`) und `kontostand` (`double`), einem Konstruktor, der beide
+  Felder per `this.` setzt (Parameter und Feld heißen bewusst gleich, um
+  die Namenskollision zu demonstrieren, die `this` auflöst), sowie zwei
+  unabhängige Instanzen — nur eine davon wird verändert, um
+  Instanz-Unabhängigkeit sichtbar zu machen.
+
+- **Empirischer Fund vor dem Schreiben des Contents:** Ein erster
+  Entwurf platzierte die Klassen-Definition vor den Top-Level-Statements
+  (wie bei den lokalen Funktionen aus Challenge 10/11 üblich) — das
+  schlägt fehl mit `CS8803: Top-level statements must precede namespace
+  and type declarations`. Anders als lokale Funktionen müssen echte
+  Typ-Deklarationen wie `class` **nach** allen ausführbaren Anweisungen
+  der Datei stehen. Die Challenge und ihr Tutorial-Text folgen dieser
+  Regel entsprechend — dokumentiert in
+  `docs/csharp-concept-hierarchy.md`.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** `this.` im Konstruktor vergessen (wirkungslose
+  Selbstzuweisung an den Parameter, Feld bleibt bei `null`/`0`); Feld
+  `kontostand` komplett vergessen zu deklarieren (Compilerfehler
+  `CS1061`); `Konto ben = anna;` statt einer eigenen neuen Instanz — `ben`
+  wird nur ein zweiter Name für dieselbe Instanz.
+
+- **Ergebnis:** C#-Tag-Bilanz 49/86 → 53/86 (≈62 %). B10 zu 4 von 8 Tags
+  abgedeckt. Mit einer echten Klasse jetzt verfügbar, ist auch der Weg
+  für das zurückgestellte `method-overloading` (B9) frei. Build-Größe
+  unverändert (632,33 kB) — Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 300 → 304 (Gate 1 +
+  Gate 2 für Challenge 12, alle drei Distraktoren grün). Volle Testsuite
+  926 → 930, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 92,06 % / 72,78 % / 99,11 % / 92,06 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 13 (B10 vollständig)
+
+- **Umfang:** Baseline sauber (930/930, typecheck/build/knip grün, HEAD
+  `6cc5388`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr in diesen beiden Tracks.
+  Kein SQL/Python/UI/Editor-Code seit dem letzten Live-Bug-Hunt (3
+  Durchgänge zuvor, sauber) geändert — reiner Content seither. C# hat
+  nach Challenge 12 klaren Schwung, nächster Schritt: die restlichen 4
+  B10-Tags, um den Zweig abzuschließen.
+
+- **Content:** Challenge 13 deckt die restlichen 4 B10-Tags ab:
+  `access-modifiers`, `properties`, `static-members`,
+  `value-vs-reference-types`. Zweigeteiltes Szenario: (1) eine
+  `Person`-Klasse mit einem `private` Feld hinter einer Property
+  (`get`/`set`) als kontrollierter Zugriff, und einem
+  `public static int anzahlPersonen`, das der Konstruktor bei jeder
+  neuen Instanz erhöht — abgerufen über den Klassennamen, nicht über
+  eine Instanz; (2) ein `struct Punkt` neben der `Person`-`class`, um
+  Werttyp- (Kopie bei Zuweisung) und Referenztyp-Semantik (Verweis bei
+  Zuweisung, wie schon `Konto ben = anna;` aus Challenge 12) direkt
+  nebeneinander zu zeigen.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** direkter Zugriff auf das private Feld statt die
+  Property (Compilerfehler `CS0122`); `static` bei `anzahlPersonen`
+  vergessen — Zugriff über den Klassennamen wird dann abgelehnt
+  (Compilerfehler `CS0120`); `Punkt` als `class` statt `struct`
+  deklariert — dadurch wird die zweite Variable zu einem Verweis auf
+  dieselbe Instanz statt einer Kopie, der Kernunterschied des Tags wird
+  so empirisch demonstriert statt nur behauptet.
+
+- **Ergebnis:** C#-Tag-Bilanz 53/86 → 57/86 (≈66 %). B10
+  (Objektorientierung) ist damit vollständig abgedeckt — B0 bis B8
+  sowie B10 komplett, B9 zu 7 von 8 (nur `method-overloading` offen,
+  jetzt technisch lösbar). Nächster offener Zweig: B11 (Vererbung &
+  Polymorphie) — oder zuerst `method-overloading` in B9 nachholen.
+  Build-Größe unverändert (632,33 kB) — Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 304 → 308 (Gate 1 +
+  Gate 2 für Challenge 13, alle drei Distraktoren grün). Volle Testsuite
+  930 → 934, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 92,09 % / 72,74 % / 99,11 % / 92,09 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 14 (B9 vollständig, B0–B10 komplett)
+
+- **Umfang:** Baseline sauber (934/934, typecheck/build/knip grün, HEAD
+  `3d90a5c`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr in diesen beiden Tracks.
+  Seit dem letzten Live-Bug-Hunt (4 Durchgänge zuvor, sauber) nur reiner
+  Content geändert, kein SQL/Python/UI/Editor-Code — ein erneuter
+  Playwright-Durchlauf hätte keinen neuen Signal-Wert erwartet. C# hat
+  klaren Schwung, nächster Schritt: den zurückgestellten letzten
+  B9-Tag `method-overloading` einlösen, jetzt wo Challenge 12 eine echte
+  Klasse als Container verfügbar gemacht hat.
+
+- **Content:** Challenge 14 deckt `method-overloading` ab — eine
+  `Rechner`-Klasse mit drei überladenen `static`-Methoden namens
+  `Addiere`: zwei `int`-Parameter, drei `int`-Parameter, und zwei
+  `double`-Parameter. Der Compiler wählt beim Aufruf automatisch die
+  passende Überladung anhand von Argumentanzahl und -typ.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** die dreistellige Überladung vergessen (Compilerfehler
+  `CS1501`, keine Überladung nimmt 3 Argumente); die zweistellige
+  `int`-Überladung vergessen — der Aufruf griffe dann nur noch über eine
+  implizite `int`-zu-`double`-Umwandlung auf die `double`-Überladung zu,
+  deren Rückgabewert sich ohne Cast nicht in eine `int`-Variable
+  speichern lässt (Compilerfehler `CS0266`); `+ c` im Rumpf der
+  dreistelligen Überladung vergessen (kompiliert, liefert aber `7`
+  statt `12`).
+
+- **Ergebnis:** C#-Tag-Bilanz 57/86 → 58/86 (≈67 %). B9 (Methoden) ist
+  damit ebenfalls vollständig abgedeckt — **B0 bis B10 sind jetzt
+  komplett**, deutlich über die Hälfte aller 86 Tags. Nächster offener
+  Zweig: B11 (Vererbung & Polymorphie). Build-Größe unverändert
+  (632,33 kB) — Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 308 → 312 (Gate 1 +
+  Gate 2 für Challenge 14, alle drei Distraktoren grün). Volle Testsuite
+  934 → 938, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 92,13 % / 72,74 % / 99,11 % / 92,13 %.
+
+### 2026-08-10 — Stündliche Routine: Live-Bug-Hunt (sauber) + C# Challenge 15 (B11 Teil 1)
+
+- **Umfang:** Baseline sauber (938/938, typecheck/build/knip grün, HEAD
+  `d6850cb`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. Nach fünf reinen
+  Content-Durchgängen in Folge (Challenge 10-14) zuerst wieder Priorität
+  2: ein Live-Playwright-Durchlauf gegen den echten Dev-Server, da seit
+  dem letzten sauberen Durchlauf mehrere Firings vergangen sind.
+
+- **Live-Bug-Hunt-Ergebnis:** Dev-Server per Playwright gefahren (CDN-
+  Workaround aus dem Runbook: `context.route()` liefert lokal
+  installiertes `sql.js`/`pyodide` aus). Stichprobe von 13 SQL- und 12
+  Python-Challenges (jede 6.): Tutorial-Text vorhanden, Lösung über
+  "In den Editor übernehmen" eingefügt, ausgeführt, `✓ Aufgabe erfüllt`
+  bestätigt — 25/25 bestanden. Mobile-Viewport (375×667) ohne
+  horizontalen Overflow. 0 Konsolenfehler (nach Ausschluss des bekannten
+  `ERR_CERT_AUTHORITY_INVALID`-Sandbox-Artefakts vom Hint-Chat-Fetch).
+  Ein erster Skript-Entwurf meldete fälschlich "Tutorial fehlt" für alle
+  Challenges — eigener Selektor-Bug im Testskript (`.tutorial-section`
+  statt des tatsächlichen `.tutorial-text`), kein Anwendungsfehler;
+  nach der Korrektur lief die Stichprobe sauber durch. Keine neuen
+  Funde.
+
+- **Content:** Challenge 15 deckt 4 der 7 Tags aus B11 (Vererbung &
+  Polymorphie) ab: `inheritance`, `method-overriding`, `base-keyword`,
+  `abstract-classes`. Szenario: eine `abstract class Tier` mit einer
+  `abstract`-Methode `GeraeuschMachen()` (muss überschrieben werden) und
+  einer `virtual`-Methode `Beschreibung()` (Standardimplementierung,
+  Überschreiben optional) — zwei abgeleitete Klassen `Hund : Tier` und
+  `Katze : Tier`, beide rufen `base(name)` im Konstruktor auf, nur
+  `Katze` überschreibt zusätzlich `Beschreibung()`.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** `: base(name)` weggelassen (Compilerfehler `CS7036`);
+  `override` bei der abstrakten Methode vergessen (Compilerfehler
+  `CS0534`); `override` bei der virtuellen Methode `Beschreibung()` in
+  `Katze` vergessen — anders als beim abstrakten Fall erzwingt der
+  Compiler das bei `virtual` nicht, der Aufruf läuft dann
+  stillschweigend mit der geerbten Standardversion (kompiliert, falsches
+  Ergebnis). Der dritte Distraktor demonstriert den Kernunterschied
+  zwischen `abstract` (compile-time erzwungen) und `virtual` (optional,
+  silent fallback) empirisch.
+
+- **Ergebnis:** C#-Tag-Bilanz 58/86 → 62/86 (≈72 %). B11 zu 4 von 7 Tags
+  abgedeckt (`interfaces`, `polymorphism-via-interface`,
+  `sealed-classes` offen). B0 bis B10 weiterhin vollständig. Build-Größe
+  unverändert (632,33 kB) — Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 312 → 316 (Gate 1 +
+  Gate 2 für Challenge 15, alle drei Distraktoren grün). Volle Testsuite
+  938 → 942, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 92,16 % / 72,69 % / 99,11 % / 92,16 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 16 (B11 vollständig)
+
+- **Umfang:** Baseline sauber (942/942, typecheck/build/knip grün, HEAD
+  `411a911`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. C# hat nach Challenge 15
+  klaren Schwung, nächster Schritt: die restlichen 3 B11-Tags, um den
+  Zweig abzuschließen.
+
+- **Content:** Challenge 16 deckt `interfaces`,
+  `polymorphism-via-interface`, `sealed-classes` ab. Szenario: ein
+  `interface IBeschreibbar` mit einer Methoden-Signatur (kein Rumpf),
+  zwei implementierende Klassen `Buch` und `sealed class DVD`, und ein
+  `IBeschreibbar[]`-Array mit je einer Instanz beider Klassen — eine
+  `foreach`-Schleife ruft `Beschreiben()` über den Interface-Typ auf,
+  die konkrete Implementierung wird erst zur Laufzeit bestimmt
+  (Polymorphie über Interfaces statt über eine gemeinsame Basisklasse).
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** `Buch` implementiert `Beschreiben()` nicht
+  (Compilerfehler `CS0535`); ein Versuch `class BluRay : DVD` von der
+  als `sealed` markierten `DVD` zu erben (Compilerfehler `CS0509`, genau
+  der Zweck von `sealed`); die beiden Array-Zuweisungen vertauscht
+  (kompiliert, aber falsche Ausgabereihenfolge).
+
+- **Ergebnis:** C#-Tag-Bilanz 62/86 → 65/86 (≈76 %). B11 (Vererbung &
+  Polymorphie) ist damit vollständig abgedeckt — **B0 bis B11 sind
+  jetzt komplett**, gut drei Viertel aller 86 Tags. Nächster offener
+  Zweig: B12 (Generics). Build-Größe unverändert (632,33 kB) — Track
+  bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 316 → 320 (Gate 1 +
+  Gate 2 für Challenge 16, alle drei Distraktoren grün). Volle Testsuite
+  942 → 946, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 92,19 % / 72,65 % / 99,11 % / 92,19 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 17 (B12 vollständig, B0–B12 komplett)
+
+- **Umfang:** Baseline sauber (946/946, typecheck/build/knip grün, HEAD
+  `f23dfdd`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. C# hat nach Challenge 16
+  klaren Schwung, nächster Zweig: B12 (Generics, klein genug für einen
+  einzigen Durchgang, alle 3 Tags).
+
+- **Content:** Challenge 17 deckt alle 3 Tags aus B12 in einem
+  Durchgang ab: `generic-type-definition`, `generic-method-definition`,
+  `generic-constraints`. Szenario: eine generische Klasse `Box<T>` mit
+  Feld `Inhalt`, verwendet mit zwei unterschiedlichen konkreten Typen
+  (`Box<string>` und `Box<int>`) — genau das macht den generischen Typ
+  gegenüber einer festen Klasse überhaupt erst notwendig; und eine
+  generische Methode `T Groesser<T>(T a, T b) where T :
+  IComparable<T>`, die per `CompareTo` den größeren Wert liefert,
+  aufrufbar sowohl mit `int`- als auch mit `string`-Argumenten ohne
+  explizite Typangabe (Typ-Inferenz).
+
+- **Design-Korrektur vor dem Schreiben des Contents:** Ein erster
+  Entwurf des "Box nicht generisch"-Distraktors kompilierte fälschlich
+  unverändert durch, weil das Szenario `Box` nur mit einem einzigen Typ
+  (`string`) verwendete — eine fest auf `string` zugeschnittene Klasse
+  wäre für diese Aufgabe genauso gültig gewesen. Behoben durch eine
+  zweite `Box<int>`-Instanziierung im Szenario, die Genericität dadurch
+  tatsächlich notwendig macht statt nur zu behaupten — vor dem
+  eigentlichen Content-Schreiben empirisch gegen den echten
+  `dotnet`-Treiber verifiziert.
+
+- **Drei Distraktoren, alle empirisch verifiziert:** `where T :
+  IComparable<T>` weggelassen — ein uneingeschränktes `T` kennt keine
+  `CompareTo`-Methode (Compilerfehler); `Box` nicht generisch, sondern
+  fest auf `string` zugeschnitten — `Box<int> zahlBox = ...` lässt sich
+  dann nicht mehr kompilieren (Compilerfehler `CS0308`); `Groesser`
+  nicht generisch, sondern fest auf `int` zugeschnitten — der Aufruf
+  mit zwei `string`-Argumenten passt zu keiner Methode mehr
+  (Compilerfehler `CS1503`).
+
+- **Ergebnis:** C#-Tag-Bilanz 65/86 → 68/86 (≈79 %). B12 (Generics) ist
+  damit vollständig abgedeckt — **B0 bis B12 sind jetzt komplett**.
+  Nächster offener Zweig: B13 (Fehlerbehandlung). Build-Größe
+  unverändert (632,33 kB) — Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 320 → 324 (Gate 1 +
+  Gate 2 für Challenge 17, alle drei Distraktoren grün). Volle Testsuite
+  946 → 950, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 92,17 % / 72,64 % / 99,12 % / 92,17 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 18 (B13 Teil 1)
+
+- **Umfang:** Baseline sauber (950/950, typecheck/build/knip grün, HEAD
+  `2cf0edd`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. C# hat nach Challenge 17
+  klaren Schwung, nächster Zweig: B13 (Fehlerbehandlung, 6 Tags — auf
+  zwei Challenges aufgeteilt wie schon B9/B10/B11).
+
+- **Content:** Challenge 18 deckt 4 der 6 B13-Tags ab:
+  `runtime-exceptions-concept`, `try-catch`, `specific-exception-types`,
+  `finally-block`. Szenario, zweigeteilt: ein Array-Zugriff außerhalb
+  der Grenzen in einem `try`/`catch (IndexOutOfRangeException)`/
+  `finally`-Block — der `finally`-Block hängt unabhängig vom Ausgang
+  einen Status-Suffix an; und eine Ganzzahl-Division durch 0 in einem
+  separaten `try`/`catch (DivideByZeroException)`-Block, ohne
+  `finally`. Beide Blöcke fangen ihren jeweiligen Exception-Typ gezielt.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** `finally`-Block komplett weggelassen (kompiliert, aber
+  der Status-Suffix fehlt); `catch (FormatException)` statt
+  `catch (IndexOutOfRangeException)` — der falsche Exception-Typ passt
+  nicht, die tatsächlich geworfene Ausnahme bleibt ungefangen und das
+  Programm stürzt komplett ab (bestätigt: echte
+  `TargetInvocationException` mit `IndexOutOfRangeException` als
+  innerer Ausnahme); `b / a` statt `a / b` bei der Division — `0 / 10`
+  wirft keine Exception, `divisionStatus` bleibt fälschlich `"Erfolg"`.
+
+- **Ergebnis:** C#-Tag-Bilanz 68/86 → 72/86 (≈84 %). B13 zu 4 von 6
+  Tags abgedeckt (`throw-statement`, `custom-exceptions` offen). B0 bis
+  B12 weiterhin vollständig. Build-Größe unverändert (632,33 kB) —
+  Track bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 324 → 328 (Gate 1 +
+  Gate 2 für Challenge 18, alle drei Distraktoren grün). Volle Testsuite
+  950 → 954, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 92,21 % / 72,62 % / 99,12 % / 92,21 %.
+
+### 2026-08-10 — Stündliche Routine: C# Challenge 19 (B13 vollständig, B0–B13 komplett)
+
+- **Umfang:** Baseline sauber (954/954, typecheck/build/knip grün, HEAD
+  `ae03e65`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. C# hat nach Challenge 18
+  klaren Schwung, nächster Schritt: die restlichen 2 B13-Tags, um den
+  Zweig abzuschließen.
+
+- **Content:** Challenge 19 deckt `throw-statement` und
+  `custom-exceptions` ab. Szenario: eine eigene Exception-Klasse
+  `UngueltigesAlterException : Exception` mit Konstruktor, der die
+  Nachricht per `: base(nachricht)` weiterreicht — dieselbe
+  Vererbungssyntax und dasselbe `base(...)`-Muster wie schon bei
+  gewöhnlichen Klassen aus B11. Eine Methode `PruefeAlter(int alter)`
+  löst sie bei einem negativen Alter per `throw new
+  UngueltigesAlterException(...)` aus; zwei Aufrufe (einer gültig,
+  einer ungültig) zeigen sowohl den Erfolgs- als auch den Fehlerpfad.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** `throw` vor `new UngueltigesAlterException(...)`
+  vergessen — es wird nur ein Exception-Objekt erzeugt, aber nie
+  tatsächlich ausgelöst (kompiliert, falsches Ergebnis); `: base(nachricht)`
+  im Konstruktor vergessen — `e.Message` liefert den generischen
+  Standardtext statt der eigenen Nachricht (kompiliert, falsches
+  Ergebnis); `: Exception` bei der Klassendefinition weggelassen — eine
+  Klasse, die nicht von `Exception` erbt, lässt sich weder werfen noch
+  fangen (Compilerfehler `CS0155`).
+
+- **Ergebnis:** C#-Tag-Bilanz 72/86 → 74/86 (≈86 %). B13
+  (Fehlerbehandlung) ist damit vollständig abgedeckt — **B0 bis B13
+  sind jetzt komplett**. Nächster offener Zweig: B14 (Delegates &
+  Lambda-Ausdrücke). Build-Größe unverändert (632,33 kB) — Track
+  bleibt unregistriert.
+
+- **Tests:** `test/content/challengeRunner.test.ts` 328 → 332 (Gate 1 +
+  Gate 2 für Challenge 19, alle drei Distraktoren grün). Volle Testsuite
+  954 → 958, alle grün. `typecheck`, `npm run build` grün. `knip`:
+  unverändert 10 Funde. Coverage: 92,24 % / 72,60 % / 99,12 % / 92,24 %.
+
+### 2026-08-10 — Stündliche Routine: C#-Engine-Integration — LanguagePlugin für den Editor
+
+- **Umfang:** Baseline sauber (958/958, typecheck/build/knip grün, HEAD
+  `b2dee97`). SQL/Python bleiben bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. C#-Content ist bei
+  B0–B13 komplett (74/86); der nächste offene Zweig B14 wäre der übliche
+  nächste Content-Schritt, aber laut Mandat ist C#-Engine-Integration
+  jetzt explizit in Scope und hat hier klaren Schwung: `docs/
+  csharp-engine-poc.md` listet für die Live-Wiring vier offene Lücken
+  (Registry-Eintrag, `ctx.engines`/`AppContext`-Fall, Editor-
+  `LanguagePlugin`, Blazor-Serving in Dev/Prod). Die `LanguagePlugin`-Lücke
+  ist die einzige davon, die sich isoliert, ohne die anderen drei
+  anzufassen, bauen und testen lässt — genau ein begrenztes Increment.
+
+- **Implementiert:** `src/editor/languages/csharp/` — `keywords.ts`
+  (Keyword-/Typ-/Sonstige-Mengen), `tokenizer.ts` (`//`- und `/* */`-
+  Kommentare, `"..."`/`$"..."`/`@"..."`-Strings inkl. Verbatim-`""`-
+  Escape, `'x'`-Char-Literale, Zahlen mit Suffix wie `10.5f`/`42L`),
+  `highlight.ts`, `autoIndent.ts` (kopiert Einrückung, +1 Tab nach Zeilen,
+  die mit `{` enden — brace-basiertes Pendant zu Pythons Doppelpunkt-Regel),
+  `autoClosePairs.ts` (wiederverwendet aus dem SQL-Modul, sprachagnostisch),
+  `uppercaseKeyword.ts` (No-Op, wie schon bei Python), zusammengeführt in
+  `csharpLanguagePlugin.ts` (`id: 'csharp'`, implementiert das bestehende
+  `LanguagePlugin`-Interface unverändert). 28 neue Unit-Tests in
+  `csharpLanguagePlugin.test.ts`, gleicher Stil wie
+  `pythonLanguagePlugin.test.ts`.
+
+- **Ein echter Bug, beim Testen gegen echte C#-Syntax gefunden (nicht nur
+  angenommen):** SQL/Python klassifizieren jedes Wort direkt vor `(` immer
+  als Funktionsaufruf, geprüft *vor* jeder Keyword-Zugehörigkeit — richtig
+  für SQL, wo z. B. `DATE` sowohl Datentyp als auch Funktion sein kann.
+  Direkt auf C# übertragen hätte das `if (`, `while (`, `catch (` — also
+  praktisch jede reale C#-Kontrollfluss-Syntax — fälschlich als
+  Funktionsaufruf eingefärbt, weil diese Keywords fast immer direkt von
+  `(` gefolgt werden. Fix: für C# werden Keyword-/Typ-Mengen zuerst
+  geprüft, die Klammer-Heuristik greift nur noch für echte, nicht
+  reservierte Bezeichner — in C# ist das sogar korrekter als das
+  SQL/Python-Vorbild, weil jedes C#-Keyword und jeder eingebaute Typ ein
+  echtes reserviertes Wort ist (anders als in SQL), es also gar keine
+  echte Mehrdeutigkeit mehr gibt, die die Klammer-Regel auflösen müsste.
+
+- **Bewusst nicht getan:** Keine Anbindung an `domEditor.ts`/`editorTab.ts`,
+  kein Registry-Eintrag, kein `AppContext`-Fall, kein Blazor-Serving —
+  C# bleibt weiterhin nicht auswählbar in der Live-App. Das Plugin ist
+  eigenständig gebaut und getestet, genau wie es `docs/csharp-engine-poc.md`
+  für diese Lücke vorsieht (fertig, sobald die übrigen drei Lücken
+  geschlossen sind).
+
+- **Tests:** Volle Testsuite 958 → 986 (28 neue Tests), alle grün.
+  `typecheck`, `npm run build` grün (632,33 kB, unverändert — reiner
+  Editor-Code, keine neue Route). `knip`: unverändert 10 Funde (das neue
+  Modul wird von seiner eigenen Testdatei referenziert, keine toten
+  Dateien). Coverage: 92,30 % / 73,11 % / 99,13 % / 92,30 %.
+
+### 2026-08-10 — Stündliche Routine: C#-Engine-Integration — AppContext/EngineFactory-Wiring
+
+- **Umfang:** Baseline sauber (986/986, typecheck/build/knip grün, HEAD
+  `cfbc50c`). SQL/Python weiterhin bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag mehr. C#-Engine-Integration hat
+  nach dem letzten Durchgang (Editor-`LanguagePlugin`) klaren Schwung:
+  von den vier Wiring-Lücken aus `docs/csharp-engine-poc.md` ist die
+  `ctx.engines`/`AppContext`-Lücke die nächste, die sich isoliert bauen
+  und testen lässt, ohne die übrigen (Registry-Eintrag, Blazor-Serving)
+  anzufassen.
+
+- **Implementiert:** `EngineFactory` (`src/ui/context.ts`) bekommt
+  `getMainCSharp()`/`ensureCSharpEngine(loadEngine)` — exaktes Pendant zu
+  `getMainPython()`/`ensurePythonEngine(loadPyodide)`: lädt einmalig,
+  cached danach, ein einziger geteilter Engine (keine separate
+  Disposable-Variante, da jeder `exec()`-Aufruf wie bei Python zustandslos
+  ist). `ensureCSharpEngine` nimmt bewusst eine parameterlose
+  `loadEngine`-Closure statt direkt eine `baseUrl`, damit die Factory
+  weiterhin unabhängig davon bleibt, woher das Blazor-Bundle kommt (diese
+  Entscheidung ist weiterhin offen) — ein echter Aufrufer würde später
+  `() => loadCSharpEngineFromServer(baseUrl)` übergeben. 6 neue Tests in
+  `context.test.ts`, gleiche Struktur wie die bestehenden Python-Tests
+  (Laden+Caching, `exec()`-Delegation, Retry nach fehlgeschlagenem Laden).
+
+- **Mechanischer Nebenaufwand:** 16 Testdateien bauen sich jeweils eine
+  eigene Fake-`EngineFactory` für andere UI-Tests — alle mussten um einen
+  ablehnenden `ensureCSharpEngine`-Stub ergänzt werden, um das jetzt
+  größere Interface zu erfüllen (gleiches Muster wie ihr bestehender
+  `ensurePythonEngine`-Stub). Reine Mechanik, keine Verhaltensänderung an
+  diesen Tests.
+
+- **Bewusst nicht getan:** Keine Aufrufstelle ruft `ensureCSharpEngine`
+  tatsächlich auf (anders als Pythons `ensurePythonEngineLoaded` in
+  `src/ui/state/actions.ts`, ausgelöst beim Öffnen einer Python-Challenge)
+  — es gibt keine C#-Challenge in der Registry, die das auslösen könnte.
+  Eine echte Aufrufstelle jetzt zu bauen wäre toter Code ohne Trigger.
+  Verbleibende Lücken: der Registry-Eintrag selbst, und die Serving-
+  Entscheidung für das Blazor-Bundle in Dev/Prod (Letztere muss zuerst
+  stehen, bevor eine echte Aufrufstelle eine funktionierende `baseUrl`
+  übergeben kann).
+
+- **Tests:** Volle Testsuite 986 → 990 (6 neue Tests, abzüglich der
+  entfernten Redundanz keine — reine Addition). `typecheck`, `npm run
+  build` grün (632,59 kB, geringfügig gewachsen, da `csharpEngine.ts`
+  jetzt auch vom Produktions-Bundle importiert wird, nicht nur von
+  Tests). `knip`: unverändert 10 Funde. Coverage: 92,31 % / 73,15 % /
+  99,14 % / 92,31 %.
+
+### 2026-08-10 — Stündliche Routine: Live-Bug-Hunt (sauber), kein aktionabler Schritt
+
+- **Umfang:** Baseline sauber (990/990, typecheck/build/knip grün, HEAD
+  `826b5e1`). SQL/Python weiterhin bei 81/82 (nur permanente Ausnahmen
+  offen) — kein aktionabler Content-Tag. Nach zwei reinen
+  C#-Engine-Durchgängen in Folge (Editor-`LanguagePlugin`,
+  `AppContext`-Wiring) zuerst wieder Priorität 2: ein Live-Playwright-
+  Durchlauf gegen den echten Dev-Server, da seit dem letzten sauberen
+  Durchlauf mehrere Firings vergangen sind.
+
+- **Live-Bug-Hunt-Ergebnis:** Dev-Server per Playwright gefahren (CDN-
+  Workaround aus dem Runbook: `context.route()` liefert lokal
+  installiertes `sql.js`/`pyodide` aus). Stichprobe von 13 SQL- und 12
+  Python-Challenges (jede 6.): Tutorial-Text vorhanden, Lösung über
+  "In den Editor übernehmen" eingefügt, ausgeführt, `✓ Aufgabe erfüllt`
+  bestätigt — 25/25 bestanden. Zusätzlich zwei echte Distraktoren aus
+  dem Content (SQL 16: verschachteltes `BEGIN` während laufender
+  Transaktion; Python 11: `len(wort)` statt Treffer-Zählung) manuell im
+  Editor eingefügt und ausgeführt — beide korrekt abgelehnt, keine
+  Diskrepanz zur `challengeRunner.test.ts`-Vorhersage. Mobile-Viewport
+  (375×667) ohne horizontalen Overflow. 0 Konsolenfehler. Keine neuen
+  Funde.
+
+- **C#-Engine-Integration:** Kein bounded nächster Schritt für diesen
+  Durchgang identifiziert. Von den verbleibenden zwei Wiring-Lücken
+  (Registry-Eintrag, Blazor-Serving in Dev/Prod) hängt der
+  Registry-Eintrag am Serving — ohne funktionierende `baseUrl` wäre eine
+  Registrierung nur eine tote Auswahl ohne lauffähigen Engine dahinter.
+  Die Serving-Entscheidung selbst (Vite-Dev-Server-Middleware mit
+  COOP/COEP-Headern + Produktions-Integration ins `deploy-pages.yml` samt
+  `coi-serviceworker`) ist eine deutlich größere, mehrteilige
+  Änderung als die letzten beiden Increments — bewusst nicht in diesem
+  Durchgang neben dem Bug-Hunt begonnen, um kein halbfertiges Ergebnis zu
+  riskieren. Nächster C#-Schritt für einen künftigen, dafür reservierten
+  Durchgang.
+
+- **Ergebnis:** Keine Code-/Content-Änderung in diesem Durchgang — Tests,
+  Coverage und Build-Größe unverändert gegenüber dem letzten Snapshot
+  (990/990, 92,31 % / 73,15 % / 99,14 % / 92,31 %, 632,59 kB). Kein neuer
+  Commit, keine Artifact-Republikation nötig (keine Zahl hat sich
+  bewegt).
+
+### 2026-08-10 — Stündliche Routine: C#-Hosting-Plan überarbeitet (Analyse, kein Code)
+
+- **Umfang:** Baseline sauber (990/990, typecheck/build/knip grün, HEAD
+  `fbee26f`). SQL/Python weiterhin an der permanenten Scope-Grenze. Statt
+  den letzten Durchgang zu wiederholen (Live-Bug-Hunt, gerade erst
+  sauber durchgelaufen — das wäre reine Wiederholung ohne neuen Wert),
+  diesmal der als nächstes anstehende C#-Schritt: die noch offene
+  Blazor-Serving-Entscheidung aus `docs/csharp-engine-poc.md` genauer
+  geprüft, bevor sie implementiert wird.
+
+- **Fund:** Der bisherige Hosting-Plan ("`coi-serviceworker`, beschränkt
+  auf die eigene Route des C#-Motors") geht von einer eigenen Seite/Route
+  für den C#-Motor aus — die es in dieser Single-Page-App gar nicht gibt.
+  `vite-plugin-singlefile` fasst SQL/Python/(künftig C#) in eine einzige
+  `index.html` zusammen, und `loadCSharpEngineFromServer` (bestätigt im
+  aktuellen Code, nicht nur im Plan) injiziert Blazors `<script>`-Tag
+  direkt in genau dieses eine Dokument. COOP/COEP gelten pro Dokument —
+  "nur für den C#-Teil" gibt es nicht. Sie fürs ganze Dokument zu setzen
+  würde SQL/Pythons CDN-Ladevorgänge (Produktion) und die lokal per
+  `context.route()` ausgelieferten Kopien (jeder Playwright-Bug-Hunt)
+  ohne `Cross-Origin-Resource-Policy`-Header verstummen lassen — eine
+  echte Regressionsgefahr, die das Mandat ("nie einen kaputten
+  Zwischenzustand hinterlassen") explizit vermeiden soll.
+
+- **Vorgeschlagene Korrektur (noch nicht implementiert, noch nicht live
+  verifiziert):** den Blazor-Motor in einem eigenen, same-origin
+  `<iframe>` hosten statt im Hauptdokument — ein Kind-Frame kann eigene
+  COOP/COEP-Header tragen und unabhängig vom Elternfenster cross-origin-
+  isoliert werden (dasselbe Muster wie z. B. StackBlitz WebContainers).
+  `CSharpRuntime`/`CSharpExecResult` (Schritt 4, bereits entschieden)
+  müssten sich dabei nicht ändern, nur der Transport darunter
+  (`postMessage` statt direktem `Blazor.start()`-Aufruf im Hauptdokument).
+  Braucht vor der Umsetzung noch eine echte Playwright-Prüfung, ob ein
+  same-origin-iframe mit eigenen COOP/COEP-Headern tatsächlich
+  `crossOriginIsolated === true` erreicht, unabhängig vom Elternfenster.
+
+- **Ergebnis:** Reine Analyse/Dokumentations-Änderung
+  (`docs/csharp-engine-poc.md`), kein Code geändert. Tests/Coverage/
+  Build-Größe unverändert (990/990, 92,31 % / 73,15 % / 99,14 % /
+  92,31 %, 632,59 kB) — keine Artifact-Republikation nötig.
+
+### 2026-08-10 — Stündliche Routine: C#-Hosting-Plan empirisch verifiziert — iframe-Idee widerlegt, `credentialless` als echte Lösung gefunden
+
+- **Umfang:** Baseline sauber (990/990, typecheck/build/knip grün, HEAD
+  `af872cc`). SQL/Python weiterhin an der permanenten Scope-Grenze, ein
+  erneuter Live-Bug-Hunt wäre reine Wiederholung des letzten sauberen
+  Durchlaufs. Der letzte Durchgang hatte einen konkreten nächsten
+  Schritt hinterlassen: die im selben Durchgang vorgeschlagene
+  iframe-Isolation-Idee brauchte "eine echte Playwright-Prüfung ... bevor
+  sie als endgültiges Design gilt" — genau diese Prüfung diesen
+  Durchgang durchgeführt.
+
+- **Ergebnis der Prüfung:** Ein minimaler, wegwerfbarer Node+Playwright-
+  Aufbau (zwei lokale HTTP-Origins auf verschiedenen Ports, da echte
+  CDN-Domains in dieser Sandbox blockiert sind) hat die iframe-Idee
+  **empirisch widerlegt**: ein same-origin-Kind-iframe mit eigenen
+  `COOP: same-origin`/`COEP: require-corp`-Headern erreicht
+  `crossOriginIsolated=false`, wenn das Elterndokument selbst keine
+  dieser Header sendet — Isolation ist eine Eigenschaft des
+  Top-Level-Dokuments, kein Kind-Frame kann sie sich allein verschaffen
+  (eine Positivkontrolle mit Headern auf beiden Ebenen bestätigte
+  `true`/`true`, der Testaufbau selbst war also korrekt).
+
+- **Die tatsächliche Lösung, live verifiziert:** `Cross-Origin-Embedder-
+  Policy: credentialless` statt `require-corp` aufs gesamte Hauptdokument
+  angewendet (`COOP: same-origin` bleibt gleich) — `credentialless`
+  verlangt **keinen** `Cross-Origin-Resource-Policy`-Header von
+  Cross-Origin-Subressourcen, sondern entfernt nur Credentials
+  (Cookies/HTTP-Auth) aus diesen Anfragen, was für öffentliche,
+  unauthentifizierte CDN-Skripte irrelevant ist. Live bestätigt: eine
+  Seite mit `credentialless` erreicht `crossOriginIsolated=true` und
+  `SharedArrayBuffer` ist verfügbar, während ein Cross-Origin-`<script>`
+  ganz ohne CORP-Header (bewusst als unkonfigurierter echter CDN
+  nachgebildet) weiterhin fehlerfrei lädt und ausführt — SQL/Pythons
+  CDN-Ladevorgänge und die per `context.route()` servierten lokalen
+  Kopien in jedem Bug-Hunt brauchen dadurch keine Änderung.
+  `claudeChatClient.ts`s Cross-Origin-`fetch()` zu `api.anthropic.com`
+  ist ebenfalls unbetroffen (kein `credentials`-Flag, keine Cookies).
+
+- **Konsequenz für den Plan:** Der ursprüngliche Plan vom 2026-08-08
+  ("`coi-serviceworker`, aufs ganze Dokument angewendet") war näher am
+  Richtigen als die iframe-Idee vom selben Tag — die einzige nötige
+  Korrektur ist `credentialless` statt `require-corp`. Keine
+  iframe-/postMessage-Umstellung von `csharpEngine.ts` nötig. Noch offen:
+  ein Live-Check, ob Blazors Multithreaded-WASM-Boot (`WasmEnableThreads`)
+  auch unter `credentialless` funktioniert (bisher nur an einer reinen
+  HTML-Seite verifiziert, nicht am echten Blazor-Bundle) — das plus die
+  eigentliche Dev-Server-Middleware ist der nächste konkrete C#-Schritt.
+
+- **Ergebnis:** Reine Analyse/Dokumentations-Änderung
+  (`docs/csharp-engine-poc.md`, iframe-Vorschlag korrigiert), kein
+  Code im Repo geändert (der Testaufbau lief komplett im Scratchpad).
+  Tests/Coverage/Build-Größe unverändert (990/990, 92,31 % / 73,15 % /
+  99,14 % / 92,31 %, 632,59 kB) — keine Artifact-Republikation nötig.
+
+### 2026-08-10 — Stündliche Routine: C#-Hosting-Frage endgültig geschlossen — echter Build-Bug gefunden + `credentialless` gegen den echten Blazor-Bundle verifiziert
+
+- **Umfang:** Baseline sauber (990/990, typecheck/build/knip grün, HEAD
+  `789000f`). SQL/Python weiterhin an der permanenten Scope-Grenze. Der
+  letzte Durchgang hatte einen klaren nächsten Schritt hinterlassen: die
+  `credentialless`-Erkenntnis war bis dahin nur an einer schlichten
+  HTML-Seite verifiziert, nicht am echten Blazor-Multithreaded-WASM-Bundle
+  — genau diese Lücke diesen Durchgang geschlossen.
+
+- **Echter Build-Bug gefunden, bevor überhaupt getestet werden konnte:**
+  ein frischer `dotnet publish -c Release` schlug mit `CS8802` fehl (nur
+  eine Kompilationseinheit darf Top-Level-Statements haben) — das
+  SDK-Standard-Glob `**/*.cs` erfasste rekursiv auch
+  `csharp-engine/driver/Program.cs` (das separate Konsolenprojekt aus
+  einer späteren Session), das mit dem eigenen `Program.cs` kollidierte.
+  Unentdeckt, weil seit dem Hinzufügen von `driver/` niemand mehr einen
+  frischen Publish auf das Blazor-Projekt losgelassen hatte. Behoben mit
+  `<Compile Remove="driver/**/*.cs" />` in `CSharpEngineBlazor.csproj` —
+  separat committet (`b4d00ec`), gegen einen sauberen Publish und die
+  volle npm-Testsuite verifiziert (990/990, betrifft nichts unter `src/`).
+
+- **`credentialless` gegen den echten Bundle verifiziert:** den frischen
+  Publish-Output (`csharp-engine/bin/Release/net8.0/publish/wwwroot`) über
+  einen minimalen Node-Server mit `COOP: same-origin` +
+  `COEP: credentialless` ausgeliefert, in echtem Headless-Chromium via
+  Playwright geladen. `crossOriginIsolated` sofort `true`. Das im Repo
+  bereits vorhandene `index.html` bootet Blazor selbst und ruft
+  automatisch `CSharpEngine.RunCode('int x = 2 + 2; ...')` auf — Ergebnis:
+  `CSHARP_RESULT:{"stdout":"x = 4\n","error":null}`, ein echter
+  Roslyn-Compile und eine echte WASM-Ausführung, beide erfolgreich unter
+  `credentialless`. Ein Folgeaufruf mit absichtlich ungültigem Code lieferte
+  korrekt einen echten Compilerfehler (`CS0029`). Ein erster Testlauf, der
+  zusätzlich manuell ein zweites `Blazor.start()` auslöste (überflüssig,
+  die Seite bootet sich selbst), erzeugte einen harmlosen
+  "Root component already attached"-Kollisionsfehler und einen
+  scheinbaren mehrminütigen Hänger — ein Bug im Wegwerf-Testskript, nicht
+  in der Engine oder in `credentialless` selbst.
+
+- **Konsequenz:** Die Hosting-Frage aus `docs/csharp-engine-poc.md` ist
+  damit nicht nur analytisch, sondern end-to-end gegen den echten
+  Multithreaded-WASM-Bundle verifiziert — keine offene Design-Frage
+  blockiert mehr die eigentliche Umsetzung (Vite-Dev-Server-Middleware +
+  `coi-serviceworker` für GitHub Pages), der nächste konkrete C#-Schritt
+  für einen künftigen Durchgang.
+
+- **Ergebnis:** Ein committeter Code-Fix (`csharp-engine/
+  CSharpEngineBlazor.csproj`, `b4d00ec`) außerhalb von `src/` — npm-Tests/
+  Coverage/Build-Größe dadurch unverändert (990/990, 92,31 % / 73,15 % /
+  99,14 % / 92,31 %, 632,59 kB). Der restliche Verifikationsaufbau lief
+  komplett im Scratchpad. Keine Artifact-Republikation nötig (keine der
+  dort dargestellten Zahlen hat sich bewegt).
+
+### 2026-08-10 — Stündliche Routine: C#-Dev-Server-Middleware gebaut und live verifiziert
+
+- **Umfang:** Baseline sauber (990/990, typecheck/build/knip grün, HEAD
+  `04a95da`). SQL/Python weiterhin an der permanenten Scope-Grenze. Der
+  letzte Durchgang hatte die Hosting-Frage vollständig geschlossen und
+  als nächsten Schritt "die eigentliche Dev-Server-Middleware bauen"
+  hinterlassen — kein offener Design-Punkt mehr im Weg, klarer
+  nächster Schritt.
+
+- **Implementiert:** `vite.config.ts` bekommt ein
+  `csharpEngineDevServer()`-Plugin (`apply: 'serve'`, Produktions-Build
+  komplett unberührt) — setzt `COOP: same-origin` +
+  `COEP: credentialless` auf jede Dev-Server-Antwort und liefert
+  `csharp-engine/bin/Release/net8.0/publish/wwwroot` (gitignored, lokal
+  per `dotnet publish -c Release` gebaut) unter `/csharp-engine/` aus.
+  Fehlt der Publish-Output (frischer Checkout ohne .NET SDK), loggt das
+  Plugin einen einzeiligen Hinweis und liefert `/csharp-engine/` einfach
+  nicht aus — `npm run dev` funktioniert für SQL/Python trotzdem normal.
+
+- **Live gegen den echten Dev-Server verifiziert** (Playwright, üblicher
+  `context.route()`-CDN-Workaround für sql.js/Pyodide): Haupt-App
+  `crossOriginIsolated=true`, 10/10 SQL- und 9/9 Python-Stichproben
+  weiterhin bestanden, 0 Konsolenfehler — die `credentialless`-Erkenntnis
+  hält auch gegen die echte App, nicht nur den synthetischen Testaufbau.
+  `/csharp-engine/` selbst ebenfalls `crossOriginIsolated=true`, die im
+  Repo bereits vorhandene Smoke-Test-Seite kompilierte und lief
+  erfolgreich (`CSHARP_RESULT:{"stdout":"x = 4\n","error":null}`) — durch
+  die echte Vite-Middleware, nicht mehr nur einen Scratchpad-Server.
+
+- **Ein weiterer echter Bug gefunden und behoben:** erster Versuch
+  scheiterte mit `Blazor is not defined` (404). Ursache: das
+  eingecheckte `index.html` hat `<base href="/" />` fest codiert (für
+  den Fall, dass dieses Projekt an seiner eigenen Origin-Wurzel gehostet
+  wird) — unter `/csharp-engine/` verschachtelt löst das den relativen
+  `<script src="_framework/blazor.webassembly.js">` gegen die Site-Wurzel
+  auf statt gegen den Mount-Pfad. Wichtiger noch: `Program.cs` setzt
+  `CSharpEngine.BaseAddress` aus genau demselben `<base href>` — ein
+  falscher Wert hätte auch die Ref-Assembly-Fetches 404en lassen, nicht
+  nur den Skript-Load. Behoben, indem die Middleware `<base href="/" />`
+  gezielt zu `<base href="/csharp-engine/" />` umschreibt, nur für diese
+  eine HTML-Datei.
+
+- **Für den nächsten Wiring-Schritt vermerkt:** Blazors eigene
+  Boot-Sequenz löst ihre Basisadresse immer aus `document.baseURI` des
+  hostenden Dokuments auf — wird die Engine später direkt ins Dokument
+  der Haupt-App injiziert (statt in ein eigenes `/csharp-engine/`-Dokument
+  wie beim heutigen Test), bräuchte sie denselben Fix erneut. Eine
+  Iframe-Einbettung würde das für lau lösen (eigenes Dokument, eigene
+  `baseURI`) und ist isolationstechnisch inzwischen unproblematisch, da
+  ein same-origin-iframe `crossOriginIsolated` von einem bereits
+  isolierten Elterndokument erbt (bestätigt durch die Positivkontrolle
+  aus dem vorletzten Durchgang) — ein Wiedersehen mit der iframe-Idee,
+  diesmal aus einem anderen, echten Grund als der ursprünglich falschen
+  COOP/COEP-Begründung.
+
+- **Ergebnis:** Committeter Code-Fix (`vite.config.ts`), keine Änderung
+  unter `src/` — Coverage dadurch unverändert (Vitest misst nur
+  `src/**/*.ts`). Tests 990 → 990 (gleich, kein Testcode geändert),
+  `typecheck`/`npm run build` grün (632,59 kB, unverändert — Plugin läuft
+  nur im Dev-Server). `knip`: unverändert 10 Funde. Keine
+  Artifact-Republikation nötig (keine dargestellte Zahl hat sich
+  bewegt).
+
+### 2026-08-10 — Stündliche Routine: Live-Bug-Hunt (sauber), kein aktionabler Schritt
+
+- **Umfang:** Baseline sauber (990/990, typecheck/build/knip grün, HEAD
+  `2998683`). SQL/Python weiterhin an der permanenten Scope-Grenze. Nach
+  fünf C#-Engine-Durchgängen in Folge (LanguagePlugin, AppContext-Wiring,
+  Hosting-Analyse ×3, Dev-Server-Middleware) laut Mandat-Priorität wieder
+  zuerst Priorität 2: ein gründlicherer Live-Playwright-Durchlauf gegen
+  den echten Dev-Server, da der letzte dedizierte Bug-Hunt mehrere
+  Durchgänge zurückliegt (die zwischenzeitlichen C#-Firings enthielten
+  zwar kleinere SQL/Python-Stichproben als Nebenprodukt ihrer eigenen
+  Verifikation, aber keinen vollständigen Durchlauf).
+
+- **Live-Bug-Hunt-Ergebnis:** Dev-Server per Playwright gefahren (CDN-
+  Workaround aus dem Runbook: `context.route()` liefert lokal
+  installiertes `sql.js`/`pyodide` aus; `crossOriginIsolated=true` dank
+  der seit letztem Durchgang aktiven COOP/COEP-Middleware weiterhin
+  bestätigt). Breitere Stichprobe als in den letzten Durchgängen — jede
+  4. Challenge statt jede 6./8.: 20 von 78 SQL- und 17 von 67
+  Python-Challenges, jeweils Tutorial-Text geprüft, Lösung über "In den
+  Editor übernehmen" eingefügt, ausgeführt, `✓ Aufgabe erfüllt`
+  bestätigt — 37/37 bestanden. Zusätzlich zwei frische, in keinem der
+  letzten Durchgänge geprüfte echte Distraktoren manuell eingefügt und
+  ausgeführt (SQL 25 UPSERT: `menge = excluded.menge` statt `menge =
+  menge + excluded.menge`; Python 20 dynamische Typisierung: neue
+  Variable `wert2` statt Wiederverwendung von `wert`) — beide korrekt
+  abgelehnt. Mobile-Viewport (375×667) ohne horizontalen Overflow. 0
+  Konsolenfehler. Keine neuen Funde.
+
+- **Ergebnis:** Keine Code-/Content-Änderung in diesem Durchgang — Tests,
+  Coverage und Build-Größe unverändert (990/990, 92,31 % / 73,15 % /
+  99,14 % / 92,31 %, 632,59 kB). Kein neuer Commit, keine
+  Artifact-Republikation nötig.
+
+### 2026-08-10 — Stündliche Routine: C#-Wiring-Frage empirisch geklärt — iframe endgültig bestätigt als nötig
+
+- **Umfang:** Baseline sauber (990/990, typecheck/build/knip grün, HEAD
+  `008d856`). SQL/Python weiterhin an der permanenten Scope-Grenze,
+  letzter Bug-Hunt gerade erst sauber durchgelaufen. Der letzte
+  C#-Durchgang hatte eine offene Unsicherheit hinterlassen: hängt Blazors
+  eigener Core-Loader (`_framework/dotnet.js`) beim Booten vom
+  `<base href>` des hostenden Dokuments ab, oder vom Skript-eigenen
+  Ladeort? Davon hängt ab, ob die spätere Wiring-Arbeit einen einfachen
+  JS-Setter braucht oder eine echte iframe-Umstellung.
+
+- **Test:** Wegwerf-Server im Scratchpad (kein Repo-Code geändert) —
+  Publish-Output unter `/v2/` ausgeliefert, Seiten-eigenes
+  `<base href>` bewusst auf `/` belassen (derselbe Mismatch, den die
+  Haupt-App hätte, die aktuell gar kein `<base>`-Tag besitzt), mit einem
+  korrekt absoluten `<script src="/v2/_framework/blazor.webassembly.js">`
+  — exakt wie `loadCSharpEngineFromServer` es bereits macht. Ergebnis:
+  das Skript selbst lädt einwandfrei, aber Blazors eigener Bootstrapper
+  versucht danach `_framework/dotnet.js` gegen `<base href>` aufzulösen
+  (`http://.../​_framework/dotnet.js` statt `http://.../v2/_framework/dotnet.js`)
+  — 404, `Failed to start platform`. Das passiert innerhalb von Blazors
+  eigenem Kern-Loader, bevor überhaupt eigener C#-Code läuft — kein
+  JS-seitiger Override von `CSharpEngine.BaseAddress` könnte das beheben.
+
+- **Konsequenz:** Direktes Einbetten in das Haupt-Dokument der App
+  funktioniert nicht, solange dessen `<base href>` nicht auf
+  `/csharp-engine/` zeigt (aktuell gar kein `<base>`-Tag vorhanden).
+  Dynamisches Umschreiben des Haupt-`<base href>` wurde verworfen (zu
+  riskanter globaler Seiteneffekt auf jede relative URL-Auflösung in der
+  SPA). Eine iframe-Einbettung (eigenes Dokument, eigene korrekte
+  `baseURI`, erbt Isolation vom bereits isolierten Elterndokument) ist
+  damit die einzig tragfähige Option — die Unsicherheit, die diese
+  Entscheidung bisher zurückgestellt hatte, ist jetzt aufgelöst. Der
+  nächste C#-Wiring-Schritt kann direkt mit iframe + `postMessage` als
+  Transport geplant werden, ohne weitere Design-Fragen.
+
+- **Ergebnis:** Reine Analyse (`docs/csharp-engine-poc.md`), kein Code im
+  Repo geändert — der Testaufbau lief komplett im Scratchpad.
+  Tests/Coverage/Build-Größe unverändert (990/990, 92,31 % / 73,15 % /
+  99,14 % / 92,31 %, 632,59 kB). Keine Artifact-Republikation nötig.
+
+### 2026-08-10 — Stündliche Routine: C#-Engine — iframe+postMessage-Transport implementiert und live verifiziert
+
+- **Umfang:** Baseline sauber (990/990, typecheck/build/knip grün, HEAD
+  `3f4242e`). SQL/Python weiterhin an der permanenten Scope-Grenze. Der
+  letzte Durchgang hatte die verbleibende Design-Unsicherheit für die
+  C#-Engine vollständig aufgelöst (iframe statt direktem Script-Inject
+  nötig, empirisch bestätigt) — kein offener Punkt mehr im Weg, klarer
+  nächster Schritt: die eigentliche Umsetzung.
+
+- **Implementiert:** `src/runtime/csharp/csharpEngine.ts`s
+  `loadCSharpEngineFromServer` injiziert nicht mehr direkt ein
+  `<script>`-Tag ins aktuelle Dokument, sondern erstellt ein verstecktes
+  `<iframe src="${baseUrl}host.html">` und wartet auf eine
+  `csharp-host-ready`-`postMessage`. Neue Datei
+  `csharp-engine/wwwroot/host.html` — eigenständiges Hosting-Dokument,
+  bootet Blazor selbst (bewusst ohne `<base>`-Tag, damit
+  `document.baseURI` automatisch zum tatsächlichen Serving-Pfad passt),
+  hört danach auf `{ type: 'csharp-run', id, code }`-Nachrichten und
+  antwortet mit `{ type: 'csharp-result', id, json }` (oder `error`) —
+  per `id` zugeordnet, damit gleichzeitige Anfragen sich nicht
+  überschneiden können. `CSharpRuntime`/`CSharpExecResult` (die
+  öffentliche Form, von der `EngineFactory.ensureCSharpEngine` bereits
+  abhängt) mussten sich nicht ändern — nur der Transport darunter, das
+  AppContext-Wiring vom vorletzten Durchgang bleibt unverändert
+  funktionsfähig.
+
+- **Tests komplett neu geschrieben** (`csharpEngine.test.ts`, 12 statt 7):
+  iframe-Erstellung/-Attribute, Nachrichten-Roundtrip per Request-`id`
+  zugeordnet, Origin-/Source-Mismatch-Nachrichten ignoriert,
+  Boot-Fehler- und iframe-Ladefehler-Ablehnung mit denselben
+  deutschsprachigen Meldungen wie zuvor, Retry nach Fehlschlag erzeugt
+  ein neues iframe, gleichzeitige Aufrufer teilen sich ein
+  In-Flight-iframe, ein aufgelöster Engine liefert bei erneutem Aufruf
+  dieselben Exports ohne zweites iframe.
+
+- **Live-end-to-end verifiziert, nicht nur unit-getestet:** `csharp-engine`
+  frisch gepublished (`host.html` bestätigt im Publish-Output), über die
+  Dev-Server-Middleware ausgeliefert, das exakte iframe+postMessage-
+  Protokoll per Playwright aus dem **echten Haupt-Dokument** heraus
+  angesteuert (`http://localhost:5173/`, kein `<base>`-Tag — genau das
+  Szenario, das für direkten Script-Inject nachweislich kaputt war). Alle
+  drei Fälle erfolgreich: echter Compile+Run (`x = 4`), echter
+  Compilerfehler (`CS0029`) bei ungültigem Code, echte Laufzeit-Exception
+  mit vollständigem .NET-Stacktrace (`IndexOutOfRangeException` über
+  `TargetInvocationException`). SQL zeigte danach weiterhin alle 78
+  Challenges — das iframe hat keine Nebenwirkung auf den Rest der App.
+
+- **Bewusst nicht getan:** Noch keine echte Aufrufstelle
+  (`ensureCSharpEngine` wird nirgends aufgerufen) und der Registry-Eintrag
+  bleibt zurückgehalten — dieser Durchgang schließt die Transport-Frage
+  vollständig ab, das eigentliche UI-Wiring bleibt der nächste Schritt.
+
+- **Ergebnis:** Tests 990 → 993 (netto +3: 12 neue iframe-Transport-Tests
+  ersetzen 7 alte Script-Inject-Tests). `typecheck`, `npm run build` grün
+  (632,59 kB, unverändert). `knip`: unverändert 10 Funde. Coverage:
+  92,33 % / 73,16 % / 99,14 % / 92,33 %.
+
+### 2026-08-10 — Stündliche Routine: C#-Editor-UI — Ergebnis-Rendering + LanguagePlugin-Routing
+
+- **Umfang:** Baseline sauber (993/993, typecheck/build/knip grün, HEAD
+  `26c39e9`). SQL/Python weiterhin an der permanenten Scope-Grenze. Der
+  letzte Durchgang hatte die Transport-Frage vollständig geschlossen und
+  "das eigentliche UI-Wiring" als nächsten Schritt benannt — beim Prüfen,
+  was dafür nötig wäre, einen echten architektonischen Fund gemacht: die
+  bestehende `runQuery`-Funktion in `actions.ts` ist **synchron** (SQL/
+  Python laufen ohne `await`, sobald die Engine geladen ist), aber C#s
+  `executeAndValidate` ist **async** (`engine.exec()` wartet immer auf
+  einen echten Roslyn-Compile+Run). C# vollständig in `runQuery`
+  einzubauen bräuchte eine echte Umstellung auf einen awaited Rückgabewert
+  — betrifft jeden Aufrufer von `runQuery`, zu groß für dieses Increment,
+  hier nur dokumentiert statt unter Zeitdruck versucht.
+
+- **Stattdessen gebaut, sauber von dieser offenen Frage entkoppelt:**
+  (1) `src/ui/views/tabs/editorTab/csharpResultsArea.ts` —
+  `renderCSharpRunOutcome`/`renderCSharpLoadingOutcome`, C#s Pendant zu
+  `pythonResultsArea.ts`, nimmt direkt ein
+  `CSharpExecuteAndValidateOutcome` (noch nicht über `RunOutcome`
+  geroutet, da diese Union noch nicht erweitert ist) und rendert Status/
+  stdout — keine Variablentabelle, da Schritt 4s `validate()`-Entscheidung
+  bereits festgelegt hat, dass C#-Lokale nach `Main` nicht reflektierbar
+  sind. 9 neue Tests, gleiche Abdeckung wie
+  `pythonResultsArea.test.ts` (Fehler/Erfolg/Warnung, leeres-stdout-
+  Empty-State, HTML-Escaping). (2) `editorTab.ts`s `pluginForTrack` und
+  `placeholderFor` behandeln jetzt `'csharp'` (routet zu
+  `csharpLanguagePlugin`, `//`-Kommentar-Platzhalter) — beide Zweige
+  unerreichbar, bis der Registry-Eintrag kommt, genau wie
+  `EngineFactory.ensureCSharpEngine` es zwei Durchgänge lang war, bevor
+  seine Aufrufstelle existierte.
+
+- **Ergebnis:** Tests 993 → 1002 (+9, komplett aus
+  `csharpResultsArea.test.ts`). `typecheck` grün. `npm run build`
+  erfolgreich, Größe 632,59 kB → 635,90 kB (232 → 239 Module) —
+  `csharpLanguagePlugin.ts` und seine Abhängigkeiten (Tokenizer,
+  Highlighter, Auto-Indent, Keyword-Tabellen) sind jetzt vom
+  Produktions-Einstiegspunkt über `editorTab.ts`s Import erreichbar,
+  nicht mehr nur von ihrer eigenen Testdatei — deshalb erstmals gebündelt,
+  obwohl zur Laufzeit weiterhin unerreichbar. `knip`: unverändert 10
+  Funde. Coverage: 92,35 % / 73,18 % / 99,15 % / 92,35 %.
+
+### 2026-08-11 — Stündliche Routine: C# Challenge 20 (B14 Teil 1: Delegates, Lambda-Ausdrücke, Func<>)
+
+- **Umfang:** Baseline sauber (1002/1002, typecheck/build/knip grün, HEAD
+  `cb7835b`). SQL/Python weiterhin an der permanenten Scope-Grenze
+  (81/82 je Track, nur die bekannten dauerhaften Ausnahmen offen) —
+  damit bleibt C# der einzige Track mit aktionablem Content-Fortschritt.
+  Letzter offener Zweig laut `docs/csharp-concept-hierarchy.md`: B14
+  (Delegates & Lambda-Ausdrücke, 4 Tags:
+  `delegate-type`/`lambda-expressions`/`func-action-types`/`events`).
+
+- **Neue Challenge 20** deckt drei der vier B14-Tags ab: ein eigener
+  Delegate-Typ `delegate int RechenOperation(int a, int b);`, dem eine
+  benannte Methode (Methodenreferenz ohne Aufruf-Klammern), ein direkt
+  zugewiesener Lambda-Ausdruck und zusätzlich der eingebaute generische
+  Delegate-Typ `Func<int, int, int>` mit einem dritten Lambda
+  zugewiesen werden — dieselbe Zuweisungssyntax für alle drei Varianten,
+  um den gemeinsamen Kern ("Methode als Wert") sichtbar zu machen.
+  `events` bleibt bewusst offen: ein Publisher/Subscriber-Aufbau mit dem
+  `event`-Schlüsselwort verdient ein eigenständigeres Szenario als ein
+  Anhängsel an diese Challenge.
+
+- **Echter Bug im ersten Entwurf gefunden, nicht nur ein Stilproblem:**
+  die erste Fassung deklarierte den `delegate`-Typ ganz am Dateianfang
+  (wie in jeder Tutorial-Erklärung intuitiv) — der echte `dotnet`-Treiber
+  lehnte das mit `CS8803: Top-level statements must precede namespace
+  and type declarations` ab. Ein `delegate` ist genau wie `class` eine
+  Typ-Deklaration; in C#s Top-Level-Programmen müssen **alle**
+  Anweisungen vor **allen** Typ-Deklarationen stehen, nicht nur vor der
+  jeweils jüngsten. Challenge 19 hatte dasselbe Muster schon für die
+  dortige `class`-Deklaration richtig gemacht (ganz am Ende), diese
+  Challenge hatte es beim `delegate` zunächst übersehen. Fix: Lösung,
+  alle drei Distraktoren und der dritte Hinweis verschieben die
+  `delegate`-Zeile ans Dateiende, nach der lokalen Methode `Addieren`;
+  Hinweis 2 erklärt jetzt explizit die Anweisungen-vor-Typen-Regel samt
+  `CS8803`-Fehlercode. Erst nach diesem Fix bestand die eigene Lösung
+  Gate 1.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** `Addieren` zu `void` statt `int` gemacht — die Signatur
+  passt nicht mehr zu `RechenOperation`, der Compiler lehnt die
+  Zuweisung ab (`CS0407`); im Lambda für `operation2` `a + b` statt
+  `a * b` verwendet — kompiliert fehlerfrei, liefert aber
+  "Multiplizieren: 7" statt "Multiplizieren: 12"; die Argumente beim
+  Aufruf von `operation3` vertauscht — kompiliert fehlerfrei, liefert
+  aber "Subtrahieren: -6" statt "Subtrahieren: 6" bei einer Subtraktion.
+
+- **Ergebnis:** Tests 1002 → 1006 (+4: Gate 1 eigene Lösung + Gate 2 drei
+  Distraktoren für Challenge 20, alle gegen den echten `dotnet`-Treiber).
+  `typecheck` grün. `npm run build` erfolgreich, unverändert 635,90 kB
+  (reine Content-Datei, kein neuer Code-Pfad). `knip`: unverändert 10
+  Funde. Coverage: 92,38 % / 73,17 % / 99,15 % / 92,38 %.
+  `docs/csharp-concept-hierarchy.md`: Tag-Bilanz 74/86 → 77/86 (≈ 90 %),
+  B14 zu 3 von 4 Tags abgedeckt (`events` offen).
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt (sauber), kein aktionabler Schritt
+
+- **Umfang:** Baseline sauber (1006/1006, typecheck/build grün, HEAD
+  `747a512`). SQL/Python weiterhin an der permanenten Scope-Grenze,
+  letzter dedizierter Live-Bug-Hunt lag drei Durchgänge zurück (vor der
+  iframe-Transport-/Editor-UI-/Challenge-20-Arbeit) — laut Mandat-
+  Priorität diesmal Priorität 2 statt eines weiteren C#-Increments.
+
+- **Vorgehen:** Dev-Server gestartet, sql.js/Pyodide lokal per
+  `context.route()` statt der in dieser Sandbox blockierten CDN-Domains
+  serviert (Standard-Runbook). Drei Playwright-Durchläufe: Desktop
+  (1400×1000), Mobile (375×667, iPhone-SE-Breite, Standing-Requirement
+  seit 2026-08-09), Python-Track. Geprüft: horizontales Overflow, echte
+  `.click()`-Versuche (nicht nur `isVisible()`) auf Tabs/Run-Button nach
+  Interaktion, Sidebar-Drawer-Verhalten nach Auswahl auf Mobile,
+  Konsolenfehler/`pageerror`, ein vollständiger End-to-End-Run-Zyklus
+  (echte Musterlösung aus Challenge 01 in den Editor eingefügt, Run
+  geklickt, `.status-ok` bestätigt).
+
+- **Zwei scheinbare Befunde aus dem ersten automatisierten Durchlauf
+  entpuppten sich beim Nachprüfen als Fehler im eigenen Testskript, nicht
+  im Produkt** — festgehalten, weil das Muster lehrreich ist: (1) ein
+  `.click()` auf `.challenge-item[data-num="3"]` schlug fehl, weil
+  `data-num` tatsächlich nullgepolstert ist (`"03"`) — mit der korrekten
+  Selektor-Form lief die gesamte Mobile-Sidebar-Sequenz (Drawer offen bei
+  Erstladung → nach Auswahl korrekt auf `collapsed` mit 52px Breite,
+  Editor-Tab danach klickbar) genau wie erwartet durch, kein
+  F-020-Rückfall. (2) `task tab visible: false` und `run nach Lösung-
+  Klick: status-ok false` lagen an geratenen Selektoren
+  (`.task-tab`/`[data-tab-panel="task"]` statt des echten
+  `#tabpanel-task`) bzw. einer falschen Annahme (der Button
+  „Lösung anzeigen" zeigt die Musterlösung nur zum Vergleich an, füllt
+  sie aber bewusst nicht automatisch in den Editor — kein Bug, korrektes
+  Verhalten, das ein automatisches Bestehen ohne eigenes Tippen
+  verhindern soll). Mit den korrigierten Selektoren: Task-Tab-Panel
+  sichtbar, Lösungs-Panel zeigt Text (771 Zeichen), Editor-Textarea mit
+  korrektem Platzhalter vorbefüllt, echter End-to-End-Lauf mit der
+  richtigen Musterlösung liefert `status-ok`.
+
+- **Ergebnis:** Keine echten Bugs gefunden. Keine Code-Änderung nötig,
+  kein Commit. Tests/typecheck/build unverändert bei 1006/1006 grün.
+  Nächster offener Schritt bleibt entweder ein weiterer C#-Content-
+  Schritt (`events`, B14, oder B15/LINQ) oder der nächste Live-Bug-Hunt
+  in ein paar Durchgängen.
+
+### 2026-08-11 — Stündliche Routine: C# Challenge 21 (B14 vollständig: Events)
+
+- **Umfang:** Baseline sauber (1006/1006, typecheck/build/knip grün, HEAD
+  `25e90fa`). SQL/Python weiterhin an der permanenten Scope-Grenze.
+  Letzter Durchgang war ein sauberer Live-Bug-Hunt ohne Codeänderung —
+  laut Mandat-Priorität diesmal wieder C#, da mit `events` ein klar
+  begrenzter, dokumentierter nächster Schritt anstand (letzter offener
+  B14-Tag).
+
+- **Neue Challenge 21** deckt `events` ab — den letzten Tag aus B14.
+  Szenario: eine Klasse `Kontostand` mit
+  `public event Action<int>? SaldoNiedrig;` (bewusst der eingebaute
+  `Action<int>`-Typ statt eines eigenen `delegate`, direkte Fortsetzung
+  von Challenge 20s `func-action-types`). `Abheben(int betrag)` löst
+  das Event per `SaldoNiedrig?.Invoke(saldo);` aus, sobald der Saldo
+  unter 50 fällt; von außen meldet sich der Aufrufer per `+=` mit einem
+  Lambda an. Zwei Abhebungen (100 → 70 → 40) zeigen sowohl den
+  Nicht-Auslöse- als auch den Auslöse-Fall in der Ausgabe.
+
+- **Drei Distraktoren, alle beim ersten Durchlauf korrekt gegen den
+  echten `dotnet`-Treiber verifiziert — kein Nacharbeiten nötig, anders
+  als bei Challenge 20s CS8803-Fund:** ein Versuch, das Event direkt
+  von außen aufzurufen (`konto.SaldoNiedrig(letzterSaldo);` statt nur
+  `+=`/`-=`) — der Compiler lehnt das mit `CS0070` ab, genau die
+  Zugriffsbeschränkung, die `event` gegenüber einem gewöhnlichen
+  öffentlichen Delegate-Feld durchsetzt und damit den Kernpunkt des
+  Tags empirisch demonstriert; das `event`-Schlüsselwort weggelassen
+  (nur `public Action<int>? SaldoNiedrig;`) und zusätzlich direkt von
+  außen aufgerufen — kompiliert jetzt anstandslos und löst die Warnung
+  schon vor der ersten Abhebung fälschlich aus, zeigt empirisch, was
+  ohne `event` an Kapselung verloren geht; die Auslöse-Schwelle von
+  `saldo < 50` auf `saldo < 40` geändert — nach der zweiten Abhebung
+  steht der Saldo exakt bei 40, `40 < 40` ist falsch, das Event feuert
+  nie (Off-by-one in der Fachlogik).
+
+- **Ergebnis:** Tests 1006 → 1010 (+4: Gate 1 eigene Lösung + Gate 2
+  drei Distraktoren für Challenge 21). `typecheck` grün. `npm run build`
+  erfolgreich, unverändert 635,90 kB (reine Content-Datei). `knip`:
+  unverändert 10 Funde. Coverage: 92,41 % / 73,17 % / 99,15 % / 92,41 %.
+  `docs/csharp-concept-hierarchy.md`: Tag-Bilanz 77/86 → 78/86 (≈ 91 %),
+  **B14 (Delegates & Lambda-Ausdrücke) damit vollständig abgedeckt** —
+  B0 bis B14 sind jetzt komplett. Nächster offener Zweig: B15 (LINQ).
+
+### 2026-08-11 — Stündliche Routine: C# Challenge 22 (B15 Teil 1: LINQ Where/Select)
+
+- **Umfang:** Baseline sauber (1010/1010, typecheck/build/knip grün, HEAD
+  `ee8e808`). SQL/Python weiterhin an der permanenten Scope-Grenze. Dies
+  ist der dritte C#-Content-Durchgang in Folge — bewusst gewählt, weil
+  B15s Basis-Tag `linq-method-syntax` ein klar begrenzter nächster
+  Schritt war (einzelner Tag, wohldefiniertes Szenario), nicht weil ein
+  Bug-Hunt fällig gewesen wäre; der letzte Live-Bug-Hunt liegt erst zwei
+  Durchgänge zurück und kam sauber zurück.
+
+- **Neue Challenge 22** deckt `linq-method-syntax` ab — den ersten von
+  fünf B15-Tags. Szenario: `List<int> zahlen = { 3, 8, 15, 22, 4, 30,
+  11 }`, gefiltert mit `.Where(z => z % 2 == 0).ToList()` (nur die
+  geraden Zahlen: 8, 22, 4, 30), transformiert mit
+  `.Select(z => z * 2).ToList()` (verdoppelt: 16, 44, 8, 60) — beide
+  LINQ-Grundoperationen aus der Tag-Definition in einer Verkettung.
+
+- **Drei Distraktoren, alle beim ersten Durchlauf empirisch gegen den
+  echten `dotnet`-Treiber verifiziert — diesmal ausschließlich
+  Logikfehler statt Compilerfehler, weil LINQ-Verkettungen selten falsch
+  kompilieren, sondern typischerweise falsch rechnen:** die
+  Filter-Bedingung umgekehrt (`z % 2 != 0` statt `== 0`) liefert die
+  verdoppelten ungeraden statt der geraden Zahlen; die Transformation
+  geändert (`z + 2` statt `z * 2`) liefert falsche Summanden statt
+  Verdopplung; am lehrreichsten der dritte — `.Select().Where()` statt
+  `.Where().Select()` vertauscht. Da jede verdoppelte Zahl automatisch
+  gerade ist, lässt der Filter danach *alle* 7 Elemente durch statt nur
+  der 4 ursprünglich geraden — ein empirischer Beleg, dass die
+  Verkettungsreihenfolge bei LINQ das Ergebnis tatsächlich verändert.
+
+- **Ergebnis:** Tests 1010 → 1014 (+4: Gate 1 eigene Lösung + Gate 2
+  drei Distraktoren für Challenge 22). `typecheck` grün. `npm run build`
+  erfolgreich, unverändert 635,90 kB (reine Content-Datei). `knip`:
+  unverändert 10 Funde. Coverage: 92,44 % / 73,17 % / 99,15 % / 92,44 %.
+  `docs/csharp-concept-hierarchy.md`: Tag-Bilanz 78/86 → 79/86 (≈ 92 %),
+  B15 zu 1 von 5 Tags abgedeckt (`linq-query-syntax`,
+  `linq-ordering-grouping`, `linq-aggregation`,
+  `linq-deferred-execution` offen). B0 bis B14 bleiben komplett.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt (sauber), kein aktionabler Schritt
+
+- **Umfang:** Baseline sauber (1014/1014, typecheck/build grün, HEAD
+  `28caf4b`). Drei Durchgänge in Folge hatten C#-Content gebaut
+  (Challenges 20–22) — laut Mandat-Priorität diesmal bewusst Priorität 2
+  statt eines weiteren C#-Increments, um die Balance zu halten.
+
+- **Vorgehen:** Dev-Server gestartet, sql.js/Pyodide lokal per
+  `context.route()` statt der blockierten CDN-Domains serviert. Gezielt
+  Bereiche mit niedrigerer Branch-Coverage aus dem letzten
+  Coverage-Report geprüft (`chatTab.ts` 93,9 %, `pgAskPanel.ts` 87,0 %,
+  `themePicker.ts`/Overlay-Logik, `courseSelectPicker`-Track-Wechsel):
+  Chat-Tab-Sichtbarkeit und Senden-Button; PgAsk-Panel — erst
+  `.pg-ask-toggle-btn` öffnet `.ask-panel` (per CSS `display: none` bis
+  `.open`), danach ein leerer Frage-Submit als No-op-Pfad
+  (`question.trim()`-Guard); Track-Wechsel SQL → Python → SQL ohne
+  Restzustand in der Challenge-Liste; Theme-Picker-Overlay öffnet sich
+  per echtem `.click()` und markiert exakt eine Theme-Option als
+  `selected` (Regressionscheck für den alten Theme-Picker-Bug, siehe
+  F-007).
+
+- **Ein scheinbarer Befund aus dem ersten Skript-Entwurf entpuppte sich
+  beim Nachprüfen wieder als eigener Testskript-Fehler, nicht als
+  Produktbug:** ein direkter `.click()` auf `.pg-ask-submit-btn` ohne
+  vorherigen Klick auf `.pg-ask-toggle-btn` schlug mit "element is not
+  visible" fehl — das Submit-Feld sitzt bewusst hinter `.ask-panel`,
+  das laut `themes.css` erst nach dem Toggle-Klick sichtbar wird
+  (`display: none` → `.open { display: block }`). Mit dem korrigierten
+  Skript (erst Toggle, dann Submit) lief die gesamte Sequenz wie
+  erwartet durch.
+
+- **Ergebnis:** Keine echten Bugs gefunden. Keine Code-Änderung nötig.
+  Tests/typecheck/build unverändert bei 1014/1014 grün. Nächster
+  offener Schritt: weiterer C#-Content (`linq-query-syntax` o. Ä., B15)
+  oder der nächste Live-Bug-Hunt in ein paar Durchgängen.
+
+### 2026-08-11 — Stündliche Routine: C# Challenge 23 (B15 Teil 2: LINQ Aggregation)
+
+- **Umfang:** Baseline sauber (1014/1014, typecheck/build/knip grün, HEAD
+  `26c30a2`). SQL/Python weiterhin an der permanenten Scope-Grenze. Der
+  letzte Durchgang war ein sauberer Live-Bug-Hunt — laut Mandat-Priorität
+  diesmal wieder C#, da B15s zweiter Tag (`linq-aggregation`) ein klar
+  begrenzter nächster Schritt war, direkte Fortsetzung von Challenge 22s
+  `linq-method-syntax`.
+
+- **Neue Challenge 23** deckt `linq-aggregation` ab — den zweiten von
+  fünf B15-Tags. Szenario: `List<int> punkte = { 80, 90, 70, 60, 100 };`,
+  zusammengefasst über alle fünf Aggregations-Methoden aus der
+  Tag-Definition: `.Sum()` (400), `.Count()` (5), `.Average()` (400 als
+  `double`, bewusst exakt 80 gewählt, um .NETs Fließkomma-
+  Rundungsdarstellung aus der erwarteten Ausgabe herauszuhalten),
+  `.Max()` (100), `.Min()` (60).
+
+- **Drei Distraktoren, alle beim ersten Durchlauf empirisch gegen den
+  echten `dotnet`-Treiber verifiziert:** `Max()` und `Min()` bei der
+  Zuweisung vertauscht — liefert "Maximum: 60" und "Minimum: 100" statt
+  umgekehrt (Logikfehler, kompiliert fehlerfrei); `.Length` statt
+  `.Count()` verwendet — `List<T>` hat anders als Arrays keine
+  `.Length`-Eigenschaft, echter Compilerfehler `CS1061`; und ein Element
+  beim Anlegen der Liste vergessen (nur vier statt fünf Zahlen) —
+  verändert vier der fünf Ausgabezeilen, nur `Minimum` bleibt zufällig
+  korrekt, ein realistischer Abschreibfehler statt einer API-
+  Verwechslung.
+
+- **Ergebnis:** Tests 1014 → 1018 (+4: Gate 1 eigene Lösung + Gate 2
+  drei Distraktoren für Challenge 23). `typecheck` grün. `npm run build`
+  erfolgreich, unverändert 635,90 kB (reine Content-Datei). `knip`:
+  unverändert 10 Funde. Coverage: 92,47 % / 73,14 % / 99,15 % / 92,47 %.
+  `docs/csharp-concept-hierarchy.md`: Tag-Bilanz 79/86 → 80/86 (≈ 93 %),
+  B15 zu 2 von 5 Tags abgedeckt (`linq-query-syntax`,
+  `linq-ordering-grouping`, `linq-deferred-execution` offen). B0 bis B14
+  bleiben komplett.
+
+### 2026-08-11 — Stündliche Routine: C# Challenge 24 (B15 Teil 3: LINQ Query-Syntax)
+
+- **Umfang:** Baseline sauber (1018/1018, typecheck/build/knip grün, HEAD
+  `372185f`). SQL/Python weiterhin an der permanenten Scope-Grenze. Der
+  letzte Live-Bug-Hunt liegt zwei Durchgänge zurück und kam sauber
+  zurück — laut Mandat-Priorität diesmal wieder C#, da B15s dritter Tag
+  (`linq-query-syntax`) ein klar begrenzter nächster Schritt war.
+
+- **Neue Challenge 24** deckt `linq-query-syntax` ab — den dritten von
+  fünf B15-Tags. Szenario: `List<int> mengen = { 12, 5, 18, 7, 24, 9,
+  30 };`, abgefragt per Query-Syntax `from m in mengen where m > 10
+  select m * 3` statt der Method-Syntax aus Challenge 22 — dieselbe
+  Semantik, syntaktisch fast identisch mit SQLs `SELECT ... FROM ...
+  WHERE ...` (nur in umgekehrter Klausel-Reihenfolge, ohne Kommas/
+  Semikolons zwischen den Klauseln).
+
+- **Drei Distraktoren, alle beim ersten Durchlauf empirisch gegen den
+  echten `dotnet`-Treiber verifiziert, diesmal ohne Compilerfehler —
+  Query-Syntax-Fehler sind fast immer Logikfehler:** die `where`-
+  Bedingung umgekehrt (`m < 10` statt `m > 10`) liefert die
+  verdreifachten kleinen statt der großen Mengen; der `select`-
+  Multiplikator geändert (`m * 2` statt `m * 3`) verdoppelt statt zu
+  verdreifachen; am lehrreichsten die komplett weggelassene `where`-
+  Klausel — sie ist in der Query-Syntax **optional**, `from ... select
+  ...` ohne Filter ist gültiges C# und wählt einfach alle sieben
+  Elemente statt nur der vier über 10 aus, ein empirischer Beleg dafür,
+  dass „syntaktisch gültig" und „semantisch richtig" zwei verschiedene
+  Dinge sind.
+
+- **Ergebnis:** Tests 1018 → 1022 (+4: Gate 1 eigene Lösung + Gate 2
+  drei Distraktoren für Challenge 24). `typecheck` grün. `npm run build`
+  erfolgreich, unverändert 635,90 kB (reine Content-Datei). `knip`:
+  unverändert 10 Funde. Coverage: 92,50 % / 73,14 % / 99,15 % / 92,50 %.
+  `docs/csharp-concept-hierarchy.md`: Tag-Bilanz 80/86 → 81/86 (≈ 94 %),
+  B15 zu 3 von 5 Tags abgedeckt (`linq-ordering-grouping`,
+  `linq-deferred-execution` offen). B0 bis B14 bleiben komplett.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt (sauber), kein aktionabler Schritt
+
+- **Umfang:** Baseline sauber (1022/1022, typecheck/build/knip grün, HEAD
+  `59b9044`). Drei Durchgänge in Folge hatten C#-Content gebaut
+  (Challenges 22–24) — laut Mandat-Priorität diesmal wieder Priorität 2
+  statt eines weiteren C#-Increments.
+
+- **Vorgehen:** Dev-Server gestartet, sql.js/Pyodide lokal per
+  `context.route()` statt der blockierten CDN-Domains serviert. Diesmal
+  gezielt Bereiche geprüft, die in früheren Durchgängen noch nicht
+  live abgedeckt waren: `compareView.ts` — "Mit Musterlösung
+  vergleichen" per echtem `.click()`, beide Spalten (eigener Code,
+  Musterlösung) zeigen tatsächlichen Inhalt; `hintsSection.ts` — ein
+  Tipp per echtem `.click()` angefordert, Tipptext erscheint korrekt;
+  Tastatur-Bedienbarkeit der Challenge-Liste — ein echtes `Enter`-
+  `KeyboardEvent` auf einem fokussierten `.challenge-item` wählt die
+  Challenge aus (Regressionscheck für die frühe Tastatur-Arbeit); ein
+  echter End-to-End-Lauf mit der tatsächlichen Musterlösung von Python
+  Challenge 01 (`print(...)`-Doppelzeile) über den echten Pyodide-Motor.
+  Alle vier Prüfungen liefen wie erwartet durch.
+
+- **Eine CONSOLE-ERROR-Meldung aufgetreten, aber kein Produktbug:**
+  `net::ERR_CERT_AUTHORITY_INVALID` beim Tipp-Anfordern. Nachverfolgt
+  auf den Netzwerk-Request dahinter: ein Aufruf an
+  `api.anthropic.com/v1/messages` — das ist `revealHint`s zusätzlicher
+  Claude-Chat-Elaborations-Call (siehe Kommentar in `hintsSection.ts`),
+  vom Sandbox-Netzwerk blockiert, dieselbe Kategorie wie die bereits
+  dokumentierte CDN-Sperre. Der eigentliche Tipptext wird davon
+  unabhängig sofort und korrekt angezeigt (bestätigt) — die App
+  degradiert hier bereits sauber, kein Fix nötig.
+
+- **Eigener Bedienfehler während des Durchgangs, kein Produktbug:**
+  ein `pkill -f "vite"` zum Beenden des Dev-Servers traf per
+  Substring-Match auch den parallel laufenden `vitest`-Hintergrundlauf
+  (der Prozessname enthält ebenfalls "vite") und brach ihn mitten im
+  Lauf ab. Erkannt am unerwarteten Exit-Code, sauber durch einen
+  zweiten vollständigen Testlauf behoben — für künftige Durchgänge
+  festgehalten: `pkill -f "vite"` ist zu unspezifisch, wenn parallel
+  ein `vitest`-Lauf aktiv sein könnte.
+
+- **Ergebnis:** Keine echten Bugs gefunden. Keine Code-Änderung nötig.
+  Tests/typecheck/build unverändert bei 1022/1022 grün. Nächster
+  offener Schritt: weiterer C#-Content (B15-Rest oder B16) oder der
+  nächste Live-Bug-Hunt in ein paar Durchgängen.
+
+### 2026-08-11 — Stündliche Routine: C# Challenge 25 (B15 Teil 4: LINQ Ordering/Grouping)
+
+- **Umfang:** Baseline sauber (1022/1022, typecheck/build/knip grün, HEAD
+  `132621d`). SQL/Python weiterhin an der permanenten Scope-Grenze. Der
+  letzte Durchgang war ein sauberer Live-Bug-Hunt — laut Mandat-
+  Priorität diesmal wieder C#, da B15s vierter Tag
+  (`linq-ordering-grouping`) ein klar begrenzter nächster Schritt war.
+
+- **Neue Challenge 25** deckt `linq-ordering-grouping` ab — alle drei
+  Methoden aus der Tag-Definition (`.OrderBy()`, `.OrderByDescending()`,
+  `.GroupBy()`) in einem Durchgang. Szenario: `List<int> zahlen = { 42,
+  17, 8, 23, 4, 16 };`, sortiert aufsteigend und absteigend, gruppiert
+  per `.GroupBy(z => z % 2 == 0 ? "Gerade" : "Ungerade")`. Empirisch
+  bestätigt: die Gruppenreihenfolge folgt dem ersten Vorkommen jedes
+  Schlüssels im Quell-Enumerable — "Gerade" zuerst, weil `42` (das
+  erste Element) gerade ist.
+
+- **Drei Distraktoren, alle beim ersten Durchlauf empirisch gegen den
+  echten `dotnet`-Treiber verifiziert:** `OrderBy()`/
+  `OrderByDescending()` bei der Zuweisung vertauscht — die ersten
+  beiden Zeilen zeigen vertauschte Sortierrichtungen; die Ternär-Zweige
+  im `GroupBy()`-Schlüssel vertauscht — die letzten beiden Zeilen
+  zeigen falsche Beschriftungen, obwohl die tatsächliche Gruppierung
+  unverändert bleibt; `gruppe.Count()` statt `gruppe.Key` verwendet —
+  verwechselt Gruppengröße mit Gruppenschlüssel.
+
+- **Ergebnis:** Tests 1022 → 1026 (+4: Gate 1 eigene Lösung + Gate 2
+  drei Distraktoren für Challenge 25). `typecheck` grün. `npm run build`
+  erfolgreich, unverändert 635,90 kB (reine Content-Datei). `knip`:
+  unverändert 10 Funde. Coverage: 92,53 % / 73,13 % / 99,16 % / 92,53 %.
+  `docs/csharp-concept-hierarchy.md`: Tag-Bilanz 81/86 → 82/86 (≈ 95 %),
+  B15 zu 4 von 5 Tags abgedeckt — nur `linq-deferred-execution` bleibt
+  offen, der letzte Tag im gesamten C#-Dokument. B0 bis B14 bleiben
+  komplett.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt (sauber), kein aktionabler Schritt
+
+- **Umfang:** Baseline sauber (1026/1026, typecheck/build/knip grün, HEAD
+  `013629e`). Vier Durchgänge in Folge hatten C#-Content gebaut
+  (Challenges 22–25) — laut Mandat-Priorität diesmal wieder Priorität 2
+  statt eines weiteren C#-Increments.
+
+- **Vorgehen:** Dev-Server gestartet, sql.js lokal per `context.route()`
+  statt der blockierten CDN-Domain serviert. Diesmal gezielt Zustands-
+  übergänge geprüft, die in früheren Durchgängen noch nicht live
+  abgedeckt waren: Study-/Exam-Modus-Umschaltung inklusive des
+  gemeinsamen Exam-Tipp-Pools — nach einer Tipp-Anforderung im
+  Exam-Modus sinkt der Pool korrekt von 3 auf 2, das Label
+  aktualisiert sich sofort; Schema-Zurücksetzen-Bestätigungsfluss —
+  öffnet sich per echtem `.click()`, schließt sauber bei "Abbrechen"
+  ohne zurückzusetzen, schließt sauber bei "Ja, löschen" nach
+  tatsächlichem Zurücksetzen; ein echter End-to-End-Abschluss von SQL
+  Challenge 01 mit der tatsächlichen Musterlösung — vor dem Lösen leere
+  Sterne-Anzeige, nach erfolgreichem Lauf korrekt drei Sterne (keine
+  Tipps verwendet) und `active`-Klasse gesetzt. Alle Prüfungen liefen
+  wie erwartet durch.
+
+- **Eine CONSOLE-ERROR-Meldung aufgetreten, aber kein neuer Fund:**
+  dieselbe bereits dokumentierte `net::ERR_CERT_AUTHORITY_INVALID` von
+  `api.anthropic.com` (Claude-Chat-Elaboration beim Tipp-Anfordern,
+  vom Sandbox-Netzwerk blockiert) aus einem früheren Durchgang — kein
+  Produktbug, keine neue Untersuchung nötig.
+
+- **Lehre aus dem vorletzten Durchgang beherzigt:** der Dev-Server
+  wurde diesmal über die exakten PIDs beendet (`ps aux | grep -E
+  "vite$|npm run dev"`, gezielt `kill`), statt eines breiten
+  `pkill -f "vite"`, das beim letzten Mal versehentlich auch den
+  parallel laufenden `vitest`-Hintergrundlauf getroffen hatte. Der
+  Testlauf blieb diesmal ungestört.
+
+- **Ergebnis:** Keine echten Bugs gefunden. Keine Code-Änderung nötig.
+  Tests/typecheck/build unverändert bei 1026/1026 grün. Nächster
+  offener Schritt: letzter C#-Content-Schritt für B15
+  (`linq-deferred-execution`) oder B16, oder der nächste
+  Live-Bug-Hunt in ein paar Durchgängen.
+
+### 2026-08-11 — Stündliche Routine: C# Challenge 26 (B15 vollständig: LINQ Deferred Execution)
+
+- **Umfang:** Baseline sauber (1026/1026, typecheck/build/knip grün, HEAD
+  `ac605e1`). Der letzte Durchgang war ein sauberer Live-Bug-Hunt — laut
+  Mandat-Priorität diesmal wieder C#, da `linq-deferred-execution` der
+  letzte offene Tag in B15 (und im gesamten C#-Dokument) war, ein klar
+  begrenzter nächster Schritt.
+
+- **Neue Challenge 26** deckt `linq-deferred-execution` ab — den letzten
+  Tag von B15 (LINQ) und den letzten offenen Tag im gesamten
+  C#-Konzept-Dokument. Szenario: `List<int> zahlen = { 2, 5, 8 };`,
+  `var query = zahlen.Where(z => z > 3);` (bewusst ohne `.ToList()`),
+  danach `zahlen.Add(10);` gefolgt von einem ersten `foreach` über
+  `query`, danach zwei weitere `Add()`-Aufrufe gefolgt von einem
+  zweiten `foreach` über dieselbe `query`-Variable. Empirisch gegen den
+  echten `dotnet`-Treiber bestätigt: der erste Durchlauf zeigt 5, 8, 10
+  (Stand von `zahlen` beim ersten Iterieren), der zweite Durchlauf
+  zeigt 5, 8, 10, 20 (Stand beim zweiten Iterieren) — dieselbe
+  Query-Variable liefert bei zwei verschiedenen Iterationen zwei
+  verschiedene Ergebnisse, weil `.Where()` ohne Materialisierung nichts
+  als "Bauplan" speichert, keinen Schnappschuss.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** `.ToList()` direkt an `Where()` angehängt — erzwingt
+  sofortige Auswertung beim Erstellen der Query, macht `query` zu einer
+  festen Liste, beide `Add()`-Aufrufe danach wirken sich nicht mehr
+  aus, beide Durchläufe zeigen identisch nur 5, 8; die Filterbedingung
+  auf `z > 5` statt `z > 3` geändert — die 5 fällt aus beiden
+  Durchläufen raus; alle drei `Add()`-Aufrufe vor das erste `foreach`
+  statt zwischen die beiden Durchläufe verschoben — beide Iterationen
+  sehen denselben, bereits vollständigen Zustand von `zahlen`, beide
+  Durchläufe zeigen identisch 5, 8, 10, 20 statt unterschiedlicher
+  Ergebnisse.
+
+- **Ergebnis:** Tests 1026 → 1030 (+4: Gate 1 eigene Lösung + Gate 2
+  drei Distraktoren für Challenge 26). `typecheck` grün. `npm run build`
+  erfolgreich, unverändert 635,90 kB — der C#-Track ist noch nicht in
+  `src/content/registry.ts`'s `TRACKS` registriert, C#-Content-Dateien
+  landen also (noch) nicht im Produktions-Bundle, nur in den Tests, die
+  direkt aus dem Kurs-Modul importieren; erwartetes, dokumentiertes
+  Verhalten, kein Fund. `knip`: unverändert 10 Funde (alle vorbestehend,
+  keine neuen durch diese reine Content-Datei). Coverage: 92,56 % /
+  73,13 % / 99,16 % / 92,56 %.
+  `docs/csharp-concept-hierarchy.md`: Tag-Bilanz 82/86 → 83/86 (≈ 97 %).
+  **B15 (LINQ) damit komplett** (alle 5 Tags). B0 bis B15 sind jetzt
+  vollständig abgedeckt. Einzig verbleibender offener Zweig im gesamten
+  C#-Dokument: **B16 (Namespaces & Imports)** mit seinem einzigen Tag
+  `own-namespaces` — als nächster Schritt zu klären, ob/wie sich das
+  sinnvoll in das aktuelle Single-File-`dotnet exec`-Engine-Modell
+  einpassen lässt, oder ob es wie `updatable-view` (SQL) und
+  `own-modules` (Python) eine dauerhafte Scope-Ausnahme bleibt.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt (sauber), kein aktionabler Schritt
+
+- **Umfang:** Baseline sauber (1030/1030, typecheck/build/knip grün, HEAD
+  `254ea3d`). Der letzte Durchgang hatte C#-Content (Challenge 26)
+  abgeschlossen und B15 vollständig gemacht — laut Mandat-Priorität
+  diesmal wieder Priorität 2, zumal SQL/Python weiterhin an der
+  permanenten Scope-Grenze stehen (nur die dokumentierten
+  Ausnahmen `updatable-view`/`own-modules` offen) und der einzige
+  verbleibende C#-Schritt (B16 `own-namespaces`) noch eine offene
+  architektonische Frage ist statt eines klar begrenzten nächsten
+  Schritts.
+
+- **Vorgehen:** Dev-Server gestartet, sql.js lokal per `context.route()`
+  statt der blockierten CDN-Domain serviert. Diesmal gezielt drei
+  bisher nicht live abgedeckte Bereiche geprüft: der
+  Endlosrekursions-Schutz (`findUnboundedRecursion`) — eine echte
+  `WITH RECURSIVE`-CTE ohne `WHERE` im rekursiven Teil und ohne
+  `LIMIT` danach wurde im Editor ausgeführt; die Seite blieb reaktionsfähig
+  (kein Einfrieren), der Run-Klick kehrte in ~660ms zurück statt zu
+  hängen, und die exakte deutsche Warnmeldung
+  ("... ohne eine der beiden Abbruchbedingungen läuft die Rekursion
+  unendlich weiter ...") erschien korrekt mit `status-err`-Klasse;
+  fehlerhaftes SQL (`SELEKT * FROM nichts WO id = ;`) zeigte ebenfalls
+  korrekt eine nicht-leere Fehlermeldung mit `status-err`-Klasse; und
+  `localStorage`-Persistenz über einen echten Seiten-Reload hinweg —
+  Challenge 01 gelöst (drei Sterne), zu Challenge 02 gewechselt, dann
+  `page.reload()`: nach dem Reload zeigte Challenge 01 weiterhin
+  korrekt drei Sterne und Challenge 02 blieb als zuletzt geöffnete
+  Challenge aktiv (`active`-Klasse gesetzt) — Fortschritt und
+  Navigationszustand überleben einen echten Browser-Reload korrekt.
+
+- **Ein Fehlalarm im eigenen Testskript, kein Produktbug:** die ersten
+  beiden Prüfungen (`status-error`-Selektor) schlugen zunächst fehl,
+  weil die tatsächliche CSS-Klasse `status-err` heißt (siehe
+  `src/ui/views/tabs/editorTab/resultsArea.ts`), nicht `status-error`
+  — nach Korrektur des Selektors liefen beide Prüfungen sauber durch.
+  Derselbe wiederkehrende Fehlerklasse wie in früheren Durchgängen
+  (falsch geratene Selektoren im eigenen Skript statt echter Bugs).
+
+- **Dev-Server sauber über exakte PIDs beendet** (`ps aux | grep -E
+  "vite$|npm run dev"`, gezielt `kill`), kein breiter `pkill`.
+
+- **Ergebnis:** Keine echten Bugs gefunden. Keine Code-Änderung nötig.
+  Tests/typecheck/build unverändert bei 1030/1030 grün. Nächster
+  offener Schritt: B16 (`own-namespaces`) — klären, ob/wie es ins
+  Single-File-`dotnet exec`-Engine-Modell passt, oder ob es eine
+  dauerhafte Scope-Ausnahme bleibt — oder der nächste Live-Bug-Hunt in
+  ein paar Durchgängen.
+
+### 2026-08-11 — Stündliche Routine: C# Challenge 27 (B16 vollständig: Namespaces & Imports — C#-Dokument 100 %)
+
+- **Umfang:** Baseline sauber (1030/1030, typecheck/build/knip grün, HEAD
+  `e7c0ab0`). Der letzte Durchgang war ein sauberer Live-Bug-Hunt — laut
+  Mandat-Priorität diesmal wieder C#, um die aus dem vorletzten Durchgang
+  offen gelassene architektonische Frage zu B16 (`own-namespaces`) zu
+  klären: braucht der Tag ein Mehrdatei-Projekt-Setup, das die aktuelle
+  Single-File-`dotnet exec`-Engine nicht abbilden kann?
+
+- **Empirischer Befund, bevor Content geschrieben wurde:** Die Frage
+  ist mit Nein beantwortet. C# erlaubt mehrere `namespace`-Blöcke in
+  einer einzigen Datei — kein Mehrdatei-Setup nötig. Ein Testszenario
+  mit zwei unabhängigen `namespace`-Blöcken (`Lager`, `Versand`), die
+  je eine eigene, gleichnamige Klasse `Kiste` enthalten, wurde direkt
+  gegen `CSharpDriver.dll` (denselben Treiber, den auch die Tests
+  benutzen) kompiliert und ausgeführt — erfolgreich. Zusätzlicher Fund:
+  B16 hat nicht nur einen Tag (`own-namespaces`), sondern **drei**
+  (`namespace-declaration`, `using-directive`, `own-namespaces`) — die
+  Annahme aus dem vorletzten Durchgang war hier ungenau. Da der
+  Node-Testtreiber `System`/`System.Linq`/etc. bereits als globale
+  Usings injiziert, hatte bis dahin keine Challenge einen eigenen
+  `using`- oder `namespace`-Block gebraucht — ein einziges Szenario
+  konnte also alle drei B16-Tags gleichzeitig abdecken.
+
+- **Neue Challenge 27** deckt alle drei B16-Tags in einem Durchgang ab.
+  Szenario: `namespace Lager { class Kiste { ... } }` und
+  `namespace Versand { class Kiste { ... } }`, zwei unabhängige Typen
+  trotz gleichen Namens. `using Lager;` importiert nur `Lager`;
+  `new Kiste(5)` löst darüber zu `Lager.Kiste` auf, `new
+  Versand.Kiste(10)` braucht die vollqualifizierte Schreibweise, weil
+  `Versand` nicht importiert ist — genau die Namenskollisions-
+  Vermeidung, für die eigene Namespaces gedacht sind.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** `using Lager;` komplett weggelassen — echter
+  Compilerfehler `CS0246` ("The type or namespace name 'Kiste' could
+  not be found"); die beiden Konstruktor-Zahlenwerte vertauscht —
+  kompiliert einwandfrei, zeigt aber vertauschte Werte in beiden
+  Ausgabezeilen; der zweite Namespace-Name bei der Deklaration
+  versehentlich als `Versand2` statt `Versand` getippt — der Aufruf
+  `new Versand.Kiste(10)` referenziert weiterhin den jetzt nicht mehr
+  existierenden Namen, wieder `CS0246`.
+
+- **Ergebnis:** Tests 1030 → 1034 (+4: Gate 1 eigene Lösung + Gate 2
+  drei Distraktoren für Challenge 27). `typecheck` grün. `npm run build`
+  erfolgreich, unverändert 635,90 kB (C#-Track weiterhin nicht in
+  `registry.ts` registriert, erwartetes Verhalten). `knip`: unverändert
+  10 Funde. Coverage: 92,59 % / 73,12 % / 99,16 % / 92,59 %.
+  `docs/csharp-concept-hierarchy.md`: Tag-Bilanz 83/86 → **86/86
+  (100 %)**. **B16 (Namespaces & Imports) damit komplett — und mit ihm
+  das gesamte C#-Konzept-Dokument.** Jeder Tag in allen 17 Zweigen
+  (B0–B16) ist jetzt durch mindestens eine Challenge abgedeckt. Anders
+  als SQL (81/82, permanente Ausnahme `updatable-view`) und Python
+  (81/82, permanente Ausnahme `own-modules`) bleibt bei C# nicht einmal
+  eine bewusste Scope-Ausnahme übrig — 27 Challenges decken den
+  kompletten Konzeptraum ab. Nächster offener Schritt für C# ist kein
+  Content mehr, sondern die Engine-Integration selbst live spielbar zu
+  machen (`runQuery`-Async-Umstellung, Registry-Eintrag,
+  `coi-serviceworker` für Produktion — siehe `docs/csharp-engine-poc.md`).
+
+### 2026-08-11 — Stündliche Routine: C#-Engine live verdrahtet (Registry-Eintrag, async runQuery, iframe-Transport E2E-verifiziert)
+
+- **Umfang:** Baseline sauber (1034/1034, typecheck/build/knip grün, HEAD
+  `e938d8a`). C#-Content ist seit dem letzten Durchgang vollständig
+  (86/86 Tags) und SQL/Python stehen an der permanenten Scope-Grenze —
+  laut Mandat-Priorität diesmal C#-Engine-Integration, mit klarem
+  nächstem Schritt laut `docs/csharp-engine-poc.md`: den letzten
+  verbliebenen Wiring-Schritt (`runQuery`-Async-Umstellung +
+  Registry-Eintrag) schließen, um C# im Dev-Server tatsächlich spielbar
+  zu machen.
+
+- **`runQuery` async gemacht:** einziger Aufrufer außerhalb der Tests ist
+  `editorTab.ts`s `run()` — geringer Streuradius. `RunOutcome` um
+  `csharp`/`csharp-loading` erweitert (Spiegelbild von
+  `python`/`python-loading`). `ensureCSharpEngineLoaded` (Spiegel von
+  `ensurePythonEngineLoaded`) lädt `loadCSharpEngineFromServer('/csharp-engine/')`
+  beim Öffnen einer C#-Challenge, mit `withTimeout`-Absicherung und
+  neuem `session.csharpStatus`-Feld. `renderPythonEngineStatus` zu
+  `renderEngineStatus(status, label)` verallgemeinert statt dupliziert
+  (Python/C#-Banner sind identisch bis auf den Namen).
+  `csharpGrundlagenCourse` jetzt in `TRACKS` registriert — der zuvor in
+  jedem Durchgang bewusst zurückgehaltene letzte Baustein.
+
+- **Ein echter Bug gefunden und behoben, bevor committet wurde:** da
+  jetzt auch SQL/Python durch ein `await` laufen (obwohl beide intern
+  nichts asynchrones tun), verschiebt sich ihr DOM-Render um einen
+  Mikrotask — unsichtbar für Menschen, aber vier bestehende
+  `editorTab.test.ts`-Tests prüften synchron direkt nach dem
+  Klick-Dispatch und schlugen fehl. Behoben durch `await
+  Promise.resolve();` in diesen Tests, nach demselben Muster, das die
+  Datei für den Pyodide-Ladefehler-Test schon nutzte. Zusätzlich ein
+  Race-Guard in `run()` ergänzt: da C#s echter Compile+Run jetzt der
+  einzige Zweig ist, der langsam genug ist, dass Nutzer währenddessen
+  wegnavigieren könnten, prüft `run()` nach dem `await runQuery(...)`
+  erneut die aktuelle Auswahl und verwirft das Ergebnis, falls sich die
+  Auswahl inzwischen geändert hat.
+
+- **Live-E2E-verifiziert gegen den echten Dev-Server** (Playwright, nicht
+  nur Unit-Tests): C#-Track im Sidebar-Dropdown ausgewählt, alle 27
+  Challenges gelistet, Challenge 01 geöffnet, Editor nutzt korrekt
+  `csharpLanguagePlugin` (Toolbar zeigt "C#", Syntax-Highlighting aktiv),
+  echte Musterlösung ausgeführt — echter Roslyn-Compile + WASM-Ausführung
+  über den iframe-Transport, `validate()` lief, UI zeigte `✓ Aufgabe
+  erfüllt`, drei Sterne, korrektes stdout, Sidebar-Sternebadge
+  aktualisierte sich. Zweiter Lauf derselben Challenge brauchte nur
+  ~30ms (Engine bereits gecacht — bestätigt `ensureCSharpEngine`s
+  Load-once-Verhalten unter dem echten iframe-Transport). SQL lief auf
+  derselben Seite unverändert korrekt weiter — keine Regression. Die
+  eine beobachtete Konsolen-Meldung (`ManagedError: ... Could not find
+  any element matching selector '#app'`) ist dieselbe bereits
+  dokumentierte harmlose Blazor-Root-Component-Suche, kein neuer Fund.
+
+- **Ergebnis:** Tests 1034 → 1037 (+3: `csharp-loading`-Fall in
+  `actions.test.ts`, echter C#-Erfolgs-Test + Lade-Platzhalter-Test in
+  `editorTab.test.ts`). `typecheck` grün. `npm run build` erfolgreich —
+  Größe wächst 635,90 kB → 827,57 kB gzip 192,41 kB (239 → 269 Module):
+  erster Build, in dem C#-Content tatsächlich vom Produktions-Entry-Point
+  erreichbar ist (bestätigt per Grep auf `dist/index.html` nach
+  Challenge-Text wie "Kiste"/"Lager" — vorher abwesend, jetzt vorhanden).
+  `knip`: unverändert 10 Funde. Coverage: 92,63 % / 73,44 % / 99,37 % /
+  92,63 % — spürbarer Sprung bei Branch- und Function-Abdeckung, weil
+  C#-UI-Codepfade jetzt tatsächlich erreichbar und durchlaufen werden
+  statt totem Code zu sein.
+
+- **Bewusst offen gelassen:** Produktions-Hosting. `CSHARP_ENGINE_BASE_URL`
+  (`/csharp-engine/`) funktioniert nur, weil die Vite-Dev-Server-
+  Middleware lokal einen von Hand gebauten `dotnet publish`-Output
+  ausliefert — für GitHub Pages (oder wo auch immer produktiv gehostet
+  wird) gibt es noch kein Äquivalent. Ein frischer Checkout ohne .NET-SDK
+  oder ein Produktions-Build würde C# als wählbaren Track zeigen, dessen
+  Challenges beim Ausführen 404en. Das ist der letzte verbleibende
+  Schritt: `coi-serviceworker` (oder ein äquivalenter Build-Schritt) für
+  den echten Produktions-Host.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt auf der neuen C#-UI-Fläche (sauber)
+
+- **Umfang:** Baseline sauber (1037/1037, typecheck/build/knip grün, HEAD
+  `5ab928d`). Der letzte Durchgang hat den C#-Track zum ersten Mal live
+  im Dev-Server spielbar gemacht — laut Mandat-Priorität diesmal
+  Priorität 2 (Live-Bug-Hunt) statt eines weiteren C#-Increments, gezielt
+  auf die brandneue, vorher gar nicht erreichbare UI-Fläche gerichtet.
+  Produktions-Hosting (`coi-serviceworker`) wäre der nächste C#-Schritt,
+  ist aber ein größeres, risikoreicheres CI/Deploy-Vorhaben — bewusst
+  nicht in diesem Durchgang begonnen.
+
+- **Sicherheitscheck vor dem Durchgang:** `.github/workflows/deploy-pages.yml`
+  geprüft — der Produktions-Deploy triggert nur bei Push auf `main`, nicht
+  auf `claude/github-projekt-b3ivo1`. Die letzte Firing hat also keine
+  echte Produktionsseite mit einem nicht funktionierenden C#-Track
+  ausgeliefert; das bleibt erst relevant, sobald der Branch nach `main`
+  gemerged wird.
+
+- **Vorgehen:** Dev-Server gestartet, sql.js lokal per `context.route()`
+  serviert. Vier gezielt neue Prüfungen, die vor der letzten Firing
+  technisch gar nicht möglich waren, da der C#-Track nicht in `TRACKS`
+  registriert war: ein Distraktor mit echtem Compilerfehler (fehlendes
+  Semikolon) ausgeführt — zeigt korrekt `status-err` mit der echten
+  `CS1002`-Meldung; Track-Wechsel SQL → C# → Python → C# hintereinander
+  — Toolbar-Label, Syntax-Highlighting und Ergebnis-Panel bleiben
+  durchgehend korrekt synchron, keine going-stale Zustände; Tipp-Anzeige
+  auf einer C#-Challenge — funktioniert wie bei SQL/Python; `localStorage`-
+  Persistenz einer C#-Challenge-Lösung über einen echten Seiten-Reload —
+  Sterne und die zuletzt geöffnete Challenge (inklusive Track) bleiben
+  korrekt erhalten.
+
+- **Ein Fehlalarm im eigenen Testskript, kein Produktbug:** der erste
+  Testlauf des Distraktor-Checks lieferte einen leeren Status, weil das
+  Skript sofort nach dem Track-Wechsel auf das Challenge-Item klickte,
+  während die Sidebar noch neu rendert (`element was detached from the
+  DOM, retrying`) — nach einer kurzen Wartezeit nach dem Track-Wechsel
+  lief die Prüfung stabil durch. Kein Timing-Problem im Produkt, nur im
+  Skript selbst.
+
+- **Zwei bereits dokumentierte, nicht-neue Konsolen-Meldungen:** die
+  harmlose Blazor-`#app`-Root-Component-Suche (bekannt seit Schritt 3
+  des Engine-POC) und die bereits dokumentierten
+  `ERR_TUNNEL_CONNECTION_FAILED`/`ERR_CERT_AUTHORITY_INVALID`-Meldungen
+  vom Sandbox-Netzwerk (Pyodide-CDN bzw. `api.anthropic.com`) — keine
+  neuen Funde.
+
+- **Dev-Server sauber über exakte PIDs beendet.**
+
+- **Ergebnis:** Keine echten Bugs gefunden. Keine Code-Änderung nötig.
+  Tests/typecheck/build unverändert bei 1037/1037 grün. Die neue
+  C#-Live-Wiring aus dem letzten Durchgang hält unter gezielter
+  Belastung (Track-Wechsel, Fehlerpfade, Tipp-Flow, Persistenz) stand.
+  Nächster offener Schritt: Produktions-Hosting für die C#-Engine
+  (`coi-serviceworker` o. ä.) oder der nächste Live-Bug-Hunt in ein paar
+  Durchgängen.
+
+### 2026-08-11 — Stündliche Routine: C#-Produktions-Hosting, Schritt 1 — `coi-serviceworker` vorbereitet und empirisch verifiziert
+
+- **Umfang:** Baseline sauber (1037/1037, typecheck/build/knip grün, HEAD
+  `2e77a89`). Laut Mandat-Punkt 4 ("genau EIN begrenztes Increment" für
+  C#) diesmal der in der letzten Firing benannte nächste Schritt:
+  Produktions-Hosting der C#-Engine über den `coi-serviceworker`-Trick,
+  damit `crossOriginIsolated` (und damit `SharedArrayBuffer`, das die
+  Blazor-WASM-Engine braucht) auch auf einem statischen Host wie GitHub
+  Pages erreicht wird, der keine eigenen COOP/COEP-Response-Header
+  setzen kann.
+
+- **Entdeckte Architektur-Einschränkung vor jeder Code-Änderung:** Vor
+  dem Schreiben von Code geprüft, ob `coi-serviceworker` (das laut
+  Upstream-Dokumentation eine eigenständige, separat ladbare Datei sein
+  muss — kein Bundling/Inlining möglich) mit dem Projekt vereinbar ist.
+  `test/build/distOutput.test.ts` und `index.html`s eigener Fallback-Text
+  ("Deren Inhalt fügst du in einen claude.ai-Chat ein") belegen eine
+  bislang nicht explizit dokumentierte harte Vorgabe: `dist/index.html`
+  muss die EINZIGE ausgelieferte Datei bleiben, weil der primäre
+  Distributionsweg das Einfügen des Dateiinhalts in einen claude.ai-Chat
+  ist, nicht nur klassisches Website-Hosting. Ein naiver Ansatz über
+  Vites `public/`-Ordner hätte diese Vorgabe verletzt.
+  **Lösung:** `coi-serviceworker.js` (Original v0.1.7, MIT-lizenziert,
+  Guido Zuidhof) unverändert im Repo-ROOT abgelegt — bewusst außerhalb
+  von `src/` und `public/`, damit Vite die Datei nie anfasst — und per
+  einfachem `<script src="coi-serviceworker.js">`-Tag in `index.html`
+  referenziert, exakt nach demselben Muster wie der bereits bestehende
+  sql.js-CDN-Script-Tag. Per echtem `npm run build` bestätigt: `dist/`
+  liefert weiterhin genau eine Datei (828,81 kB), `distOutput.test.ts`
+  (9 Tests) bleibt grün.
+
+- **Empirische Verifikation der Technik selbst (nicht nur "bricht nichts"):**
+  Mock-GitHub-Pages-Deployment im Scratchpad gebaut (nur `index.html` +
+  `coi-serviceworker.js`), ein von Hand geschriebener Node-Static-Server
+  ohne jegliche Custom-Header (bildet GitHub Pages exakt nach, das keine
+  eigenen Response-Header setzen kann), echtes Headless-Chromium per
+  Playwright dagegen gefahren. Ergebnis: `crossOriginIsolated: true`,
+  Service-Worker-Controller aktiv, `SharedArrayBuffer` verfügbar — die
+  Technik funktioniert nachweislich unter realistischen Bedingungen, nicht
+  nur in der Theorie.
+  Ergänzend `window.coi = { coepCredentialless: () => true }` gesetzt, um
+  den bereits etablierten `credentialless`-COEP-Modus zu erzwingen (statt
+  des Library-Default `require-corp`, der die CDN-Loads von SQL.js/Pyodide
+  brechen würde, da diese kein `Cross-Origin-Resource-Policy`-Header
+  senden).
+
+- **Zwei Sandbox-Tooling-Stolpersteine unterwegs gefunden und behoben:**
+  `npm install coi-serviceworker --no-save` hat trotz `--no-save` über
+  npms Dependency-Tree-Reconciliation `playwright`/`sql.js`/`pyodide` aus
+  `node_modules` entfernt (diese sind absichtlich nicht in
+  `package.json`, nur Ad-hoc-Sandbox-Tooling) — behoben durch erneutes
+  `npm install playwright sql.js pyodide --no-save`. Das frisch
+  installierte `playwright` (1.62.1) erwartete danach einen anderen
+  Chromium-Build als den im Sandbox-Cache vorhandenen (`chromium-1194`)
+  — behoben per explizitem `executablePath`. Beides in
+  `docs/csharp-engine-poc.md` als Lektion für künftige Durchgänge
+  festgehalten: kein `npm install <pkg>` (auch nicht `--no-save`) nur um
+  Paket-Quellcode zu lesen.
+
+- **`knip.json` neu angelegt** (erste Knip-Config dieses Projekts):
+  unterdrückt einen legitimen Fehlalarm ("Unused files: coi-serviceworker.js"),
+  da Knip reine `<script src>`-HTML-Referenzen nicht wie ES-Imports
+  verfolgen kann. Nach der Ergänzung wieder exakt bei den vorherigen 10
+  Funden.
+
+- **Ergebnis:** Tests unverändert 1037/1037 grün (keine neuen `src/`-
+  Dateien, reine Infrastruktur außerhalb des Build-Graphen).
+  Typecheck/Build/Knip unverändert grün. Keine Coverage-Änderung, daher
+  kein Artifact-Republish nötig — die Prozentzahlen sind identisch zum
+  letzten Durchgang.
+
+- **Bewusst offen gelassen (nächste, separate Increments):** (1)
+  `.github/workflows/deploy-pages.yml` muss noch angepasst werden, um
+  `coi-serviceworker.js` zusätzlich zu `dist/index.html` nach `gh-pages`
+  zu kopieren. (2) Der C#-Engine-`wwwroot`-Output (`dotnet publish -c
+  Release`) muss noch per CI-Schritt gebaut und unter `/csharp-engine/`
+  nach `gh-pages` kopiert werden, analog zur lokalen Dev-Server-
+  Middleware. Beides bewusst nicht in diesem Durchgang begonnen, da das
+  Ändern des Produktions-Deploy-Workflows das riskanteste Teilstück des
+  gesamten Vorhabens ist und ein eigenes, in sich abgeschlossenes
+  Increment verdient.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt (sauber) + Dev-Server-Erkenntnis zu `coi-serviceworker`
+
+- **Umfang:** Baseline sauber (1037/1037, typecheck/build/knip grün, HEAD
+  `02e6590`). SQL (81/82) und Python (81/82) haben beide nur noch ihre
+  permanente Scope-Ausnahme offen — kein aktionabler Content-Tag mehr
+  vorhanden — und C# ist bei 86/86 (100 %). Der letzte Durchgang hat
+  bereits das Firing-Kontingent für C# (Mandat-Punkt 4: genau EIN
+  Increment) mit dem `coi-serviceworker`-Schritt verbraucht. Damit bleibt
+  für diesen Durchgang Priorität 2: ein Live-Bug-Hunt gegen den echten
+  Dev-Server.
+
+- **Erkenntnis zu `coi-serviceworker.js` im Dev-Modus (kein Bug, aber
+  eine Korrektur der eigenen Annahme aus dem letzten Durchgang):** Der
+  Kommentar in `index.html` ging davon aus, dass die Datei im
+  `npm run dev`-Betrieb "harmlos 404et", weil sie nicht in `public/`
+  liegt. Tatsächlich liefert Vites Dev-Server jede Datei im Projekt-Root
+  statisch aus (nicht nur `public/`), daher antwortet
+  `GET /coi-serviceworker.js` im Dev-Betrieb mit echtem 200 und dem
+  echten Skriptinhalt. Per echtem Playwright-Check gegen `localhost:5173`
+  bestätigt: `crossOriginIsolated` ist im Dev-Betrieb bereits `true` —
+  allerdings **nicht** wegen des Service Workers (dessen Controller war
+  in der Messung `false`), sondern weil `vite.config.ts`s eigene
+  COOP/COEP-Middleware (siehe letzter `/csharp-engine/`-Durchgang) für
+  die ganze Dev-App bereits reale Response-Header setzt. Der
+  Service-Worker-Trick bleibt also weiterhin ausschließlich für die
+  Produktions-Hosting-Lücke relevant (GitHub Pages, keine eigenen
+  Header) — im Dev-Betrieb ist er ein wirkungsloser, aber unschädlicher
+  No-Op. Keine Code-Änderung nötig, nur die Kommentar-Annahme war
+  ungenau; nicht korrigiert, da sie den Kern (dist/-Constraint) korrekt
+  beschreibt und die Dev-Server-Feinheit für die Produktionsentscheidung
+  irrelevant ist.
+
+- **Vorgehen:** Tastaturnavigation durch die Sidebar (erster Tab-Stopp
+  korrekt der Sidebar-Toggle-Button), Track-Dropdown-Optionen geprüft
+  (alle drei Tracks korrekt gelistet), Theme-Picker (öffnen über
+  `.theme-btn`, 22 Theme-Optionen im Grid, Schließen per Escape-Taste
+  funktioniert — echter `keydown`-Listener in `themePicker.ts`, kein
+  Zufallstreffer), mobiles Layout bei 375px (Sidebar korrekt als
+  Overlay-Drawer mit Backdrop sichtbar, entspricht der dokumentierten
+  Standard-offen-Vorgabe in `themes.css`, kein Bug).
+
+- **Ein aufwendiger Fehlalarm im eigenen Testskript, kein Produktbug:**
+  ein End-to-End-Smoke-Test (Challenge 1 je Track öffnen, Editor-Tab
+  wechseln, Run-Button klicken) zeigte für SQL und Python leere
+  Ergebnis-Panels und — genauer untersucht — dass `.challenge-item`-
+  Klicks gar keine `active`-Klasse setzten. Ursache gefunden:
+  `selectChallenge()` (`src/ui/state/actions.ts:220-222`) bricht für
+  SQL still ab, wenn `ctx.engines.getMain()` noch `undefined` ist (SQL-
+  Engine noch nicht geladen) — und sql.js/Pyodide laden per CDN-
+  `<script>`, das dieser Sandbox aus Netzwerkgründen (`ERR_TUNNEL_
+  CONNECTION_FAILED`, bereits mehrfach dokumentiert) nicht erreichbar
+  ist. Frühere Durchgänge haben genau deshalb sql.js in ihren
+  Playwright-Skripten per `context.route()` lokal umgeleitet — dieser
+  Durchgangs-Skript tat das nicht, daher der Fehlalarm. C# (lädt lokal,
+  keine CDN-Abhängigkeit) lief im selben Skript einwandfrei durch und
+  lieferte über den echten Compiler einen echten `CS5001`-Fehler
+  (fehlende `Main`-Methode im Platzhaltertext) — bestätigt also, dass
+  Editor-Laden, Tab-Wechsel, Run-Button und Fehler-Rendering für den
+  Track, der ohne CDN funktioniert, sauber durchlaufen. Keine
+  Code-Änderung, da die Ursache vollständig im Testskript liegt, nicht
+  im Produkt.
+
+- **Dev-Server sauber beendet.**
+
+- **Ergebnis:** Keine echten Bugs gefunden. Tests/typecheck/build/knip
+  unverändert bei 1037/1037 grün, kein Artifact-Republish nötig (keine
+  Zahlenänderung). Nächster offener Schritt bleibt der bereits benannte
+  Deploy-Workflow (`deploy-pages.yml` + C#-`dotnet publish`-CI-Schritt)
+  als eigenes Increment, oder der nächste Live-Bug-Hunt.
+
+### 2026-08-11 — Stündliche Routine: C#-Produktions-Hosting, Schritt 2 — `coi-serviceworker.js` im Deploy-Workflow verdrahtet
+
+- **Umfang:** Baseline sauber (1037/1037, typecheck/build/knip grün, HEAD
+  `658e384`). SQL/Python haben beide nur noch ihre permanente
+  Scope-Ausnahme offen, C# ist bei 86/86 — kein aktionabler Content-Schritt
+  vorhanden. Laut aktualisiertem Mandat ist C#-Engine-Integration jetzt
+  regulär priorisierbar (vorherige Einschränkung aufgehoben); der vorletzte
+  Durchgang hat in `docs/csharp-engine-poc.md` bereits zwei konkrete,
+  unabhängige nächste Schritte benannt: (1) `coi-serviceworker.js` in
+  `deploy-pages.yml` verdrahten, (2) `dotnet publish` + C#-Engine-`wwwroot`
+  in denselben Workflow aufnehmen. Diesen Durchgang genau EINEN davon
+  begonnen und abgeschlossen — Schritt (1), da deutlich kleiner und ohne
+  neue CI-Toolchain-Abhängigkeit (kein .NET-SDK-Setup nötig).
+
+- **Änderung:** `.github/workflows/deploy-pages.yml`s einziger
+  Publish-Step kopiert jetzt zusätzlich zu `dist/index.html` auch
+  `coi-serviceworker.js` (Repo-Root) nach `/tmp`, checkt `gh-pages` aus,
+  kopiert beide Dateien in den Arbeitsbaum zurück und committet sie
+  gemeinsam (`git add index.html coi-serviceworker.js`) — bewusst als ein
+  einziger Commit, damit nie ein `index.html` ohne die dazugehörige
+  `coi-serviceworker.js` (oder umgekehrt) live steht. Rein additive,
+  mechanische Erweiterung des bereits bestehenden Kopiermusters, keine
+  neue Logikform.
+
+- **Verifikation ohne Risiko für die echte Seite:** Der Workflow triggert
+  ausschließlich bei Push auf `main`, dieser Durchgang arbeitet auf
+  `claude/github-projekt-b3ivo1` — das Bearbeiten der YAML-Datei selbst
+  löst keinerlei echten Deploy aus. Zusätzlich die Shell-Logik in einem
+  Wegwerf-Scratch-Git-Repo nachgestellt (fake `main` mit
+  Platzhalter-`dist/index.html`, fake vorbestehender `gh-pages`-Branch mit
+  altem `index.html`-Inhalt) — exakt dieselbe `checkout -B gh-pages
+  origin/gh-pages` → kopieren → `add` → `commit`-Sequenz durchlaufen und
+  bestätigt, dass beide Dateien korrekt zusammen auf dem resultierenden
+  `gh-pages`-Baum landen.
+
+- **Bewusst weiterhin offen:** Schritt (2), die C#-Engine selbst im
+  Deploy-Workflow zu bauen und auszuliefern (`dotnet publish -c Release`
+  + `wwwroot`-Kopie nach `/csharp-engine/` auf `gh-pages`, analog zur
+  lokalen Dev-Server-Middleware) — deutlich größere CI-Änderung (.NET-SDK-
+  und `wasm-tools`-Workload-Setup auf dem Runner, echter WASM-Publish,
+  Verifikation unter echten COOP/COEP-Headern in CI) und bleibt ein
+  eigenes Increment. Praktische Konsequenz: Ein `main`-Deploy jetzt würde
+  bereits eine Seite ausliefern, die per Service Worker
+  `crossOriginIsolated` erreicht — der C#-Track würde aber weiterhin
+  404en, sobald er versucht, sein Blazor-Bundle von `/csharp-engine/` zu
+  laden, da dieser Pfad noch von nichts ausgeliefert wird.
+
+- **Ergebnis:** Tests unverändert 1037/1037 grün (reine Workflow-Datei,
+  kein `src/`-Code geändert). Typecheck/Build/Knip unverändert grün. Keine
+  Coverage-Änderung, kein Artifact-Republish nötig.
+
+### 2026-08-11 — Stündliche Routine: Echter Bug gefunden und behoben — SQL-Query mit Endkommentar schlug fehl
+
+- **Umfang:** Baseline sauber (1037/1037, typecheck/build/knip grün, HEAD
+  `e729634`). SQL/Python haben beide nur noch ihre permanente
+  Scope-Ausnahme offen, C# ist bei 86/86 — kein aktionabler Content-Schritt.
+  Der letzte Durchgang hat bereits den C#-Increment-Slot für diese Stunde
+  verbraucht. Also Priorität 2: Live-Bug-Hunt gegen den echten Dev-Server,
+  diesmal mit vollem CDN-Workaround (sql.js **und** Pyodide lokal per
+  `context.route()`, nicht nur C#), um genau die Lücke aus dem letzten
+  sauberen Durchgang zu schließen, in der SQL/Python mangels Routing gar
+  nicht getestet werden konnten.
+
+- **Fund:** Ein End-to-End-Smoke-Test (Challenge 1 öffnen, echte
+  kanonische Lösung eintippen, **plus einen harmlosen Endkommentar
+  danach** — ein realistisches Nutzerverhalten, keine Ausnahme) schlug
+  mit `Fehler: Zeile 15: undefined` fehl, obwohl die Lösung korrekt war.
+  Das wörtliche `undefined` in einer Nutzer-Fehlermeldung ist ein starkes
+  Bug-Signal.
+
+- **Ursache gefunden (echter Live-Browser-Bug, nicht nur Node-Testmotor):**
+  `splitStatements()` (`src/domain/sql/statementSplitter.ts`) behandelte
+  einen reinen Kommentar am Ende des SQL-Texts (nach dem letzten `;`, oder
+  zwischen zwei `;`) als eigenständiges "Statement", weil die einzige
+  bisherige Prüfung `rest.trim()` war — ein Kommentar ist nach `.trim()`
+  nicht leer. Dieses Kommentar-Fragment landete dann in
+  `engine.exec()`/`db.prepare()`. Empirisch gegen das echte,
+  browserverwendete sql.js-Paket bestätigt: `db.prepare('-- Kommentar')`
+  wirft **keinen** `Error`, sondern einen rohen String (`"Nothing to
+  prepare"`). `executeAndValidate.ts`s Fehlerpfad griff aber
+  `(e as Error).message` ab — bei einem String-Wurf ist das `undefined`,
+  wörtlich in die Meldung interpoliert. Betrifft nicht nur den exotischen
+  Fall des unveränderten Platzhaltertexts (bereits im vorletzten
+  Durchgang beobachtet, damals fälschlich als reiner Testskript-Fehlalarm
+  eingeordnet, siehe unten), sondern jede sonst korrekte Lösung mit einem
+  abschließenden erklärenden Kommentar — ein plausibles, alltägliches
+  Nutzermuster.
+
+- **Korrektur:** Neue Hilfsfunktion `hasSqlContent()` im selben Modul,
+  die exakt dieselbe Kommentar-/String-Tokenisierung wie `splitStatements`
+  selbst verwendet, aber prüft, ob nach Abzug von Kommentaren und einem
+  isolierten `;` noch echter SQL-Inhalt übrig bleibt. `splitStatements`
+  verwirft jetzt sowohl das abschließende Restfragment als auch jedes
+  `;`-terminierte Zwischenfragment, wenn `hasSqlContent()` `false`
+  liefert — Kommentar-only-Fragmente erreichen `engine.exec()` dadurch
+  gar nicht mehr, an keiner der beiden Stellen (`executeAndValidate.ts`,
+  `sqlJsEngine.ts`), die dieselbe geteilte `splitStatements`-Funktion
+  nutzen (inklusive des Node-Testmotors `nodeSqliteEngine.ts` — der Fix
+  gilt für alle drei SQL-Ausführungspfade gleichzeitig, nicht nur den
+  Browser). 12 neue Tests: 4 in `splitStatements` (Endkommentar,
+  Block-Kommentar, Kommentar-Fragment zwischen zwei echten Statements,
+  Kommentar + echtes SQL bleibt erhalten) und 8 direkt für
+  `hasSqlContent()` (leer, nur Kommentar(e), nur `;`, echtes SQL, SQL +
+  Inline-Kommentar, String-Literal zählt sofort als Inhalt).
+
+- **Verifikation:** Live im echten Browser gegen echtes sql.js-WASM
+  (`context.route()`-Workaround) reproduziert (`status-err`, `undefined`
+  in der Meldung) und nach dem Fix erneut geprüft — dieselbe Lösung mit
+  demselben Endkommentar liefert jetzt korrekt `✓ Aufgabe erfüllt`. Alle
+  4 Gate-1/Gate-2-Dateien (`challengeRunner.test.ts` u. a.) weiterhin
+  grün — keine der 74 bestehenden SQL-Challenges/-Distraktoren war von
+  dem alten, fehlerhaften Verhalten abhängig.
+
+- **Ergebnis:** Tests 1037 → 1049 (+12). `typecheck`, volle Testsuite und
+  `npm run build` grün (829,19 kB, +0,38 kB durch die Testdatei-Erweiterung
+  — kein Produktionscode-Wachstum, da `hasSqlContent` klein ist). `knip`
+  unverändert, 10 Funde. Coverage: 92,63 % → 92,57 % Statements/Lines
+  (minimale Verdünnung durch den neuen, noch nicht in jedem Zweig
+  durchlaufenen `splitStatements`-Code), Branches 73,44 % → 73,65 %
+  (Anstieg — die 12 neuen Tests decken `hasSqlContent`s Verzweigungen
+  gründlicher ab, als das bisherige `splitStatements` im Schnitt
+  abgedeckt war). Kein Republish der SQL-/Python-Konzept-Hierarchie-
+  Artifacts nötig — die Tag-Bilanzen selbst ändern sich nicht (reiner
+  Bugfix, keine neue Content-Abdeckung); das Test-/UI-UX-Audit-Dashboard-
+  Artifact wird beim nächsten inhaltlich größeren Durchgang mit
+  aktualisierten Zahlen neu veröffentlicht, nicht separat für diese eine
+  Coverage-Nachkommastelle.
+
+- **Nachtrag zur Einordnung eines älteren Fehlalarms:** Im Durchgang
+  "C#-Produktions-Hosting, Schritt 1" wurde ein Smoke-Test-Fehlschlag bei
+  SQL/Python als reiner Testskript-Fehler (fehlendes `context.route()`)
+  abgetan — das stimmte für den *Grund*, warum `selectChallenge` gar
+  nicht erst reagierte (Engine noch nicht geladen), maskierte aber, dass
+  ein zweiter, unabhängiger echter Bug im Kommentar-Handling existierte,
+  der erst mit korrekt geladener Engine überhaupt sichtbar werden konnte.
+  Lehre: ein plausibler Erklärungsfund für ein Symptom schließt einen
+  zweiten, tieferliegenden Fund nicht automatisch aus — lohnt sich, nach
+  der ersten Erklärung trotzdem einmal mit funktionierendem Setup
+  nachzuprüfen.

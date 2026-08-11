@@ -1,8 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BlazorInterface, CSharpEngineExports } from './csharpEngine';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createCSharpEngine, loadCSharpEngineFromServer } from './csharpEngine';
 
-function fakeExports(runCodeResult: string): CSharpEngineExports & { calls: string[] } {
+function fakeExports(runCodeResult: string) {
   const calls: string[] = [];
   return {
     calls,
@@ -42,65 +41,107 @@ describe('createCSharpEngine', () => {
 });
 
 describe('loadCSharpEngineFromServer', () => {
-  const originalBlazor = window.Blazor;
-
   beforeEach(() => {
     vi.resetModules();
-    delete window.Blazor;
     document.body.innerHTML = '';
   });
 
-  afterEach(() => {
-    window.Blazor = originalBlazor;
-    document.body.innerHTML = '';
-  });
-
-  function installFakeBlazor(runCodeResult = '{}'): BlazorInterface & { started: boolean } {
-    const blazor = {
-      started: false,
-      start: vi.fn().mockImplementation(async () => {
-        blazor.started = true;
-      }),
-      runtime: {
-        getAssemblyExports: vi.fn().mockResolvedValue({
-          CSharpEngineBlazor: { CSharpEngine: fakeExports(runCodeResult) },
-        }),
-      },
-    };
-    return blazor;
+  function getIframes(): HTMLIFrameElement[] {
+    return Array.from(document.querySelectorAll('iframe'));
   }
 
-  it('reuses an already-loaded window.Blazor without injecting a script tag', async () => {
-    window.Blazor = installFakeBlazor();
+  /** Simulates the iframe's own host.html posting a message back to the parent (this test). */
+  function postFromIframe(iframe: HTMLIFrameElement, data: unknown) {
+    window.dispatchEvent(
+      new MessageEvent('message', { data, origin: window.location.origin, source: iframe.contentWindow }),
+    );
+  }
 
-    const { loadCSharpEngineFromServer } = await import('./csharpEngine');
-    const exports = await loadCSharpEngineFromServer('/csharp-engine/');
-
-    expect(document.querySelectorAll('script')).toHaveLength(0);
-    expect(window.Blazor.start).toHaveBeenCalledTimes(1);
-    expect(window.Blazor.runtime.getAssemblyExports).toHaveBeenCalledWith('CSharpEngineBlazor');
-    expect(await exports.RunCode('irrelevant')).toBe('{}');
-  });
-
-  it('injects a script tag pointing at the given base URL and resolves once it loads', async () => {
+  it('creates a hidden iframe pointed at baseUrl + host.html', async () => {
     const { loadCSharpEngineFromServer } = await import('./csharpEngine');
 
     const pending = loadCSharpEngineFromServer('/csharp-engine/');
-    const script = document.querySelector('script')!;
-    expect(script.src).toContain('/csharp-engine/_framework/blazor.webassembly.js');
-    expect(script.getAttribute('autostart')).toBe('false');
+    const [iframe] = getIframes();
 
-    window.Blazor = installFakeBlazor();
-    script.onload?.(new Event('load'));
+    expect(getIframes()).toHaveLength(1);
+    expect(iframe!.src).toContain('/csharp-engine/host.html');
+    expect(iframe!.style.display).toBe('none');
 
+    postFromIframe(iframe!, { type: 'csharp-host-ready' });
     await expect(pending).resolves.toBeDefined();
   });
 
-  it('rejects with a friendly German message when the Blazor script fails to load', async () => {
+  it('ignores messages from an unrelated window (origin/source mismatch)', async () => {
     const { loadCSharpEngineFromServer } = await import('./csharpEngine');
 
     const pending = loadCSharpEngineFromServer('/csharp-engine/');
-    document.querySelector('script')!.onerror?.(new Event('error'));
+    window.dispatchEvent(
+      new MessageEvent('message', { data: { type: 'csharp-host-ready' }, origin: 'https://evil.example', source: null }),
+    );
+
+    const [iframe] = getIframes();
+    postFromIframe(iframe!, { type: 'csharp-host-ready' });
+    await expect(pending).resolves.toBeDefined();
+  });
+
+  it('resolved exports RunCode() round-trips through postMessage, matched by request id', async () => {
+    const { loadCSharpEngineFromServer } = await import('./csharpEngine');
+
+    const pending = loadCSharpEngineFromServer('/csharp-engine/');
+    const [iframe] = getIframes();
+    postFromIframe(iframe!, { type: 'csharp-host-ready' });
+    const exports = await pending;
+
+    const postMessageSpy = vi.spyOn(iframe!.contentWindow!, 'postMessage');
+    const runPromise = exports.RunCode('Console.WriteLine(1);');
+
+    expect(postMessageSpy).toHaveBeenCalledTimes(1);
+    const [sentMessage, targetOrigin] = postMessageSpy.mock.calls[0]!;
+    expect(sentMessage).toMatchObject({ type: 'csharp-run', code: 'Console.WriteLine(1);' });
+    expect(targetOrigin).toBe(window.location.origin);
+
+    postFromIframe(iframe!, {
+      type: 'csharp-result',
+      id: (sentMessage as { id: string }).id,
+      json: '{"stdout":"1\\n","error":null}',
+    });
+
+    await expect(runPromise).resolves.toBe('{"stdout":"1\\n","error":null}');
+  });
+
+  it('RunCode() rejects when the host reports a runtime error for that request', async () => {
+    const { loadCSharpEngineFromServer } = await import('./csharpEngine');
+
+    const pending = loadCSharpEngineFromServer('/csharp-engine/');
+    const [iframe] = getIframes();
+    postFromIframe(iframe!, { type: 'csharp-host-ready' });
+    const exports = await pending;
+
+    const postMessageSpy = vi.spyOn(iframe!.contentWindow!, 'postMessage');
+    const runPromise = exports.RunCode('boom');
+    const [sentMessage] = postMessageSpy.mock.calls[0]!;
+
+    postFromIframe(iframe!, { type: 'csharp-result', id: (sentMessage as { id: string }).id, error: 'kaboom' });
+
+    await expect(runPromise).rejects.toThrow('kaboom');
+  });
+
+  it('rejects with a friendly German message when the host reports a boot error', async () => {
+    const { loadCSharpEngineFromServer } = await import('./csharpEngine');
+
+    const pending = loadCSharpEngineFromServer('/csharp-engine/');
+    const [iframe] = getIframes();
+    postFromIframe(iframe!, { type: 'csharp-boot-error', message: 'Failed to start platform' });
+
+    await expect(pending).rejects.toThrow(/C#-Motor konnte nicht gestartet werden/);
+  });
+
+  it('rejects with a friendly German message when the iframe itself fails to load', async () => {
+    const { loadCSharpEngineFromServer } = await import('./csharpEngine');
+
+    const pending = loadCSharpEngineFromServer('/csharp-engine/');
+    const [iframe] = getIframes();
+    iframe!.onerror?.(new Event('error'));
 
     await expect(pending).rejects.toThrow(/C#-Motor konnte nicht geladen werden/);
   });
@@ -108,37 +149,40 @@ describe('loadCSharpEngineFromServer', () => {
   it('allows a retry after a failed load instead of staying stuck on the first rejection', async () => {
     const { loadCSharpEngineFromServer } = await import('./csharpEngine');
 
-    const firstAttempt = loadCSharpEngineFromServer('/csharp-engine/');
-    document.querySelector('script')!.onerror?.(new Event('error'));
-    await expect(firstAttempt).rejects.toThrow();
+    const first = loadCSharpEngineFromServer('/csharp-engine/');
+    getIframes()[0]!.onerror?.(new Event('error'));
+    await expect(first).rejects.toThrow();
 
-    const secondAttempt = loadCSharpEngineFromServer('/csharp-engine/');
-    expect(document.querySelectorAll('script')).toHaveLength(2);
-    window.Blazor = installFakeBlazor();
-    document.querySelectorAll('script')[1]!.onload?.(new Event('load'));
+    const second = loadCSharpEngineFromServer('/csharp-engine/');
+    const iframes = getIframes();
+    expect(iframes).toHaveLength(2);
+    postFromIframe(iframes[1]!, { type: 'csharp-host-ready' });
 
-    await expect(secondAttempt).resolves.toBeDefined();
+    await expect(second).resolves.toBeDefined();
   });
 
-  it('shares one in-flight script load across concurrent callers', async () => {
+  it('shares one in-flight iframe load across concurrent callers', async () => {
     const { loadCSharpEngineFromServer } = await import('./csharpEngine');
 
     const first = loadCSharpEngineFromServer('/csharp-engine/');
     const second = loadCSharpEngineFromServer('/csharp-engine/');
-    expect(document.querySelectorAll('script')).toHaveLength(1);
+    expect(getIframes()).toHaveLength(1);
 
-    window.Blazor = installFakeBlazor();
-    document.querySelector('script')!.onload?.(new Event('load'));
+    postFromIframe(getIframes()[0]!, { type: 'csharp-host-ready' });
 
     await expect(Promise.all([first, second])).resolves.toBeDefined();
   });
 
-  it('throws if the script loads but window.Blazor is still missing', async () => {
+  it('once resolved, keeps returning the same exports without creating another iframe', async () => {
     const { loadCSharpEngineFromServer } = await import('./csharpEngine');
 
     const pending = loadCSharpEngineFromServer('/csharp-engine/');
-    document.querySelector('script')!.onload?.(new Event('load'));
+    postFromIframe(getIframes()[0]!, { type: 'csharp-host-ready' });
+    const first = await pending;
 
-    await expect(pending).rejects.toThrow(/C#-Motor wurde nicht geladen/);
+    const second = await loadCSharpEngineFromServer('/csharp-engine/');
+
+    expect(second).toBe(first);
+    expect(getIframes()).toHaveLength(1);
   });
 });

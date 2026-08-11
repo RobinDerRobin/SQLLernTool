@@ -535,6 +535,799 @@ gegen den echten `dotnet`-Toolchain (kein Mock). Tag-Bilanz bleibt bei
 `TRACKS` bisher nicht generisch, sondern ruft `describeSqlCourse`/
 `describePythonCourse` fest verdrahtet auf).*
 
+*Update 2026-08-09 (stündliche Routine, Fortsetzung): Schritt 7 hat jetzt
+begonnen — die erste echte Challenge existiert. Vorher nötige Plumbing
+ergänzt: `src/runtime/csharp/executeAndValidate.ts` (async-Pendant zu
+Pythons `executeAndValidate.ts` — `CSharpRuntime.exec()` ist ein echter
+`await`, anders als die synchronen SQL-/Python-Engines) und
+`describeCSharpCourse` in `test/content/challengeRunner.test.ts` (async
+`it()`-Callbacks, sonst identisches Gate-1/Gate-2-Muster). Challenge 01
+deckt alle 5 Tags aus B0 ab (`program-execution-model` und `comments` im
+Tutorial-Text erklärt — analog zu Pythons Challenge 01, die Kommentare
+ebenfalls nur im Tutorial einführt, nicht im geforderten Code;
+`top-level-statements`, `function-call-syntax` und
+`member-access-dot-syntax` direkt über die zwei `Console.WriteLine(...)`-
+Aufrufe) sowie den einzigen Tag aus B1 (`console-write-line`) — macht B0
+und B1 beide vollständig, 6 Tags insgesamt. `validate()` folgt dem in
+Schritt 4 entschiedenen
+stdout-only-Muster, prüft aber exakte Zeilentrennung (nicht nur
+Teilstring-Enthaltensein): der Distraktor (`Console.Write` statt
+`Console.WriteLine`) erzeugt sonst zufällig einen String, der beide
+erwarteten Teiltexte noch enthält, nur ohne Zeilenumbruch dazwischen — ein
+reiner `.includes()`-Check hätte diesen Distraktor fälschlich bestehen
+lassen. Beides live gegen den echten `dotnet`-Treiber verifiziert (Lösung
+besteht, Distraktor scheitert). `csharpGrundlagenCourse` bleibt bewusst
+**nicht** in `TRACKS` registriert (dieselben vier Live-UI-Lücken wie bei
+Schritt 5 notiert), daher validiert `registry.test.ts`s generischer
+Schema-Check diese Challenge nicht automatisch — ein eigener Test in
+`course.test.ts` übernimmt das stattdessen direkt gegen
+`csharpChallengeSchema`.
+
+**Tag-Bilanz: 6 von 86 (≈ 7 %).** Erster inhaltlicher Fortschritt seit
+Beginn dieses Dokuments — B0 (Grundlagen) und B1 (Ausgabe) sind damit
+komplett abgedeckt.*
+
+*Update 2026-08-09 (stündliche Routine, Fortsetzung): Challenge 02 ergänzt
+— deckt 6 der 9 Tags aus B2 (Variablen & Typen) ab: `static-typing-concept`,
+`typed-variable-declaration`, `int-type`, `double-type`, `string-type`,
+`bool-type`. Szenario: 7 Äpfel auf 2 Personen aufteilen, in einem
+Durchgang alle vier Grundtypen. Zeigt dabei einen echten C#-Stolperstein
+konkret: `int`-Division rundet immer ab (`7 / 2` → `3`), selbst wenn das
+Ergebnis danach in eine `double`-Variable geschrieben wird — nur wenn
+mindestens ein Operand selbst schon `double` ist (`7.0 / 2.0` → `3.5`),
+wird tatsächlich genau gerechnet. `validate()` ist stdout-only (Schritt-4-
+Entscheidung) und musste deshalb bewusst um dieses Verhalten herum
+konstruiert werden: ein erster Entwurf (Typ + Wert einfach ausgeben, ohne
+weitere Rechnung) wurde vor dem Schreiben verworfen, weil eine als
+`string` statt `int` deklarierte Zahl (<code>string x = "25";</code>)
+denselben stdout wie ein `int` erzeugt — <code>ToString()</code> macht
+den Typunterschied unsichtbar, sobald nur der reine Wert ausgegeben wird.
+Die int/double-Divisions-Aufgabe umgeht das, weil die beiden Typen dabei
+nachweislich **unterschiedliche Werte** produzieren, nicht nur denselben
+Wert in unterschiedlicher Verpackung. Beide Distraktoren (fehlendes `.0`
+bei der Division; falscher `bool`-Wert) vor dem Schreiben empirisch mit
+dem echten `dotnet`-Treiber verifiziert, nicht nur angenommen.
+
+**Tag-Bilanz: 12 von 86 (≈ 14 %).** `char-type`, `var-type-inference` und
+`constants-readonly` bleiben als Rest von B2 offen — bewusst nicht in
+derselben Challenge mit untergebracht, um sie nicht zu überladen.*
+
+*Update 2026-08-09 (stündliche Routine, Fortsetzung): Challenge 03 ergänzt
+— deckt die restlichen drei Tags aus B2 ab: `char-type`, `var-type-inference`,
+`constants-readonly`. Szenario: eine Prüfung mit 100 Maximalpunkten, 82
+erreichten Punkten und Note B — eine Konstante (`const int maxPunkte`),
+eine per Typinferenz angelegte Variable (`var erreichtePunkte`) und ein
+einzelnes Zeichen (`char notenBuchstabe`) in einem Durchgang. Beide
+Distraktoren sind bewusst **Compilerfehler**, nicht falsche Laufzeit-
+Ausgaben — anders als bei Challenge 02 lässt sich "eine Konstante wurde
+verändert" oder "ein string wurde als char behandelt" nicht über
+unterschiedlichen stdout beobachten, weil beide Verstöße den Compiler
+selbst stoppen, bevor überhaupt etwas läuft. Das ist konzeptionell korrekt
+so: `executeAndValidate` liefert bei einem Compilerfehler `{ ok: false,
+error: ... }`, bevor `validate()` je aufgerufen wird (dasselbe Muster, das
+schon bei SQL-Constraint-Verletzungen greift) — der Test prüft nur
+`outcome.ok === false`, das reicht als Nachweis. Beide Distraktoren vor
+dem Schreiben empirisch gegen den echten `dotnet`-Treiber verifiziert:
+Neuzuweisung an `maxPunkte` erzeugt tatsächlich `CS0131`, `char
+notenBuchstabe = "B";` tatsächlich `CS0029`.
+
+**Tag-Bilanz: 15 von 86 (≈ 17 %).** Damit ist **B2 (Variablen & Typen)
+vollständig abgedeckt** — B0, B1 und B2 sind jetzt komplett. Nächster
+offener Zweig: B3 (nach der Branch-Übersicht in Abschnitt 5).*
+
+*Update 2026-08-09 (stündliche Routine, Fortsetzung): Challenge 04
+ergänzt — deckt alle 6 Tags aus B3 (Operatoren) in einem Durchgang ab:
+`arithmetic-operators`, `integer-division-modulo`,
+`comparison-operators`, `boolean-logic-operators`,
+`compound-assignment-operators`, `increment-decrement-operators`.
+Szenario: ein Punktestand-Tracker (Start 10 Punkte), der nacheinander
+`+=`, `++`, `*`, `/`, `%`, `>` und `&&` einsetzt — bewusst als
+gerade Anweisungsfolge ohne Schleife, da `for`/`while` (B7) noch nicht
+freigeschaltet sind. Beide Distraktoren sind reguläre falsche
+Berechnungen (kein Compilerfehler diesmal, anders als bei Challenge 03):
+`/` und `%` vertauscht (ein klassischer Verwechslungsfehler bei
+Ganzzahl-Division), sowie das komplette Weglassen von `punkte++`. Beide
+vor dem Schreiben empirisch gegen den echten `dotnet`-Treiber
+nachgerechnet, nicht nur angenommen — die Verkettung aus `+=` und `++`
+auf denselben Variablenwert macht Kopfrechnen fehleranfällig genug, dass
+eine Verifikation lohnt.
+
+**Tag-Bilanz: 21 von 86 (≈ 24 %).** Damit ist **B3 (Operatoren)
+vollständig abgedeckt** — B0 bis B3 sind jetzt komplett. Nächster offener
+Zweig: B4 (Strings, nach der Branch-Übersicht in Abschnitt 5).*
+
+*Update 2026-08-09 (stündliche Routine, Fortsetzung): Challenge 05
+ergänzt — deckt alle 3 Tags aus B4 (Strings) in einem Durchgang ab:
+`string-concatenation`, `string-interpolation`, `string-methods`.
+Szenario: Vor- und Nachname per `+` zu einem vollen Namen verketten,
+per `$"..."`-Interpolation begrüßen (inklusive `.Length` als
+eingebundener Ausdruck) und per `.ToUpper()` großschreiben — damit
+kommen alle drei Tags in einer einzigen zusammenhängenden
+Anweisungskette vor, nicht isoliert nebeneinander. Beide Distraktoren
+wieder reguläre Falschberechnungen (kein Compilerfehler): das
+Leerzeichen bei der Verkettung vergessen (wirkt sich auf alle drei
+Ausgabezeilen aus, weil `vollerName` überall wiederverwendet wird) und
+`ToLower()` statt `ToUpper()` (wirkt sich nur auf die letzte Zeile aus).
+Beide vor dem Schreiben empirisch gegen den echten `dotnet`-Treiber
+verifiziert.
+
+**Tag-Bilanz: 24 von 86 (≈ 28 %).** Damit ist **B4 (Strings)
+vollständig abgedeckt** — B0 bis B4 sind jetzt komplett. Nächster offener
+Zweig: B5 (Typumwandlung & Nullability, nach der Branch-Übersicht in
+Abschnitt 5).*
+
+*Update 2026-08-09 (stündliche Routine, Fortsetzung): Challenge 06
+ergänzt — deckt alle 4 Tags aus B5 (Typumwandlung & Nullability) in
+einem Durchgang ab: `explicit-type-casting`, `nullable-value-types`,
+`null-conditional-operator`, `null-coalescing-operator`. Szenario: eine
+Testauswertung mit roher Punktzahl (per `(int)`-Cast gerundet — schneidet
+ab, `87.6` wird `87`, nicht 88), einer `int?`-Bonuspunktzahl (`null`, per
+`??` auf `0` ersetzt) und einem `string?`-Spitznamen (`null`, per `?.`
+sicher auf `.Length` zugegriffen). Dabei musste `validate()` erstmals
+mit einer **legitim leeren Ausgabezeile** umgehen (`spitznameLaenge` ist
+`null`, `Console.WriteLine(null)` gibt eine leere Zeile aus) — das
+bisherige Muster `stdout.split('\n').filter(line => line.length > 0)`
+hätte diese Zeile fälschlich verschluckt, weil es *jede* leere Zeile
+wegfiltert, nicht nur den einen Trailing-Newline-Artefakt am Stringende.
+Neues Muster stattdessen: `stdout.split('\n').slice(0, -1)` — entfernt
+gezielt nur das letzte, durch das abschließende `\n` erzeugte leere
+Element, lässt aber echte Leerzeilen mitten in der Ausgabe stehen.
+Rückwirkend äquivalent zum alten Muster bei allen bisherigen Challenges
+(keine hatte je eine legitime Leerzeile), aber allgemeiner korrekt.
+Drei statt der üblichen zwei Distraktoren, weil sich hier drei
+unabhängige, alle einzeln empirisch verifizierte Fehlerarten anboten:
+fehlender Cast (Compilerfehler CS0266), `.` statt `?.` (kompiliert,
+stürzt aber zur Laufzeit mit `NullReferenceException` ab — die
+Kernaussage von `?.` an einem echten Absturz demonstriert statt nur
+behauptet), und fehlendes `?` bei der `int?`-Deklaration (zwei
+Compilerfehler, CS0037 + CS0019, weil ohne Nullable-Markierung weder die
+`null`-Zuweisung noch die anschließende `??`-Verknüpfung typprüfen).
+
+**Tag-Bilanz: 28 von 86 (≈ 33 %).** Damit ist **B5 (Typumwandlung &
+Nullability) vollständig abgedeckt** — B0 bis B5 sind jetzt komplett.
+Nächster offener Zweig: B6 (Kontrollfluss, nach der Branch-Übersicht in
+Abschnitt 5).*
+
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 07
+ergänzt — deckt alle 5 Tags aus B6 (Kontrollfluss) in einem Durchgang
+ab: `if-else-statement`, `else-if-chain`, `switch-statement`,
+`ternary-operator`, `pattern-matching-switch`. Szenario: ein
+Notenrechner (`int punkte = 78`), der dieselbe grobe Logik (Punktzahl in
+eine von vier Kategorien einordnen) über vier verschiedene
+Kontrollfluss-Formen ausdrückt — eine `if`/`else if`/`else`-Kette
+(Textkategorie), einen Ternär-Operator (bestanden-Bool), ein klassisches
+`switch`/`case`/`break` (Stufe, mit bewusst leeren `case`-Fallthroughs
+zwischen `10`/`9` bzw. `8`/`7`) und einen modernen
+Pattern-Matching-`switch`-Ausdruck mit relationalen Mustern (Note als
+Buchstabe). Drei Distraktoren, alle empirisch gegen den echten `dotnet`-
+Treiber verifiziert: die `if`/`else if`-Kette in aufsteigender statt
+absteigender Reihenfolge geprüft (ein echter Logikfehler bei
+sich überschneidenden Bereichen — 78 erfüllt sofort die erste, zu
+großzügige Bedingung); ein fehlendes `break;` im `switch`, das in C#
+anders als in C/C++ **kein stillschweigender Laufzeitfehler** ist,
+sondern ein vom Compiler erzwungener Fehler (`CS0163`, "Control cannot
+fall through"); die beiden Zweige des Ternär-Operators vertauscht.
+
+**Tag-Bilanz: 33 von 86 (≈ 38 %).** Damit ist **B6 (Kontrollfluss)
+vollständig abgedeckt** — B0 bis B6 sind jetzt komplett. Nächster
+offener Zweig: B7 (Schleifen, nach der Branch-Übersicht in Abschnitt
+5).*
+
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 08
+ergänzt — deckt alle 5 Tags aus B7 (Schleifen) in einem Durchgang ab:
+`while-loop`, `for-loop`, `do-while-loop`, `break-continue`,
+`nested-loops`. Fünf unabhängige Berechnungen, je eine pro Schleifenform:
+eine `for`-Schleife (Quadratsumme 1²–5²), eine `while`-Schleife (Summe
+akkumulieren bis zur Grenze), eine `do`-`while`-Schleife mit einer von
+Anfang an falschen Bedingung (`versuch < 5` bei `versuch = 10`) — zeigt
+konkret, dass der Rumpf trotzdem mindestens einmal läuft, anders als bei
+`while`, eine `for`-Schleife mit sowohl `continue` (gerade Zahlen
+überspringen) als auch `break` (bei Werten über 7 abbrechen) im selben
+Durchlauf, und zwei verschachtelte `for`-Schleifen (3×4-Zellen-Zählung).
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `while` statt `do`-`while` (Rumpf läuft dann gar nicht,
+0 statt 1 — der Kernunterschied der beiden Schleifenformen an einem
+echten Zahlenwert demonstriert statt nur behauptet); das `continue`
+komplett weggelassen (falsches Summenergebnis, 28 statt 16); dieselbe
+Schleifenvariable `zeile` in innerer und äußerer `for`-Schleife wieder
+verwendet — in C# kein stilles Überschreiben, sondern ein Compilerfehler
+(`CS0136`, "cannot be declared in this scope because that name is used
+in an enclosing local scope").
+
+**Tag-Bilanz: 38 von 86 (≈ 44 %).** Damit ist **B7 (Schleifen)
+vollständig abgedeckt** — B0 bis B7 sind jetzt komplett, fast die Hälfte
+aller 86 Tags. Nächster offener Zweig: B8 (Arrays & Collections, nach der
+Branch-Übersicht in Abschnitt 5).*
+
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 09
+ergänzt — deckt alle 4 Tags aus B8 (Arrays & Collections) in einem
+Durchgang ab: `array-basics`, `foreach-loop`, `list-basics`,
+`dictionary-basics`. Szenario: eine Punktzahl-Liste (Array mit
+Index-Zugriff und `foreach`-Summierung), eine Einkaufsliste
+(`List<string>` mit `.Add()`/`.Remove()`/`.Count`) und eine Preisliste
+(`Dictionary<string, double>` mit `.ContainsKey()`). Drei Distraktoren,
+alle empirisch gegen den echten `dotnet`-Treiber verifiziert: ein
+vergessenes `.Remove(...)` (falsche `Count`); der direkte Dictionary-
+Indexer `preise["Butter"]` statt `.ContainsKey("Butter")` auf einem nie
+eingetragenen Schlüssel — kompiliert, stürzt aber zur Laufzeit mit einer
+`KeyNotFoundException` ab, genau die Situation, für die `.ContainsKey()`
+existiert; und ein Off-by-one beim Array-Index (`punkte[1]` statt
+`punkte[0]`, Indizes beginnen bei 0).
+
+**Tag-Bilanz: 42 von 86 (≈ 49 %).** Damit ist **B8 (Arrays &
+Collections) vollständig abgedeckt** — B0 bis B8 sind jetzt komplett,
+knapp die Hälfte aller 86 Tags. Nächster offener Zweig: B9 (Methoden,
+nach der Branch-Übersicht in Abschnitt 5).*
+
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 10
+ergänzt — deckt 4 der 8 Tags aus B9 (Methoden) ab: `method-definition`,
+`method-parameters`, `return-statement`, `recursion`. Szenario: drei
+eigene Methoden (`Quadrieren`, `Rechteckflaeche` mit zwei typisierten
+Parametern, und die rekursive `Fakultaet` mit explizitem Basisfall
+`n <= 1`). Drei Distraktoren, alle empirisch gegen den echten
+`dotnet`-Treiber verifiziert: fehlendes `return` (Compilerfehler CS0161,
+nicht alle Codepfade liefern einen Wert); `breite + hoehe` statt
+`breite * hoehe` (kompiliert, falsches Ergebnis); Rekursions-Basisfall
+liefert `0` statt `1` zurück, wodurch die ganze Multiplikationskette
+mit 0 durchmultipliziert wird.
+
+Empirisch entdeckt beim Entwurf dieser Challenge — bevor Content dazu
+geschrieben wurde, wie bei jeder C#-Challenge zuerst gegen den echten
+Treiber getestet: **`method-overloading` (der verbleibende B9-Tag)
+lässt sich mit der aktuellen Top-Level-Statements-Architektur des
+Kurses nicht direkt umsetzen.** Methoden, die nach den Top-Level-
+Statements einer `.cs`-Datei definiert werden, sind technisch
+**lokale Funktionen** der implizit generierten `Main`-Methode — und
+lokale Funktionen können in C#, anders als normale Klassenmethoden,
+**nicht überladen werden**. Ein Versuch mit zwei `Verdoppeln`-Methoden
+(eine `int`-, eine `double`-Überladung) schlägt mit `CS0128: A local
+variable or function named 'Verdoppeln' is already defined in this
+scope` fehl. Echtes Overloading bräuchte eine Klasse als Container
+(`class Rechner { public static int Verdoppeln(int x) ...; public
+static double Verdoppeln(double x) ...; }`) — das wäre inhaltlich ein
+Vorgriff auf `class-definition` (B10), das im Kurs noch nicht
+eingeführt ist. `method-overloading` bleibt deshalb vorerst
+zurückgestellt, bis B10 verfügbar ist oder eine andere Lösung gefunden
+wird; die verbleibenden B9-Tags `optional-parameters`,
+`ref-out-parameters` und `params-array` sind davon nicht betroffen
+(alle drei funktionieren mit lokalen Funktionen einwandfrei) und folgen
+in einer künftigen Challenge.
+
+**Tag-Bilanz: 46 von 86 (≈ 53 %).** B9 ist damit zu 4 von 8 Tags
+abgedeckt (`method-overloading`, `optional-parameters`,
+`ref-out-parameters`, `params-array` offen) — kein Zweig komplett neu
+geschlossen, aber über die Hälfte aller 86 Tags erreicht.*
+
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 11
+ergänzt — deckt die restlichen 3 aktionablen B9-Tags ab (`method-
+overloading` bleibt wie oben beschrieben zurückgestellt):
+`optional-parameters`, `ref-out-parameters`, `params-array`. Szenario:
+vier eigene Methoden — `Steigern(int zahl, int schritt = 1)` (Standard-
+wert), `Verdoppeln(ref int zahl)` (ändert die Aufrufer-Variable direkt),
+`TryDurchTeilen(int zahl, int teiler, out int ergebnis)` (das
+idiomatische C#-`Try`-Muster: `bool`-Erfolgs-Rückgabewert plus `out`-
+Parameter für den eigentlichen Wert), und `Summiere(params int[]
+zahlen)` (beliebig viele Argumente in einem Array gesammelt). Drei
+Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: fehlender Standardwert bei `schritt` — `Steigern(5)` mit
+nur einem Argument hat dann keinen passenden Aufruf mehr
+(Compilerfehler `CS7036`); `Verdoppeln(wert)` ohne das `ref`-Schlüsselwort
+beim Aufruf, obwohl die Methode `ref int zahl` erwartet
+(Compilerfehler `CS1620`); `Summiere` gibt `zahlen.Length` statt der
+aufsummierten Werte zurück — verwechselt die Anzahl der Argumente mit
+ihrer Summe (kompiliert, falsches Ergebnis).
+
+**Tag-Bilanz: 49 von 86 (≈ 57 %).** B9 ist damit zu 7 von 8 Tags
+abgedeckt — nur `method-overloading` bleibt offen (zurückgestellt bis
+`class-definition`/B10 verfügbar ist, siehe oben). B0 bis B8 weiterhin
+vollständig, B9 praktisch abgeschlossen. Nächster Fokus: entweder eine
+Lösung für `method-overloading` finden, oder direkt mit B10
+(Objektorientierung) weitermachen, was `method-overloading` über den
+Klassen-Container gleich mitlösen würde.*
+
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 12
+ergänzt — deckt 4 der 8 Tags aus B10 (Objektorientierung) ab:
+`class-definition`, `fields`, `constructors`, `this-keyword`. Erste
+Challenge mit einer echten Klasse. Szenario: eine `Konto`-Klasse mit
+den Feldern `name` (`string`) und `kontostand` (`double`), einem
+Konstruktor `Konto(string name, double kontostand)`, der beide Felder
+per `this.` setzt (Parameter und Feld heißen bewusst gleich, um die
+Namenskollision zu demonstrieren, die `this` auflöst) — sowie zwei
+unabhängige Instanzen (`anna`, `ben`), von denen nur `anna`s Kontostand
+geändert wird, um Instanz-Unabhängigkeit sichtbar zu machen.
+
+**Empirischer Fund vor dem Schreiben des Contents:** Ein erster Entwurf
+platzierte die Klassen-Definition vor den Top-Level-Statements (wie bei
+den lokalen Funktionen aus Challenge 10/11 üblich) — das schlägt fehl
+mit `CS8803: Top-level statements must precede namespace and type
+declarations`. Anders als lokale Funktionen (die überall im Top-Level-
+Statements-Block stehen dürfen) müssen echte Typ-Deklarationen wie
+`class` **nach** allen ausführbaren Anweisungen der Datei stehen. Die
+Challenge — und ihr Tutorial-Text — folgen dieser Regel entsprechend.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `this.` im Konstruktor vergessen — `name = name;` ist dann
+nur eine wirkungslose Selbstzuweisung an den Parameter, das Feld bleibt
+bei seinem Standardwert (`null`/`0`); das Feld `kontostand` komplett
+vergessen zu deklarieren (Compilerfehler `CS1061`, da der Konstruktor
+und alle Zugriffe auf ein nicht existierendes Feld verweisen); und
+`Konto ben = anna;` statt einer eigenen neuen Instanz — `ben` wird
+dadurch nur ein zweiter Name für dieselbe Instanz, zeigt also fälschlich
+Annas Werte.
+
+**Tag-Bilanz: 53 von 86 (≈ 62 %).** B10 ist damit zu 4 von 8 Tags
+abgedeckt (`access-modifiers`, `properties`, `static-members`,
+`value-vs-reference-types` offen). Mit einer echten Klasse jetzt
+verfügbar, ist auch der Weg für das zurückgestellte `method-overloading`
+(B9) frei — beide sind Kandidaten für eine künftige Challenge.*
+
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 13
+ergänzt — deckt die restlichen 4 Tags aus B10 ab und schließt den Zweig
+vollständig: `access-modifiers`, `properties`, `static-members`,
+`value-vs-reference-types`. Szenario, zweigeteilt: (1) eine
+`Person`-Klasse mit einem `private` Feld `name`, einer Property `Name`
+(`get`/`set`) davor als kontrollierter Zugriff, und einem
+`public static int anzahlPersonen`, das der Konstruktor bei jeder neuen
+Instanz erhöht — abgerufen über den Klassennamen (`Person.anzahlPersonen`),
+nicht über eine Instanz; (2) ein `struct Punkt { public int X; public
+int Y; }` neben der `Person`-`class`, um Werttyp- (Kopie bei Zuweisung)
+und Referenztyp-Semantik (Verweis bei Zuweisung, wie schon `Konto ben =
+anna;` aus Challenge 12) direkt nebeneinander zu zeigen: `Punkt p2 = p1;
+p2.X = 99;` lässt `p1.X` unverändert bei `5`.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: direkter Zugriff auf das private Feld (`anna.name` statt
+`anna.Name`, Compilerfehler `CS0122`); `static` bei `anzahlPersonen`
+vergessen — der Zugriff über den Klassennamen wird dann vom Compiler
+abgelehnt (`CS0120`); `Punkt` als `class` statt `struct` deklariert —
+dadurch wird `p2` zu einem zweiten Verweis auf dieselbe Instanz, `p1.X`
+wird durch `p2.X = 99;` fälschlich mitverändert. Der dritte Distraktor
+demonstriert den Kernunterschied des Tags empirisch, statt ihn nur zu
+behaupten.
+
+**Tag-Bilanz: 57 von 86 (≈ 66 %).** Damit ist **B10 (Objektorientierung)
+vollständig abgedeckt** — B0 bis B8 sowie B10 komplett, B9 zu 7 von 8
+(nur `method-overloading` offen, jetzt technisch lösbar). Nächster
+offener Zweig: B11 (Vererbung & Polymorphie) — oder zuerst
+`method-overloading` in B9 nachholen, jetzt wo eine Klasse als
+Container zur Verfügung steht.*
+
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 14
+ergänzt — löst den zuvor zurückgestellten letzten B9-Tag
+`method-overloading` ein, jetzt wo Challenge 12 eine echte Klasse als
+Container verfügbar gemacht hat. Szenario: eine `Rechner`-Klasse mit
+drei überladenen `static`-Methoden namens `Addiere` — zwei
+`int`-Parameter, drei `int`-Parameter, und zwei `double`-Parameter. Der
+Compiler wählt beim Aufruf (`Rechner.Addiere(3, 4)`,
+`Rechner.Addiere(3, 4, 5)`, `Rechner.Addiere(2.5, 1.5)`) automatisch die
+passende Überladung anhand von Argumentanzahl und -typ. Drei
+Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: die dreistellige Überladung vergessen (Compilerfehler
+`CS1501`, keine Überladung nimmt 3 Argumente); die zweistellige
+`int`-Überladung vergessen — der Aufruf griffe dann nur noch über eine
+implizite `int`-zu-`double`-Umwandlung auf die `double`-Überladung zu,
+deren Rückgabewert sich ohne Cast nicht in eine `int`-Variable speichern
+lässt (Compilerfehler `CS0266`); `+ c` im Rumpf der dreistelligen
+Überladung vergessen (kompiliert, liefert aber `7` statt `12` — das
+dritte Argument wird stillschweigend ignoriert).
+
+**Tag-Bilanz: 58 von 86 (≈ 67 %).** Damit ist **B9 (Methoden) ebenfalls
+vollständig abgedeckt** — B0 bis B10 sind jetzt komplett, deutlich über
+die Hälfte aller 86 Tags. Nächster offener Zweig: B11 (Vererbung &
+Polymorphie, nach der Branch-Übersicht in Abschnitt 5).*
+
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Vor dem Content-
+Schritt ein Live-Playwright-Durchlauf gegen den echten Dev-Server (CDN-
+Workaround aus dem Runbook) — 13 SQL- und 12 Python-Lösungen
+stichprobenartig eingefügt und ausgeführt, alle 25/25 mit `✓ Aufgabe
+erfüllt` bestätigt, keine Konsolenfehler, keine mobile Overflow bei
+375×667. Sauber, keine Regression durch die letzten Content-Durchgänge.
+
+Anschließend Challenge 15 ergänzt — deckt 4 der 7 Tags aus B11
+(Vererbung & Polymorphie) ab: `inheritance`, `method-overriding`,
+`base-keyword`, `abstract-classes`. Szenario: eine `abstract class Tier`
+mit einer `abstract`-Methode `GeraeuschMachen()` (ohne Implementierung,
+muss überschrieben werden) und einer `virtual`-Methode `Beschreibung()`
+(mit Standardimplementierung, Überschreiben optional) — zwei abgeleitete
+Klassen `Hund : Tier` und `Katze : Tier`, beide rufen `base(name)` im
+Konstruktor auf, nur `Katze` überschreibt zusätzlich `Beschreibung()`.
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `: base(name)` weggelassen (Compilerfehler `CS7036`, da
+`Tier` keinen parameterlosen Konstruktor hat); `override` bei der
+abstrakten Methode vergessen (Compilerfehler `CS0534`, abstrakte
+Methoden müssen implementiert werden); `override` bei der virtuellen
+Methode `Beschreibung()` in `Katze` vergessen — anders als beim
+abstrakten Fall erzwingt der Compiler das bei `virtual` **nicht**, der
+Aufruf läuft dann stillschweigend mit der geerbten Standardversion
+(kompiliert, falsches Ergebnis). Der dritte Distraktor demonstriert den
+Kernunterschied zwischen `abstract` (compile-time erzwungen) und
+`virtual` (optional, silent fallback) empirisch.
+
+**Tag-Bilanz: 62 von 86 (≈ 72 %).** B11 ist damit zu 4 von 7 Tags
+abgedeckt (`interfaces`, `polymorphism-via-interface`, `sealed-classes`
+offen). B0 bis B10 weiterhin vollständig. Nächster Schritt: die
+restlichen B11-Tags (Interfaces, Polymorphie über Interface-Typen,
+`sealed`) in einer künftigen Challenge.*
+
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 16
+ergänzt — deckt die restlichen 3 Tags aus B11 ab und schließt den
+Zweig vollständig: `interfaces`, `polymorphism-via-interface`,
+`sealed-classes`. Szenario: ein `interface IBeschreibbar` mit einer
+Methoden-Signatur (kein Rumpf), zwei implementierende Klassen `Buch`
+und `sealed class DVD`, und ein `IBeschreibbar[]`-Array mit je einer
+Instanz beider Klassen — eine `foreach`-Schleife ruft `Beschreiben()`
+über den Interface-Typ auf, die konkrete Implementierung wird erst zur
+Laufzeit bestimmt (Polymorphie über Interfaces, nicht über eine
+gemeinsame Basisklasse). Drei Distraktoren, alle empirisch gegen den
+echten `dotnet`-Treiber verifiziert: `Buch` implementiert
+`Beschreiben()` nicht (Compilerfehler `CS0535`, jede Interface-Methode
+muss bereitgestellt werden); ein Versuch `class BluRay : DVD` von der
+als `sealed` markierten `DVD` zu erben (Compilerfehler `CS0509`, genau
+der Zweck von `sealed`); die beiden Array-Zuweisungen vertauscht
+(kompiliert, aber falsche Ausgabereihenfolge).
+
+**Tag-Bilanz: 65 von 86 (≈ 76 %).** Damit ist **B11 (Vererbung &
+Polymorphie) vollständig abgedeckt** — B0 bis B11 sind jetzt komplett,
+gut drei Viertel aller 86 Tags. Nächster offener Zweig: B12 (Generics,
+nach der Branch-Übersicht in Abschnitt 5).*
+
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 17
+ergänzt — deckt alle 3 Tags aus B12 (Generics) in einem Durchgang ab:
+`generic-type-definition`, `generic-method-definition`,
+`generic-constraints`. Szenario: eine generische Klasse `Box<T>` mit
+Feld `Inhalt`, verwendet mit zwei unterschiedlichen konkreten Typen
+(`Box<string>` und `Box<int>`) — genau das macht den generischen Typ
+gegenüber einer festen Klasse überhaupt erst notwendig; und eine
+generische Methode `T Groesser<T>(T a, T b) where T : IComparable<T>`,
+die per `CompareTo` den größeren Wert liefert, aufrufbar sowohl mit
+`int`- als auch mit `string`-Argumenten ohne explizite Typangabe (Typ-
+Inferenz).
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `where T : IComparable<T>` weggelassen — ein
+uneingeschränktes `T` kennt keine `CompareTo`-Methode, der Aufruf lässt
+sich nicht mehr auflösen (Compilerfehler); `Box` nicht generisch,
+sondern fest auf `string` zugeschnitten — `Box<int> zahlBox = ...`
+lässt sich dann nicht mehr kompilieren (Compilerfehler `CS0308`, der
+nicht-generische Typ kann nicht mit Typargumenten verwendet werden);
+`Groesser` nicht generisch, sondern fest auf `int` zugeschnitten — der
+Aufruf mit zwei `string`-Argumenten passt zu keiner Methode mehr
+(Compilerfehler `CS1503`). Ein erster Entwurf des ersten Distraktors
+(Box mit `string` fest verdrahtet, aber ohne eine zweite
+`Box<int>`-Verwendung im Szenario) kompilierte fälschlich unverändert
+durch — der Fehler wurde vor dem Schreiben des Contents durch eine
+zweite `Box<T>`-Instanziierung mit einem anderen Typ behoben, die
+Genericität dadurch tatsächlich notwendig statt nur behauptet.
+
+**Tag-Bilanz: 68 von 86 (≈ 79 %).** Damit ist **B12 (Generics)
+vollständig abgedeckt** — B0 bis B12 sind jetzt komplett. Nächster
+offener Zweig: B13 (Fehlerbehandlung, nach der Branch-Übersicht in
+Abschnitt 5).*
+
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 18
+ergänzt — deckt 4 der 6 Tags aus B13 (Fehlerbehandlung) ab:
+`runtime-exceptions-concept`, `try-catch`, `specific-exception-types`,
+`finally-block`. Szenario, zweigeteilt: ein Array-Zugriff außerhalb der
+Grenzen (`zahlen[5]` bei nur drei Elementen) in einem
+`try`/`catch (IndexOutOfRangeException)`/`finally`-Block — der
+`finally`-Block hängt unabhängig vom Ausgang einen Status-Suffix an;
+und eine Ganzzahl-Division durch 0 in einem separaten
+`try`/`catch (DivideByZeroException)`-Block, ohne `finally`. Beide
+Blöcke fangen ihren jeweiligen Exception-Typ gezielt, nicht die
+allgemeine Basisklasse `Exception`.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `finally`-Block komplett weggelassen (kompiliert, aber der
+Status-Suffix fehlt in der Ausgabe); `catch (FormatException)` statt
+`catch (IndexOutOfRangeException)` — der falsche Exception-Typ passt
+nicht, die tatsächlich geworfene Ausnahme bleibt ungefangen und das
+Programm stürzt komplett ab, noch bevor irgendeine Ausgabe erfolgt
+(bestätigt: der Treiber liefert eine echte `TargetInvocationException`
+mit `IndexOutOfRangeException` als innerer Ausnahme); `b / a` statt
+`a / b` bei der Division — `0 / 10` wirft keine Exception (nur ein
+Nenner von 0 ist das Problem, nicht der Zähler), `divisionStatus`
+bleibt fälschlich `"Erfolg"`.
+
+**Tag-Bilanz: 72 von 86 (≈ 84 %).** B13 ist damit zu 4 von 6 Tags
+abgedeckt (`throw-statement`, `custom-exceptions` offen). B0 bis B12
+weiterhin vollständig. Nächster Schritt: die restlichen B13-Tags
+(eigene Exceptions werfen und definieren, letzteres baut auf
+`inheritance` aus B11 auf, das bereits verfügbar ist) in einer
+künftigen Challenge.*
+
+*Update 2026-08-10 (stündliche Routine, Fortsetzung): Challenge 19
+ergänzt — deckt die restlichen 2 Tags aus B13 ab und schließt den Zweig
+vollständig: `throw-statement`, `custom-exceptions`. Szenario: eine
+eigene Exception-Klasse `UngueltigesAlterException : Exception` mit
+Konstruktor, der die Nachricht per `: base(nachricht)` weiterreicht —
+dieselbe Vererbungssyntax und dasselbe `base(...)`-Muster wie schon bei
+gewöhnlichen Klassen aus B11. Eine Methode `PruefeAlter(int alter)`
+löst sie bei einem negativen Alter per `throw new
+UngueltigesAlterException(...)` aus; zwei Aufrufe (einer gültig, einer
+ungültig) in je einem `try`/`catch (UngueltigesAlterException e)`-Block
+zeigen sowohl den Erfolgs- als auch den Fehlerpfad.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `throw` vor `new UngueltigesAlterException(...)`
+vergessen — es wird nur ein Exception-<b>Objekt</b> erzeugt, aber nie
+tatsächlich ausgelöst, der Code läuft normal weiter (kompiliert,
+falsches Ergebnis); `: base(nachricht)` im Konstruktor vergessen — die
+eigene Nachricht erreicht nie die geerbte `Message`-Property, `e.Message`
+liefert stattdessen den generischen Standardtext "Exception of type
+'UngueltigesAlterException' was thrown." (kompiliert, falsches
+Ergebnis); `: Exception` bei der Klassendefinition weggelassen — eine
+Klasse, die nicht von `Exception` erbt, lässt sich weder werfen noch
+fangen (Compilerfehler `CS0155`).
+
+**Tag-Bilanz: 74 von 86 (≈ 86 %).** Damit ist **B13 (Fehlerbehandlung)
+vollständig abgedeckt** — B0 bis B13 sind jetzt komplett. Nächster
+offener Zweig: B14 (Delegates & Lambda-Ausdrücke, nach der
+Branch-Übersicht in Abschnitt 5).*
+
+**Update:** Challenge 20 deckt drei der vier B14-Tags ab:
+`delegate-type`, `lambda-expressions`, `func-action-types`. Szenario: ein
+eigener Delegate-Typ `delegate int RechenOperation(int a, int b);`, dem
+zunächst eine benannte Methode (`Addieren`, ohne Aufruf-Klammern
+zugewiesen — reine Methodenreferenz statt Methodenaufruf) und dann ein
+Lambda-Ausdruck (`(a, b) => a * b`) direkt zugewiesen wird, sowie
+zusätzlich der eingebaute generische Delegate-Typ `Func<int, int, int>`
+mit einem dritten Lambda — dieselbe Zuweisungssyntax für alle drei
+Varianten, um den gemeinsamen Kern (Methode als Wert) sichtbar zu
+machen.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: die zugewiesene Methode `Addieren` zu `void` statt `int`
+gemacht — die Signatur passt nicht mehr zu `RechenOperation`, der
+Compiler lehnt die Zuweisung ab (`CS0407`); im Lambda für `operation2`
+`a + b` statt `a * b` verwendet — kompiliert fehlerfrei, liefert aber
+das falsche Ergebnis; die Argumente beim Aufruf von `operation3`
+vertauscht (`operation3(4, 10)` statt `operation3(10, 4)`) — kompiliert
+fehlerfrei, liefert aber `-6` statt `6` bei einer Subtraktion.
+
+`events` bleibt als vierter B14-Tag offen — Events brauchen einen
+Publisher/Subscriber-Aufbau (`event`-Schlüsselwort, Zugriffsbeschränkung
+von außen), der ein eigenständigeres Szenario verdient als ein
+Anhängsel an diese Challenge; folgt in einem künftigen Durchgang.
+
+**Tag-Bilanz: 77 von 86 (≈ 90 %).** B14 ist damit zu 3 von 4 Tags
+abgedeckt (`events` offen). B0 bis B13 bleiben komplett. Nächster
+offener Schritt: `events` (B14 abschließen) oder B15 (LINQ).*
+
+**Update:** Challenge 21 schließt den letzten B14-Tag `events` ab.
+Szenario: eine Klasse `Kontostand` mit
+`public event Action<int>? SaldoNiedrig;` — ein Event auf Basis des
+eingebauten `Action<int>`-Delegate-Typs statt eines eigenen `delegate`,
+bewusst als direkte Fortsetzung von Challenge 20s `func-action-types`.
+Eine Methode `Abheben(int betrag)` löst das Event per
+`SaldoNiedrig?.Invoke(saldo);` aus, sobald der Saldo unter 50 fällt;
+außerhalb der Klasse meldet sich der Aufrufer per `+=` mit einem
+Lambda an, das zwei Variablen setzt — zwei Abhebungen (100 → 70 → 40)
+zeigen sowohl den Nicht-Auslöse- als auch den Auslöse-Fall.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert, zusammen der Kern der Tag-Bedeutung ("Delegate mit
+eingeschränktem Zugriff"): ein Versuch, das Event direkt von außen
+aufzurufen (`konto.SaldoNiedrig(letzterSaldo);` statt nur `+=`/`-=`) —
+der Compiler lehnt das ab (`CS0070`), genau die Einschränkung, die
+`event` gegenüber einem gewöhnlichen öffentlichen Delegate-Feld
+durchsetzt; das `event`-Schlüsselwort bei der Deklaration weggelassen
+(nur `public Action<int>? SaldoNiedrig;`) und zusätzlich direkt von
+außen aufgerufen — kompiliert jetzt anstandslos und löst die Warnung
+schon vor der ersten Abhebung fälschlich aus, zeigt empirisch, was
+ohne `event` an Kapselung verloren geht; die Auslöse-Schwelle von
+`saldo < 50` auf `saldo < 40` geändert — nach der zweiten Abhebung
+steht der Saldo exakt bei 40, `40 < 40` ist falsch, das Event feuert
+nie, ein klassischer Off-by-one-Fehler in der Fachlogik.
+
+**Tag-Bilanz: 78 von 86 (≈ 91 %).** Damit ist **B14 (Delegates &
+Lambda-Ausdrücke) vollständig abgedeckt** — B0 bis B14 sind jetzt
+komplett. Nächster offener Zweig: B15 (LINQ).*
+
+**Update:** Challenge 22 startet B15 (LINQ) mit dem grundlegendsten
+Tag, `linq-method-syntax`. Szenario: `List<int> zahlen = new List<int>
+{ 3, 8, 15, 22, 4, 30, 11 };`, gefiltert mit
+`zahlen.Where(z => z % 2 == 0).ToList()` (nur die geraden Zahlen), dann
+transformiert mit `.Select(z => z * 2).ToList()` (jede verdoppelt) —
+beide LINQ-Grundoperationen aus der Tag-Definition (`.Where()`,
+`.Select()`) in einer Verkettung.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert — anders als bei den meisten bisherigen C#-Challenges
+diesmal ausschließlich Logikfehler statt Compilerfehler, weil LINQ-
+Verkettungen selten falsch *kompilieren*, sondern typischerweise falsch
+*rechnen*: die Filter-Bedingung umgekehrt (`z % 2 != 0` statt `== 0`)
+liefert die verdoppelten ungeraden statt der geraden Zahlen; die
+Transformation geändert (`z + 2` statt `z * 2`) liefert falsche
+Summanden statt Verdopplung; am lehrreichsten der dritte Distraktor —
+`.Select().Where()` statt `.Where().Select()` vertauscht. Da jede
+verdoppelte Zahl automatisch gerade ist, lässt der Filter danach *alle*
+7 Elemente durch statt nur der 4 ursprünglich geraden — ein empirischer
+Beleg dafür, dass die Verkettungsreihenfolge bei LINQ das Ergebnis
+verändert, nicht nur ein Stilunterschied ist.
+
+**Tag-Bilanz: 79 von 86 (≈ 92 %).** B15 ist damit zu 1 von 5 Tags
+abgedeckt (`linq-query-syntax`, `linq-ordering-grouping`,
+`linq-aggregation`, `linq-deferred-execution` offen). B0 bis B14
+bleiben komplett.*
+
+**Update:** Challenge 23 deckt `linq-aggregation` ab — den zweiten von
+fünf B15-Tags. Szenario: `List<int> punkte = { 80, 90, 70, 60, 100 };`,
+zusammengefasst über alle fünf Aggregations-Methoden aus der
+Tag-Definition: `.Sum()` (400), `.Count()` (5), `.Average()` (400 als
+`double`, hier exakt 80 ohne Nachkommastellen — die Zahlen wurden
+bewusst so gewählt, dass die Ausgabe nicht von .NETs Fließkomma-
+Rundungsdarstellung abhängt), `.Max()` (100), `.Min()` (60).
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `Max()` und `Min()` bei der Zuweisung vertauscht — liefert
+"Maximum: 60" und "Minimum: 100" statt umgekehrt (Logikfehler,
+kompiliert fehlerfrei); `.Length` statt `.Count()` verwendet — `List<T>`
+hat anders als Arrays keine `.Length`-Eigenschaft, echter Compilerfehler
+`CS1061`; und ein Element beim Anlegen der Liste vergessen (nur vier
+statt fünf Zahlen) — verändert vier der fünf Ausgabezeilen (Summe,
+Anzahl, Durchschnitt, Maximum), nur `Minimum` bleibt zufällig korrekt,
+ein realistischer Abschreibfehler statt einer API-Verwechslung.
+
+**Tag-Bilanz: 80 von 86 (≈ 93 %).** B15 ist damit zu 2 von 5 Tags
+abgedeckt (`linq-query-syntax`, `linq-ordering-grouping`,
+`linq-deferred-execution` offen). B0 bis B14 bleiben komplett.*
+
+**Update:** Challenge 24 deckt `linq-query-syntax` ab — den dritten von
+fünf B15-Tags. Szenario: `List<int> mengen = { 12, 5, 18, 7, 24, 9, 30 };`,
+abgefragt per Query-Syntax `from m in mengen where m > 10 select m * 3`
+statt der Method-Syntax aus Challenge 22 — dieselbe Semantik, syntaktisch
+fast identisch mit SQLs `SELECT ... FROM ... WHERE ...` (nur in
+umgekehrter Klausel-Reihenfolge und ohne Kommas/Semikolons zwischen den
+Klauseln), genau der Punkt, den Abschnitt 1.6/8 dieses Dokuments schon
+vorwegnahm.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert, diesmal ohne Compilerfehler — Query-Syntax-Fehler sind
+fast immer Logikfehler, keine Syntaxfehler: die `where`-Bedingung
+umgekehrt (`m < 10` statt `m > 10`) liefert die verdreifachten kleinen
+statt der großen Mengen; der `select`-Multiplikator geändert (`m * 2`
+statt `m * 3`) verdoppelt statt zu verdreifachen; am lehrreichsten die
+komplett weggelassene `where`-Klausel — sie ist in der Query-Syntax
+**optional**, `from ... select ...` ohne Filter ist gültiges C# und
+wählt einfach alle sieben Elemente statt nur der vier über 10 aus, ein
+empirischer Beleg dafür, dass „syntaktisch gültig" und „semantisch
+richtig" zwei verschiedene Dinge sind.
+
+**Tag-Bilanz: 81 von 86 (≈ 94 %).** B15 ist damit zu 3 von 5 Tags
+abgedeckt (`linq-ordering-grouping`, `linq-deferred-execution` offen).
+B0 bis B14 bleiben komplett.*
+
+**Update:** Challenge 25 deckt `linq-ordering-grouping` ab — den
+vierten von fünf B15-Tags, alle drei Methoden aus der Tag-Definition
+in einem Durchgang. Szenario: `List<int> zahlen = { 42, 17, 8, 23, 4,
+16 };`, sortiert mit `.OrderBy(z => z)` (aufsteigend: 4, 8, 16, 17, 23,
+42) und `.OrderByDescending(z => z)` (absteigend: 42, 23, 17, 16, 8,
+4), gruppiert mit `.GroupBy(z => z % 2 == 0 ? "Gerade" : "Ungerade")`.
+Empirisch bestätigt: die Gruppenreihenfolge folgt dem ersten Vorkommen
+jedes Schlüssels im Quell-Enumerable — "Gerade" zuerst, weil `42` (das
+erste Element) gerade ist, dann "Ungerade" (erstes ungerades Element:
+`17`), unabhängig von der Deklarationsreihenfolge der Ternär-Zweige.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `OrderBy()`/`OrderByDescending()` bei der Zuweisung
+vertauscht — die ersten beiden Ausgabezeilen zeigen die Werte in
+vertauschter Sortierrichtung; die beiden Ternär-Zweige im
+`GroupBy()`-Schlüssel vertauscht — die letzten beiden Zeilen zeigen die
+falschen Beschriftungen ("Ungerade" für die geraden Zahlen und
+umgekehrt), obwohl die tatsächliche Gruppierung unverändert bleibt;
+`gruppe.Count()` statt `gruppe.Key` für die Beschriftung — verwechselt
+die Gruppengröße mit dem Gruppenschlüssel, zeigt `"4: ..."`/`"2: ..."`
+statt der Textlabels.
+
+**Tag-Bilanz: 82 von 86 (≈ 95 %).** B15 ist damit zu 4 von 5 Tags
+abgedeckt — nur `linq-deferred-execution` bleibt offen, der letzte Tag
+im gesamten C#-Dokument. B0 bis B14 bleiben komplett.*
+
+**Update:** Challenge 26 deckt `linq-deferred-execution` ab — den
+letzten der fünf B15-Tags und damit den letzten offenen Tag im
+gesamten C#-Dokument. Szenario: `List<int> zahlen = { 2, 5, 8 };`,
+`var query = zahlen.Where(z => z > 3);` (bewusst **ohne** `.ToList()`),
+danach `zahlen.Add(10);` gefolgt von einem ersten `foreach` über
+`query`, danach zwei weitere `Add()`-Aufrufe (`1`, `20`) gefolgt von
+einem zweiten `foreach` über **dieselbe** `query`-Variable. Empirisch
+gegen den echten `dotnet`-Treiber bestätigt: der erste Durchlauf zeigt
+5, 8, 10 (Stand von `zahlen` beim ersten Iterieren), der zweite
+Durchlauf zeigt 5, 8, 10, 20 (Stand beim zweiten Iterieren, `1` fällt
+raus) — dieselbe Query-Variable liefert bei zwei verschiedenen
+Iterationen zwei verschiedene Ergebnisse, weil `.Where()` ohne
+Materialisierung nichts als "Bauplan" speichert, keinen Schnappschuss.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `.ToList()` direkt an `Where()` angehängt — erzwingt
+sofortige Auswertung beim Erstellen der Query (als `zahlen` noch
+`{ 2, 5, 8 }` ist), macht `query` zu einer festen Liste `{ 5, 8 }`,
+beide `Add()`-Aufrufe danach wirken sich nicht mehr aus, beide
+Durchläufe zeigen identisch nur 5, 8; die Filterbedingung auf `z > 5`
+statt `z > 3` geändert — die 5 fällt aus beiden Durchläufen raus,
+zeigt 8, 10 bzw. 8, 10, 20; alle drei `Add()`-Aufrufe vor das erste
+`foreach` statt zwischen die beiden Durchläufe verschoben — beide
+Iterationen sehen denselben, bereits vollständigen Zustand von
+`zahlen`, beide Durchläufe zeigen identisch 5, 8, 10, 20 statt
+unterschiedlicher Ergebnisse.
+
+**Tag-Bilanz: 83 von 86 (≈ 97 %).** Damit ist **B15 (LINQ) komplett**
+(alle 5 Tags: `linq-method-syntax`, `linq-query-syntax`,
+`linq-aggregation`, `linq-ordering-grouping`,
+`linq-deferred-execution`). B0 bis B15 sind jetzt vollständig
+abgedeckt. Einzig verbleibender offener Zweig im gesamten Dokument:
+**B16 (Namespaces & Imports)** mit seinem einzigen Tag
+`own-namespaces` — Voraussetzung dafür ist ein Mehrdatei-Projekt-Setup
+(mehrere `.cs`-Dateien mit eigenen `namespace`-Deklarationen), was mit
+der aktuellen Single-File-`dotnet exec`-Engine (ein `.cs`-Skript pro
+Challenge) nicht ohne Weiteres abbildbar ist — nächster offener
+Schritt ist zu klären, ob/wie sich `own-namespaces` sinnvoll in dieses
+Engine-Modell einpassen lässt, oder ob es wie `updatable-view` (SQL)
+und `own-modules` (Python) eine dauerhafte, dokumentierte Scope-
+Ausnahme bleibt.*
+
+**Update — die oben gestellte Frage ist entschieden, und die Annahme
+aus dem letzten Durchgang war zu pessimistisch in zweierlei Hinsicht:**
+Erstens braucht `own-namespaces` **kein** Mehrdatei-Projekt-Setup — C#
+erlaubt mehrere `namespace`-Blöcke in einer einzigen Datei, der
+eigentliche Kern des Tags (eigene Namespaces deklarieren und per
+`using` importieren, um Namenskollisionen in größeren Projekten zu
+vermeiden) lässt sich vollständig innerhalb eines einzigen
+`.cs`-Skripts demonstrieren, exakt wie schon `delegate`-Typen (B14)
+oder `class`-Deklarationen (B10) am Dateiende nach den
+Top-Level-Anweisungen stehen (`CS8803`). Empirisch gegen den echten
+`dotnet`-Treiber bestätigt, **bevor** der Content geschrieben wurde:
+ein Szenario mit zwei unabhängigen `namespace`-Blöcken (`Lager`,
+`Versand`), die jeweils eine eigene, gleichnamige Klasse `Kiste`
+enthalten, kompiliert und läuft korrekt — `using Lager;` importiert
+nur den einen Namespace, der andere braucht die vollqualifizierte
+Schreibweise `Versand.Kiste`. Zweitens hat B16 nicht nur den einen
+Tag `own-namespaces`, sondern **drei**: `namespace-declaration`,
+`using-directive` und `own-namespaces` — keine der beiden anderen
+Tags war bislang durch eine Challenge abgedeckt, denn der
+Node-Testtreiber injiziert `System`/`System.Linq`/etc. bereits als
+globale Usings (siehe `csharp-engine/driver/Program.cs`), sodass bis
+hierhin **keine** Challenge einen eigenen `using`- oder
+`namespace`-Block im Lösungscode brauchte. Damit ist `own-namespaces`
+**kein** dauerhafter Scope-Ausnahmefall wie `updatable-view` (SQL) oder
+`own-modules` (Python), sondern ein regulär abdeckbarer Tag — und ein
+einziges Szenario kann alle drei B16-Tags gleichzeitig abdecken.
+
+Challenge 27 deckt alle drei B16-Tags in einem Durchgang ab — den
+letzten offenen Zweig im gesamten C#-Dokument. Szenario: zwei
+`namespace`-Blöcke `Lager` und `Versand` (`namespace-declaration`),
+beide mit einer eigenen Klasse `Kiste` (unabhängige Typen trotz
+gleichen Namens). Ein selbst geschriebenes `using Lager;`
+(`using-directive`) importiert nur `Lager`; `new Kiste(5)` löst
+darüber zu `Lager.Kiste` auf, während `new Versand.Kiste(10)` die
+vollqualifizierte Schreibweise braucht, weil `Versand` nicht
+importiert ist (`own-namespaces`: genau die Namenskollisions-
+Vermeidung, für die eigene Namespaces gedacht sind). Drei
+Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `using Lager;` komplett weggelassen — echter
+Compilerfehler `CS0246` ("The type or namespace name 'Kiste' could not
+be found"); die beiden Zahlenwerte bei der Konstruktion vertauscht —
+kompiliert einwandfrei, zeigt aber die vertauschten Werte in beiden
+Ausgabezeilen; der zweite Namespace-Name bei der Deklaration
+versehentlich als `Versand2` statt `Versand` getippt — der Aufruf
+`new Versand.Kiste(10)` referenziert weiterhin den ursprünglichen,
+jetzt nicht mehr existierenden Namen, wieder ein echter
+`CS0246`-Compilerfehler.
+
+**Tag-Bilanz: 86 von 86 (100 %).** Damit ist **B16 (Namespaces &
+Imports) komplett** — und mit ihm das **gesamte C#-Konzept-Dokument**.
+Jeder Tag in allen 17 Zweigen (B0 bis B16) ist jetzt durch mindestens
+eine Challenge abgedeckt, empirisch gegen den echten `dotnet`-Treiber
+verifiziert (Gate 1: eigene Lösung besteht `validate()`; Gate 2: jeder
+Distraktor scheitert daran). Analog zu SQL (81/82, nur die permanente
+Scope-Ausnahme `updatable-view` offen) und Python (81/82, nur die
+permanente Ausnahme `own-modules` offen) hat C# damit seinen
+vollständigen aktionablen Konzeptraum erreicht — anders als bei SQL
+und Python bleibt hier nicht einmal eine bewusste Scope-Ausnahme
+übrig. Nächster offener Schritt für C# ist kein Content mehr, sondern
+Mandat-Punkt 4: die Engine-Integration selbst live spielbar machen
+(`runQuery`-Async-Umstellung, Registry-Eintrag, `coi-serviceworker`
+für Produktion — siehe `docs/csharp-engine-poc.md`).*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt

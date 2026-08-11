@@ -20,7 +20,7 @@ const c01 = sqlLernenToolCourse.challenges.find((c) => c.num === '01')!;
 
 function testEngineFactory(): EngineFactory {
   const main = createNodeSqliteEngine();
-  return { getMain: () => main, setMainFromSqlJs: () => {}, createDisposable: () => createNodeSqliteEngine(), getMainPython: () => null, ensurePythonEngine: () => Promise.reject(new Error("python engine not available in this test fixture")) };
+  return { getMain: () => main, setMainFromSqlJs: () => {}, createDisposable: () => createNodeSqliteEngine(), getMainPython: () => null, ensurePythonEngine: () => Promise.reject(new Error("python engine not available in this test fixture")), getMainCSharp: () => null, ensureCSharpEngine: () => Promise.reject(new Error("csharp engine not available in this test fixture")) };
 }
 
 function makeCtx(progress: ProgressState = createDefaultProgressState()): AppContext {
@@ -76,6 +76,16 @@ describe('mountHintsSection', () => {
     selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
 
     expect(root.querySelector('.hint-text code')).not.toBeNull();
+  });
+
+  it('syntax-highlights code inside a revealed hint using the same tokenizer as the editor', () => {
+    let progress = createDefaultProgressState();
+    progress = withChallengeProgress(progress, 'sqlite', 'sqlLernenTool', '01', { hintsUsed: 3 });
+    const ctx = makeCtx(progress);
+    mountHintsSection(root, ctx);
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
+
+    expect(root.querySelector('.hint-text .tok-keyword')).not.toBeNull();
   });
 
   it('shows revealed hints and still offers the next one', () => {

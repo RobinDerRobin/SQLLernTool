@@ -1,6 +1,7 @@
 import { getCourseSettings } from '../../../../domain/progress/progressModel';
 import type { AppContext } from '../../../context';
 import { mountView } from '../../../mount';
+import { highlightContentHtml } from '../../../render/contentHighlight';
 import { revealHint } from '../../../state/actions';
 import { selectChallengeProgress, type AppState } from '../../../state/appState';
 import { findChallengeInRegistry } from '../../../state/challengeLookup';
@@ -13,6 +14,7 @@ interface HintsSlice {
   hintsUsed: number;
   mode: 'study' | 'exam';
   examTipsRemaining: number;
+  trackId: string;
 }
 
 function sliceHints(state: AppState, registry: AppContext['registry']): HintsSlice {
@@ -29,6 +31,7 @@ function sliceHints(state: AppState, registry: AppContext['registry']): HintsSli
     hintsUsed: selectChallengeProgress(state)?.hintsUsed ?? 0,
     mode: settings.mode,
     examTipsRemaining: settings.examTipsRemaining,
+    trackId: selection?.trackId ?? '',
   };
 }
 
@@ -57,7 +60,7 @@ function renderHints(slice: HintsSlice): string {
         return `
           <div class="hint-revealed">
             <span class="hint-num">Tipp ${idx + 1}</span>
-            <div class="hint-text">${hintHtml}</div>
+            <div class="hint-text">${highlightContentHtml(hintHtml, slice.trackId)}</div>
           </div>`;
       }
       const locked = idx > slice.hintsUsed || poolEmpty;
@@ -81,6 +84,7 @@ export function mountHintsSection(root: HTMLElement, ctx: AppContext): Unsubscri
       render: renderHints,
       shouldUpdate: (prev, next) =>
         prev.num !== next.num ||
+        prev.trackId !== next.trackId ||
         prev.hintsUsed !== next.hintsUsed ||
         prev.mode !== next.mode ||
         prev.examTipsRemaining !== next.examTipsRemaining,

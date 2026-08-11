@@ -438,6 +438,22 @@ geschrieben — B10 und B11 sind jetzt ebenfalls vollständig abgedeckt.**
 Der Rest dieses Abschnitts ist der historische Stand vor diesen Updates;
 die Bilanz am Ende ist bereits aktualisiert.*
 
+*Update 2026-08-09 (stündliche Routine, Fortsetzung): Challenges 20–20.3
+ergänzt und schließen die vier verbleibenden, thematisch verstreuten
+Einzeltags aus B2/B5/B6 — `dynamic-typing` (20, dieselbe Variable wechselt
+per Neuzuweisung den Typ, geprüft über `type(x).__name__`),
+`bool-conversion-truthiness` (20.1, `bool(0/""/[])` vs. Werte mit Inhalt —
+der Distraktor demonstriert die naheliegende Fehlannahme, jeder "vorhandene"
+Wert sei automatisch truthy), `truthiness-in-conditions` (20.2, `if liste:`
+direkt statt `bool()`/Vergleich — der Distraktor vergleicht fälschlich mit
+`== True`, was bei Listen nie zutrifft, auch nicht bei nicht-leeren),
+`ternary-expression` (20.3, `x if bedingung else y`). Alle vier
+Distraktor-Annahmen vorab mit echtem `python3` verifiziert, nicht nur
+angenommen (u. a. `[] == True` → `False`). **Damit ist jeder aktionable
+Python-Tag abgedeckt — 81 von 82, nur noch `own-modules` (permanente
+Sandbox-Ausnahme) bleibt offen.** Python liegt damit erstmals vor SQL
+(80/82) statt gleichauf.
+
 Von den 82 Tags deckt `pythonGrundlagen` (63 Challenges) folgende ab:
 
 **Vollständig abgedeckt:** `program-execution-model`, `function-call-syntax`
@@ -477,37 +493,32 @@ Objektorientierung komplett**: `class-definition` (18),
 `instance-attributes-init` (18.1), `instance-methods` (18.2),
 `class-vs-instance-attributes` (18.3), `inheritance` (18.4),
 `method-overriding` (18.5), `dunder-methods` (18.6),
-`encapsulation-convention` (18.7), sowie **seit 2026-08-09 die
-verbleibenden Tags aus B10 und B11**: `iterator-protocol` (19),
-`generator-functions` (19.1), `custom-exceptions` (19.2) —
-**77 von 82 Tags (≈ 94 %).**
+`encapsulation-convention` (18.7), sowie seit 2026-08-09 die
+verbleibenden Tags aus B10 und B11: `iterator-protocol` (19),
+`generator-functions` (19.1), `custom-exceptions` (19.2), sowie
+**seit 2026-08-09 die letzten vier aktionablen Einzeltags aus B2/B5/B6**:
+`dynamic-typing` (20), `bool-conversion-truthiness` (20.1),
+`truthiness-in-conditions` (20.2), `ternary-expression` (20.3) —
+**81 von 82 Tags (≈ 99 %).**
 
-**Nicht abgedeckt:** `dynamic-typing` als **eigenes** Thema (wird
-durchgehend demonstriert, nie benannt — genau wie `logical-operators` im
-SQL-Kurs), `bool-conversion-truthiness`, `truthiness-in-conditions`,
-`ternary-expression`, und `own-modules` aus B12 (siehe architektonische
+**Nicht abgedeckt:** nur noch `own-modules` aus B12 (siehe architektonische
 Begründung oben) — die einzige verbleibende Lücke, die keine
 Einzeltag-Frage, sondern eine dauerhafte Sandbox-Grenze ist.
 
-**Bilanz:** 77 von 82 Tags abgedeckt (≈ 94 %) — Stand 2026-08-09 liegt
-SQL gleichauf (ebenfalls 77/82, ≈ 94 %, nach mehreren SQL-Content-
-Routinen seit dieser Zahl hier zuletzt aktualisiert wurde — siehe
-`docs/sql-concept-hierarchy.md`). Der Kursname `pythonGrundlagen`
-deckt inzwischen deutlich mehr als nur die absoluten Basics ab (Variablen,
-Grundrechenarten, Verzweigung, Schleifen, ganz Funktionen inklusive
+**Bilanz:** 81 von 82 Tags abgedeckt (≈ 99 %) — Python liegt damit
+erstmals **vor** SQL (80/82, ≈ 98 % — siehe `docs/sql-concept-hierarchy.md`).
+Der Kursname `pythonGrundlagen` deckt inzwischen deutlich mehr als nur die
+absoluten Basics ab (Variablen, Grundrechenarten, Verzweigung inklusive
+Truthiness und Ternary-Ausdruck, Schleifen, ganz Funktionen inklusive
 *args/**kwargs, lambda, map()/filter()/sorted(), ganz Datenstrukturen,
 List-/Dict-/Set-Comprehensions, Generator Expressions, ganz
 Fehlerbehandlung inklusive eigener Exception-Klassen, die Kernsyntax von
 Imports/Standardbibliothek, ganz Dateizugriff, und ganz
 Objektorientierung inklusive des Iterator-Protokolls und
-Generatorfunktionen) — B7, B8, B9, B10, B11, B13 und B14 sind vollständig
-geschlossen. **Kein Zweig ist mehr komplett Lücke, und bis auf B12 (das
-own-modules-Sandbox-Limit) ist kein Zweig mehr überhaupt teilweise
-offen** — B2, B5 und B6 bleiben bei den drei kleinen, bewusst nicht
-vorgezogenen "Nicht abgedeckt"-Tags oben (`dynamic-typing`,
-`bool-conversion-truthiness`, `truthiness-in-conditions`,
-`ternary-expression`), die keiner B14-Abhängigkeit unterlagen, sondern
-schlicht noch nicht an der Reihe waren.
+Generatorfunktionen) — B2, B5, B6, B7, B8, B9, B10, B11, B13 und B14 sind
+vollständig geschlossen. **Kein Zweig ist mehr Lücke — der einzige
+verbleibende offene Tag ist `own-modules` (B12), eine dauerhafte
+Sandbox-Ausnahme, keine offene Aufgabe.**
 
 ## 7. Bewusst ausgeklammert
 

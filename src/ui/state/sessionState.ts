@@ -35,6 +35,8 @@ export interface SessionState {
   /** Crosses a module boundary: the trigger button lives in sidebarShell, the panel in themePicker. */
   themePickerOpen: boolean;
   pythonStatus: PythonEngineStatus;
+  /** Same lazy-load shape as pythonStatus — the C# engine loads the Blazor bundle only once a C#-track challenge is opened. */
+  csharpStatus: PythonEngineStatus;
 }
 
 export function createDefaultSessionState(): SessionState {
@@ -49,6 +51,7 @@ export function createDefaultSessionState(): SessionState {
     chatDraftPrefill: null,
     themePickerOpen: false,
     pythonStatus: 'idle',
+    csharpStatus: 'idle',
   };
 }
 
@@ -90,4 +93,8 @@ export function withThemePickerOpen(state: SessionState, themePickerOpen: boolea
 
 export function withPythonStatus(state: SessionState, pythonStatus: PythonEngineStatus): SessionState {
   return { ...state, pythonStatus };
+}
+
+export function withCSharpStatus(state: SessionState, csharpStatus: PythonEngineStatus): SessionState {
+  return { ...state, csharpStatus };
 }

@@ -20,7 +20,7 @@ const c01 = sqlLernenToolCourse.challenges.find((c) => c.num === '01')!;
 
 function testEngineFactory(): EngineFactory {
   const main = createNodeSqliteEngine();
-  return { getMain: () => main, setMainFromSqlJs: () => {}, createDisposable: () => createNodeSqliteEngine(), getMainPython: () => null, ensurePythonEngine: () => Promise.reject(new Error("python engine not available in this test fixture")) };
+  return { getMain: () => main, setMainFromSqlJs: () => {}, createDisposable: () => createNodeSqliteEngine(), getMainPython: () => null, ensurePythonEngine: () => Promise.reject(new Error("python engine not available in this test fixture")), getMainCSharp: () => null, ensureCSharpEngine: () => Promise.reject(new Error("csharp engine not available in this test fixture")) };
 }
 
 function makeCtx(progress: ProgressState = createDefaultProgressState()): AppContext {
@@ -98,6 +98,15 @@ describe('mountSolutionSection', () => {
 
     expect(root.querySelector('.solution-panel pre')?.textContent).toBe(c01.solution);
     expect(root.querySelector('.solution-explanation')?.querySelector('li')).not.toBeNull();
+  });
+
+  it('syntax-highlights the solution code and its explanation using the same tokenizer as the editor', () => {
+    const ctx = makeCtx();
+    mountSolutionSection(root, ctx, fakeEditor());
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
+
+    expect(root.querySelector('.solution-panel pre .tok-keyword')).not.toBeNull();
+    expect(root.querySelector('.solution-explanation .tok-keyword')).not.toBeNull();
   });
 
   it('shows the star-cost note once the solution has been viewed', () => {

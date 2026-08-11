@@ -306,16 +306,26 @@ didn't pan out; it doesn't need to be pursued now.
 - The service worker reloads the page once on first visit to activate
   itself (standard SW-registration-then-reload pattern) — acceptable for
   a learning tool, but means the C# engine's own loading UI needs to
-  tolerate one extra reload before it starts fetching Blazor assets, and
-  this should not affect the SQL/Python tracks at all if the service
-  worker's scope is limited to only the page/route that hosts the C#
-  engine (avoid registering it site-wide).
+  tolerate one extra reload before it starts fetching Blazor assets.
+  **Correction (2026-08-10, see the dated update after step 5 below for
+  the full empirical writeup):** the "scope it to only the C# route,
+  avoid registering site-wide" idea in the original version of this
+  bullet turned out to rest on a wrong assumption — this app has no
+  per-route pages to scope to (single `index.html`, no client routing),
+  *and* a live test proved a scoped/child-only COOP+COEP doesn't grant
+  isolation anyway (isolation is a top-level-document property). The
+  header injection has to apply to the whole app. That's fine: the actual
+  fix is using `COEP: credentialless` instead of `require-corp`
+  site-wide, which does **not** require SQL/Python's CDN loads to send
+  `Cross-Origin-Resource-Policy` — verified live, see below.
 - COEP `require-corp` only requires `Cross-Origin-Resource-Policy` headers
   on genuinely cross-origin subresources; everything the Blazor boot
   sequence fetches (`.wasm`, `.dll`, `blazor.boot.json`, etc.) will be
   same-origin GitHub Pages assets, so no per-file CORP header wrangling
-  is expected to be needed — worth a real Playwright check once step 3 is
-  built, not just assumed.
+  is expected to be needed there either way. **Superseded:** per the
+  finding below, use `credentialless` rather than `require-corp` in the
+  first place, which sidesteps this question for every *other* subresource
+  on the page (SQL/Python's CDN scripts) too, not just Blazor's own assets.
 - A newer header, `Document-Isolation-Policy: isolate-and-credentialless`,
   is emerging (W3C TAG review as of 2026) as a lower-friction alternative
   that doesn't require COEP on the *page itself* — not yet broadly
@@ -479,6 +489,622 @@ Roughly in dependency order:
    a track that's selectable but non-functional would be worse than not
    shipping it yet, so the registry line is the one deliberately-withheld
    piece here — added the moment those four gaps are closed, not before.
+
+   **Update (2026-08-10): one of these four gaps is now closed.** The C#
+   `LanguagePlugin` (`src/editor/languages/csharp/`) exists — a
+   `tokenizer.ts`/`highlight.ts`/`autoIndent.ts` trio mirroring the
+   SQL/Python plugins' shape exactly, plus a reused `autoClosePairs.ts`
+   (bracket/quote closing is language-agnostic) and a no-op
+   `uppercaseKeyword.ts` (C# keywords are conventionally lowercase, same
+   reasoning Python's plugin already used), combined into
+   `csharpLanguagePlugin.ts` implementing the `LanguagePlugin` interface
+   with `id: 'csharp'`. 28 unit tests
+   (`csharpLanguagePlugin.test.ts`) cover keyword/type/string/comment
+   tokenization and auto-indent.
+
+   One real design deviation from the SQL/Python precedent, found by
+   writing the tests against real C# syntax rather than assuming the
+   ported pattern would just work: SQL's and Python's tokenizers both
+   classify *any* word immediately followed by `(` as a function call,
+   checked *before* keyword-set membership — correct for SQL, where a
+   word like `DATE` can legitimately be either a datatype or a function
+   name, so the paren-call heuristic is the only way to disambiguate.
+   Porting that same priority order to C# verbatim initially misclassified
+   `if (`, `while (`, `catch (` — i.e. virtually all real C# control-flow
+   syntax — as function calls, since those keywords are almost always
+   immediately followed by `(`. Fixed by flipping the priority for C#
+   specifically: keyword/type-set membership is checked *first*, and the
+   paren heuristic only applies to words that aren't reserved at all. This
+   is actually more correct for C# than the SQL/Python order it was copied
+   from — every C# keyword and built-in type is a genuinely reserved word
+   that can never be reused as an identifier (unlike SQL's looser
+   reserved-word rules), so there is no real ambiguity left to resolve with
+   paren-position once reserved words are excluded first.
+
+   Deliberately **not** wired into `domEditor.ts`/`editorTab.ts` yet (no
+   language-picker code path routes to it) and the C# track is still not
+   in `TRACKS` — this increment closes exactly one of the four gaps listed
+   above, not all of them. Remaining gaps before the C# track is playable
+   in the live app: `ctx.engines`/`AppContext` wiring for a C#-track case,
+   the registry line itself, and deciding where the Blazor bundle is
+   served from in dev/production (the COOP/COEP `coi-serviceworker`
+   question from step 1 is resolved in principle but not yet implemented
+   as an actual dev-server/build step).
+
+   **Update (2026-08-10, second increment): the `ctx.engines`/`AppContext`
+   gap is now closed too.** `EngineFactory` (`src/ui/context.ts`) gained
+   `getMainCSharp()`/`ensureCSharpEngine(loadEngine)`, mirroring
+   `getMainPython()`/`ensurePythonEngine(loadPyodide)` exactly: lazy,
+   load-once-and-cache, single shared engine (no separate disposable
+   engine, since — like Python — every `exec()` is a fresh, stateless run).
+   `ensureCSharpEngine` takes a zero-argument `loadEngine` closure rather
+   than a `baseUrl` directly, so the factory itself stays agnostic of
+   where the Blazor bundle is served from (that decision is still open) —
+   a real call site would pass `() => loadCSharpEngineFromServer(baseUrl)`.
+   6 new unit tests in `context.test.ts`, same shape as the existing
+   Python engine tests (load-once/caching, exec() delegation, retry after
+   a failed load). All 16 test files that build a fake `EngineFactory` for
+   other UI tests were updated to satisfy the now-larger interface (a
+   rejecting `ensureCSharpEngine` stub, matching how each already stubs
+   `ensurePythonEngine`) — pure mechanical follow-through, no behavior
+   changes to those tests.
+
+   **Deliberately not done in this increment:** no call site anywhere
+   actually calls `ensureCSharpEngine` yet (unlike Python's
+   `ensurePythonEngineLoaded` in `src/ui/state/actions.ts`, triggered when
+   a Python-track challenge opens) — there is no C#-track challenge that
+   could trigger it, since the registry line is still the deliberately-
+   withheld piece. Wiring a real call site now would be dead code with
+   nothing to invoke it. Two gaps remain: the registry line itself, and
+   the Blazor bundle's dev/production serving location — the latter has
+   to land before a real call site can pass it a working `baseUrl`.
+
+   **Design revision needed (2026-08-10, analysis only, no code changed):**
+   re-examining the still-open serving-location gap surfaced a real problem
+   with the hosting plan as currently written. The COOP/COEP decision
+   above (`coi-serviceworker`, "scoped to the C# engine's own route") was
+   written assuming there'd be a literal separate route/page for the C#
+   engine. There isn't one, and can't easily be one: this app is a single-
+   page app with **no client-side routing at all** — `vite.config.ts` uses
+   `vite-plugin-singlefile` to inline the entire SQL/Python/(future C#) UI
+   into one `index.html`, and `loadCSharpEngineFromServer` in
+   `src/runtime/csharp/csharpEngine.ts` (confirmed by re-reading the
+   current code, not just the plan) injects Blazor's `<script>` tag
+   directly into `document.body` of that *same* document. COOP/COEP are
+   enforced per-document, decided by that document's own response headers
+   — there is no way to apply them to "only the C# part" of a single HTML
+   document. Applying them to the whole document to satisfy multithreaded
+   WASM's `SharedArrayBuffer` requirement would put every other track's
+   asset loads under `Cross-Origin-Embedder-Policy: require-corp` too —
+   including SQL/Python's CDN-hosted `sql.js`/Pyodide `<script>` loads in
+   production, and this project's own `context.route()`-served local
+   copies in every Playwright bug-hunt pass — neither of which currently
+   sends a `Cross-Origin-Resource-Policy` header, and both would silently
+   start failing to load. This is exactly the kind of regression risk the
+   "never leave the repo in a broken intermediate state" rule in the
+   standing routine mandate exists to prevent, so it's flagged here rather
+   than implemented under time pressure.
+
+   **Update (2026-08-10, later same day): the iframe proposal above is
+   WRONG — empirically disproven, not just reconsidered.** Built a
+   minimal, throwaway Node+Playwright harness (two local HTTP origins on
+   different ports, standing in for a same-origin parent app and a
+   cross-origin CDN, since the sandbox blocks real CDN domains) and tested
+   the actual claim before writing any real code:
+   - **Same-origin child iframe with its own `COOP: same-origin` +
+     `COEP: require-corp`, embedded in a parent with NEITHER header:**
+     `window.crossOriginIsolated` inside the iframe measured **`false`**,
+     `SharedArrayBuffer` **undefined**. A positive control (both parent
+     *and* child sending the headers) measured `true`/available in both,
+     proving the harness itself was sound — the negative result is real.
+     Cross-origin isolation is a property of the top-level browsing
+     context / agent cluster, decided by the *top* document's own headers;
+     a child frame cannot unilaterally opt itself into it while the parent
+     stays unisolated. The whole "isolate only the iframe, leave
+     `index.html` alone" premise from the proposal above does not work,
+     full stop — it would need to be abandoned regardless of any
+     `postMessage`/transport rewrite effort spent on it.
+   - **The actual fix, verified working:** use
+     `Cross-Origin-Embedder-Policy: credentialless` instead of
+     `require-corp` on the **main document** (`COOP: same-origin` stays
+     the same either way). Unlike `require-corp`, `credentialless` does
+     **not** require a `Cross-Origin-Resource-Policy` header on cross-origin
+     no-cors subresources — it just strips credentials (cookies/HTTP
+     auth) from those specific requests, which is irrelevant for public,
+     unauthenticated CDN scripts. Verified live: a page served with
+     `COOP: same-origin` + `COEP: credentialless`, loading a
+     cross-origin `<script>` from a second local origin that sends **no**
+     `Cross-Origin-Resource-Policy` header at all (deliberately mimicking
+     an unconfigured real-world CDN), measured
+     `crossOriginIsolated=true`, `SharedArrayBuffer` available, the
+     cross-origin script loaded and ran successfully, and zero console
+     errors. This directly resolves the regression risk found earlier
+     today — SQL/Python's CDN-hosted `sql.js`/Pyodide loads and this
+     project's `context.route()`-served local copies in every Playwright
+     bug-hunt pass need no changes at all, because they're all plain,
+     unauthenticated, public-script loads with nothing that
+     `credentialless` would strip. (The one network call in this app that
+     *is* cross-origin, `claudeChatClient.ts`'s `fetch()` to
+     `api.anthropic.com`, sends no `credentials` option and carries no
+     cookies — also unaffected, confirmed by re-reading that file.)
+   - **This also simplifies the plan back down**, not up: the original
+     2026-08-08 decision ("`coi-serviceworker`, applied to the whole app")
+     turns out to have been *closer to correct* than this same day's
+     earlier iframe detour — the only real correction needed to that
+     original plan is **use `credentialless` mode, not `require-corp`**,
+     applied document-wide via whatever mechanism sets the headers
+     (`coi-serviceworker`'s injected headers in production/GitHub Pages,
+     a small Vite dev-server middleware locally). No iframe, no
+     `postMessage` transport rewrite, no change to
+     `loadCSharpEngineFromServer`'s current "inject a `<script>` tag into
+     the current document" approach.
+   - **Update (2026-08-10, later same day): `WasmEnableThreads` under
+     `credentialless` now verified against the real published bundle, not
+     just a plain HTML page.** First, a real, previously-undiscovered
+     build bug surfaced while getting a fresh publish output at all: a
+     clean `dotnet publish -c Release` failed with `CS8802` (only one
+     compilation unit can have top-level statements) — the SDK's default
+     recursive `**/*.cs` glob was sweeping `csharp-engine/driver/Program.cs`
+     (the separate console project from step 6 below, added in a later
+     session) into this project's own compilation. Fixed with a
+     `<Compile Remove="driver/**/*.cs" />` exclusion in
+     `CSharpEngineBlazor.csproj` (committed separately, verified against a
+     clean publish and the full npm test suite — 990/990, this touches
+     nothing under `src/`).
+
+     With a real publish output in hand: served
+     `csharp-engine/bin/Release/net8.0/publish/wwwroot` from a minimal
+     Node static server sending `COOP: same-origin` +
+     `COEP: credentialless` on every response, and loaded it in real
+     headless Chromium via Playwright. `window.crossOriginIsolated` was
+     `true` immediately. The published `index.html`'s own built-in boot
+     script (`Blazor.start().then(...)`, already present in the checked-in
+     file, unrelated to anything written today) ran
+     `CSharpEngine.RunCode('int x = 2 + 2; Console.WriteLine($"x = {x}");')`
+     automatically on load and logged
+     `CSHARP_RESULT:{"stdout":"x = 4\n","error":null}` to the console — a
+     real Roslyn compile and a real WASM execution, both succeeding under
+     `credentialless`. A follow-up call against the same already-booted
+     instance with intentionally invalid code
+     (`int x = "not a number";`) correctly returned a real compiler
+     diagnostic, `error CS0029: Cannot implicitly convert type 'string' to
+     'int'`. (An earlier attempt to *also* manually re-inject the Blazor
+     script and call `Blazor.start()` a second time from the test harness
+     — redundant, since the page already does this itself — caused a
+     harmless "root component already attached" collision error and an
+     apparent multi-minute hang; that was a bug in the throwaway test
+     script, not in the engine or in `credentialless` itself, and
+     disappeared once the test just let the page's own boot script run
+     once.)
+
+     **This closes the hosting question for real.** The plan from
+     2026-08-08 (apply the headers document-wide via `coi-serviceworker`
+     in production / a small dev-server middleware locally), corrected
+     today to use `credentialless` instead of `require-corp`, is now
+     verified end-to-end against the actual multithreaded-WASM Blazor
+     bundle — not just reasoned about. The next concrete C# increment for
+     a future firing is building the actual Vite dev-server middleware
+     (so `npm run dev` serves `csharp-engine/`'s published output with
+     these headers) and wiring GitHub Pages' `coi-serviceworker` for
+     production — no more open design questions block that work.
+
+   **Update (2026-08-10, third increment same day): the dev-server
+   middleware is now built.** `vite.config.ts` gained a
+   `csharpEngineDevServer()` plugin (`apply: 'serve'`, so production
+   builds are completely untouched): sets `Cross-Origin-Opener-Policy:
+   same-origin` + `Cross-Origin-Embedder-Policy: credentialless` on every
+   dev-server response, and serves
+   `csharp-engine/bin/Release/net8.0/publish/wwwroot` (gitignored, built
+   locally via `dotnet publish -c Release`) under `/csharp-engine/`. If
+   that publish output doesn't exist (a fresh clone without the .NET SDK),
+   the plugin logs a one-line note and simply skips the static-file
+   middleware — `npm run dev` still works fine for SQL/Python either way.
+
+   Live-verified end-to-end with the real dev server (`npm run dev`,
+   Playwright, the usual `context.route()` CDN workaround for
+   sql.js/Pyodide): the main app's `window.crossOriginIsolated` is `true`,
+   10/10 sampled SQL solutions and 9/9 sampled Python solutions still pass
+   with zero console errors — the `credentialless` finding held up against
+   the real app, not just the earlier synthetic test. `/csharp-engine/`
+   itself also reports `crossOriginIsolated: true`, and its built-in
+   smoke-test page (already in the checked-in `index.html`, unrelated to
+   today's work) successfully compiled and ran real C#
+   (`CSHARP_RESULT:{"stdout":"x = 4\n","error":null}`) through the actual
+   Vite middleware.
+
+   **One more real bug found and fixed along the way:** the first attempt
+   at `/csharp-engine/` 404'd with `Blazor is not defined`. Cause: the
+   checked-in `index.html` hardcodes `<base href="/" />`, written for the
+   case where this project is hosted at its own origin root (e.g.
+   `dotnet run`'s own dev server). Nested under `/csharp-engine/`, that
+   base href resolves the page's relative `_framework/blazor.webassembly.js`
+   script tag against site root instead of the mount path — a 404 for the
+   script itself, hence `Blazor` staying undefined. Worse, this isn't just
+   a page-load nuance: `Program.cs` sets `CSharpEngine.BaseAddress` from
+   `WebAssemblyHostBuilder.HostEnvironment.BaseAddress`, which Blazor
+   itself derives from the same `<base href>` at boot — so a wrong base
+   href would 404 the ref-assembly fetches
+   (`CSharpEngine.GetReferencesAsync()`) too, not merely the initial
+   script load. Fixed by rewriting `<base href="/" />` to
+   `<base href="/csharp-engine/" />` specifically when the middleware
+   serves that one HTML file — nothing else about the response changes.
+   **Implication flagged for the next wiring increment:** the real
+   `loadCSharpEngineFromServer(baseUrl)` path (used once a real call site
+   exists) injects its own `<script>` tag with an absolute `src` rather
+   than relying on a relative one, sidestepping half of this problem — but
+   Blazor's *own* internal boot sequence still resolves its base address
+   from `document.baseURI` of whichever document hosts it, which for a
+   script injected into the *main SQLLernTool app's own document* would be
+   that document's base (effectively `/`, no override), not
+   `/csharp-engine/`. Embedding the engine in a dedicated iframe (its own
+   document, naturally getting the right `baseURI` from its own URL) would
+   solve this for free — and is now safe from an isolation standpoint too,
+   since a same-origin iframe *does* inherit `crossOriginIsolated` from an
+   already-isolated parent (confirmed by this session's earlier positive-
+   control test, 2026-08-10). Revisiting the iframe idea for *this*
+   specific reason — not the COOP/COEP reason it was wrongly proposed for
+   earlier today — is worth real consideration in the next increment that
+   wires an actual `ensureCSharpEngine` call site.
+
+   **Update (2026-08-10, next day's first firing): confirmed empirically
+   — an iframe (or equivalent dedicated document) is required, not just
+   nicer-to-have.** The open question above was whether Blazor's *own*
+   core module loader (`_framework/dotnet.js` etc., not just this
+   project's custom ref-assembly `HttpClient`) resolves paths from
+   `document.baseURI`/`<base href>`, or from wherever the
+   `blazor.webassembly.js` script itself was loaded from — if the latter,
+   a small `[JSExport]` setter overriding `CSharpEngine.BaseAddress`
+   explicitly from JS might have been enough, without needing an iframe.
+
+   Tested directly with a throwaway static server (scratchpad-only, no
+   repo changes): served the published output under `/v2/` while the
+   page's own `<base href>` stayed `/` (the same mismatch the main
+   SQLLernTool document would have — no `<base>` tag at all, so
+   `document.baseURI` defaults to site root), with a correctly-absolute
+   `<script src="/v2/_framework/blazor.webassembly.js">` tag (mirroring
+   exactly what `loadCSharpEngineFromServer` already does). Result: the
+   script itself loaded fine, but Blazor's own bootstrapper then tried to
+   fetch `http://.../​_framework/dotnet.js` (base-href-relative, resolving
+   against `/`) instead of `http://.../v2/_framework/dotnet.js` (where it
+   actually lives) — a 404, and `Failed to start platform. Reason:
+   TypeError: Failed to fetch dynamically imported module`. This happens
+   inside Blazor's own core loader, before any of this project's C# code
+   ever runs — so no JS-side override of `CSharpEngine.BaseAddress` could
+   possibly fix it; the fix has to happen before `Blazor.start()`, at the
+   level of which document is hosting it.
+
+   **Conclusion, now settled:** injecting Blazor directly into the main
+   SQLLernTool document will not work as long as that document has no
+   `<base href>` matching `/csharp-engine/` (it currently has none at
+   all). The two remaining options are (a) mutate the main document's
+   `<base href>` dynamically before booting Blazor — rejected as too
+   risky, since it's a global side effect on *every* relative URL
+   resolution in the SPA for as long as it's set, including anything
+   SQL/Python-related happening concurrently; or (b) host the engine in a
+   dedicated iframe pointed at `/csharp-engine/`, whose own `document.baseURI`
+   is naturally correct without touching the parent at all, and whose
+   isolation is inherited for free from the already-isolated parent. (b)
+   is the only sound option. The next C# increment that wires a real
+   `ensureCSharpEngine` call site should build this iframe + `postMessage`
+   transport as part of that work, not attempt direct injection — the
+   uncertainty that justified deferring this decision is now resolved.
+
+   **Update (2026-08-10, next firing): the iframe transport is now built.**
+   `src/runtime/csharp/csharpEngine.ts`'s `loadCSharpEngineFromServer` no
+   longer injects a `<script>` tag into the current document at all — it
+   creates a hidden `<iframe src="${baseUrl}host.html">` and waits for a
+   `csharp-host-ready` `postMessage` before resolving. A new file,
+   `csharp-engine/wwwroot/host.html`, is the dedicated hosting document:
+   boots Blazor itself on load (deliberately no `<base>` tag, so its
+   `document.baseURI` naturally matches wherever it was actually served
+   from), then listens for `{ type: 'csharp-run', id, code }` messages and
+   replies with `{ type: 'csharp-result', id, json }` (or `error`) —
+   `RunCode`'s JSON payload passed through unchanged, id-matched so
+   concurrent requests can't cross-resolve. `CSharpRuntime`/
+   `CSharpExecResult` (the public shape `EngineFactory.ensureCSharpEngine`
+   already depends on) did not need to change — only the transport
+   underneath did, so last firing's `AppContext` wiring stays intact
+   without modification. `createIframeExports`/`loadCSharpEngineFromServer`
+   validate every incoming message's `origin` against
+   `window.location.origin` and its `source` against the specific iframe's
+   `contentWindow`, rejecting anything else — both frames are always
+   same-origin by construction, so this is a same-origin sanity check, not
+   a cross-origin security boundary.
+
+   `csharpEngine.test.ts` fully rewritten for the new transport (12 tests,
+   up from 7): iframe creation/attributes, message round-tripping matched
+   by request id, origin/source-mismatch messages ignored, boot-error and
+   iframe-load-error rejection with the same friendly German messages as
+   before, retry-after-failure creates a fresh iframe, concurrent callers
+   share one in-flight iframe, and a resolved engine keeps returning the
+   same exports without creating a second iframe. `createCSharpEngine`'s
+   own tests (exec/reset) are unchanged since that layer didn't move.
+
+   **Live-verified end-to-end**, not just unit-tested: rebuilt
+   `csharp-engine` (`dotnet publish -c Release`, confirming `host.html`
+   lands in the publish output), served it through the Vite dev-server
+   middleware from two firings ago, and drove the *exact* iframe +
+   `postMessage` protocol via Playwright from inside the **real main
+   SQLLernTool document** (`http://localhost:5173/`, no `<base>` tag,
+   already `crossOriginIsolated`) — the precise scenario that was
+   confirmed broken for direct script injection. All three cases
+   succeeded: a real compile-and-run (`x = 4`), a real compiler diagnostic
+   (`CS0029`) on invalid code, and a real runtime exception with full
+   .NET stack trace (`IndexOutOfRangeException` via
+   `TargetInvocationException`, matching the original POC's documented
+   behavior). SQL still listed all 78 challenges afterward — creating and
+   messaging the iframe has no effect on the rest of the app.
+
+   Tests 990 → 993 (+3 net: 12 new iframe-transport tests replacing 7
+   script-injection ones). `typecheck`, `npm run build` green (632.59 kB,
+   unchanged — this only touches `src/runtime/csharp/` and
+   `csharp-engine/wwwroot/`, neither reachable from the production bundle
+   any differently than before). `knip`: unchanged, 10 findings. Coverage:
+   92.33 % / 73.16 % / 99.14 % / 92.33 %.
+
+   **Deliberately not done in this increment:** still no real
+   `ensureCSharpEngine` call site (`src/ui/state/actions.ts` has no
+   C#-track equivalent of `ensurePythonEngineLoaded` yet) and the registry
+   line is still withheld — this closes the transport-design question
+   completely, but wiring the actual UI trigger and making C# selectable
+   remains the next increment.
+
+   **Update (2026-08-10, next firing): two more standalone UI pieces
+   built, following the same "build it, don't wire the registry yet"
+   pattern already used for the `EngineFactory` and `LanguagePlugin`
+   increments.** Investigating what a real `runQuery`-equivalent for C#
+   would need surfaced a real architectural fact worth recording:
+   `src/ui/state/actions.ts`'s `runQuery` is **synchronous** — SQL's
+   `executeAndValidate` and Python's `pythonExecuteAndValidate` both run
+   to completion without awaiting anything once the engine is loaded — but
+   `src/runtime/csharp/executeAndValidate.ts`'s C# equivalent is
+   **async** (`engine.exec()` always awaits a real Roslyn compile+run,
+   whether via the Node driver or the browser's iframe/postMessage
+   transport). Wiring C# into `runQuery` therefore isn't a same-shaped
+   drop-in the way Python's `python-loading` `RunOutcome` kind was — it
+   needs `runQuery` itself (or a parallel async entry point) to support an
+   awaited result, which touches every caller of `runQuery` (currently
+   assumes a synchronous return). That's real scope for whichever future
+   firing does it, flagged here rather than attempted under time
+   pressure this increment.
+
+   What *was* built, safely decoupled from that still-open question: (1)
+   `src/ui/views/tabs/editorTab/csharpResultsArea.ts` —
+   `renderCSharpRunOutcome`/`renderCSharpLoadingOutcome`, C#'s equivalent
+   of `pythonResultsArea.ts`, taking a `CSharpExecuteAndValidateOutcome`
+   directly (not routed through `RunOutcome`, since that union hasn't
+   been extended yet) and rendering status/stdout — no variables table,
+   since step 4's `validate()` decision already established C# locals
+   aren't reflectable after `Main` returns. 9 new tests, mirroring
+   `pythonResultsArea.test.ts`'s coverage (error/success/warning states,
+   empty-stdout empty-state, HTML-escaping). (2)
+   `src/ui/views/tabs/editorTab/editorTab.ts`'s `pluginForTrack` and
+   `placeholderFor` now handle `'csharp'` (routing to
+   `csharpLanguagePlugin`, `//` line-comment placeholders) alongside
+   `'sqlite'`/`'python'` — both are unreachable dead branches until the
+   registry line lands, exactly like `EngineFactory.ensureCSharpEngine`
+   was for two firings before its call site existed.
+
+   Tests 993 → 1002 (+9, all from `csharpResultsArea.test.ts`). `typecheck`
+   green. `npm run build` succeeds; size grew 632.59 kB → 635.90 kB (232 →
+   239 modules) — `csharpLanguagePlugin.ts` and its dependents (tokenizer,
+   highlighter, auto-indent, keyword tables) are now reachable from the
+   production entry point via `editorTab.ts`'s import, not just from their
+   own test files, so they're bundled for the first time even though
+   still unreachable at runtime. `knip`: unchanged, 10 findings. Coverage:
+   92.35 % / 73.18 % / 99.15 % / 92.35 %.
+
+   **Update (2026-08-11, next firing): the final gap is closed — C# is
+   now live-playable in the app, not just authored and Gate-1/2-verified.**
+   The async-`runQuery` question flagged above turned out to have a small
+   blast radius: `runQuery` has exactly one call site outside tests
+   (`editorTab.ts`'s `run()`), so making it `async function runQuery(...):
+   Promise<RunOutcome>` and awaiting it at that one call site was a
+   contained change, not the wide refactor the earlier flag worried about.
+   `RunOutcome` gained `csharp`/`csharp-loading` kinds (mirroring
+   `python`/`python-loading` exactly); `ensureCSharpEngineLoaded` (mirrors
+   `ensurePythonEngineLoaded`, same `withTimeout`-wrapped load-once-and-
+   cache shape, triggered from `selectChallenge` for `trackId === 'csharp'`)
+   passes `loadCSharpEngineFromServer('/csharp-engine/')` — the exact path
+   the dev-server middleware from two firings ago already serves. A new
+   `session.csharpStatus` field (`withCSharpStatus`) mirrors `pythonStatus`;
+   `editorTab.ts`'s `renderPythonEngineStatus` was generalized to
+   `renderEngineStatus(status, label)` (Python and C#'s banners are
+   otherwise identical) rather than duplicated. `csharpGrundlagenCourse`
+   is now registered in `TRACKS` (`src/content/registry.ts`) — the
+   deliberately-withheld piece from every prior increment.
+
+   One real bug surfaced and fixed before committing: because SQL/Python's
+   branches of `runQuery` now also go through one `await` (even though
+   neither does any async work internally), a synchronous DOM click ->
+   result render turned into a one-microtask-later render — invisible to a
+   human, but four existing `editorTab.test.ts` tests asserted on the DOM
+   synchronously right after dispatching the click and started failing.
+   Fixed by awaiting one microtask tick in those tests (`await
+   Promise.resolve()`), matching a pattern this file already used for the
+   Pyodide-load-failure test. Also added a race guard in `run()`: since C#'s
+   real compile+run is now the one branch slow enough for a user to
+   navigate to a different challenge before it resolves, `run()` re-checks
+   the current selection after `await runQuery(...)` and drops the result
+   if the user has since moved on, instead of overwriting whatever
+   challenge is now open.
+
+   **Live-verified end-to-end against the real dev server** (Playwright,
+   not just unit tests): selected the C# track from the sidebar's
+   track/course dropdown, confirmed all 27 challenges list, opened
+   Challenge 01, confirmed the editor picked up `csharpLanguagePlugin`
+   (toolbar shows "C#", syntax highlighting active), ran the actual
+   solution — a real Roslyn compile + WASM execution over the iframe
+   transport completed, `validate()` ran, the UI showed `✓ Aufgabe
+   erfüllt`, three stars, and the correct stdout, and the sidebar's
+   challenge-list star badge updated to match. A second run against the
+   same challenge completed in ~30ms (engine cached from the first load,
+   confirming `ensureCSharpEngine`'s load-once behavior holds under the
+   real iframe transport, not just in unit tests). Confirmed no
+   regression: SQL still runs and shows success correctly on the same
+   page. The one console message observed (`ManagedError: ... Could not
+   find any element matching selector '#app'`) is the same harmless
+   Blazor-root-component-search noise documented since step 3 above — not
+   a new issue.
+
+   Tests 1034 → 1037 (+3: a `csharp-loading` case in `actions.test.ts`, a
+   real end-to-end C# success test and a C#-loading-placeholder test in
+   `editorTab.test.ts`). `typecheck` green. `npm run build` succeeds; size
+   grew 635.90 kB → 827.57 kB gzip 192.41 kB (239 → 269 modules) — this is
+   the first build where C# content is actually reachable from the
+   production entry point, not just bundled-but-dead code, confirmed by
+   grepping the built `dist/index.html` for challenge text (`Kiste`,
+   `Lager`, etc. — previously absent, now present). `knip`: unchanged, 10
+   findings.
+
+   **Still open, deliberately out of scope for this increment:**
+   production hosting. `CSHARP_ENGINE_BASE_URL = '/csharp-engine/'` in
+   `actions.ts` only resolves because the Vite dev-server middleware
+   (`csharpEngineDevServer()`) serves it locally from a `dotnet publish`
+   output that has to be built by hand first — GitHub Pages (or wherever
+   this ships) has no equivalent yet. A fresh clone without the .NET SDK,
+   or a production build, will show C# as a selectable track whose
+   challenges 404 when run. That's the next and last remaining piece:
+   `coi-serviceworker` (or an equivalent build step) wiring for whatever
+   the real production host is.
+
+   **Update (2026-08-11, next firing): a real architectural constraint
+   discovered before writing any coi-serviceworker code — this project has
+   *two* distribution paths, not one, and they pull in opposite
+   directions here.** `test/build/distOutput.test.ts` (`'is the only file
+   emitted (nothing to host alongside it)'`) and `index.html`'s own
+   fallback banner ("Deren Inhalt fügst du in einen claude.ai-Chat ein")
+   both assert/document that `dist/index.html` must stay a **single,
+   self-contained file** — the primary distribution path is pasting that
+   one file's content into a claude.ai chat, not (only) hosting it as a
+   traditional multi-file website. `coi-serviceworker` fundamentally
+   requires a **second** file (its own README: "It must be in a separate
+   file, you can't bundle it along with your app") — so the obvious first
+   idea, dropping it in Vite's `public/` folder, would make `vite build`
+   emit two files and break that test and that distribution path.
+
+   The resolution: `coi-serviceworker.js` (vendored from the official
+   `coi-serviceworker` npm package, v0.1.7, MIT, unmodified except for one
+   `window.coi = { coepCredentialless: () => true }` config block — forces
+   `credentialless` mode regardless of browser, since the library's own
+   default (`require-corp` outside Chrome) would break SQL.js'/Pyodide's
+   CDN `<script>` loads exactly as originally found in the 2026-08-10
+   COOP/COEP investigation above) now lives as a **repo-root file, outside
+   `src/` and outside `public/`** — invisible to Vite's build graph
+   entirely. `index.html` gained a `<script src="coi-serviceworker.js">`
+   tag (plus the `window.coi` config) in its `<head>`; since this is a
+   plain external-file reference exactly like the existing sql.js CDN
+   `<script>` tag two lines below it, Vite's build passes it through as
+   inert markup rather than trying to inline or resolve it — confirmed
+   with a real `npm run build` afterward: `dist/` still contains exactly
+   one file, `distOutput.test.ts` still passes unmodified. For the
+   "paste into a claude.ai chat" use case, that script tag now simply
+   404s harmlessly (same as the C# track already does in that context,
+   since there's no `/csharp-engine/` to load from there either) — no
+   regression, because nothing worked there before either.
+
+   **Empirically verified the technique itself works**, not just that it
+   doesn't break the existing tests: built a throwaway plain Node static
+   file server (scratchpad-only) that serves the real built
+   `dist/index.html` plus the vendored `coi-serviceworker.js` and sends
+   **zero** custom headers on every response — deliberately reproducing
+   GitHub Pages' exact constraint (no custom header support at all) rather
+   than assuming it. Real headless Chromium via Playwright confirmed:
+   `window.crossOriginIsolated` → `true`, `navigator.serviceWorker.controller`
+   → active, `typeof SharedArrayBuffer` → `"function"` (available) — the
+   full isolation stack Blazor's multithreaded WASM needs, achieved with
+   zero server-side header support, exactly the GitHub Pages constraint
+   this whole detour exists to solve.
+
+   One tooling accident along the way, caught and fixed before it could
+   cause confusion in a future firing: installing the `coi-serviceworker`
+   npm package (`--no-save`, purely to read its source — the maintained,
+   version-pinned copy rather than retyping it from memory) triggered an
+   npm dependency-tree reconciliation that silently pruned `playwright`,
+   `sql.js`, and `pyodide` from `node_modules` — all three are
+   intentionally *not* in `package.json` (they're sandbox-only tooling for
+   live Playwright bug-hunts, installed ad hoc per the runbook in
+   `docs/ui-ux-audit.md`), so any bare `npm install <pkg> --no-save` can
+   prune them as "extraneous." Reinstalled all three afterward; also hit a
+   Playwright/browser-cache version mismatch from the reinstall pulling
+   the latest `playwright` instead of whatever version the pre-baked
+   `/opt/pw-browsers` cache matches — worked around with an explicit
+   `executablePath` pointing at the cached `chromium-1194` build rather
+   than downloading a new one. **Lesson for future firings:** avoid `npm
+   install <pkg>` (even `--no-save`) as a way to just *read* a package's
+   source when investigating a library — it has this side effect. Fetching
+   the file's contents via `npm view`/registry tooling or a pinned,
+   isolated install would avoid disturbing the sandbox's existing
+   ad hoc-installed tooling.
+
+   Also added `knip.json` (`{ "ignore": ["coi-serviceworker.js"] }`) —
+   knip's static-analysis approach can't see a plain `<script src>`
+   reference in `index.html` the way it sees ES module imports, so it
+   flagged the new file as dead code; this is a real false positive (the
+   file is load-bearing at runtime, just outside knip's traceable graph),
+   not a genuine finding, and the project had no `knip.json` before this.
+
+   Tests unchanged (1037/1037 — this increment adds no new source files
+   under `src/`, only a vendored static asset and an `index.html` edit).
+   `typecheck` green. `npm run build` succeeds, `dist/` still exactly one
+   file (828.81 kB, up ~1.2 kB from the `<script>`/`<style>` tag text
+   itself — no new bundled code). `knip`: unchanged, 10 findings (the
+   `coi-serviceworker.js` false positive now suppressed via `knip.json`).
+
+   **Deliberately not done in this increment:** `.github/workflows/
+   deploy-pages.yml` is untouched — it still copies only `dist/index.html`
+   to the `gh-pages` branch, so `coi-serviceworker.js` isn't actually
+   deployed anywhere yet, and the C# engine's own `dotnet publish` output
+   still has no path into that workflow at all (no .NET SDK setup step
+   exists there). Both are real, separate next increments: (1) teach
+   `deploy-pages.yml` to also copy `coi-serviceworker.js` next to
+   `index.html` on `gh-pages`, and (2) add a `dotnet publish -c Release`
+   step for `csharp-engine/` plus a copy of its `wwwroot` output into
+   `gh-pages` under `/csharp-engine/` (mirroring the dev-server
+   middleware's own routing exactly). Deliberately deferred rather than
+   done together — modifying the actual production deploy workflow is
+   the highest-risk piece of this whole effort (a mistake there is a
+   mistake against the real live site, not just this feature branch), and
+   deserves its own careful, dedicated increment rather than being
+   bundled with today's already-substantial vendoring + verification
+   work.
+
+   **Update (2026-08-11, next firing): deferred item (1) is now done —
+   `coi-serviceworker.js` is deployed to `gh-pages`.** `deploy-pages.yml`'s
+   single publish step now copies `coi-serviceworker.js` to `/tmp` right
+   alongside `dist/index.html`, then — after `git checkout -B gh-pages
+   origin/gh-pages` — copies both into the working tree and `git add`s
+   both before the commit, so they land in the same deploy commit as a
+   unit (never `index.html` referencing a script tag that hasn't actually
+   been pushed yet, or vice versa). The change is a minimal, mechanical
+   extension of the exact pattern the `index.html` copy already used — no
+   new logic shape introduced.
+
+   Verified without touching the real `gh-pages` branch or triggering an
+   actual deploy (this workflow only runs on push to `main`, and this
+   firing works on `claude/github-projekt-b3ivo1`, so editing the YAML
+   itself carries zero live-site risk regardless): built a disposable
+   scratch git repo simulating the exact same `checkout -B gh-pages
+   origin/gh-pages` → copy → `add` → `commit` sequence against a fake
+   `main` (with a stand-in `dist/index.html`) and a fake pre-existing
+   `gh-pages` (with old `index.html` content only) — confirmed both
+   `index.html` and `coi-serviceworker.js` end up correctly staged,
+   committed together, and present with their right contents on the
+   resulting `gh-pages` tree.
+
+   **Still deliberately not done:** deferred item (2), the C# engine's
+   own `dotnet publish -c Release` + `wwwroot` copy into `gh-pages` under
+   `/csharp-engine/`. That's a materially bigger CI change (installing
+   the .NET SDK + `wasm-tools` workload on the runner, a full WASM
+   publish, verifying the published output actually boots under real
+   COOP/COEP headers in CI) and stays its own increment. Practical
+   consequence of today's step alone: a `main` deploy right now would
+   correctly serve a page that achieves `crossOriginIsolated` via the
+   service worker, but the C# track would still 404 when it tries to
+   fetch its Blazor bundle from `/csharp-engine/`, since nothing publishes
+   that path yet — cross-origin isolation being present is a necessary
+   precondition for the C# engine to work at all once it *is* hosted, not
+   sufficient on its own yet.
 6. ~~**Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
    mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
    feasible now that `dotnet` works in this sandbox; likely just
@@ -534,15 +1160,23 @@ yet wired into the live `TRACKS` registry (see step 5's own entry above
 for exactly which four gaps block that safely). Step 6 (Node-side test
 engine) is now done — `test/helpers/nodeCSharpEngine.ts` and its driver
 project exist and are verified against the real `dotnet` toolchain. Step
-7 (real content) needs a `describeCSharpCourse` added to
-`test/content/challengeRunner.test.ts` (that file currently hardcodes
-`describeSqlCourse`/`describePythonCourse` calls rather than iterating
-`TRACKS` generically, so a C# course isn't picked up automatically) plus
-actual challenges written against `csharpGrundlagenCourse`, following the
-same house style as SQL/Python (3 hints, verified-failing distractors).
-The live app additionally still needs the four wiring gaps from step 5
-closed before any of it is actually playable in the browser, not just
-authored and Gate-1/2-verified in Node.
+7 (real content) is underway: `describeCSharpCourse` in
+`test/content/challengeRunner.test.ts` iterates `csharpGrundlagenCourse.
+challenges` generically (added alongside the first challenge, unlike the
+hardcoded-per-course setup that predates it), and three challenges exist
+as of 2026-08-09 — `01` (Console.WriteLine), `02` (typed variables: int/
+double/string/bool), `03` (const, var type inference, char) — covering
+B0–B2 completely (see `docs/csharp-concept-hierarchy.md`'s dated updates
+for per-challenge detail). Same house style as SQL/Python throughout: 3
+hints, at least one verified-failing distractor per challenge — with one
+deliberate C#-specific variant, since step 4 decided `validate()` is
+stdout-only: distractors that violate a compile-time rule (reassigning a
+`const`, passing a `string` where `char` is expected) are verified to
+produce a real compiler error rather than a differing stdout, which
+`executeAndValidate` already treats as a failing outcome before
+`validate()` is ever called. The live app additionally still needs the
+four wiring gaps from step 5 closed before any of it is actually playable
+in the browser, not just authored and Gate-1/2-verified in Node.
 Treat each routine firing that touches this as making **one bounded,
 committed increment** (e.g. "scaffold the project directory and get a
 minimal Blazor boot working," not "finish the whole engine") — never

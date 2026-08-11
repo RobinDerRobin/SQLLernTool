@@ -13,7 +13,7 @@ const c01 = sqlLernenToolCourse.challenges.find((c) => c.num === '01')!;
 
 function testEngineFactory(): EngineFactory {
   const main = createNodeSqliteEngine();
-  return { getMain: () => main, setMainFromSqlJs: () => {}, createDisposable: () => createNodeSqliteEngine(), getMainPython: () => null, ensurePythonEngine: () => Promise.reject(new Error("python engine not available in this test fixture")) };
+  return { getMain: () => main, setMainFromSqlJs: () => {}, createDisposable: () => createNodeSqliteEngine(), getMainPython: () => null, ensurePythonEngine: () => Promise.reject(new Error("python engine not available in this test fixture")), getMainCSharp: () => null, ensureCSharpEngine: () => Promise.reject(new Error("csharp engine not available in this test fixture")) };
 }
 
 function makeCtx(): AppContext {
@@ -44,6 +44,15 @@ describe('mountTutorialTab', () => {
     const tutorial = root.querySelector('.tutorial-text');
     expect(tutorial?.querySelector('code')).not.toBeNull();
     expect(tutorial?.textContent).toContain('Tabelle');
+  });
+
+  it('syntax-highlights code inside the tutorial using the same tokenizer as the editor', () => {
+    const ctx = makeCtx();
+    mountTutorialTab(root, ctx);
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '2.2');
+
+    const tutorial = root.querySelector('.tutorial-text');
+    expect(tutorial?.querySelector('.tok-keyword')).not.toBeNull();
   });
 
   it('repeats the success criteria alongside the tutorial', () => {

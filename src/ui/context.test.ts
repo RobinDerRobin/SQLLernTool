@@ -65,4 +65,44 @@ describe('createEngineFactory', () => {
     const engine = await factory.ensurePythonEngine(succeeding);
     expect(engine).not.toBeNull();
   });
+
+  it('has no main C# engine before ensureCSharpEngine() resolves', () => {
+    const factory = createEngineFactory();
+    expect(factory.getMainCSharp()).toBeNull();
+  });
+
+  it('ensureCSharpEngine() loads and caches the C# engine, calling the loader only once', async () => {
+    const factory = createEngineFactory();
+    const fakeExports = { RunCode: vi.fn().mockResolvedValue('{"stdout":"x = 4\\n","error":null}') };
+    const loader = vi.fn().mockResolvedValue(fakeExports);
+
+    const [first, second] = await Promise.all([factory.ensureCSharpEngine(loader), factory.ensureCSharpEngine(loader)]);
+
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(first).toBe(second);
+    expect(factory.getMainCSharp()).toBe(first);
+  });
+
+  it('ensureCSharpEngine() returns a working engine that delegates exec() to the loaded exports', async () => {
+    const factory = createEngineFactory();
+    const fakeExports = { RunCode: vi.fn().mockResolvedValue('{"stdout":"hallo\\n","error":null}') };
+    const loader = vi.fn().mockResolvedValue(fakeExports);
+
+    const engine = await factory.ensureCSharpEngine(loader);
+    const result = await engine.exec('Console.WriteLine("hallo");');
+
+    expect(result).toEqual({ stdout: 'hallo\n', error: null });
+  });
+
+  it('ensureCSharpEngine() allows retrying after a failed load', async () => {
+    const factory = createEngineFactory();
+    const failing = vi.fn().mockRejectedValue(new Error('Blazor-Skript blockiert'));
+    await expect(factory.ensureCSharpEngine(failing)).rejects.toThrow('Blazor-Skript blockiert');
+    expect(factory.getMainCSharp()).toBeNull();
+
+    const fakeExports = { RunCode: vi.fn().mockResolvedValue('{"stdout":"","error":null}') };
+    const succeeding = vi.fn().mockResolvedValue(fakeExports);
+    const engine = await factory.ensureCSharpEngine(succeeding);
+    expect(engine).not.toBeNull();
+  });
 });
