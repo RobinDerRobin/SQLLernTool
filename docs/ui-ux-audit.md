@@ -4223,3 +4223,54 @@ sondern pro PR direkt in den Checks sichtbar.
   Zahlenänderung). Nächster offener Schritt bleibt der bereits benannte
   Deploy-Workflow (`deploy-pages.yml` + C#-`dotnet publish`-CI-Schritt)
   als eigenes Increment, oder der nächste Live-Bug-Hunt.
+
+### 2026-08-11 — Stündliche Routine: C#-Produktions-Hosting, Schritt 2 — `coi-serviceworker.js` im Deploy-Workflow verdrahtet
+
+- **Umfang:** Baseline sauber (1037/1037, typecheck/build/knip grün, HEAD
+  `658e384`). SQL/Python haben beide nur noch ihre permanente
+  Scope-Ausnahme offen, C# ist bei 86/86 — kein aktionabler Content-Schritt
+  vorhanden. Laut aktualisiertem Mandat ist C#-Engine-Integration jetzt
+  regulär priorisierbar (vorherige Einschränkung aufgehoben); der vorletzte
+  Durchgang hat in `docs/csharp-engine-poc.md` bereits zwei konkrete,
+  unabhängige nächste Schritte benannt: (1) `coi-serviceworker.js` in
+  `deploy-pages.yml` verdrahten, (2) `dotnet publish` + C#-Engine-`wwwroot`
+  in denselben Workflow aufnehmen. Diesen Durchgang genau EINEN davon
+  begonnen und abgeschlossen — Schritt (1), da deutlich kleiner und ohne
+  neue CI-Toolchain-Abhängigkeit (kein .NET-SDK-Setup nötig).
+
+- **Änderung:** `.github/workflows/deploy-pages.yml`s einziger
+  Publish-Step kopiert jetzt zusätzlich zu `dist/index.html` auch
+  `coi-serviceworker.js` (Repo-Root) nach `/tmp`, checkt `gh-pages` aus,
+  kopiert beide Dateien in den Arbeitsbaum zurück und committet sie
+  gemeinsam (`git add index.html coi-serviceworker.js`) — bewusst als ein
+  einziger Commit, damit nie ein `index.html` ohne die dazugehörige
+  `coi-serviceworker.js` (oder umgekehrt) live steht. Rein additive,
+  mechanische Erweiterung des bereits bestehenden Kopiermusters, keine
+  neue Logikform.
+
+- **Verifikation ohne Risiko für die echte Seite:** Der Workflow triggert
+  ausschließlich bei Push auf `main`, dieser Durchgang arbeitet auf
+  `claude/github-projekt-b3ivo1` — das Bearbeiten der YAML-Datei selbst
+  löst keinerlei echten Deploy aus. Zusätzlich die Shell-Logik in einem
+  Wegwerf-Scratch-Git-Repo nachgestellt (fake `main` mit
+  Platzhalter-`dist/index.html`, fake vorbestehender `gh-pages`-Branch mit
+  altem `index.html`-Inhalt) — exakt dieselbe `checkout -B gh-pages
+  origin/gh-pages` → kopieren → `add` → `commit`-Sequenz durchlaufen und
+  bestätigt, dass beide Dateien korrekt zusammen auf dem resultierenden
+  `gh-pages`-Baum landen.
+
+- **Bewusst weiterhin offen:** Schritt (2), die C#-Engine selbst im
+  Deploy-Workflow zu bauen und auszuliefern (`dotnet publish -c Release`
+  + `wwwroot`-Kopie nach `/csharp-engine/` auf `gh-pages`, analog zur
+  lokalen Dev-Server-Middleware) — deutlich größere CI-Änderung (.NET-SDK-
+  und `wasm-tools`-Workload-Setup auf dem Runner, echter WASM-Publish,
+  Verifikation unter echten COOP/COEP-Headern in CI) und bleibt ein
+  eigenes Increment. Praktische Konsequenz: Ein `main`-Deploy jetzt würde
+  bereits eine Seite ausliefern, die per Service Worker
+  `crossOriginIsolated` erreicht — der C#-Track würde aber weiterhin
+  404en, sobald er versucht, sein Blazor-Bundle von `/csharp-engine/` zu
+  laden, da dieser Pfad noch von nichts ausgeliefert wird.
+
+- **Ergebnis:** Tests unverändert 1037/1037 grün (reine Workflow-Datei,
+  kein `src/`-Code geändert). Typecheck/Build/Knip unverändert grün. Keine
+  Coverage-Änderung, kein Artifact-Republish nötig.

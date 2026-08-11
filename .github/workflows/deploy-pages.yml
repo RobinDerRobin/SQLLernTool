@@ -26,11 +26,18 @@ jobs:
       - name: Publish dist/index.html to gh-pages
         run: |
           cp dist/index.html /tmp/index.html
+          # coi-serviceworker.js is deliberately kept out of src/ and public/ (see
+          # index.html's own comment and docs/csharp-engine-poc.md) so dist/index.html
+          # stays the single self-contained file test/build/distOutput.test.ts requires.
+          # It still needs to sit next to index.html on the actual deployed host (GitHub
+          # Pages can't set the COOP/COEP headers itself) — copy it separately here.
+          cp coi-serviceworker.js /tmp/coi-serviceworker.js
           git fetch origin gh-pages
           git checkout -B gh-pages origin/gh-pages
           cp /tmp/index.html index.html
+          cp /tmp/coi-serviceworker.js coi-serviceworker.js
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add index.html
+          git add index.html coi-serviceworker.js
           git diff --cached --quiet && echo "No changes to deploy" || git commit -m "Deploy ${{ github.sha }}"
           git push origin gh-pages

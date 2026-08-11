@@ -1068,6 +1068,43 @@ Roughly in dependency order:
    deserves its own careful, dedicated increment rather than being
    bundled with today's already-substantial vendoring + verification
    work.
+
+   **Update (2026-08-11, next firing): deferred item (1) is now done —
+   `coi-serviceworker.js` is deployed to `gh-pages`.** `deploy-pages.yml`'s
+   single publish step now copies `coi-serviceworker.js` to `/tmp` right
+   alongside `dist/index.html`, then — after `git checkout -B gh-pages
+   origin/gh-pages` — copies both into the working tree and `git add`s
+   both before the commit, so they land in the same deploy commit as a
+   unit (never `index.html` referencing a script tag that hasn't actually
+   been pushed yet, or vice versa). The change is a minimal, mechanical
+   extension of the exact pattern the `index.html` copy already used — no
+   new logic shape introduced.
+
+   Verified without touching the real `gh-pages` branch or triggering an
+   actual deploy (this workflow only runs on push to `main`, and this
+   firing works on `claude/github-projekt-b3ivo1`, so editing the YAML
+   itself carries zero live-site risk regardless): built a disposable
+   scratch git repo simulating the exact same `checkout -B gh-pages
+   origin/gh-pages` → copy → `add` → `commit` sequence against a fake
+   `main` (with a stand-in `dist/index.html`) and a fake pre-existing
+   `gh-pages` (with old `index.html` content only) — confirmed both
+   `index.html` and `coi-serviceworker.js` end up correctly staged,
+   committed together, and present with their right contents on the
+   resulting `gh-pages` tree.
+
+   **Still deliberately not done:** deferred item (2), the C# engine's
+   own `dotnet publish -c Release` + `wwwroot` copy into `gh-pages` under
+   `/csharp-engine/`. That's a materially bigger CI change (installing
+   the .NET SDK + `wasm-tools` workload on the runner, a full WASM
+   publish, verifying the published output actually boots under real
+   COOP/COEP headers in CI) and stays its own increment. Practical
+   consequence of today's step alone: a `main` deploy right now would
+   correctly serve a page that achieves `crossOriginIsolated` via the
+   service worker, but the C# track would still 404 when it tries to
+   fetch its Blazor bundle from `/csharp-engine/`, since nothing publishes
+   that path yet — cross-origin isolation being present is a necessary
+   precondition for the C# engine to work at all once it *is* hosted, not
+   sufficient on its own yet.
 6. ~~**Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
    mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
    feasible now that `dotnet` works in this sandbox; likely just
