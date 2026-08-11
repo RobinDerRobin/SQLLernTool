@@ -152,6 +152,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-11 | HEAD (C# Challenge 26: B15 vollständig — LINQ Deferred Execution, 83/86) | 92.56 % | 73.13 % | 99.16 % | 92.56 % |
 | 2026-08-11 | HEAD (C# Challenge 27: B16 vollständig — Namespaces & Imports, 86/86, C#-Dokument komplett) | 92.59 % | 73.12 % | 99.16 % | 92.59 % |
 | 2026-08-11 | HEAD (C#-Engine live verdrahtet: TRACKS-Eintrag, async runQuery, iframe-Transport im echten Dev-Server E2E-verifiziert) | 92.63 % | 73.44 % | 99.37 % | 92.63 % |
+| 2026-08-11 | HEAD (Bugfix: SQL-Endkommentar-Fehler, `hasSqlContent()` + 12 Tests) | 92.57 % | 73.65 % | 99.37 % | 92.57 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -4274,3 +4275,92 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Ergebnis:** Tests unverändert 1037/1037 grün (reine Workflow-Datei,
   kein `src/`-Code geändert). Typecheck/Build/Knip unverändert grün. Keine
   Coverage-Änderung, kein Artifact-Republish nötig.
+
+### 2026-08-11 — Stündliche Routine: Echter Bug gefunden und behoben — SQL-Query mit Endkommentar schlug fehl
+
+- **Umfang:** Baseline sauber (1037/1037, typecheck/build/knip grün, HEAD
+  `e729634`). SQL/Python haben beide nur noch ihre permanente
+  Scope-Ausnahme offen, C# ist bei 86/86 — kein aktionabler Content-Schritt.
+  Der letzte Durchgang hat bereits den C#-Increment-Slot für diese Stunde
+  verbraucht. Also Priorität 2: Live-Bug-Hunt gegen den echten Dev-Server,
+  diesmal mit vollem CDN-Workaround (sql.js **und** Pyodide lokal per
+  `context.route()`, nicht nur C#), um genau die Lücke aus dem letzten
+  sauberen Durchgang zu schließen, in der SQL/Python mangels Routing gar
+  nicht getestet werden konnten.
+
+- **Fund:** Ein End-to-End-Smoke-Test (Challenge 1 öffnen, echte
+  kanonische Lösung eintippen, **plus einen harmlosen Endkommentar
+  danach** — ein realistisches Nutzerverhalten, keine Ausnahme) schlug
+  mit `Fehler: Zeile 15: undefined` fehl, obwohl die Lösung korrekt war.
+  Das wörtliche `undefined` in einer Nutzer-Fehlermeldung ist ein starkes
+  Bug-Signal.
+
+- **Ursache gefunden (echter Live-Browser-Bug, nicht nur Node-Testmotor):**
+  `splitStatements()` (`src/domain/sql/statementSplitter.ts`) behandelte
+  einen reinen Kommentar am Ende des SQL-Texts (nach dem letzten `;`, oder
+  zwischen zwei `;`) als eigenständiges "Statement", weil die einzige
+  bisherige Prüfung `rest.trim()` war — ein Kommentar ist nach `.trim()`
+  nicht leer. Dieses Kommentar-Fragment landete dann in
+  `engine.exec()`/`db.prepare()`. Empirisch gegen das echte,
+  browserverwendete sql.js-Paket bestätigt: `db.prepare('-- Kommentar')`
+  wirft **keinen** `Error`, sondern einen rohen String (`"Nothing to
+  prepare"`). `executeAndValidate.ts`s Fehlerpfad griff aber
+  `(e as Error).message` ab — bei einem String-Wurf ist das `undefined`,
+  wörtlich in die Meldung interpoliert. Betrifft nicht nur den exotischen
+  Fall des unveränderten Platzhaltertexts (bereits im vorletzten
+  Durchgang beobachtet, damals fälschlich als reiner Testskript-Fehlalarm
+  eingeordnet, siehe unten), sondern jede sonst korrekte Lösung mit einem
+  abschließenden erklärenden Kommentar — ein plausibles, alltägliches
+  Nutzermuster.
+
+- **Korrektur:** Neue Hilfsfunktion `hasSqlContent()` im selben Modul,
+  die exakt dieselbe Kommentar-/String-Tokenisierung wie `splitStatements`
+  selbst verwendet, aber prüft, ob nach Abzug von Kommentaren und einem
+  isolierten `;` noch echter SQL-Inhalt übrig bleibt. `splitStatements`
+  verwirft jetzt sowohl das abschließende Restfragment als auch jedes
+  `;`-terminierte Zwischenfragment, wenn `hasSqlContent()` `false`
+  liefert — Kommentar-only-Fragmente erreichen `engine.exec()` dadurch
+  gar nicht mehr, an keiner der beiden Stellen (`executeAndValidate.ts`,
+  `sqlJsEngine.ts`), die dieselbe geteilte `splitStatements`-Funktion
+  nutzen (inklusive des Node-Testmotors `nodeSqliteEngine.ts` — der Fix
+  gilt für alle drei SQL-Ausführungspfade gleichzeitig, nicht nur den
+  Browser). 12 neue Tests: 4 in `splitStatements` (Endkommentar,
+  Block-Kommentar, Kommentar-Fragment zwischen zwei echten Statements,
+  Kommentar + echtes SQL bleibt erhalten) und 8 direkt für
+  `hasSqlContent()` (leer, nur Kommentar(e), nur `;`, echtes SQL, SQL +
+  Inline-Kommentar, String-Literal zählt sofort als Inhalt).
+
+- **Verifikation:** Live im echten Browser gegen echtes sql.js-WASM
+  (`context.route()`-Workaround) reproduziert (`status-err`, `undefined`
+  in der Meldung) und nach dem Fix erneut geprüft — dieselbe Lösung mit
+  demselben Endkommentar liefert jetzt korrekt `✓ Aufgabe erfüllt`. Alle
+  4 Gate-1/Gate-2-Dateien (`challengeRunner.test.ts` u. a.) weiterhin
+  grün — keine der 74 bestehenden SQL-Challenges/-Distraktoren war von
+  dem alten, fehlerhaften Verhalten abhängig.
+
+- **Ergebnis:** Tests 1037 → 1049 (+12). `typecheck`, volle Testsuite und
+  `npm run build` grün (829,19 kB, +0,38 kB durch die Testdatei-Erweiterung
+  — kein Produktionscode-Wachstum, da `hasSqlContent` klein ist). `knip`
+  unverändert, 10 Funde. Coverage: 92,63 % → 92,57 % Statements/Lines
+  (minimale Verdünnung durch den neuen, noch nicht in jedem Zweig
+  durchlaufenen `splitStatements`-Code), Branches 73,44 % → 73,65 %
+  (Anstieg — die 12 neuen Tests decken `hasSqlContent`s Verzweigungen
+  gründlicher ab, als das bisherige `splitStatements` im Schnitt
+  abgedeckt war). Kein Republish der SQL-/Python-Konzept-Hierarchie-
+  Artifacts nötig — die Tag-Bilanzen selbst ändern sich nicht (reiner
+  Bugfix, keine neue Content-Abdeckung); das Test-/UI-UX-Audit-Dashboard-
+  Artifact wird beim nächsten inhaltlich größeren Durchgang mit
+  aktualisierten Zahlen neu veröffentlicht, nicht separat für diese eine
+  Coverage-Nachkommastelle.
+
+- **Nachtrag zur Einordnung eines älteren Fehlalarms:** Im Durchgang
+  "C#-Produktions-Hosting, Schritt 1" wurde ein Smoke-Test-Fehlschlag bei
+  SQL/Python als reiner Testskript-Fehler (fehlendes `context.route()`)
+  abgetan — das stimmte für den *Grund*, warum `selectChallenge` gar
+  nicht erst reagierte (Engine noch nicht geladen), maskierte aber, dass
+  ein zweiter, unabhängiger echter Bug im Kommentar-Handling existierte,
+  der erst mit korrekt geladener Engine überhaupt sichtbar werden konnte.
+  Lehre: ein plausibler Erklärungsfund für ein Symptom schließt einen
+  zweiten, tieferliegenden Fund nicht automatisch aus — lohnt sich, nach
+  der ersten Erklärung trotzdem einmal mit funktionierendem Setup
+  nachzuprüfen.

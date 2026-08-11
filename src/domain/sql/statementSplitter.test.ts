@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { splitStatements } from './statementSplitter';
+import { hasSqlContent, splitStatements } from './statementSplitter';
 
 describe('splitStatements', () => {
   it('splits two simple statements on the semicolon', () => {
@@ -56,6 +56,31 @@ describe('splitStatements', () => {
     expect(splitStatements('   \n  ')).toEqual([]);
   });
 
+  // Regression: a trailing line comment after the last statement used to be
+  // kept as its own "statement" (non-whitespace after .trim()), which then
+  // reached engine.exec()/db.prepare() and blew up — sql.js throws a raw
+  // string ("Nothing to prepare") for it, not an Error, surfacing to the user
+  // as "Zeile N: undefined" for an otherwise entirely correct query.
+  it('drops a trailing line comment after the last statement instead of treating it as its own statement', () => {
+    const result = splitStatements('SELECT 1;\n-- all done here');
+    expect(result.map((s) => s.text)).toEqual(['SELECT 1;']);
+  });
+
+  it('drops a trailing block comment after the last statement', () => {
+    const result = splitStatements('SELECT 1;\n/* all done here */');
+    expect(result.map((s) => s.text)).toEqual(['SELECT 1;']);
+  });
+
+  it('drops a comment-only fragment between two real statements', () => {
+    const result = splitStatements('SELECT 1;\n-- a stray comment ends up terminated below\n;\nSELECT 2;');
+    expect(result.map((s) => s.text)).toEqual(['SELECT 1;', '\nSELECT 2;']);
+  });
+
+  it('still keeps a trailing statement that has real SQL alongside a comment', () => {
+    const result = splitStatements('SELECT 1;\n-- explains the next line\nSELECT 2');
+    expect(result.map((s) => s.text)).toEqual(['SELECT 1;', '\n-- explains the next line\nSELECT 2']);
+  });
+
   it('reports correct startOffset for each statement', () => {
     const sql = 'SELECT 1;\nSELECT 2;';
     const result = splitStatements(sql);
@@ -64,5 +89,41 @@ describe('splitStatements', () => {
     result.forEach((stmt) => {
       expect(sql.slice(stmt.startOffset, stmt.startOffset + stmt.text.length)).toBe(stmt.text);
     });
+  });
+});
+
+describe('hasSqlContent', () => {
+  it('is false for empty or whitespace-only text', () => {
+    expect(hasSqlContent('')).toBe(false);
+    expect(hasSqlContent('   \n\t ')).toBe(false);
+  });
+
+  it('is false for a line-comment-only fragment', () => {
+    expect(hasSqlContent('-- just a note\n')).toBe(false);
+  });
+
+  it('is false for a block-comment-only fragment', () => {
+    expect(hasSqlContent('/* just a note */')).toBe(false);
+  });
+
+  it('is false for whitespace mixed with comments only', () => {
+    expect(hasSqlContent('  -- note one\n  /* note two */  ')).toBe(false);
+  });
+
+  it('is false for a bare semicolon, or a comment followed by one', () => {
+    expect(hasSqlContent(';')).toBe(false);
+    expect(hasSqlContent('-- comment\n;')).toBe(false);
+  });
+
+  it('is true for real SQL', () => {
+    expect(hasSqlContent('SELECT 1')).toBe(true);
+  });
+
+  it('is true for a statement that also contains a comment', () => {
+    expect(hasSqlContent('SELECT 1 -- inline note')).toBe(true);
+  });
+
+  it('is true the moment a string literal starts, even if its content is only whitespace', () => {
+    expect(hasSqlContent("'   '")).toBe(true);
   });
 });
