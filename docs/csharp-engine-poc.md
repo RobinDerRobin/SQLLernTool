@@ -1368,20 +1368,65 @@ further (the most likely candidate given everything *version-pinned* and
 locally re-verifiable checked out clean), or a regression whose actual
 trigger wasn't captured by any of the eight checks above.
 
-**Not yet checked, candidates for the next firing:** whether this
-reproduces with `WasmEnableThreads` temporarily disabled (would isolate
-whether the multithreading path specifically is implicated, vs. a more
-generic WASM-boot issue) — deliberately *not* attempted this firing since
-disabling it would itself require understanding the interaction with
-Roslyn's `Task.Wait()` usage (bug #3 in this doc's WASM-bugs section) well
-enough not to just trade one failure for another; whether a different,
-non-headless or non-Playwright-automated browser context changes anything
-(this sandbox has no display, so untested); and — if resources allow in a
-future session — checking whether this is a known, reported issue against
-the specific `Microsoft.NET.Sdk.BlazorWebAssembly` + `wasm-tools` version
-combination pinned here, which would require external web access this
-sandbox's network policy currently blocks for most non-package-registry
-domains.
+**Update (2026-08-11, next firing): two of the three candidates above are
+now checked — neither explains it, but the search narrowed the failure
+to something more specific than initially framed.**
+
+- **`WasmEnableThreads` ruled out as the cause.** Temporarily set to
+  `false` in a scratch edit (never committed), clean `rm -rf bin obj
+  wwwroot/refs && dotnet publish -c Release`, same exact failure
+  (`Can't find … JavaScriptExports class`, `Failed to start platform`) —
+  just without the `[0x…-main]` worker-context prefix in the log line,
+  since there's no multithreading context to report. Change reverted via
+  `git checkout` immediately after, working tree confirmed clean. This is
+  **not** a threading-path-specific failure.
+
+- **External web research** (now available this firing) surfaced several
+  historically similar `dotnet/runtime`/`dotnet/aspnetcore` issues
+  (`#72803`, `#38433`, `#48522`, `#103499`, `#87690`) — none an exact
+  match for this specific error string, and none with a confirmed,
+  documented root cause or fix in their visible content (GitHub's own
+  dynamically-loaded comment threads aren't fully retrievable through
+  this session's fetch tooling, only the initial issue body). Recurring
+  theme across them: `System.Runtime.InteropServices.JavaScript`
+  bindings failing to resolve correctly is a known *class* of issue in
+  .NET 8/9's Blazor WASM interop, not unique to this project, but no
+  single thread pinpoints this exact symptom with a fix.
+
+- **New, more targeted local diagnosis:** the generated interop glue
+  *does* run correctly. Forced `EmitCompilerGeneratedFiles=true` +
+  `CompilerGeneratedFilesOutputPath=generated` on a clean build —
+  `Microsoft.Interop.JavaScript.JSExportGenerator` **did** emit
+  `JSExports.g.cs`, correctly registering `CSharpEngine.RunCode` via
+  `JSFunctionBinding.BindManagedFunction` in a `[ModuleInitializer]`.
+  Separately confirmed the runtime-internal `JavaScriptExports` type the
+  boot error complains about missing — not something our generator
+  emits, it's a BCL-internal type inside the framework's own
+  `System.Runtime.InteropServices.JavaScript.wasm` — genuinely *is*
+  present in that assembly's compiled metadata (`strings` on the `.wasm`
+  finds the literal type name). Also confirmed the served file's actual
+  SHA-256 matches `blazor.boot.json`'s declared integrity hash exactly
+  (computed independently in Python, byte-for-byte match) — not a
+  stale-file-vs-stale-manifest mismatch either.
+
+  So: the generator runs, the wrapper code is correctly registered, the
+  type the runtime wants exists in the right assembly, and that assembly
+  is served correctly and matches its own integrity hash. The failure is
+  specifically in the MONO_WASM runtime's own internal resolution of that
+  type at `bindings_init` time — a layer below anything this project's
+  own code or build configuration controls. This is consistent with the
+  web research above: a genuine interop-plumbing issue in this specific
+  .NET 8.0.29 runtime-pack build, not a project misconfiguration.
+
+**Still not checked:** whether a different, non-headless or
+non-Playwright-automated browser context changes anything (this sandbox
+has no display, so untested); reading the *actual* comment threads on the
+GitHub issues above (blocked by this session's fetch tooling only
+returning issue bodies, not dynamically-loaded comments) for a maintainer-
+confirmed fix or an exact-match report; whether a different .NET 8 SDK
+patch/workload version (older or newer than `8.0.29`) resolves it —
+untested because changing the pinned version without a way to verify the
+fix actually works would just trade one unverified state for another.
 
 **Practical severity, calibrated:** this is **not currently a live
 production incident** — `deploy-pages.yml` still doesn't publish the C#

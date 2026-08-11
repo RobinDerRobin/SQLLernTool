@@ -4628,3 +4628,52 @@ sondern pro PR direkt in den Checks sichtbar.
   isolieren, ob spezifisch der Multithreading-Pfad betroffen ist;
   externe Recherche zu bekannten Issues für diese exakte SDK/
   Workload-Kombination, sobald Netzwerkzugriff das erlaubt).
+
+### 2026-08-11 — Stündliche Routine: C#-Boot-Bug — zwei weitere Kandidaten geprüft, Ursache weiter eingegrenzt, noch ungelöst
+
+- **Umfang:** Baseline sauber (1049/1049, typecheck/build/knip grün, HEAD
+  `eaaf190`). Fortsetzung der im letzten Durchgang begonnenen Diagnose
+  des kritischen C#-Boot-Fehlers — diesmal mit Web-Zugriff verfügbar,
+  zusätzlich die im letzten Durchgang benannten "noch nicht geprüft"-
+  Kandidaten abgearbeitet.
+
+- **`WasmEnableThreads` als Ursache ausgeschlossen:** testweise auf
+  `false` gesetzt (nie committet), sauberer Rebuild — identischer Fehler.
+  Kein Multithreading-spezifisches Problem. Änderung sofort per `git
+  checkout` zurückgesetzt, Arbeitsbaum sauber bestätigt.
+
+- **Externe Recherche:** mehrere ähnliche, historische `dotnet/runtime`-/
+  `dotnet/aspnetcore`-Issues gefunden (u. a. #72803, #38433, #48522,
+  #103499), keins exakt passend, keins mit dokumentierter Lösung im für
+  dieses Fetch-Tooling sichtbaren Bereich (nur Issue-Text, keine dynamisch
+  geladenen Kommentar-Threads). Bestätigt aber: diese Klasse von
+  JS-Interop-Bindungsfehlern ist ein bekanntes, wiederkehrendes Muster in
+  .NET 8/9 Blazor WASM, kein Einzelfall dieses Projekts.
+
+- **Neue, gezieltere lokale Diagnose:** `EmitCompilerGeneratedFiles=true`
+  erzwungen — der `[JSExport]`-Quellgenerator läuft korrekt und
+  registriert `CSharpEngine.RunCode` einwandfrei. Die vom Bootfehler
+  vermisste `JavaScriptExports`-Klasse ist kein Generator-Artefakt
+  dieses Projekts, sondern ein BCL-interner Typ in
+  `System.Runtime.InteropServices.JavaScript.wasm` — per `strings`
+  bestätigt, dass er in dieser Assembly tatsächlich vorhanden ist.
+  Zusätzlich den SHA-256-Hash der ausgelieferten Datei unabhängig in
+  Python nachgerechnet — deckt sich exakt mit `blazor.boot.json`s
+  Integritäts-Hash. Damit: Generator läuft, Wrapper korrekt registriert,
+  der gesuchte Typ existiert in der richtigen Assembly, die Datei wird
+  korrekt und unverändert ausgeliefert — der Fehler sitzt spezifisch in
+  der MONO_WASM-Laufzeit selbst beim Auflösen dieses Typs, unterhalb
+  jeder von diesem Projekt kontrollierbaren Ebene.
+
+- **Weiterhin ungeklärt:** ob ein anderer Browser-Kontext (kein
+  Headless/Playwright) etwas ändert (keine Anzeige in dieser Sandbox,
+  ungetestet); die tatsächlichen Kommentar-Threads der gefundenen
+  GitHub-Issues (vom Fetch-Tooling nicht vollständig ladbar); ob eine
+  andere .NET-8-SDK-Patch-/Workload-Version das Problem löst
+  (ungetestet, da ein Versionswechsel ohne Verifikationsmöglichkeit nur
+  einen unbestätigten Zustand gegen einen anderen tauschen würde).
+
+- **Ergebnis:** Tests/typecheck/build/knip unverändert grün (keine
+  Code-Änderung, working tree sauber). Kein Artifact-Republish nötig.
+  Der Fehler bleibt bestehen, aber die Ursachenraum ist jetzt deutlich
+  enger als am Ende des letzten Durchgangs.
