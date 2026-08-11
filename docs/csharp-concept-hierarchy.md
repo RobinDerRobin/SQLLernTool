@@ -1265,6 +1265,69 @@ Engine-Modell einpassen lässt, oder ob es wie `updatable-view` (SQL)
 und `own-modules` (Python) eine dauerhafte, dokumentierte Scope-
 Ausnahme bleibt.*
 
+**Update — die oben gestellte Frage ist entschieden, und die Annahme
+aus dem letzten Durchgang war zu pessimistisch in zweierlei Hinsicht:**
+Erstens braucht `own-namespaces` **kein** Mehrdatei-Projekt-Setup — C#
+erlaubt mehrere `namespace`-Blöcke in einer einzigen Datei, der
+eigentliche Kern des Tags (eigene Namespaces deklarieren und per
+`using` importieren, um Namenskollisionen in größeren Projekten zu
+vermeiden) lässt sich vollständig innerhalb eines einzigen
+`.cs`-Skripts demonstrieren, exakt wie schon `delegate`-Typen (B14)
+oder `class`-Deklarationen (B10) am Dateiende nach den
+Top-Level-Anweisungen stehen (`CS8803`). Empirisch gegen den echten
+`dotnet`-Treiber bestätigt, **bevor** der Content geschrieben wurde:
+ein Szenario mit zwei unabhängigen `namespace`-Blöcken (`Lager`,
+`Versand`), die jeweils eine eigene, gleichnamige Klasse `Kiste`
+enthalten, kompiliert und läuft korrekt — `using Lager;` importiert
+nur den einen Namespace, der andere braucht die vollqualifizierte
+Schreibweise `Versand.Kiste`. Zweitens hat B16 nicht nur den einen
+Tag `own-namespaces`, sondern **drei**: `namespace-declaration`,
+`using-directive` und `own-namespaces` — keine der beiden anderen
+Tags war bislang durch eine Challenge abgedeckt, denn der
+Node-Testtreiber injiziert `System`/`System.Linq`/etc. bereits als
+globale Usings (siehe `csharp-engine/driver/Program.cs`), sodass bis
+hierhin **keine** Challenge einen eigenen `using`- oder
+`namespace`-Block im Lösungscode brauchte. Damit ist `own-namespaces`
+**kein** dauerhafter Scope-Ausnahmefall wie `updatable-view` (SQL) oder
+`own-modules` (Python), sondern ein regulär abdeckbarer Tag — und ein
+einziges Szenario kann alle drei B16-Tags gleichzeitig abdecken.
+
+Challenge 27 deckt alle drei B16-Tags in einem Durchgang ab — den
+letzten offenen Zweig im gesamten C#-Dokument. Szenario: zwei
+`namespace`-Blöcke `Lager` und `Versand` (`namespace-declaration`),
+beide mit einer eigenen Klasse `Kiste` (unabhängige Typen trotz
+gleichen Namens). Ein selbst geschriebenes `using Lager;`
+(`using-directive`) importiert nur `Lager`; `new Kiste(5)` löst
+darüber zu `Lager.Kiste` auf, während `new Versand.Kiste(10)` die
+vollqualifizierte Schreibweise braucht, weil `Versand` nicht
+importiert ist (`own-namespaces`: genau die Namenskollisions-
+Vermeidung, für die eigene Namespaces gedacht sind). Drei
+Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `using Lager;` komplett weggelassen — echter
+Compilerfehler `CS0246` ("The type or namespace name 'Kiste' could not
+be found"); die beiden Zahlenwerte bei der Konstruktion vertauscht —
+kompiliert einwandfrei, zeigt aber die vertauschten Werte in beiden
+Ausgabezeilen; der zweite Namespace-Name bei der Deklaration
+versehentlich als `Versand2` statt `Versand` getippt — der Aufruf
+`new Versand.Kiste(10)` referenziert weiterhin den ursprünglichen,
+jetzt nicht mehr existierenden Namen, wieder ein echter
+`CS0246`-Compilerfehler.
+
+**Tag-Bilanz: 86 von 86 (100 %).** Damit ist **B16 (Namespaces &
+Imports) komplett** — und mit ihm das **gesamte C#-Konzept-Dokument**.
+Jeder Tag in allen 17 Zweigen (B0 bis B16) ist jetzt durch mindestens
+eine Challenge abgedeckt, empirisch gegen den echten `dotnet`-Treiber
+verifiziert (Gate 1: eigene Lösung besteht `validate()`; Gate 2: jeder
+Distraktor scheitert daran). Analog zu SQL (81/82, nur die permanente
+Scope-Ausnahme `updatable-view` offen) und Python (81/82, nur die
+permanente Ausnahme `own-modules` offen) hat C# damit seinen
+vollständigen aktionablen Konzeptraum erreicht — anders als bei SQL
+und Python bleibt hier nicht einmal eine bewusste Scope-Ausnahme
+übrig. Nächster offener Schritt für C# ist kein Content mehr, sondern
+Mandat-Punkt 4: die Engine-Integration selbst live spielbar machen
+(`runQuery`-Async-Umstellung, Registry-Eintrag, `coi-serviceworker`
+für Produktion — siehe `docs/csharp-engine-poc.md`).*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt

@@ -150,6 +150,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-11 | HEAD (C# Challenge 24: B15 Teil 3 — LINQ Query-Syntax, 81/86) | 92.50 % | 73.14 % | 99.15 % | 92.50 % |
 | 2026-08-11 | HEAD (C# Challenge 25: B15 Teil 4 — LINQ Ordering/Grouping, 82/86) | 92.53 % | 73.13 % | 99.16 % | 92.53 % |
 | 2026-08-11 | HEAD (C# Challenge 26: B15 vollständig — LINQ Deferred Execution, 83/86) | 92.56 % | 73.13 % | 99.16 % | 92.56 % |
+| 2026-08-11 | HEAD (C# Challenge 27: B16 vollständig — Namespaces & Imports, 86/86, C#-Dokument komplett) | 92.59 % | 73.12 % | 99.16 % | 92.59 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -3879,3 +3880,63 @@ sondern pro PR direkt in den Checks sichtbar.
   Single-File-`dotnet exec`-Engine-Modell passt, oder ob es eine
   dauerhafte Scope-Ausnahme bleibt — oder der nächste Live-Bug-Hunt in
   ein paar Durchgängen.
+
+### 2026-08-11 — Stündliche Routine: C# Challenge 27 (B16 vollständig: Namespaces & Imports — C#-Dokument 100 %)
+
+- **Umfang:** Baseline sauber (1030/1030, typecheck/build/knip grün, HEAD
+  `e7c0ab0`). Der letzte Durchgang war ein sauberer Live-Bug-Hunt — laut
+  Mandat-Priorität diesmal wieder C#, um die aus dem vorletzten Durchgang
+  offen gelassene architektonische Frage zu B16 (`own-namespaces`) zu
+  klären: braucht der Tag ein Mehrdatei-Projekt-Setup, das die aktuelle
+  Single-File-`dotnet exec`-Engine nicht abbilden kann?
+
+- **Empirischer Befund, bevor Content geschrieben wurde:** Die Frage
+  ist mit Nein beantwortet. C# erlaubt mehrere `namespace`-Blöcke in
+  einer einzigen Datei — kein Mehrdatei-Setup nötig. Ein Testszenario
+  mit zwei unabhängigen `namespace`-Blöcken (`Lager`, `Versand`), die
+  je eine eigene, gleichnamige Klasse `Kiste` enthalten, wurde direkt
+  gegen `CSharpDriver.dll` (denselben Treiber, den auch die Tests
+  benutzen) kompiliert und ausgeführt — erfolgreich. Zusätzlicher Fund:
+  B16 hat nicht nur einen Tag (`own-namespaces`), sondern **drei**
+  (`namespace-declaration`, `using-directive`, `own-namespaces`) — die
+  Annahme aus dem vorletzten Durchgang war hier ungenau. Da der
+  Node-Testtreiber `System`/`System.Linq`/etc. bereits als globale
+  Usings injiziert, hatte bis dahin keine Challenge einen eigenen
+  `using`- oder `namespace`-Block gebraucht — ein einziges Szenario
+  konnte also alle drei B16-Tags gleichzeitig abdecken.
+
+- **Neue Challenge 27** deckt alle drei B16-Tags in einem Durchgang ab.
+  Szenario: `namespace Lager { class Kiste { ... } }` und
+  `namespace Versand { class Kiste { ... } }`, zwei unabhängige Typen
+  trotz gleichen Namens. `using Lager;` importiert nur `Lager`;
+  `new Kiste(5)` löst darüber zu `Lager.Kiste` auf, `new
+  Versand.Kiste(10)` braucht die vollqualifizierte Schreibweise, weil
+  `Versand` nicht importiert ist — genau die Namenskollisions-
+  Vermeidung, für die eigene Namespaces gedacht sind.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** `using Lager;` komplett weggelassen — echter
+  Compilerfehler `CS0246` ("The type or namespace name 'Kiste' could
+  not be found"); die beiden Konstruktor-Zahlenwerte vertauscht —
+  kompiliert einwandfrei, zeigt aber vertauschte Werte in beiden
+  Ausgabezeilen; der zweite Namespace-Name bei der Deklaration
+  versehentlich als `Versand2` statt `Versand` getippt — der Aufruf
+  `new Versand.Kiste(10)` referenziert weiterhin den jetzt nicht mehr
+  existierenden Namen, wieder `CS0246`.
+
+- **Ergebnis:** Tests 1030 → 1034 (+4: Gate 1 eigene Lösung + Gate 2
+  drei Distraktoren für Challenge 27). `typecheck` grün. `npm run build`
+  erfolgreich, unverändert 635,90 kB (C#-Track weiterhin nicht in
+  `registry.ts` registriert, erwartetes Verhalten). `knip`: unverändert
+  10 Funde. Coverage: 92,59 % / 73,12 % / 99,16 % / 92,59 %.
+  `docs/csharp-concept-hierarchy.md`: Tag-Bilanz 83/86 → **86/86
+  (100 %)**. **B16 (Namespaces & Imports) damit komplett — und mit ihm
+  das gesamte C#-Konzept-Dokument.** Jeder Tag in allen 17 Zweigen
+  (B0–B16) ist jetzt durch mindestens eine Challenge abgedeckt. Anders
+  als SQL (81/82, permanente Ausnahme `updatable-view`) und Python
+  (81/82, permanente Ausnahme `own-modules`) bleibt bei C# nicht einmal
+  eine bewusste Scope-Ausnahme übrig — 27 Challenges decken den
+  kompletten Konzeptraum ab. Nächster offener Schritt für C# ist kein
+  Content mehr, sondern die Engine-Integration selbst live spielbar zu
+  machen (`runQuery`-Async-Umstellung, Registry-Eintrag,
+  `coi-serviceworker` für Produktion — siehe `docs/csharp-engine-poc.md`).
