@@ -146,6 +146,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-11 | HEAD (C# Challenge 20: B14 Teil 1 — Delegates/Lambda/Func<>, 77/86) | 92.38 % | 73.17 % | 99.15 % | 92.38 % |
 | 2026-08-11 | HEAD (C# Challenge 21: B14 vollständig — Events, 78/86) | 92.41 % | 73.17 % | 99.15 % | 92.41 % |
 | 2026-08-11 | HEAD (C# Challenge 22: B15 Teil 1 — LINQ Where/Select, 79/86) | 92.44 % | 73.17 % | 99.15 % | 92.44 % |
+| 2026-08-11 | HEAD (C# Challenge 23: B15 Teil 2 — LINQ Aggregation, 80/86) | 92.47 % | 73.14 % | 99.15 % | 92.47 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -3579,3 +3580,40 @@ sondern pro PR direkt in den Checks sichtbar.
   Tests/typecheck/build unverändert bei 1014/1014 grün. Nächster
   offener Schritt: weiterer C#-Content (`linq-query-syntax` o. Ä., B15)
   oder der nächste Live-Bug-Hunt in ein paar Durchgängen.
+
+### 2026-08-11 — Stündliche Routine: C# Challenge 23 (B15 Teil 2: LINQ Aggregation)
+
+- **Umfang:** Baseline sauber (1014/1014, typecheck/build/knip grün, HEAD
+  `26c30a2`). SQL/Python weiterhin an der permanenten Scope-Grenze. Der
+  letzte Durchgang war ein sauberer Live-Bug-Hunt — laut Mandat-Priorität
+  diesmal wieder C#, da B15s zweiter Tag (`linq-aggregation`) ein klar
+  begrenzter nächster Schritt war, direkte Fortsetzung von Challenge 22s
+  `linq-method-syntax`.
+
+- **Neue Challenge 23** deckt `linq-aggregation` ab — den zweiten von
+  fünf B15-Tags. Szenario: `List<int> punkte = { 80, 90, 70, 60, 100 };`,
+  zusammengefasst über alle fünf Aggregations-Methoden aus der
+  Tag-Definition: `.Sum()` (400), `.Count()` (5), `.Average()` (400 als
+  `double`, bewusst exakt 80 gewählt, um .NETs Fließkomma-
+  Rundungsdarstellung aus der erwarteten Ausgabe herauszuhalten),
+  `.Max()` (100), `.Min()` (60).
+
+- **Drei Distraktoren, alle beim ersten Durchlauf empirisch gegen den
+  echten `dotnet`-Treiber verifiziert:** `Max()` und `Min()` bei der
+  Zuweisung vertauscht — liefert "Maximum: 60" und "Minimum: 100" statt
+  umgekehrt (Logikfehler, kompiliert fehlerfrei); `.Length` statt
+  `.Count()` verwendet — `List<T>` hat anders als Arrays keine
+  `.Length`-Eigenschaft, echter Compilerfehler `CS1061`; und ein Element
+  beim Anlegen der Liste vergessen (nur vier statt fünf Zahlen) —
+  verändert vier der fünf Ausgabezeilen, nur `Minimum` bleibt zufällig
+  korrekt, ein realistischer Abschreibfehler statt einer API-
+  Verwechslung.
+
+- **Ergebnis:** Tests 1014 → 1018 (+4: Gate 1 eigene Lösung + Gate 2
+  drei Distraktoren für Challenge 23). `typecheck` grün. `npm run build`
+  erfolgreich, unverändert 635,90 kB (reine Content-Datei). `knip`:
+  unverändert 10 Funde. Coverage: 92,47 % / 73,14 % / 99,15 % / 92,47 %.
+  `docs/csharp-concept-hierarchy.md`: Tag-Bilanz 79/86 → 80/86 (≈ 93 %),
+  B15 zu 2 von 5 Tags abgedeckt (`linq-query-syntax`,
+  `linq-ordering-grouping`, `linq-deferred-execution` offen). B0 bis B14
+  bleiben komplett.

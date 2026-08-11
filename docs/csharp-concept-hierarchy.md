@@ -1150,6 +1150,28 @@ abgedeckt (`linq-query-syntax`, `linq-ordering-grouping`,
 `linq-aggregation`, `linq-deferred-execution` offen). B0 bis B14
 bleiben komplett.*
 
+**Update:** Challenge 23 deckt `linq-aggregation` ab — den zweiten von
+fünf B15-Tags. Szenario: `List<int> punkte = { 80, 90, 70, 60, 100 };`,
+zusammengefasst über alle fünf Aggregations-Methoden aus der
+Tag-Definition: `.Sum()` (400), `.Count()` (5), `.Average()` (400 als
+`double`, hier exakt 80 ohne Nachkommastellen — die Zahlen wurden
+bewusst so gewählt, dass die Ausgabe nicht von .NETs Fließkomma-
+Rundungsdarstellung abhängt), `.Max()` (100), `.Min()` (60).
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `Max()` und `Min()` bei der Zuweisung vertauscht — liefert
+"Maximum: 60" und "Minimum: 100" statt umgekehrt (Logikfehler,
+kompiliert fehlerfrei); `.Length` statt `.Count()` verwendet — `List<T>`
+hat anders als Arrays keine `.Length`-Eigenschaft, echter Compilerfehler
+`CS1061`; und ein Element beim Anlegen der Liste vergessen (nur vier
+statt fünf Zahlen) — verändert vier der fünf Ausgabezeilen (Summe,
+Anzahl, Durchschnitt, Maximum), nur `Minimum` bleibt zufällig korrekt,
+ein realistischer Abschreibfehler statt einer API-Verwechslung.
+
+**Tag-Bilanz: 80 von 86 (≈ 93 %).** B15 ist damit zu 2 von 5 Tags
+abgedeckt (`linq-query-syntax`, `linq-ordering-grouping`,
+`linq-deferred-execution` offen). B0 bis B14 bleiben komplett.*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt
