@@ -1,0 +1,60 @@
+name: C# Engine CI
+
+# Verifies that csharp-engine/ (the Blazor WASM + Roslyn engine, a completely
+# separate .NET/MSBuild toolchain from the main Vite/npm app — see
+# csharp-engine/README.md) still builds and publishes cleanly on a real
+# GitHub Actions runner. This does NOT deploy anything yet — it is
+# deliberately scoped to proving the .NET SDK + wasm-tools workload + publish
+# pipeline works in CI at all before docs/csharp-engine-poc.md's next,
+# separate step (wiring the published output into deploy-pages.yml for
+# production) is attempted. Path-filtered so ordinary frontend-only commits
+# don't pay for a .NET SDK install.
+
+on:
+  push:
+    paths:
+      - 'csharp-engine/**'
+      - '.github/workflows/csharp-engine-ci.yml'
+  pull_request:
+    paths:
+      - 'csharp-engine/**'
+      - '.github/workflows/csharp-engine-ci.yml'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # --skip-manifest-update pins to the manifest bundled with the SDK
+      # instead of fetching the latest advertised one — same flag already
+      # verified working for this exact engine, and more reproducible for CI
+      # than letting the workload version drift between runs.
+      - name: Install wasm-tools workload
+        run: dotnet workload install wasm-tools --skip-manifest-update
+
+      - name: Publish C# engine (Release, WASM)
+        working-directory: csharp-engine
+        run: dotnet publish -c Release
+
+      # Sanity-checks the exact files the dev-server middleware (vite.config.ts)
+      # and the eventual production deploy step both need: the Blazor loader
+      # script and the reference-assembly DLLs CSharpEngine.cs resolves types
+      # against at runtime.
+      - name: Verify published output has the files the app loader needs
+        run: |
+          set -e
+          PUBLISH_DIR="csharp-engine/bin/Release/net8.0/publish/wwwroot"
+          test -f "$PUBLISH_DIR/_framework/blazor.webassembly.js"
+          test -f "$PUBLISH_DIR/_framework/CSharpEngineBlazor.wasm.gz"
+          test -d "$PUBLISH_DIR/refs"
+          REF_COUNT=$(find "$PUBLISH_DIR/refs" -name '*.dll' | wc -l)
+          if [ "$REF_COUNT" -lt 1 ]; then
+            echo "Expected at least one reference assembly DLL under refs/, found $REF_COUNT"
+            exit 1
+          fi
+          echo "C# engine publish output verified ($REF_COUNT reference DLLs)."

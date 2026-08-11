@@ -1105,6 +1105,63 @@ Roughly in dependency order:
    that path yet — cross-origin isolation being present is a necessary
    precondition for the C# engine to work at all once it *is* hosted, not
    sufficient on its own yet.
+
+   **Update (2026-08-11, next firing): deferred item (2) split into two —
+   the CI-feasibility half is now done, the production-wiring half stays
+   deferred.** `main` was merged and pushed this session (67 commits,
+   at the user's explicit request) — the accumulated SQL/Python/C# work
+   is live in production for the first time, which raises the practical
+   stakes of the still-broken C# track from "known gap" to "a real user
+   could hit this." Before touching the actual `deploy-pages.yml`
+   (still the highest-risk piece — a mistake there breaks the live site,
+   not just this branch), this firing proves the untested part first: can
+   a real GitHub Actions runner even install the .NET SDK + `wasm-tools`
+   workload and `dotnet publish -c Release` the engine at all? Nothing in
+   this repo had exercised that outside this sandbox before.
+
+   New `.github/workflows/csharp-engine-ci.yml`: `actions/setup-dotnet@v4`
+   (`8.0.x`) → `dotnet workload install wasm-tools --skip-manifest-update`
+   → `dotnet publish -c Release` in `csharp-engine/` → asserts the exact
+   files the app's own loader needs actually exist (`_framework/
+   blazor.webassembly.js`, `_framework/CSharpEngineBlazor.wasm.gz`, and
+   at least one `refs/*.dll`) rather than just trusting a zero exit code.
+   Triggers on push/PR, but path-filtered to `csharp-engine/**` and the
+   workflow file itself, so ordinary frontend-only commits never pay for
+   a .NET SDK install. Deliberately a **separate** workflow from
+   `ci.yml` (different toolchain entirely, and no reason to slow down
+   every Node/TS change with a multi-minute .NET setup) and **not**
+   wired into `deploy-pages.yml` — this step proves feasibility, it does
+   not deploy anything.
+
+   Verified locally first, matching what the CI step will do: fresh
+   `dotnet publish -c Release` in `csharp-engine/` (this sandbox's SDK is
+   apt-installed 8.0.129 + `wasm-tools`, same workload the CI step
+   installs, just via a different install path — apt here, `dotnet
+   workload install` there, since GitHub's runners don't have it
+   preinstalled the way this sandbox now does) — succeeds in ~32s warm,
+   produces a 68 MB `wwwroot/` (matches the ~9 MB compressed figure
+   documented at the top of this doc: most of that 68 MB is the
+   uncompressed originals sitting alongside the `.gz`/`.br` variants
+   browsers actually fetch). Confirmed all three assertions the new CI
+   step makes actually pass against that real output (`blazor.
+   webassembly.js` present, `CSharpEngineBlazor.wasm.gz` present, 11
+   `refs/*.dll` files present — matches the "11 needed DLLs" figure from
+   step 2 above). This is exactly the `wwwroot/` shape
+   `vite.config.ts`'s dev-server middleware already serves under
+   `/csharp-engine/` locally, and the shape the eventual production step
+   would need to copy into `gh-pages`.
+
+   **Still deliberately not done:** actually wiring this into
+   `deploy-pages.yml` and copying the published output into `gh-pages`
+   under `/csharp-engine/`. That remains its own increment — this
+   firing's job was narrowly "prove a clean GitHub Actions runner can
+   build this at all," not "ship it." The next step, once this workflow
+   has run for real in CI and been observed to pass, is extending
+   `deploy-pages.yml` itself with the same publish step plus a copy into
+   `gh-pages`, and verifying the deployed page's `/csharp-engine/` route
+   actually boots under production COOP/COEP (service-worker-provided,
+   not the dev-server's real headers) — a materially different test than
+   anything done so far.
 6. ~~**Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
    mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
    feasible now that `dotnet` works in this sandbox; likely just

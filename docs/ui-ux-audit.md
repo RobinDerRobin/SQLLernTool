@@ -4389,3 +4389,61 @@ sondern pro PR direkt in den Checks sichtbar.
   `deploy-pages.yml`-Workflow läuft dadurch automatisch an.
   `claude/github-projekt-b3ivo1` bleibt der Arbeits-Branch für die
   stündliche Routine, unverändert bei `cf1c10d`.
+
+### 2026-08-11 — Stündliche Routine: `main`-Deploy verifiziert (grün) + C#-Produktions-Hosting, Schritt 3 — CI-Machbarkeit für `dotnet publish` bewiesen
+
+- **Umfang:** Baseline sauber (1049/1049, typecheck/build/knip grün, HEAD
+  `22d3ab5`). Erster Schritt dieses Durchgangs: den `deploy-pages.yml`-
+  Lauf, den der Merge nach `main` in der letzten Nutzeranfrage ausgelöst
+  hat, tatsächlich geprüft — `conclusion: success` für Commit `d0edb4f`,
+  keine "irgendwas ist kaputt"-Situation. Ein direkter Zugriff auf die
+  Live-Seite selbst (`robinderrobin.github.io`) scheitert an derselben
+  Sandbox-Netzwerksperre wie die CDN-Domains (403 auf den Proxy-
+  CONNECT-Tunnel) — kein Signal über den Deploy, nur eine bekannte
+  Umgebungseinschränkung dieser Sandbox.
+
+- **C#-Schritt:** SQL/Python haben keine aktionable Content-Lücke mehr,
+  daher laut Mandat-Priorität dieser Durchgang für C#. Der zuletzt
+  benannte nächste Schritt (`dotnet publish` + C#-Engine-`wwwroot` im
+  Deploy-Workflow) ist laut eigener Doku "das riskanteste Teilstück des
+  gesamten Vorhabens" — direkt in `deploy-pages.yml` schreiben, ohne
+  vorher zu wissen, ob ein echter GitHub-Actions-Runner die .NET-SDK-
+  und `wasm-tools`-Workload-Installation überhaupt schafft, wäre grob
+  fahrlässig. Stattdessen den Schritt aufgeteilt: zuerst die reine
+  CI-Machbarkeit in einem separaten, ungefährlichen Workflow beweisen,
+  danach (nächster Durchgang) erst die eigentliche Produktions-Verdrahtung.
+
+- **Neu:** `.github/workflows/csharp-engine-ci.yml` — `actions/setup-
+  dotnet@v4` (8.0.x) → `wasm-tools`-Workload → `dotnet publish -c
+  Release` in `csharp-engine/` → prüft die drei konkreten Dateien, die
+  der App-Loader tatsächlich braucht (`blazor.webassembly.js`,
+  `CSharpEngineBlazor.wasm.gz`, mindestens eine `refs/*.dll`), statt nur
+  auf einen Exit-Code 0 zu vertrauen. Pfadgefiltert auf `csharp-engine/**`
+  und die Workflow-Datei selbst — reine Frontend-Commits zahlen nicht für
+  eine .NET-SDK-Installation. Bewusst ein **separater** Workflow von
+  `ci.yml` (komplett anderes Toolchain, keine Deploy-Wirkung) statt in
+  `deploy-pages.yml` eingebaut.
+
+- **Lokal vorab verifiziert, exakt was der CI-Schritt tut:** frisches
+  `dotnet publish -c Release` in `csharp-engine/` (~32 s warm), 68 MB
+  `wwwroot/`-Output — deckt sich mit der schon dokumentierten ~9-MB-
+  komprimiert-Angabe (die 68 MB sind unkomprimierte Originale neben den
+  `.gz`/`.br`-Varianten, die der Browser tatsächlich lädt). Alle drei
+  Prüfungen des neuen CI-Schritts gegen dieses echte Ergebnis manuell
+  nachvollzogen: `blazor.webassembly.js` vorhanden, `CSharpEngineBlazor.
+  wasm.gz` vorhanden, 11 `refs/*.dll`-Dateien (deckt sich mit der aus
+  Schritt 2 bekannten "11 benötigte DLLs"-Zahl). Exakt die `wwwroot/`-
+  Form, die die lokale Dev-Server-Middleware bereits unter
+  `/csharp-engine/` ausliefert.
+
+- **Bewusst weiterhin offen:** die eigentliche Verdrahtung in
+  `deploy-pages.yml` (Publish-Schritt + Kopie nach `gh-pages` unter
+  `/csharp-engine/`) sowie die Verifikation, dass die produktiv
+  deployte Seite unter echten (Service-Worker-basierten, nicht
+  Dev-Server-echten) COOP/COEP-Headern tatsächlich bootet — bleibt der
+  nächste, eigenständige Schritt, erst nachdem dieser Workflow real in
+  CI gelaufen ist und sich bestätigt hat.
+
+- **Ergebnis:** Tests unverändert 1049/1049 grün (keine `src/`-Änderung,
+  reine Workflow-Datei). Typecheck/Build/Knip unverändert grün. Keine
+  Coverage-Änderung, kein Artifact-Republish nötig.
