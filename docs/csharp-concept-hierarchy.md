@@ -1197,6 +1197,32 @@ richtig" zwei verschiedene Dinge sind.
 abgedeckt (`linq-ordering-grouping`, `linq-deferred-execution` offen).
 B0 bis B14 bleiben komplett.*
 
+**Update:** Challenge 25 deckt `linq-ordering-grouping` ab — den
+vierten von fünf B15-Tags, alle drei Methoden aus der Tag-Definition
+in einem Durchgang. Szenario: `List<int> zahlen = { 42, 17, 8, 23, 4,
+16 };`, sortiert mit `.OrderBy(z => z)` (aufsteigend: 4, 8, 16, 17, 23,
+42) und `.OrderByDescending(z => z)` (absteigend: 42, 23, 17, 16, 8,
+4), gruppiert mit `.GroupBy(z => z % 2 == 0 ? "Gerade" : "Ungerade")`.
+Empirisch bestätigt: die Gruppenreihenfolge folgt dem ersten Vorkommen
+jedes Schlüssels im Quell-Enumerable — "Gerade" zuerst, weil `42` (das
+erste Element) gerade ist, dann "Ungerade" (erstes ungerades Element:
+`17`), unabhängig von der Deklarationsreihenfolge der Ternär-Zweige.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `OrderBy()`/`OrderByDescending()` bei der Zuweisung
+vertauscht — die ersten beiden Ausgabezeilen zeigen die Werte in
+vertauschter Sortierrichtung; die beiden Ternär-Zweige im
+`GroupBy()`-Schlüssel vertauscht — die letzten beiden Zeilen zeigen die
+falschen Beschriftungen ("Ungerade" für die geraden Zahlen und
+umgekehrt), obwohl die tatsächliche Gruppierung unverändert bleibt;
+`gruppe.Count()` statt `gruppe.Key` für die Beschriftung — verwechselt
+die Gruppengröße mit dem Gruppenschlüssel, zeigt `"4: ..."`/`"2: ..."`
+statt der Textlabels.
+
+**Tag-Bilanz: 82 von 86 (≈ 95 %).** B15 ist damit zu 4 von 5 Tags
+abgedeckt — nur `linq-deferred-execution` bleibt offen, der letzte Tag
+im gesamten C#-Dokument. B0 bis B14 bleiben komplett.*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt

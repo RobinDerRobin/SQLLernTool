@@ -148,6 +148,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-11 | HEAD (C# Challenge 22: B15 Teil 1 — LINQ Where/Select, 79/86) | 92.44 % | 73.17 % | 99.15 % | 92.44 % |
 | 2026-08-11 | HEAD (C# Challenge 23: B15 Teil 2 — LINQ Aggregation, 80/86) | 92.47 % | 73.14 % | 99.15 % | 92.47 % |
 | 2026-08-11 | HEAD (C# Challenge 24: B15 Teil 3 — LINQ Query-Syntax, 81/86) | 92.50 % | 73.14 % | 99.15 % | 92.50 % |
+| 2026-08-11 | HEAD (C# Challenge 25: B15 Teil 4 — LINQ Ordering/Grouping, 82/86) | 92.53 % | 73.13 % | 99.16 % | 92.53 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -3700,3 +3701,38 @@ sondern pro PR direkt in den Checks sichtbar.
   Tests/typecheck/build unverändert bei 1022/1022 grün. Nächster
   offener Schritt: weiterer C#-Content (B15-Rest oder B16) oder der
   nächste Live-Bug-Hunt in ein paar Durchgängen.
+
+### 2026-08-11 — Stündliche Routine: C# Challenge 25 (B15 Teil 4: LINQ Ordering/Grouping)
+
+- **Umfang:** Baseline sauber (1022/1022, typecheck/build/knip grün, HEAD
+  `132621d`). SQL/Python weiterhin an der permanenten Scope-Grenze. Der
+  letzte Durchgang war ein sauberer Live-Bug-Hunt — laut Mandat-
+  Priorität diesmal wieder C#, da B15s vierter Tag
+  (`linq-ordering-grouping`) ein klar begrenzter nächster Schritt war.
+
+- **Neue Challenge 25** deckt `linq-ordering-grouping` ab — alle drei
+  Methoden aus der Tag-Definition (`.OrderBy()`, `.OrderByDescending()`,
+  `.GroupBy()`) in einem Durchgang. Szenario: `List<int> zahlen = { 42,
+  17, 8, 23, 4, 16 };`, sortiert aufsteigend und absteigend, gruppiert
+  per `.GroupBy(z => z % 2 == 0 ? "Gerade" : "Ungerade")`. Empirisch
+  bestätigt: die Gruppenreihenfolge folgt dem ersten Vorkommen jedes
+  Schlüssels im Quell-Enumerable — "Gerade" zuerst, weil `42` (das
+  erste Element) gerade ist.
+
+- **Drei Distraktoren, alle beim ersten Durchlauf empirisch gegen den
+  echten `dotnet`-Treiber verifiziert:** `OrderBy()`/
+  `OrderByDescending()` bei der Zuweisung vertauscht — die ersten
+  beiden Zeilen zeigen vertauschte Sortierrichtungen; die Ternär-Zweige
+  im `GroupBy()`-Schlüssel vertauscht — die letzten beiden Zeilen
+  zeigen falsche Beschriftungen, obwohl die tatsächliche Gruppierung
+  unverändert bleibt; `gruppe.Count()` statt `gruppe.Key` verwendet —
+  verwechselt Gruppengröße mit Gruppenschlüssel.
+
+- **Ergebnis:** Tests 1022 → 1026 (+4: Gate 1 eigene Lösung + Gate 2
+  drei Distraktoren für Challenge 25). `typecheck` grün. `npm run build`
+  erfolgreich, unverändert 635,90 kB (reine Content-Datei). `knip`:
+  unverändert 10 Funde. Coverage: 92,53 % / 73,13 % / 99,16 % / 92,53 %.
+  `docs/csharp-concept-hierarchy.md`: Tag-Bilanz 81/86 → 82/86 (≈ 95 %),
+  B15 zu 4 von 5 Tags abgedeckt — nur `linq-deferred-execution` bleibt
+  offen, der letzte Tag im gesamten C#-Dokument. B0 bis B14 bleiben
+  komplett.
