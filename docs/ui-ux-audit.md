@@ -4364,3 +4364,28 @@ sondern pro PR direkt in den Checks sichtbar.
   zweiten, tieferliegenden Fund nicht automatisch aus — lohnt sich, nach
   der ersten Erklärung trotzdem einmal mit funktionierendem Setup
   nachzuprüfen.
+
+### 2026-08-11 — Auf Nutzeranfrage: `main` gemerged, echter Produktions-Deploy ausgelöst
+
+- **Umfang:** Nutzeranfrage außerhalb der stündlichen Routine ("merge mit
+  main"). `main` war 67 Commits hinter `claude/github-projekt-b3ivo1`
+  zurück — vor dem Merge explizit auf den Live-Deploy-Trigger
+  (`deploy-pages.yml` triggert nur auf Push nach `main`) hingewiesen und
+  den Merge-Weg abgefragt: direkter Merge + Push gewählt (statt PR).
+  Kein Fast-Forward möglich (`main` hatte eigene Merge-Commits aus den
+  PRs #1–#4, unser Branch enthält deren Inhalt aber über eine andere
+  Commit-Historie) — echter Merge-Commit nötig, Konfliktprüfung per
+  `git merge --no-commit --no-ff` vorab: sauber, keine Konflikte.
+- **Vor dem Push verifiziert** (nicht nur der übliche Branch-Check,
+  sondern bewusst noch einmal auf dem gemergten `main`-Stand selbst, weil
+  dieser Push einen echten Produktions-Deploy auslöst): `npx tsc --noEmit`
+  sauber, `npm ci && npm run build` sauber (829,19 kB, identisch zum
+  Branch-Stand), volle Testsuite **1049/1049 grün**.
+- **Ergebnis:** `main` steht jetzt bei Commit `d0edb4f`, gepusht — SQL
+  (81/82), Python (81/82), C# (86/86 Content, Engine live im Dev-Server
+  verdrahtet, zwei von drei Produktions-Hosting-Schritten fertig) sind
+  damit erstmals seit Session-Beginn vollständig auf der echten
+  Produktionsseite unterwegs statt nur auf dem Arbeits-Branch. Der
+  `deploy-pages.yml`-Workflow läuft dadurch automatisch an.
+  `claude/github-projekt-b3ivo1` bleibt der Arbeits-Branch für die
+  stündliche Routine, unverändert bei `cf1c10d`.
