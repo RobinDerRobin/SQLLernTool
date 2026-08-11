@@ -14,10 +14,12 @@ on:
   push:
     paths:
       - 'csharp-engine/**'
+      - 'global.json'
       - '.github/workflows/csharp-engine-ci.yml'
   pull_request:
     paths:
       - 'csharp-engine/**'
+      - 'global.json'
       - '.github/workflows/csharp-engine-ci.yml'
 
 jobs:

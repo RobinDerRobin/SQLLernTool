@@ -1183,6 +1183,43 @@ Roughly in dependency order:
    Release` both still succeed, and all three of the new CI step's
    assertions still pass against the rebuilt output.
 
+   **Update, same firing again: the pushed fix's own real CI run caught
+   a second, related gap.** `dotnet publish` itself now succeeded (no
+   more `CSharpEngineRefPackDir` error — the fix worked) but the run
+   still failed, this time at the "verify output" step, and a new
+   warning appeared first: `Publishing without optimizations... we
+   strongly recommend using wasm-tools workload!`. Cause: the "Install
+   wasm-tools workload" step has no `working-directory`, so it ran from
+   the repo root — which, at that point, had no `global.json` either
+   (it was scoped to `csharp-engine/` only) — so `dotnet workload
+   install` *also* silently resolved to the 10.0.10 SDK and installed
+   the workload packs there, not for the 8.0.x SDK that the (correctly
+   pinned) publish step actually used. Right SDK for the publish, wrong
+   SDK for the workload it needed — two independently-resolved `dotnet`
+   invocations disagreeing on which SDK "the" installed workload belongs
+   to. Without wasm-tools available for the SDK actually publishing,
+   Blazor falls back to an unoptimized publish path that skips the
+   AOT/trimming pipeline — which is also what produces the `.gz`/`.br`
+   precompressed assets the verify step checks for, so `CSharpEngineBlazor.
+   wasm.gz` (and likely the `blazor.webassembly.js` check ahead of it, given
+   the step failed immediately on entry) never existed to find.
+
+   **Fix:** moved `global.json` from `csharp-engine/` to the **repo
+   root**, so every `dotnet` invocation anywhere in the checkout resolves
+   the same pinned 8.0.x SDK regardless of working directory — including
+   both CI steps in this workflow without needing a `working-directory`
+   on each one, *and* the pre-existing, already-in-production `ci.yml`
+   job that builds `csharp-engine/driver/` for the Node-side C# tests
+   (`test/helpers/nodeCSharpEngine.ts`'s `ensureDriverBuilt()`), which
+   had the exact same latent multi-SDK hazard and was simply never
+   caught because that build has so far always happened to land on a
+   working SDK by luck of default resolution order. Verified locally
+   again from all three relevant directories (repo root, `csharp-engine/`,
+   `csharp-engine/driver/`) that `dotnet --version` now reports `8.0.129`
+   consistently, then a fresh rebuild of both the engine and the driver,
+   both clean, all four verify-step assertions still pass. Workflow's
+   path filter extended to also watch the (now root-level) `global.json`.
+
    **Still deliberately not done:** actually wiring this into
    `deploy-pages.yml` and copying the published output into `gh-pages`
    under `/csharp-engine/`. That remains its own increment — this

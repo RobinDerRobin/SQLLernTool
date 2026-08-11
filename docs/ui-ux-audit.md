@@ -4471,3 +4471,31 @@ sondern pro PR direkt in den Checks sichtbar.
   — der nächste reale CI-Lauf (durch genau diesen Fix selbst getriggert,
   da er `csharp-engine/**` berührt) wird zeigen, ob das Problem behoben
   ist.
+
+- **Zweiter Nachtrag, gleicher Durchgang — der Fix-Lauf fand einen
+  zweiten, verwandten Lücke:** `dotnet publish` lief diesmal tatsächlich
+  durch (kein `CSharpEngineRefPackDir`-Fehler mehr), der Job scheiterte
+  aber trotzdem — mit einer neuen Warnung davor: `Publishing without
+  optimizations... wasm-tools workload!`. Ursache: der
+  "Install wasm-tools workload"-Schritt hatte kein `working-directory`,
+  lief also vom Repo-Root aus — der zu diesem Zeitpunkt noch **kein**
+  `global.json` hatte (das lag nur unter `csharp-engine/`). Die
+  Workload-Installation griff dadurch selbst wieder auf die 10.0.10-SDK
+  zu, obwohl der (korrekt gepinnte) Publish-Schritt die 8.0.x-SDK nutzte
+  — zwei unabhängig aufgelöste `dotnet`-Aufrufe, uneinig darüber, wessen
+  installierte Workload gilt. Ohne wasm-tools für die tatsächlich
+  publizierende SDK fällt Blazor auf einen unoptimierten Pfad zurück, der
+  auch die vorkomprimierten `.gz`/`.br`-Dateien nicht erzeugt — genau die,
+  die die Verifikation prüft.
+  **Fix:** `global.json` vom `csharp-engine/`-Unterordner in den
+  **Repo-Root** verschoben, sodass jeder `dotnet`-Aufruf im gesamten
+  Checkout dieselbe gepinnte SDK auflöst — unabhängig vom Arbeitsverzeichnis,
+  ohne `working-directory` an jedem einzelnen Schritt nachpflegen zu
+  müssen. Als Nebeneffekt schützt das jetzt auch den bereits produktiven
+  `ci.yml`-Job, der `csharp-engine/driver/` für die Node-seitigen
+  C#-Tests baut und exakt dieselbe latente Mehrfach-SDK-Gefahr hatte,
+  bisher nur durch Zufall nie getroffen. Lokal aus allen drei relevanten
+  Verzeichnissen erneut bestätigt (`dotnet --version` konsistent
+  `8.0.129`), beide Projekte frisch neu gebaut, alle vier
+  Verify-Prüfungen erfüllt. Workflow-Pfadfilter um das jetzt
+  root-liegende `global.json` erweitert.
