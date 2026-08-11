@@ -3414,3 +3414,48 @@ sondern pro PR direkt in den Checks sichtbar.
   Funde. Coverage: 92,38 % / 73,17 % / 99,15 % / 92,38 %.
   `docs/csharp-concept-hierarchy.md`: Tag-Bilanz 74/86 → 77/86 (≈ 90 %),
   B14 zu 3 von 4 Tags abgedeckt (`events` offen).
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt (sauber), kein aktionabler Schritt
+
+- **Umfang:** Baseline sauber (1006/1006, typecheck/build grün, HEAD
+  `747a512`). SQL/Python weiterhin an der permanenten Scope-Grenze,
+  letzter dedizierter Live-Bug-Hunt lag drei Durchgänge zurück (vor der
+  iframe-Transport-/Editor-UI-/Challenge-20-Arbeit) — laut Mandat-
+  Priorität diesmal Priorität 2 statt eines weiteren C#-Increments.
+
+- **Vorgehen:** Dev-Server gestartet, sql.js/Pyodide lokal per
+  `context.route()` statt der in dieser Sandbox blockierten CDN-Domains
+  serviert (Standard-Runbook). Drei Playwright-Durchläufe: Desktop
+  (1400×1000), Mobile (375×667, iPhone-SE-Breite, Standing-Requirement
+  seit 2026-08-09), Python-Track. Geprüft: horizontales Overflow, echte
+  `.click()`-Versuche (nicht nur `isVisible()`) auf Tabs/Run-Button nach
+  Interaktion, Sidebar-Drawer-Verhalten nach Auswahl auf Mobile,
+  Konsolenfehler/`pageerror`, ein vollständiger End-to-End-Run-Zyklus
+  (echte Musterlösung aus Challenge 01 in den Editor eingefügt, Run
+  geklickt, `.status-ok` bestätigt).
+
+- **Zwei scheinbare Befunde aus dem ersten automatisierten Durchlauf
+  entpuppten sich beim Nachprüfen als Fehler im eigenen Testskript, nicht
+  im Produkt** — festgehalten, weil das Muster lehrreich ist: (1) ein
+  `.click()` auf `.challenge-item[data-num="3"]` schlug fehl, weil
+  `data-num` tatsächlich nullgepolstert ist (`"03"`) — mit der korrekten
+  Selektor-Form lief die gesamte Mobile-Sidebar-Sequenz (Drawer offen bei
+  Erstladung → nach Auswahl korrekt auf `collapsed` mit 52px Breite,
+  Editor-Tab danach klickbar) genau wie erwartet durch, kein
+  F-020-Rückfall. (2) `task tab visible: false` und `run nach Lösung-
+  Klick: status-ok false` lagen an geratenen Selektoren
+  (`.task-tab`/`[data-tab-panel="task"]` statt des echten
+  `#tabpanel-task`) bzw. einer falschen Annahme (der Button
+  „Lösung anzeigen" zeigt die Musterlösung nur zum Vergleich an, füllt
+  sie aber bewusst nicht automatisch in den Editor — kein Bug, korrektes
+  Verhalten, das ein automatisches Bestehen ohne eigenes Tippen
+  verhindern soll). Mit den korrigierten Selektoren: Task-Tab-Panel
+  sichtbar, Lösungs-Panel zeigt Text (771 Zeichen), Editor-Textarea mit
+  korrektem Platzhalter vorbefüllt, echter End-to-End-Lauf mit der
+  richtigen Musterlösung liefert `status-ok`.
+
+- **Ergebnis:** Keine echten Bugs gefunden. Keine Code-Änderung nötig,
+  kein Commit. Tests/typecheck/build unverändert bei 1006/1006 grün.
+  Nächster offener Schritt bleibt entweder ein weiterer C#-Content-
+  Schritt (`events`, B14, oder B15/LINQ) oder der nächste Live-Bug-Hunt
+  in ein paar Durchgängen.
