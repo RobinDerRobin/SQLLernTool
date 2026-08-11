@@ -144,6 +144,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-10 | HEAD (C#-Engine: iframe+postMessage-Transport statt direktem Script-Inject) | 92.33 % | 73.16 % | 99.14 % | 92.33 % |
 | 2026-08-10 | HEAD (C#-Editor-UI: csharpResultsArea + pluginForTrack('csharp')) | 92.35 % | 73.18 % | 99.15 % | 92.35 % |
 | 2026-08-11 | HEAD (C# Challenge 20: B14 Teil 1 — Delegates/Lambda/Func<>, 77/86) | 92.38 % | 73.17 % | 99.15 % | 92.38 % |
+| 2026-08-11 | HEAD (C# Challenge 21: B14 vollständig — Events, 78/86) | 92.41 % | 73.17 % | 99.15 % | 92.41 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -3459,3 +3460,46 @@ sondern pro PR direkt in den Checks sichtbar.
   Nächster offener Schritt bleibt entweder ein weiterer C#-Content-
   Schritt (`events`, B14, oder B15/LINQ) oder der nächste Live-Bug-Hunt
   in ein paar Durchgängen.
+
+### 2026-08-11 — Stündliche Routine: C# Challenge 21 (B14 vollständig: Events)
+
+- **Umfang:** Baseline sauber (1006/1006, typecheck/build/knip grün, HEAD
+  `25e90fa`). SQL/Python weiterhin an der permanenten Scope-Grenze.
+  Letzter Durchgang war ein sauberer Live-Bug-Hunt ohne Codeänderung —
+  laut Mandat-Priorität diesmal wieder C#, da mit `events` ein klar
+  begrenzter, dokumentierter nächster Schritt anstand (letzter offener
+  B14-Tag).
+
+- **Neue Challenge 21** deckt `events` ab — den letzten Tag aus B14.
+  Szenario: eine Klasse `Kontostand` mit
+  `public event Action<int>? SaldoNiedrig;` (bewusst der eingebaute
+  `Action<int>`-Typ statt eines eigenen `delegate`, direkte Fortsetzung
+  von Challenge 20s `func-action-types`). `Abheben(int betrag)` löst
+  das Event per `SaldoNiedrig?.Invoke(saldo);` aus, sobald der Saldo
+  unter 50 fällt; von außen meldet sich der Aufrufer per `+=` mit einem
+  Lambda an. Zwei Abhebungen (100 → 70 → 40) zeigen sowohl den
+  Nicht-Auslöse- als auch den Auslöse-Fall in der Ausgabe.
+
+- **Drei Distraktoren, alle beim ersten Durchlauf korrekt gegen den
+  echten `dotnet`-Treiber verifiziert — kein Nacharbeiten nötig, anders
+  als bei Challenge 20s CS8803-Fund:** ein Versuch, das Event direkt
+  von außen aufzurufen (`konto.SaldoNiedrig(letzterSaldo);` statt nur
+  `+=`/`-=`) — der Compiler lehnt das mit `CS0070` ab, genau die
+  Zugriffsbeschränkung, die `event` gegenüber einem gewöhnlichen
+  öffentlichen Delegate-Feld durchsetzt und damit den Kernpunkt des
+  Tags empirisch demonstriert; das `event`-Schlüsselwort weggelassen
+  (nur `public Action<int>? SaldoNiedrig;`) und zusätzlich direkt von
+  außen aufgerufen — kompiliert jetzt anstandslos und löst die Warnung
+  schon vor der ersten Abhebung fälschlich aus, zeigt empirisch, was
+  ohne `event` an Kapselung verloren geht; die Auslöse-Schwelle von
+  `saldo < 50` auf `saldo < 40` geändert — nach der zweiten Abhebung
+  steht der Saldo exakt bei 40, `40 < 40` ist falsch, das Event feuert
+  nie (Off-by-one in der Fachlogik).
+
+- **Ergebnis:** Tests 1006 → 1010 (+4: Gate 1 eigene Lösung + Gate 2
+  drei Distraktoren für Challenge 21). `typecheck` grün. `npm run build`
+  erfolgreich, unverändert 635,90 kB (reine Content-Datei). `knip`:
+  unverändert 10 Funde. Coverage: 92,41 % / 73,17 % / 99,15 % / 92,41 %.
+  `docs/csharp-concept-hierarchy.md`: Tag-Bilanz 77/86 → 78/86 (≈ 91 %),
+  **B14 (Delegates & Lambda-Ausdrücke) damit vollständig abgedeckt** —
+  B0 bis B14 sind jetzt komplett. Nächster offener Zweig: B15 (LINQ).

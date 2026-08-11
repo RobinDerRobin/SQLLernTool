@@ -1093,6 +1093,36 @@ Anhängsel an diese Challenge; folgt in einem künftigen Durchgang.
 abgedeckt (`events` offen). B0 bis B13 bleiben komplett. Nächster
 offener Schritt: `events` (B14 abschließen) oder B15 (LINQ).*
 
+**Update:** Challenge 21 schließt den letzten B14-Tag `events` ab.
+Szenario: eine Klasse `Kontostand` mit
+`public event Action<int>? SaldoNiedrig;` — ein Event auf Basis des
+eingebauten `Action<int>`-Delegate-Typs statt eines eigenen `delegate`,
+bewusst als direkte Fortsetzung von Challenge 20s `func-action-types`.
+Eine Methode `Abheben(int betrag)` löst das Event per
+`SaldoNiedrig?.Invoke(saldo);` aus, sobald der Saldo unter 50 fällt;
+außerhalb der Klasse meldet sich der Aufrufer per `+=` mit einem
+Lambda an, das zwei Variablen setzt — zwei Abhebungen (100 → 70 → 40)
+zeigen sowohl den Nicht-Auslöse- als auch den Auslöse-Fall.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert, zusammen der Kern der Tag-Bedeutung ("Delegate mit
+eingeschränktem Zugriff"): ein Versuch, das Event direkt von außen
+aufzurufen (`konto.SaldoNiedrig(letzterSaldo);` statt nur `+=`/`-=`) —
+der Compiler lehnt das ab (`CS0070`), genau die Einschränkung, die
+`event` gegenüber einem gewöhnlichen öffentlichen Delegate-Feld
+durchsetzt; das `event`-Schlüsselwort bei der Deklaration weggelassen
+(nur `public Action<int>? SaldoNiedrig;`) und zusätzlich direkt von
+außen aufgerufen — kompiliert jetzt anstandslos und löst die Warnung
+schon vor der ersten Abhebung fälschlich aus, zeigt empirisch, was
+ohne `event` an Kapselung verloren geht; die Auslöse-Schwelle von
+`saldo < 50` auf `saldo < 40` geändert — nach der zweiten Abhebung
+steht der Saldo exakt bei 40, `40 < 40` ist falsch, das Event feuert
+nie, ein klassischer Off-by-one-Fehler in der Fachlogik.
+
+**Tag-Bilanz: 78 von 86 (≈ 91 %).** Damit ist **B14 (Delegates &
+Lambda-Ausdrücke) vollständig abgedeckt** — B0 bis B14 sind jetzt
+komplett. Nächster offener Zweig: B15 (LINQ).*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt
