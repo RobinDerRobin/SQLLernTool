@@ -143,6 +143,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-10 | HEAD (C#-Engine-Wiring: EngineFactory.ensureCSharpEngine) | 92.31 % | 73.15 % | 99.14 % | 92.31 % |
 | 2026-08-10 | HEAD (C#-Engine: iframe+postMessage-Transport statt direktem Script-Inject) | 92.33 % | 73.16 % | 99.14 % | 92.33 % |
 | 2026-08-10 | HEAD (C#-Editor-UI: csharpResultsArea + pluginForTrack('csharp')) | 92.35 % | 73.18 % | 99.15 % | 92.35 % |
+| 2026-08-11 | HEAD (C# Challenge 20: B14 Teil 1 — Delegates/Lambda/Func<>, 77/86) | 92.38 % | 73.17 % | 99.15 % | 92.38 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -3359,3 +3360,57 @@ sondern pro PR direkt in den Checks sichtbar.
   nicht mehr nur von ihrer eigenen Testdatei — deshalb erstmals gebündelt,
   obwohl zur Laufzeit weiterhin unerreichbar. `knip`: unverändert 10
   Funde. Coverage: 92,35 % / 73,18 % / 99,15 % / 92,35 %.
+
+### 2026-08-11 — Stündliche Routine: C# Challenge 20 (B14 Teil 1: Delegates, Lambda-Ausdrücke, Func<>)
+
+- **Umfang:** Baseline sauber (1002/1002, typecheck/build/knip grün, HEAD
+  `cb7835b`). SQL/Python weiterhin an der permanenten Scope-Grenze
+  (81/82 je Track, nur die bekannten dauerhaften Ausnahmen offen) —
+  damit bleibt C# der einzige Track mit aktionablem Content-Fortschritt.
+  Letzter offener Zweig laut `docs/csharp-concept-hierarchy.md`: B14
+  (Delegates & Lambda-Ausdrücke, 4 Tags:
+  `delegate-type`/`lambda-expressions`/`func-action-types`/`events`).
+
+- **Neue Challenge 20** deckt drei der vier B14-Tags ab: ein eigener
+  Delegate-Typ `delegate int RechenOperation(int a, int b);`, dem eine
+  benannte Methode (Methodenreferenz ohne Aufruf-Klammern), ein direkt
+  zugewiesener Lambda-Ausdruck und zusätzlich der eingebaute generische
+  Delegate-Typ `Func<int, int, int>` mit einem dritten Lambda
+  zugewiesen werden — dieselbe Zuweisungssyntax für alle drei Varianten,
+  um den gemeinsamen Kern ("Methode als Wert") sichtbar zu machen.
+  `events` bleibt bewusst offen: ein Publisher/Subscriber-Aufbau mit dem
+  `event`-Schlüsselwort verdient ein eigenständigeres Szenario als ein
+  Anhängsel an diese Challenge.
+
+- **Echter Bug im ersten Entwurf gefunden, nicht nur ein Stilproblem:**
+  die erste Fassung deklarierte den `delegate`-Typ ganz am Dateianfang
+  (wie in jeder Tutorial-Erklärung intuitiv) — der echte `dotnet`-Treiber
+  lehnte das mit `CS8803: Top-level statements must precede namespace
+  and type declarations` ab. Ein `delegate` ist genau wie `class` eine
+  Typ-Deklaration; in C#s Top-Level-Programmen müssen **alle**
+  Anweisungen vor **allen** Typ-Deklarationen stehen, nicht nur vor der
+  jeweils jüngsten. Challenge 19 hatte dasselbe Muster schon für die
+  dortige `class`-Deklaration richtig gemacht (ganz am Ende), diese
+  Challenge hatte es beim `delegate` zunächst übersehen. Fix: Lösung,
+  alle drei Distraktoren und der dritte Hinweis verschieben die
+  `delegate`-Zeile ans Dateiende, nach der lokalen Methode `Addieren`;
+  Hinweis 2 erklärt jetzt explizit die Anweisungen-vor-Typen-Regel samt
+  `CS8803`-Fehlercode. Erst nach diesem Fix bestand die eigene Lösung
+  Gate 1.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** `Addieren` zu `void` statt `int` gemacht — die Signatur
+  passt nicht mehr zu `RechenOperation`, der Compiler lehnt die
+  Zuweisung ab (`CS0407`); im Lambda für `operation2` `a + b` statt
+  `a * b` verwendet — kompiliert fehlerfrei, liefert aber
+  "Multiplizieren: 7" statt "Multiplizieren: 12"; die Argumente beim
+  Aufruf von `operation3` vertauscht — kompiliert fehlerfrei, liefert
+  aber "Subtrahieren: -6" statt "Subtrahieren: 6" bei einer Subtraktion.
+
+- **Ergebnis:** Tests 1002 → 1006 (+4: Gate 1 eigene Lösung + Gate 2 drei
+  Distraktoren für Challenge 20, alle gegen den echten `dotnet`-Treiber).
+  `typecheck` grün. `npm run build` erfolgreich, unverändert 635,90 kB
+  (reine Content-Datei, kein neuer Code-Pfad). `knip`: unverändert 10
+  Funde. Coverage: 92,38 % / 73,17 % / 99,15 % / 92,38 %.
+  `docs/csharp-concept-hierarchy.md`: Tag-Bilanz 74/86 → 77/86 (≈ 90 %),
+  B14 zu 3 von 4 Tags abgedeckt (`events` offen).

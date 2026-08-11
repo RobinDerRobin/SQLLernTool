@@ -1064,6 +1064,35 @@ vollständig abgedeckt** — B0 bis B13 sind jetzt komplett. Nächster
 offener Zweig: B14 (Delegates & Lambda-Ausdrücke, nach der
 Branch-Übersicht in Abschnitt 5).*
 
+**Update:** Challenge 20 deckt drei der vier B14-Tags ab:
+`delegate-type`, `lambda-expressions`, `func-action-types`. Szenario: ein
+eigener Delegate-Typ `delegate int RechenOperation(int a, int b);`, dem
+zunächst eine benannte Methode (`Addieren`, ohne Aufruf-Klammern
+zugewiesen — reine Methodenreferenz statt Methodenaufruf) und dann ein
+Lambda-Ausdruck (`(a, b) => a * b`) direkt zugewiesen wird, sowie
+zusätzlich der eingebaute generische Delegate-Typ `Func<int, int, int>`
+mit einem dritten Lambda — dieselbe Zuweisungssyntax für alle drei
+Varianten, um den gemeinsamen Kern (Methode als Wert) sichtbar zu
+machen.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: die zugewiesene Methode `Addieren` zu `void` statt `int`
+gemacht — die Signatur passt nicht mehr zu `RechenOperation`, der
+Compiler lehnt die Zuweisung ab (`CS0407`); im Lambda für `operation2`
+`a + b` statt `a * b` verwendet — kompiliert fehlerfrei, liefert aber
+das falsche Ergebnis; die Argumente beim Aufruf von `operation3`
+vertauscht (`operation3(4, 10)` statt `operation3(10, 4)`) — kompiliert
+fehlerfrei, liefert aber `-6` statt `6` bei einer Subtraktion.
+
+`events` bleibt als vierter B14-Tag offen — Events brauchen einen
+Publisher/Subscriber-Aufbau (`event`-Schlüsselwort, Zugriffsbeschränkung
+von außen), der ein eigenständigeres Szenario verdient als ein
+Anhängsel an diese Challenge; folgt in einem künftigen Durchgang.
+
+**Tag-Bilanz: 77 von 86 (≈ 90 %).** B14 ist damit zu 3 von 4 Tags
+abgedeckt (`events` offen). B0 bis B13 bleiben komplett. Nächster
+offener Schritt: `events` (B14 abschließen) oder B15 (LINQ).*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt
