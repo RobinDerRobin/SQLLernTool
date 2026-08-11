@@ -145,6 +145,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-10 | HEAD (C#-Editor-UI: csharpResultsArea + pluginForTrack('csharp')) | 92.35 % | 73.18 % | 99.15 % | 92.35 % |
 | 2026-08-11 | HEAD (C# Challenge 20: B14 Teil 1 — Delegates/Lambda/Func<>, 77/86) | 92.38 % | 73.17 % | 99.15 % | 92.38 % |
 | 2026-08-11 | HEAD (C# Challenge 21: B14 vollständig — Events, 78/86) | 92.41 % | 73.17 % | 99.15 % | 92.41 % |
+| 2026-08-11 | HEAD (C# Challenge 22: B15 Teil 1 — LINQ Where/Select, 79/86) | 92.44 % | 73.17 % | 99.15 % | 92.44 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -3503,3 +3504,42 @@ sondern pro PR direkt in den Checks sichtbar.
   `docs/csharp-concept-hierarchy.md`: Tag-Bilanz 77/86 → 78/86 (≈ 91 %),
   **B14 (Delegates & Lambda-Ausdrücke) damit vollständig abgedeckt** —
   B0 bis B14 sind jetzt komplett. Nächster offener Zweig: B15 (LINQ).
+
+### 2026-08-11 — Stündliche Routine: C# Challenge 22 (B15 Teil 1: LINQ Where/Select)
+
+- **Umfang:** Baseline sauber (1010/1010, typecheck/build/knip grün, HEAD
+  `ee8e808`). SQL/Python weiterhin an der permanenten Scope-Grenze. Dies
+  ist der dritte C#-Content-Durchgang in Folge — bewusst gewählt, weil
+  B15s Basis-Tag `linq-method-syntax` ein klar begrenzter nächster
+  Schritt war (einzelner Tag, wohldefiniertes Szenario), nicht weil ein
+  Bug-Hunt fällig gewesen wäre; der letzte Live-Bug-Hunt liegt erst zwei
+  Durchgänge zurück und kam sauber zurück.
+
+- **Neue Challenge 22** deckt `linq-method-syntax` ab — den ersten von
+  fünf B15-Tags. Szenario: `List<int> zahlen = { 3, 8, 15, 22, 4, 30,
+  11 }`, gefiltert mit `.Where(z => z % 2 == 0).ToList()` (nur die
+  geraden Zahlen: 8, 22, 4, 30), transformiert mit
+  `.Select(z => z * 2).ToList()` (verdoppelt: 16, 44, 8, 60) — beide
+  LINQ-Grundoperationen aus der Tag-Definition in einer Verkettung.
+
+- **Drei Distraktoren, alle beim ersten Durchlauf empirisch gegen den
+  echten `dotnet`-Treiber verifiziert — diesmal ausschließlich
+  Logikfehler statt Compilerfehler, weil LINQ-Verkettungen selten falsch
+  kompilieren, sondern typischerweise falsch rechnen:** die
+  Filter-Bedingung umgekehrt (`z % 2 != 0` statt `== 0`) liefert die
+  verdoppelten ungeraden statt der geraden Zahlen; die Transformation
+  geändert (`z + 2` statt `z * 2`) liefert falsche Summanden statt
+  Verdopplung; am lehrreichsten der dritte — `.Select().Where()` statt
+  `.Where().Select()` vertauscht. Da jede verdoppelte Zahl automatisch
+  gerade ist, lässt der Filter danach *alle* 7 Elemente durch statt nur
+  der 4 ursprünglich geraden — ein empirischer Beleg, dass die
+  Verkettungsreihenfolge bei LINQ das Ergebnis tatsächlich verändert.
+
+- **Ergebnis:** Tests 1010 → 1014 (+4: Gate 1 eigene Lösung + Gate 2
+  drei Distraktoren für Challenge 22). `typecheck` grün. `npm run build`
+  erfolgreich, unverändert 635,90 kB (reine Content-Datei). `knip`:
+  unverändert 10 Funde. Coverage: 92,44 % / 73,17 % / 99,15 % / 92,44 %.
+  `docs/csharp-concept-hierarchy.md`: Tag-Bilanz 78/86 → 79/86 (≈ 92 %),
+  B15 zu 1 von 5 Tags abgedeckt (`linq-query-syntax`,
+  `linq-ordering-grouping`, `linq-aggregation`,
+  `linq-deferred-execution` offen). B0 bis B14 bleiben komplett.

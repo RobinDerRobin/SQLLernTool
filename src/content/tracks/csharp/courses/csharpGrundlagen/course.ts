@@ -21,6 +21,7 @@ import { challenge18 } from './challenges/18';
 import { challenge19 } from './challenges/19';
 import { challenge20 } from './challenges/20';
 import { challenge21 } from './challenges/21';
+import { challenge22 } from './challenges/22';
 
 /**
  * Step 7 of the plan in docs/csharp-engine-poc.md (actual content) has
@@ -29,7 +30,7 @@ import { challenge21 } from './challenges/21';
  * rigorous way every other track's content is verified (Gate 1/Gate 2 via
  * test/content/challengeRunner.test.ts).
  */
-const challenges: CSharpChallenge[] = [challenge01, challenge02, challenge03, challenge04, challenge05, challenge06, challenge07, challenge08, challenge09, challenge10, challenge11, challenge12, challenge13, challenge14, challenge15, challenge16, challenge17, challenge18, challenge19, challenge20, challenge21];
+const challenges: CSharpChallenge[] = [challenge01, challenge02, challenge03, challenge04, challenge05, challenge06, challenge07, challenge08, challenge09, challenge10, challenge11, challenge12, challenge13, challenge14, challenge15, challenge16, challenge17, challenge18, challenge19, challenge20, challenge21, challenge22];
 
 export const csharpGrundlagenCourse: Course<CSharpChallenge> = {
   id: 'csharpGrundlagen',

@@ -1123,6 +1123,33 @@ nie, ein klassischer Off-by-one-Fehler in der Fachlogik.
 Lambda-Ausdrücke) vollständig abgedeckt** — B0 bis B14 sind jetzt
 komplett. Nächster offener Zweig: B15 (LINQ).*
 
+**Update:** Challenge 22 startet B15 (LINQ) mit dem grundlegendsten
+Tag, `linq-method-syntax`. Szenario: `List<int> zahlen = new List<int>
+{ 3, 8, 15, 22, 4, 30, 11 };`, gefiltert mit
+`zahlen.Where(z => z % 2 == 0).ToList()` (nur die geraden Zahlen), dann
+transformiert mit `.Select(z => z * 2).ToList()` (jede verdoppelt) —
+beide LINQ-Grundoperationen aus der Tag-Definition (`.Where()`,
+`.Select()`) in einer Verkettung.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert — anders als bei den meisten bisherigen C#-Challenges
+diesmal ausschließlich Logikfehler statt Compilerfehler, weil LINQ-
+Verkettungen selten falsch *kompilieren*, sondern typischerweise falsch
+*rechnen*: die Filter-Bedingung umgekehrt (`z % 2 != 0` statt `== 0`)
+liefert die verdoppelten ungeraden statt der geraden Zahlen; die
+Transformation geändert (`z + 2` statt `z * 2`) liefert falsche
+Summanden statt Verdopplung; am lehrreichsten der dritte Distraktor —
+`.Select().Where()` statt `.Where().Select()` vertauscht. Da jede
+verdoppelte Zahl automatisch gerade ist, lässt der Filter danach *alle*
+7 Elemente durch statt nur der 4 ursprünglich geraden — ein empirischer
+Beleg dafür, dass die Verkettungsreihenfolge bei LINQ das Ergebnis
+verändert, nicht nur ein Stilunterschied ist.
+
+**Tag-Bilanz: 79 von 86 (≈ 92 %).** B15 ist damit zu 1 von 5 Tags
+abgedeckt (`linq-query-syntax`, `linq-ordering-grouping`,
+`linq-aggregation`, `linq-deferred-execution` offen). B0 bis B14
+bleiben komplett.*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt
