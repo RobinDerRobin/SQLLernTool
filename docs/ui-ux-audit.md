@@ -147,6 +147,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-11 | HEAD (C# Challenge 21: B14 vollständig — Events, 78/86) | 92.41 % | 73.17 % | 99.15 % | 92.41 % |
 | 2026-08-11 | HEAD (C# Challenge 22: B15 Teil 1 — LINQ Where/Select, 79/86) | 92.44 % | 73.17 % | 99.15 % | 92.44 % |
 | 2026-08-11 | HEAD (C# Challenge 23: B15 Teil 2 — LINQ Aggregation, 80/86) | 92.47 % | 73.14 % | 99.15 % | 92.47 % |
+| 2026-08-11 | HEAD (C# Challenge 24: B15 Teil 3 — LINQ Query-Syntax, 81/86) | 92.50 % | 73.14 % | 99.15 % | 92.50 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -3617,3 +3618,40 @@ sondern pro PR direkt in den Checks sichtbar.
   B15 zu 2 von 5 Tags abgedeckt (`linq-query-syntax`,
   `linq-ordering-grouping`, `linq-deferred-execution` offen). B0 bis B14
   bleiben komplett.
+
+### 2026-08-11 — Stündliche Routine: C# Challenge 24 (B15 Teil 3: LINQ Query-Syntax)
+
+- **Umfang:** Baseline sauber (1018/1018, typecheck/build/knip grün, HEAD
+  `372185f`). SQL/Python weiterhin an der permanenten Scope-Grenze. Der
+  letzte Live-Bug-Hunt liegt zwei Durchgänge zurück und kam sauber
+  zurück — laut Mandat-Priorität diesmal wieder C#, da B15s dritter Tag
+  (`linq-query-syntax`) ein klar begrenzter nächster Schritt war.
+
+- **Neue Challenge 24** deckt `linq-query-syntax` ab — den dritten von
+  fünf B15-Tags. Szenario: `List<int> mengen = { 12, 5, 18, 7, 24, 9,
+  30 };`, abgefragt per Query-Syntax `from m in mengen where m > 10
+  select m * 3` statt der Method-Syntax aus Challenge 22 — dieselbe
+  Semantik, syntaktisch fast identisch mit SQLs `SELECT ... FROM ...
+  WHERE ...` (nur in umgekehrter Klausel-Reihenfolge, ohne Kommas/
+  Semikolons zwischen den Klauseln).
+
+- **Drei Distraktoren, alle beim ersten Durchlauf empirisch gegen den
+  echten `dotnet`-Treiber verifiziert, diesmal ohne Compilerfehler —
+  Query-Syntax-Fehler sind fast immer Logikfehler:** die `where`-
+  Bedingung umgekehrt (`m < 10` statt `m > 10`) liefert die
+  verdreifachten kleinen statt der großen Mengen; der `select`-
+  Multiplikator geändert (`m * 2` statt `m * 3`) verdoppelt statt zu
+  verdreifachen; am lehrreichsten die komplett weggelassene `where`-
+  Klausel — sie ist in der Query-Syntax **optional**, `from ... select
+  ...` ohne Filter ist gültiges C# und wählt einfach alle sieben
+  Elemente statt nur der vier über 10 aus, ein empirischer Beleg dafür,
+  dass „syntaktisch gültig" und „semantisch richtig" zwei verschiedene
+  Dinge sind.
+
+- **Ergebnis:** Tests 1018 → 1022 (+4: Gate 1 eigene Lösung + Gate 2
+  drei Distraktoren für Challenge 24). `typecheck` grün. `npm run build`
+  erfolgreich, unverändert 635,90 kB (reine Content-Datei). `knip`:
+  unverändert 10 Funde. Coverage: 92,50 % / 73,14 % / 99,15 % / 92,50 %.
+  `docs/csharp-concept-hierarchy.md`: Tag-Bilanz 80/86 → 81/86 (≈ 94 %),
+  B15 zu 3 von 5 Tags abgedeckt (`linq-ordering-grouping`,
+  `linq-deferred-execution` offen). B0 bis B14 bleiben komplett.

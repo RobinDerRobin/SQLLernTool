@@ -1172,6 +1172,31 @@ ein realistischer Abschreibfehler statt einer API-Verwechslung.
 abgedeckt (`linq-query-syntax`, `linq-ordering-grouping`,
 `linq-deferred-execution` offen). B0 bis B14 bleiben komplett.*
 
+**Update:** Challenge 24 deckt `linq-query-syntax` ab — den dritten von
+fünf B15-Tags. Szenario: `List<int> mengen = { 12, 5, 18, 7, 24, 9, 30 };`,
+abgefragt per Query-Syntax `from m in mengen where m > 10 select m * 3`
+statt der Method-Syntax aus Challenge 22 — dieselbe Semantik, syntaktisch
+fast identisch mit SQLs `SELECT ... FROM ... WHERE ...` (nur in
+umgekehrter Klausel-Reihenfolge und ohne Kommas/Semikolons zwischen den
+Klauseln), genau der Punkt, den Abschnitt 1.6/8 dieses Dokuments schon
+vorwegnahm.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert, diesmal ohne Compilerfehler — Query-Syntax-Fehler sind
+fast immer Logikfehler, keine Syntaxfehler: die `where`-Bedingung
+umgekehrt (`m < 10` statt `m > 10`) liefert die verdreifachten kleinen
+statt der großen Mengen; der `select`-Multiplikator geändert (`m * 2`
+statt `m * 3`) verdoppelt statt zu verdreifachen; am lehrreichsten die
+komplett weggelassene `where`-Klausel — sie ist in der Query-Syntax
+**optional**, `from ... select ...` ohne Filter ist gültiges C# und
+wählt einfach alle sieben Elemente statt nur der vier über 10 aus, ein
+empirischer Beleg dafür, dass „syntaktisch gültig" und „semantisch
+richtig" zwei verschiedene Dinge sind.
+
+**Tag-Bilanz: 81 von 86 (≈ 94 %).** B15 ist damit zu 3 von 5 Tags
+abgedeckt (`linq-ordering-grouping`, `linq-deferred-execution` offen).
+B0 bis B14 bleiben komplett.*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt
