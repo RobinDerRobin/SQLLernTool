@@ -4,6 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SQL Lernen Tool</title>
+    <!-- Cross-origin isolation for the C# engine (Blazor WASM + threads needs
+         SharedArrayBuffer, which requires COOP/COEP response headers). GitHub
+         Pages can't set custom headers, so coi-serviceworker.js fakes them
+         client-side instead — see docs/csharp-engine-poc.md for the empirical
+         decision behind `coepCredentialless: () => true` specifically (plain
+         `require-corp`, the library's own default outside Chrome, would break
+         SQL.js'/Pyodide's CDN <script> loads below, since neither CDN sends a
+         Cross-Origin-Resource-Policy header). Deliberately NOT bundled by Vite
+         (kept out of src/ and public/) — dist/index.html must stay the single
+         self-contained file this project's other distribution path (pasting
+         into a claude.ai chat) depends on; see test/build/distOutput.test.ts.
+         Only meaningful when this exact file is deployed next to a real
+         coi-serviceworker.js (e.g. GitHub Pages) — harmlessly 404s otherwise,
+         same as the C# track's own iframe already does without that hosting. -->
+    <script>
+      window.coi = { coepCredentialless: () => true };
+    </script>
+    <script src="coi-serviceworker.js"></script>
   </head>
   <body>
     <!-- The fallback below is replaced the moment the app mounts (createApp

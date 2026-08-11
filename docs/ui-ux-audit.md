@@ -4071,3 +4071,85 @@ sondern pro PR direkt in den Checks sichtbar.
   Nächster offener Schritt: Produktions-Hosting für die C#-Engine
   (`coi-serviceworker` o. ä.) oder der nächste Live-Bug-Hunt in ein paar
   Durchgängen.
+
+### 2026-08-11 — Stündliche Routine: C#-Produktions-Hosting, Schritt 1 — `coi-serviceworker` vorbereitet und empirisch verifiziert
+
+- **Umfang:** Baseline sauber (1037/1037, typecheck/build/knip grün, HEAD
+  `2e77a89`). Laut Mandat-Punkt 4 ("genau EIN begrenztes Increment" für
+  C#) diesmal der in der letzten Firing benannte nächste Schritt:
+  Produktions-Hosting der C#-Engine über den `coi-serviceworker`-Trick,
+  damit `crossOriginIsolated` (und damit `SharedArrayBuffer`, das die
+  Blazor-WASM-Engine braucht) auch auf einem statischen Host wie GitHub
+  Pages erreicht wird, der keine eigenen COOP/COEP-Response-Header
+  setzen kann.
+
+- **Entdeckte Architektur-Einschränkung vor jeder Code-Änderung:** Vor
+  dem Schreiben von Code geprüft, ob `coi-serviceworker` (das laut
+  Upstream-Dokumentation eine eigenständige, separat ladbare Datei sein
+  muss — kein Bundling/Inlining möglich) mit dem Projekt vereinbar ist.
+  `test/build/distOutput.test.ts` und `index.html`s eigener Fallback-Text
+  ("Deren Inhalt fügst du in einen claude.ai-Chat ein") belegen eine
+  bislang nicht explizit dokumentierte harte Vorgabe: `dist/index.html`
+  muss die EINZIGE ausgelieferte Datei bleiben, weil der primäre
+  Distributionsweg das Einfügen des Dateiinhalts in einen claude.ai-Chat
+  ist, nicht nur klassisches Website-Hosting. Ein naiver Ansatz über
+  Vites `public/`-Ordner hätte diese Vorgabe verletzt.
+  **Lösung:** `coi-serviceworker.js` (Original v0.1.7, MIT-lizenziert,
+  Guido Zuidhof) unverändert im Repo-ROOT abgelegt — bewusst außerhalb
+  von `src/` und `public/`, damit Vite die Datei nie anfasst — und per
+  einfachem `<script src="coi-serviceworker.js">`-Tag in `index.html`
+  referenziert, exakt nach demselben Muster wie der bereits bestehende
+  sql.js-CDN-Script-Tag. Per echtem `npm run build` bestätigt: `dist/`
+  liefert weiterhin genau eine Datei (828,81 kB), `distOutput.test.ts`
+  (9 Tests) bleibt grün.
+
+- **Empirische Verifikation der Technik selbst (nicht nur "bricht nichts"):**
+  Mock-GitHub-Pages-Deployment im Scratchpad gebaut (nur `index.html` +
+  `coi-serviceworker.js`), ein von Hand geschriebener Node-Static-Server
+  ohne jegliche Custom-Header (bildet GitHub Pages exakt nach, das keine
+  eigenen Response-Header setzen kann), echtes Headless-Chromium per
+  Playwright dagegen gefahren. Ergebnis: `crossOriginIsolated: true`,
+  Service-Worker-Controller aktiv, `SharedArrayBuffer` verfügbar — die
+  Technik funktioniert nachweislich unter realistischen Bedingungen, nicht
+  nur in der Theorie.
+  Ergänzend `window.coi = { coepCredentialless: () => true }` gesetzt, um
+  den bereits etablierten `credentialless`-COEP-Modus zu erzwingen (statt
+  des Library-Default `require-corp`, der die CDN-Loads von SQL.js/Pyodide
+  brechen würde, da diese kein `Cross-Origin-Resource-Policy`-Header
+  senden).
+
+- **Zwei Sandbox-Tooling-Stolpersteine unterwegs gefunden und behoben:**
+  `npm install coi-serviceworker --no-save` hat trotz `--no-save` über
+  npms Dependency-Tree-Reconciliation `playwright`/`sql.js`/`pyodide` aus
+  `node_modules` entfernt (diese sind absichtlich nicht in
+  `package.json`, nur Ad-hoc-Sandbox-Tooling) — behoben durch erneutes
+  `npm install playwright sql.js pyodide --no-save`. Das frisch
+  installierte `playwright` (1.62.1) erwartete danach einen anderen
+  Chromium-Build als den im Sandbox-Cache vorhandenen (`chromium-1194`)
+  — behoben per explizitem `executablePath`. Beides in
+  `docs/csharp-engine-poc.md` als Lektion für künftige Durchgänge
+  festgehalten: kein `npm install <pkg>` (auch nicht `--no-save`) nur um
+  Paket-Quellcode zu lesen.
+
+- **`knip.json` neu angelegt** (erste Knip-Config dieses Projekts):
+  unterdrückt einen legitimen Fehlalarm ("Unused files: coi-serviceworker.js"),
+  da Knip reine `<script src>`-HTML-Referenzen nicht wie ES-Imports
+  verfolgen kann. Nach der Ergänzung wieder exakt bei den vorherigen 10
+  Funden.
+
+- **Ergebnis:** Tests unverändert 1037/1037 grün (keine neuen `src/`-
+  Dateien, reine Infrastruktur außerhalb des Build-Graphen).
+  Typecheck/Build/Knip unverändert grün. Keine Coverage-Änderung, daher
+  kein Artifact-Republish nötig — die Prozentzahlen sind identisch zum
+  letzten Durchgang.
+
+- **Bewusst offen gelassen (nächste, separate Increments):** (1)
+  `.github/workflows/deploy-pages.yml` muss noch angepasst werden, um
+  `coi-serviceworker.js` zusätzlich zu `dist/index.html` nach `gh-pages`
+  zu kopieren. (2) Der C#-Engine-`wwwroot`-Output (`dotnet publish -c
+  Release`) muss noch per CI-Schritt gebaut und unter `/csharp-engine/`
+  nach `gh-pages` kopiert werden, analog zur lokalen Dev-Server-
+  Middleware. Beides bewusst nicht in diesem Durchgang begonnen, da das
+  Ändern des Produktions-Deploy-Workflows das riskanteste Teilstück des
+  gesamten Vorhabens ist und ein eigenes, in sich abgeschlossenes
+  Increment verdient.

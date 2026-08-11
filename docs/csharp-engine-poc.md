@@ -967,6 +967,107 @@ Roughly in dependency order:
    challenges 404 when run. That's the next and last remaining piece:
    `coi-serviceworker` (or an equivalent build step) wiring for whatever
    the real production host is.
+
+   **Update (2026-08-11, next firing): a real architectural constraint
+   discovered before writing any coi-serviceworker code — this project has
+   *two* distribution paths, not one, and they pull in opposite
+   directions here.** `test/build/distOutput.test.ts` (`'is the only file
+   emitted (nothing to host alongside it)'`) and `index.html`'s own
+   fallback banner ("Deren Inhalt fügst du in einen claude.ai-Chat ein")
+   both assert/document that `dist/index.html` must stay a **single,
+   self-contained file** — the primary distribution path is pasting that
+   one file's content into a claude.ai chat, not (only) hosting it as a
+   traditional multi-file website. `coi-serviceworker` fundamentally
+   requires a **second** file (its own README: "It must be in a separate
+   file, you can't bundle it along with your app") — so the obvious first
+   idea, dropping it in Vite's `public/` folder, would make `vite build`
+   emit two files and break that test and that distribution path.
+
+   The resolution: `coi-serviceworker.js` (vendored from the official
+   `coi-serviceworker` npm package, v0.1.7, MIT, unmodified except for one
+   `window.coi = { coepCredentialless: () => true }` config block — forces
+   `credentialless` mode regardless of browser, since the library's own
+   default (`require-corp` outside Chrome) would break SQL.js'/Pyodide's
+   CDN `<script>` loads exactly as originally found in the 2026-08-10
+   COOP/COEP investigation above) now lives as a **repo-root file, outside
+   `src/` and outside `public/`** — invisible to Vite's build graph
+   entirely. `index.html` gained a `<script src="coi-serviceworker.js">`
+   tag (plus the `window.coi` config) in its `<head>`; since this is a
+   plain external-file reference exactly like the existing sql.js CDN
+   `<script>` tag two lines below it, Vite's build passes it through as
+   inert markup rather than trying to inline or resolve it — confirmed
+   with a real `npm run build` afterward: `dist/` still contains exactly
+   one file, `distOutput.test.ts` still passes unmodified. For the
+   "paste into a claude.ai chat" use case, that script tag now simply
+   404s harmlessly (same as the C# track already does in that context,
+   since there's no `/csharp-engine/` to load from there either) — no
+   regression, because nothing worked there before either.
+
+   **Empirically verified the technique itself works**, not just that it
+   doesn't break the existing tests: built a throwaway plain Node static
+   file server (scratchpad-only) that serves the real built
+   `dist/index.html` plus the vendored `coi-serviceworker.js` and sends
+   **zero** custom headers on every response — deliberately reproducing
+   GitHub Pages' exact constraint (no custom header support at all) rather
+   than assuming it. Real headless Chromium via Playwright confirmed:
+   `window.crossOriginIsolated` → `true`, `navigator.serviceWorker.controller`
+   → active, `typeof SharedArrayBuffer` → `"function"` (available) — the
+   full isolation stack Blazor's multithreaded WASM needs, achieved with
+   zero server-side header support, exactly the GitHub Pages constraint
+   this whole detour exists to solve.
+
+   One tooling accident along the way, caught and fixed before it could
+   cause confusion in a future firing: installing the `coi-serviceworker`
+   npm package (`--no-save`, purely to read its source — the maintained,
+   version-pinned copy rather than retyping it from memory) triggered an
+   npm dependency-tree reconciliation that silently pruned `playwright`,
+   `sql.js`, and `pyodide` from `node_modules` — all three are
+   intentionally *not* in `package.json` (they're sandbox-only tooling for
+   live Playwright bug-hunts, installed ad hoc per the runbook in
+   `docs/ui-ux-audit.md`), so any bare `npm install <pkg> --no-save` can
+   prune them as "extraneous." Reinstalled all three afterward; also hit a
+   Playwright/browser-cache version mismatch from the reinstall pulling
+   the latest `playwright` instead of whatever version the pre-baked
+   `/opt/pw-browsers` cache matches — worked around with an explicit
+   `executablePath` pointing at the cached `chromium-1194` build rather
+   than downloading a new one. **Lesson for future firings:** avoid `npm
+   install <pkg>` (even `--no-save`) as a way to just *read* a package's
+   source when investigating a library — it has this side effect. Fetching
+   the file's contents via `npm view`/registry tooling or a pinned,
+   isolated install would avoid disturbing the sandbox's existing
+   ad hoc-installed tooling.
+
+   Also added `knip.json` (`{ "ignore": ["coi-serviceworker.js"] }`) —
+   knip's static-analysis approach can't see a plain `<script src>`
+   reference in `index.html` the way it sees ES module imports, so it
+   flagged the new file as dead code; this is a real false positive (the
+   file is load-bearing at runtime, just outside knip's traceable graph),
+   not a genuine finding, and the project had no `knip.json` before this.
+
+   Tests unchanged (1037/1037 — this increment adds no new source files
+   under `src/`, only a vendored static asset and an `index.html` edit).
+   `typecheck` green. `npm run build` succeeds, `dist/` still exactly one
+   file (828.81 kB, up ~1.2 kB from the `<script>`/`<style>` tag text
+   itself — no new bundled code). `knip`: unchanged, 10 findings (the
+   `coi-serviceworker.js` false positive now suppressed via `knip.json`).
+
+   **Deliberately not done in this increment:** `.github/workflows/
+   deploy-pages.yml` is untouched — it still copies only `dist/index.html`
+   to the `gh-pages` branch, so `coi-serviceworker.js` isn't actually
+   deployed anywhere yet, and the C# engine's own `dotnet publish` output
+   still has no path into that workflow at all (no .NET SDK setup step
+   exists there). Both are real, separate next increments: (1) teach
+   `deploy-pages.yml` to also copy `coi-serviceworker.js` next to
+   `index.html` on `gh-pages`, and (2) add a `dotnet publish -c Release`
+   step for `csharp-engine/` plus a copy of its `wwwroot` output into
+   `gh-pages` under `/csharp-engine/` (mirroring the dev-server
+   middleware's own routing exactly). Deliberately deferred rather than
+   done together — modifying the actual production deploy workflow is
+   the highest-risk piece of this whole effort (a mistake there is a
+   mistake against the real live site, not just this feature branch), and
+   deserves its own careful, dedicated increment rather than being
+   bundled with today's already-substantial vendoring + verification
+   work.
 6. ~~**Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
    mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
    feasible now that `dotnet` works in this sandbox; likely just
