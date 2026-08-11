@@ -4677,3 +4677,37 @@ sondern pro PR direkt in den Checks sichtbar.
   Code-Änderung, working tree sauber). Kein Artifact-Republish nötig.
   Der Fehler bleibt bestehen, aber die Ursachenraum ist jetzt deutlich
   enger als am Ende des letzten Durchgangs.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt SQL/Editor/Tutorial (sauber)
+
+- **Umfang:** Baseline sauber (1049/1049, typecheck/build/knip grün, HEAD
+  `9ba8784`). Der C#-Boot-Bug hat bereits zwei eigene Durchgänge bekommen
+  und ist kein Produktions-Vorfall — ein dritter Durchgang in Folge auf
+  demselben festgefahrenen Problem hätte sinkende Grenzerträge riskiert.
+  Stattdessen laut Prioritätenliste Punkt 2: Live-Bug-Hunt auf Flächen,
+  die in den letzten (C#-fokussierten) Durchgängen nicht geprüft wurden —
+  Tutorial-Rendering, Tipp-Flow, localStorage-Persistenz, Lösungs-
+  Vergleichsansicht.
+
+- **Vorgehen:** Dev-Server mit sql.js-CDN-Workaround gestartet. Tutorial-
+  Tab über 5 Stichproben verteilt über alle 78 SQL-Challenges geprüft
+  (kein rohes escaptes HTML sichtbar, `&lt;b&gt;`/`&lt;code&gt;` o. ä.
+  nirgends gefunden — Markdown/HTML-Rendering korrekt). Tipp-Button
+  viermal geklickt (3 Tipps + ein Overflow-Klick) — Tipp-Elemente
+  erscheinen wie erwartet. Editor-Entwurf getippt, echten Seiten-Reload
+  ausgelöst (nicht nur SPA-State) — Entwurf via localStorage korrekt
+  wiederhergestellt. Lösungs-/Vergleichsansicht im Task-Tab geöffnet —
+  öffnet korrekt.
+
+- **Bewusst nicht getestet:** der Chat-Tab (`src/chat/claudeChatClient.ts`)
+  — ein echtes Absenden hätte einen echten API-Call an Claude ausgelöst,
+  unnötiges Risiko für einen reinen UI-Check. Bereits durch bestehende
+  Unit-Tests abgedeckt.
+
+- **Keine neuen Funde:** die drei beobachteten Konsolenfehler
+  (`ERR_CERT_AUTHORITY_INVALID`) sind das bereits mehrfach dokumentierte
+  Sandbox-Netzwerkrauschen (blockierte externe Domains), kein Produktbug.
+
+- **Ergebnis:** Tests/typecheck/build/knip unverändert grün. Kein
+  Artifact-Republish nötig (keine Zahlenänderung). Dev-Server sauber
+  beendet.
