@@ -4499,3 +4499,43 @@ sondern pro PR direkt in den Checks sichtbar.
   `8.0.129`), beide Projekte frisch neu gebaut, alle vier
   Verify-Prüfungen erfüllt. Workflow-Pfadfilter um das jetzt
   root-liegende `global.json` erweitert.
+
+- **Dritter Nachtrag, gleicher Durchgang — echter, seit Projektbeginn
+  verdeckter Bug gefunden und behoben:** Der dritte reale CI-Lauf zeigte,
+  dass beide SDK-Fixes tatsächlich griffen (Workload korrekt für 8.0.29
+  installiert, die optimierte AOT/Trimming-Publish-Pipeline lief
+  wirklich, ~49 s statt des vorherigen übersprungenen Schnelldurchlaufs)
+  — der Job scheiterte trotzdem, sofort in der Verifikation. Statt einen
+  vierten Fix zu raten, wurde der Verify-Schritt erst diagnostisch
+  gemacht (druckt das komplette Publish-Verzeichnis vor den Prüfungen
+  aus) und einzeln gepusht. Ergebnis eindeutig: `_framework/` komplett
+  vorhanden, aber `refs/` fehlte komplett im Publish-Output.
+
+  **Das ließ sich lokal reproduzieren — ein echter, seit jeher im Projekt
+  vorhandener Bug**, den diese Sandbox die ganze Zeit über durch
+  Zufall verdeckt hatte: Jede bisherige "frische" lokale Verifikation
+  in dieser Session hat nur `bin/`/`obj/` gelöscht, nie das
+  Quellverzeichnis `csharp-engine/wwwroot/refs/` selbst — das enthielt
+  die ganze Zeit einen mehrere Tage alten, gitignorten Leichenrest aus
+  einem früheren Build. `rm -rf bin obj wwwroot/refs && dotnet publish
+  -c Release` reproduziert exakt denselben Fehler wie der echte
+  CI-Runner. Ursache: Blazors Statische-Web-Asset-Erkennung ist ein
+  SDK-seitiger, zur Auswertungszeit ausgeführter Item-Glob über
+  `wwwroot/**` — keine `<Target>` — und läuft dadurch immer VOR jedem
+  `<Target>`, auch dem Ref-Kopier-Target. Auf einem wirklich sauberen
+  Checkout landen die DLLs zwar physisch korrekt in `wwwroot/refs/`,
+  aber zu spät, damit Blazors Publish-Manifest sie je kennt. Keine
+  `BeforeTargets`-Reihenfolge kann das beheben (empirisch mit
+  `ResolveStaticWebAssetsInputs` probiert — identischer Fehler).
+
+  **Fix:** zweites Target `CopyCSharpEngineRefAssembliesToPublishOutput`
+  (`AfterTargets="Publish"`) kopiert dieselben Referenz-DLLs zusätzlich
+  direkt nach `$(PublishDir)wwwroot/refs/` — unabhängig von Blazors
+  Asset-Manifest-Mechanismus, kann also nie wieder an diesem Timing
+  scheitern. Betrifft nicht nur CI: `vite.config.ts`s Dev-Server-
+  Middleware liefert denselben Publish-Output aus, ein echter frischer
+  lokaler Checkout wäre also genauso betroffen gewesen. Zweimal
+  hintereinander mit derselben Clean-Slate-Reproduktion verifiziert
+  (beide Male alle 11 Referenz-DLLs korrekt vorhanden), zusätzlich live
+  gegen den echten Dev-Server bestätigt (`curl` auf
+  `/csharp-engine/refs/System.Console.dll` → 200).

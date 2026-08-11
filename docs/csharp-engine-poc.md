@@ -1220,6 +1220,62 @@ Roughly in dependency order:
    both clean, all four verify-step assertions still pass. Workflow's
    path filter extended to also watch the (now root-level) `global.json`.
 
+   **Update, third real CI round: both SDK-pinning fixes worked —
+   `dotnet workload install` this time correctly targeted the pinned
+   8.0.x SDK (packs installed for version `8.0.29`, matching), and the
+   full optimized AOT/trimming publish pipeline genuinely ran (~49s vs.
+   the earlier skipped, near-instant fallback) — but the job *still*
+   failed, in the verify step, immediately. Rather than guess a fourth
+   fix blind, the verify step was made diagnostic first (print the full
+   publish directory tree, `_framework/`, and `refs/` contents before
+   asserting) and pushed on its own. The resulting real-run output
+   showed the actual cause precisely: `_framework/` was fully populated
+   (including `blazor.webassembly.js`), but `refs/` **did not exist at
+   all** — `ls: cannot access '.../publish/wwwroot/refs': No such file
+   or directory`.
+
+   **This turned out to be reproducible locally too, and a genuinely
+   pre-existing bug in `CSharpEngineBlazor.csproj` that had been
+   silently masked in this sandbox for the entire project's history.**
+   `CopyCSharpEngineRefAssemblies` (the existing, `BeforeTargets="Build"`
+   target from step 2) copies the reference DLLs into the *source*
+   `csharp-engine/wwwroot/refs/` — but every previous "fresh" local
+   verification in this project only ever deleted `bin/`/`obj/` before
+   rebuilding, never that source folder itself, so it always had a stale
+   (git-ignored, several-days-old) copy sitting there from some earlier
+   build. Reproduced directly: `rm -rf bin obj wwwroot/refs && dotnet
+   publish -c Release` on this sandbox — same result as the real CI
+   runner, no `refs/` in the publish output. Root cause: Blazor's static-
+   web-asset discovery (an SDK-level, evaluation-time item glob over
+   `wwwroot/**`, not a `<Target>`) finishes before *any* `<Target>`
+   executes, including the ref-copy target — so on a truly clean
+   checkout, the files get physically copied to `wwwroot/refs/`
+   correctly, but too late for Blazor's publish manifest to have ever
+   known they exist. No `BeforeTargets` ordering trick can fix this
+   (confirmed empirically — tried adding `ResolveStaticWebAssetsInputs`
+   to the existing target's `BeforeTargets`, still failed identically),
+   since target execution as a whole happens strictly after project
+   evaluation, regardless of which target or how early.
+
+   **Fix:** a second target, `CopyCSharpEngineRefAssembliesToPublishOutput`
+   (`AfterTargets="Publish"`), copies the same reference DLLs a second
+   time, directly into `$(PublishDir)wwwroot/refs/` — independent of
+   Blazor's asset-discovery/manifest machinery entirely, so it can never
+   be affected by that timing issue again. The original build-time copy
+   is untouched (still needed for `dotnet run`/the local dev-server
+   middleware, which serves the *publish* output too, per
+   `vite.config.ts` — meaning this exact bug would also have silently
+   broken a genuinely fresh local dev setup, not just CI, had anyone
+   ever actually started from a truly clean checkout instead of this
+   long-lived sandbox's incrementally-built state). Verified by
+   repeating the exact clean-slate reproduction twice in a row: `rm -rf
+   bin obj wwwroot/refs && dotnet publish -c Release` now reliably
+   produces all 11 reference DLLs in the publish output, plus
+   `blazor.webassembly.js` and the `.gz` assets, both times. Also
+   confirmed live against the real dev server afterward (`npm run dev`,
+   `curl` against `/csharp-engine/refs/System.Console.dll` → 200) — the
+   fix benefits the local dev path too, not just the new CI check.
+
    **Still deliberately not done:** actually wiring this into
    `deploy-pages.yml` and copying the published output into `gh-pages`
    under `/csharp-engine/`. That remains its own increment — this
