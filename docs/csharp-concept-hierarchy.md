@@ -1223,6 +1223,48 @@ statt der Textlabels.
 abgedeckt — nur `linq-deferred-execution` bleibt offen, der letzte Tag
 im gesamten C#-Dokument. B0 bis B14 bleiben komplett.*
 
+**Update:** Challenge 26 deckt `linq-deferred-execution` ab — den
+letzten der fünf B15-Tags und damit den letzten offenen Tag im
+gesamten C#-Dokument. Szenario: `List<int> zahlen = { 2, 5, 8 };`,
+`var query = zahlen.Where(z => z > 3);` (bewusst **ohne** `.ToList()`),
+danach `zahlen.Add(10);` gefolgt von einem ersten `foreach` über
+`query`, danach zwei weitere `Add()`-Aufrufe (`1`, `20`) gefolgt von
+einem zweiten `foreach` über **dieselbe** `query`-Variable. Empirisch
+gegen den echten `dotnet`-Treiber bestätigt: der erste Durchlauf zeigt
+5, 8, 10 (Stand von `zahlen` beim ersten Iterieren), der zweite
+Durchlauf zeigt 5, 8, 10, 20 (Stand beim zweiten Iterieren, `1` fällt
+raus) — dieselbe Query-Variable liefert bei zwei verschiedenen
+Iterationen zwei verschiedene Ergebnisse, weil `.Where()` ohne
+Materialisierung nichts als "Bauplan" speichert, keinen Schnappschuss.
+
+Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+verifiziert: `.ToList()` direkt an `Where()` angehängt — erzwingt
+sofortige Auswertung beim Erstellen der Query (als `zahlen` noch
+`{ 2, 5, 8 }` ist), macht `query` zu einer festen Liste `{ 5, 8 }`,
+beide `Add()`-Aufrufe danach wirken sich nicht mehr aus, beide
+Durchläufe zeigen identisch nur 5, 8; die Filterbedingung auf `z > 5`
+statt `z > 3` geändert — die 5 fällt aus beiden Durchläufen raus,
+zeigt 8, 10 bzw. 8, 10, 20; alle drei `Add()`-Aufrufe vor das erste
+`foreach` statt zwischen die beiden Durchläufe verschoben — beide
+Iterationen sehen denselben, bereits vollständigen Zustand von
+`zahlen`, beide Durchläufe zeigen identisch 5, 8, 10, 20 statt
+unterschiedlicher Ergebnisse.
+
+**Tag-Bilanz: 83 von 86 (≈ 97 %).** Damit ist **B15 (LINQ) komplett**
+(alle 5 Tags: `linq-method-syntax`, `linq-query-syntax`,
+`linq-aggregation`, `linq-ordering-grouping`,
+`linq-deferred-execution`). B0 bis B15 sind jetzt vollständig
+abgedeckt. Einzig verbleibender offener Zweig im gesamten Dokument:
+**B16 (Namespaces & Imports)** mit seinem einzigen Tag
+`own-namespaces` — Voraussetzung dafür ist ein Mehrdatei-Projekt-Setup
+(mehrere `.cs`-Dateien mit eigenen `namespace`-Deklarationen), was mit
+der aktuellen Single-File-`dotnet exec`-Engine (ein `.cs`-Skript pro
+Challenge) nicht ohne Weiteres abbildbar ist — nächster offener
+Schritt ist zu klären, ob/wie sich `own-namespaces` sinnvoll in dieses
+Engine-Modell einpassen lässt, oder ob es wie `updatable-view` (SQL)
+und `own-modules` (Python) eine dauerhafte, dokumentierte Scope-
+Ausnahme bleibt.*
+
 ## 7. Bewusst ausgeklammert
 
 Analog zu den ersten beiden Dokumenten (SQL Abschnitt 7, Python Abschnitt

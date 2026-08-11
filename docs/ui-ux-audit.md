@@ -149,6 +149,7 @@ Erzeugt mit `npm run test:coverage` (V8-Provider). Volles Detail lokal unter
 | 2026-08-11 | HEAD (C# Challenge 23: B15 Teil 2 — LINQ Aggregation, 80/86) | 92.47 % | 73.14 % | 99.15 % | 92.47 % |
 | 2026-08-11 | HEAD (C# Challenge 24: B15 Teil 3 — LINQ Query-Syntax, 81/86) | 92.50 % | 73.14 % | 99.15 % | 92.50 % |
 | 2026-08-11 | HEAD (C# Challenge 25: B15 Teil 4 — LINQ Ordering/Grouping, 82/86) | 92.53 % | 73.13 % | 99.16 % | 92.53 % |
+| 2026-08-11 | HEAD (C# Challenge 26: B15 vollständig — LINQ Deferred Execution, 83/86) | 92.56 % | 73.13 % | 99.16 % | 92.56 % |
 
 CI führt `npm run test:coverage` bei jedem Push/PR aus (`.github/workflows/ci.yml`)
 und lädt den Report als Artefakt hoch — Zahlen sind also nicht nur hier,
@@ -3777,3 +3778,55 @@ sondern pro PR direkt in den Checks sichtbar.
   offener Schritt: letzter C#-Content-Schritt für B15
   (`linq-deferred-execution`) oder B16, oder der nächste
   Live-Bug-Hunt in ein paar Durchgängen.
+
+### 2026-08-11 — Stündliche Routine: C# Challenge 26 (B15 vollständig: LINQ Deferred Execution)
+
+- **Umfang:** Baseline sauber (1026/1026, typecheck/build/knip grün, HEAD
+  `ac605e1`). Der letzte Durchgang war ein sauberer Live-Bug-Hunt — laut
+  Mandat-Priorität diesmal wieder C#, da `linq-deferred-execution` der
+  letzte offene Tag in B15 (und im gesamten C#-Dokument) war, ein klar
+  begrenzter nächster Schritt.
+
+- **Neue Challenge 26** deckt `linq-deferred-execution` ab — den letzten
+  Tag von B15 (LINQ) und den letzten offenen Tag im gesamten
+  C#-Konzept-Dokument. Szenario: `List<int> zahlen = { 2, 5, 8 };`,
+  `var query = zahlen.Where(z => z > 3);` (bewusst ohne `.ToList()`),
+  danach `zahlen.Add(10);` gefolgt von einem ersten `foreach` über
+  `query`, danach zwei weitere `Add()`-Aufrufe gefolgt von einem
+  zweiten `foreach` über dieselbe `query`-Variable. Empirisch gegen den
+  echten `dotnet`-Treiber bestätigt: der erste Durchlauf zeigt 5, 8, 10
+  (Stand von `zahlen` beim ersten Iterieren), der zweite Durchlauf
+  zeigt 5, 8, 10, 20 (Stand beim zweiten Iterieren) — dieselbe
+  Query-Variable liefert bei zwei verschiedenen Iterationen zwei
+  verschiedene Ergebnisse, weil `.Where()` ohne Materialisierung nichts
+  als "Bauplan" speichert, keinen Schnappschuss.
+
+- **Drei Distraktoren, alle empirisch gegen den echten `dotnet`-Treiber
+  verifiziert:** `.ToList()` direkt an `Where()` angehängt — erzwingt
+  sofortige Auswertung beim Erstellen der Query, macht `query` zu einer
+  festen Liste, beide `Add()`-Aufrufe danach wirken sich nicht mehr
+  aus, beide Durchläufe zeigen identisch nur 5, 8; die Filterbedingung
+  auf `z > 5` statt `z > 3` geändert — die 5 fällt aus beiden
+  Durchläufen raus; alle drei `Add()`-Aufrufe vor das erste `foreach`
+  statt zwischen die beiden Durchläufe verschoben — beide Iterationen
+  sehen denselben, bereits vollständigen Zustand von `zahlen`, beide
+  Durchläufe zeigen identisch 5, 8, 10, 20 statt unterschiedlicher
+  Ergebnisse.
+
+- **Ergebnis:** Tests 1026 → 1030 (+4: Gate 1 eigene Lösung + Gate 2
+  drei Distraktoren für Challenge 26). `typecheck` grün. `npm run build`
+  erfolgreich, unverändert 635,90 kB — der C#-Track ist noch nicht in
+  `src/content/registry.ts`'s `TRACKS` registriert, C#-Content-Dateien
+  landen also (noch) nicht im Produktions-Bundle, nur in den Tests, die
+  direkt aus dem Kurs-Modul importieren; erwartetes, dokumentiertes
+  Verhalten, kein Fund. `knip`: unverändert 10 Funde (alle vorbestehend,
+  keine neuen durch diese reine Content-Datei). Coverage: 92,56 % /
+  73,13 % / 99,16 % / 92,56 %.
+  `docs/csharp-concept-hierarchy.md`: Tag-Bilanz 82/86 → 83/86 (≈ 97 %).
+  **B15 (LINQ) damit komplett** (alle 5 Tags). B0 bis B15 sind jetzt
+  vollständig abgedeckt. Einzig verbleibender offener Zweig im gesamten
+  C#-Dokument: **B16 (Namespaces & Imports)** mit seinem einzigen Tag
+  `own-namespaces` — als nächster Schritt zu klären, ob/wie sich das
+  sinnvoll in das aktuelle Single-File-`dotnet exec`-Engine-Modell
+  einpassen lässt, oder ob es wie `updatable-view` (SQL) und
+  `own-modules` (Python) eine dauerhafte Scope-Ausnahme bleibt.
