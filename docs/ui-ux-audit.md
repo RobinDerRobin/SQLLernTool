@@ -4015,3 +4015,59 @@ sondern pro PR direkt in den Checks sichtbar.
   Challenges beim Ausführen 404en. Das ist der letzte verbleibende
   Schritt: `coi-serviceworker` (oder ein äquivalenter Build-Schritt) für
   den echten Produktions-Host.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt auf der neuen C#-UI-Fläche (sauber)
+
+- **Umfang:** Baseline sauber (1037/1037, typecheck/build/knip grün, HEAD
+  `5ab928d`). Der letzte Durchgang hat den C#-Track zum ersten Mal live
+  im Dev-Server spielbar gemacht — laut Mandat-Priorität diesmal
+  Priorität 2 (Live-Bug-Hunt) statt eines weiteren C#-Increments, gezielt
+  auf die brandneue, vorher gar nicht erreichbare UI-Fläche gerichtet.
+  Produktions-Hosting (`coi-serviceworker`) wäre der nächste C#-Schritt,
+  ist aber ein größeres, risikoreicheres CI/Deploy-Vorhaben — bewusst
+  nicht in diesem Durchgang begonnen.
+
+- **Sicherheitscheck vor dem Durchgang:** `.github/workflows/deploy-pages.yml`
+  geprüft — der Produktions-Deploy triggert nur bei Push auf `main`, nicht
+  auf `claude/github-projekt-b3ivo1`. Die letzte Firing hat also keine
+  echte Produktionsseite mit einem nicht funktionierenden C#-Track
+  ausgeliefert; das bleibt erst relevant, sobald der Branch nach `main`
+  gemerged wird.
+
+- **Vorgehen:** Dev-Server gestartet, sql.js lokal per `context.route()`
+  serviert. Vier gezielt neue Prüfungen, die vor der letzten Firing
+  technisch gar nicht möglich waren, da der C#-Track nicht in `TRACKS`
+  registriert war: ein Distraktor mit echtem Compilerfehler (fehlendes
+  Semikolon) ausgeführt — zeigt korrekt `status-err` mit der echten
+  `CS1002`-Meldung; Track-Wechsel SQL → C# → Python → C# hintereinander
+  — Toolbar-Label, Syntax-Highlighting und Ergebnis-Panel bleiben
+  durchgehend korrekt synchron, keine going-stale Zustände; Tipp-Anzeige
+  auf einer C#-Challenge — funktioniert wie bei SQL/Python; `localStorage`-
+  Persistenz einer C#-Challenge-Lösung über einen echten Seiten-Reload —
+  Sterne und die zuletzt geöffnete Challenge (inklusive Track) bleiben
+  korrekt erhalten.
+
+- **Ein Fehlalarm im eigenen Testskript, kein Produktbug:** der erste
+  Testlauf des Distraktor-Checks lieferte einen leeren Status, weil das
+  Skript sofort nach dem Track-Wechsel auf das Challenge-Item klickte,
+  während die Sidebar noch neu rendert (`element was detached from the
+  DOM, retrying`) — nach einer kurzen Wartezeit nach dem Track-Wechsel
+  lief die Prüfung stabil durch. Kein Timing-Problem im Produkt, nur im
+  Skript selbst.
+
+- **Zwei bereits dokumentierte, nicht-neue Konsolen-Meldungen:** die
+  harmlose Blazor-`#app`-Root-Component-Suche (bekannt seit Schritt 3
+  des Engine-POC) und die bereits dokumentierten
+  `ERR_TUNNEL_CONNECTION_FAILED`/`ERR_CERT_AUTHORITY_INVALID`-Meldungen
+  vom Sandbox-Netzwerk (Pyodide-CDN bzw. `api.anthropic.com`) — keine
+  neuen Funde.
+
+- **Dev-Server sauber über exakte PIDs beendet.**
+
+- **Ergebnis:** Keine echten Bugs gefunden. Keine Code-Änderung nötig.
+  Tests/typecheck/build unverändert bei 1037/1037 grün. Die neue
+  C#-Live-Wiring aus dem letzten Durchgang hält unter gezielter
+  Belastung (Track-Wechsel, Fehlerpfade, Tipp-Flow, Persistenz) stand.
+  Nächster offener Schritt: Produktions-Hosting für die C#-Engine
+  (`coi-serviceworker` o. ä.) oder der nächste Live-Bug-Hunt in ein paar
+  Durchgängen.
