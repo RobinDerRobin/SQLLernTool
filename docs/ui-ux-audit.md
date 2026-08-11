@@ -3543,3 +3543,39 @@ sondern pro PR direkt in den Checks sichtbar.
   B15 zu 1 von 5 Tags abgedeckt (`linq-query-syntax`,
   `linq-ordering-grouping`, `linq-aggregation`,
   `linq-deferred-execution` offen). B0 bis B14 bleiben komplett.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt (sauber), kein aktionabler Schritt
+
+- **Umfang:** Baseline sauber (1014/1014, typecheck/build grün, HEAD
+  `28caf4b`). Drei Durchgänge in Folge hatten C#-Content gebaut
+  (Challenges 20–22) — laut Mandat-Priorität diesmal bewusst Priorität 2
+  statt eines weiteren C#-Increments, um die Balance zu halten.
+
+- **Vorgehen:** Dev-Server gestartet, sql.js/Pyodide lokal per
+  `context.route()` statt der blockierten CDN-Domains serviert. Gezielt
+  Bereiche mit niedrigerer Branch-Coverage aus dem letzten
+  Coverage-Report geprüft (`chatTab.ts` 93,9 %, `pgAskPanel.ts` 87,0 %,
+  `themePicker.ts`/Overlay-Logik, `courseSelectPicker`-Track-Wechsel):
+  Chat-Tab-Sichtbarkeit und Senden-Button; PgAsk-Panel — erst
+  `.pg-ask-toggle-btn` öffnet `.ask-panel` (per CSS `display: none` bis
+  `.open`), danach ein leerer Frage-Submit als No-op-Pfad
+  (`question.trim()`-Guard); Track-Wechsel SQL → Python → SQL ohne
+  Restzustand in der Challenge-Liste; Theme-Picker-Overlay öffnet sich
+  per echtem `.click()` und markiert exakt eine Theme-Option als
+  `selected` (Regressionscheck für den alten Theme-Picker-Bug, siehe
+  F-007).
+
+- **Ein scheinbarer Befund aus dem ersten Skript-Entwurf entpuppte sich
+  beim Nachprüfen wieder als eigener Testskript-Fehler, nicht als
+  Produktbug:** ein direkter `.click()` auf `.pg-ask-submit-btn` ohne
+  vorherigen Klick auf `.pg-ask-toggle-btn` schlug mit "element is not
+  visible" fehl — das Submit-Feld sitzt bewusst hinter `.ask-panel`,
+  das laut `themes.css` erst nach dem Toggle-Klick sichtbar wird
+  (`display: none` → `.open { display: block }`). Mit dem korrigierten
+  Skript (erst Toggle, dann Submit) lief die gesamte Sequenz wie
+  erwartet durch.
+
+- **Ergebnis:** Keine echten Bugs gefunden. Keine Code-Änderung nötig.
+  Tests/typecheck/build unverändert bei 1014/1014 grün. Nächster
+  offener Schritt: weiterer C#-Content (`linq-query-syntax` o. Ä., B15)
+  oder der nächste Live-Bug-Hunt in ein paar Durchgängen.
