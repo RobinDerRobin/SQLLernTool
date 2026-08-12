@@ -5254,3 +5254,73 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Ergebnis:** echter, sofort für alle 27 C#-Challenges sichtbarer
   UX-Fix — kein Content, keine Konzept-Zahlen geändert, daher kein
   Artifact-Republish nötig.
+
+### 2026-08-11 — Stündliche Routine: Echter Content-Korruptions-Bug behoben — generische C#-Typen verschwanden lautlos in 9 Challenges
+
+- **Umfang:** Baseline sauber (1060/1060, typecheck/build/knip grün, HEAD
+  `b093906`). Nach dem Highlight-Fix aus dem letzten Durchgang gezielt
+  nach ähnlichen "csharp fehlt in einer Track-Map"-Bugs gesucht (Suche
+  nach anderen `sqlite:`/`python:`-Maps, TODO/FIXME, stale "noch nicht
+  registriert"-Kommentare) — nichts gefunden, alle anderen Track-
+  Switches behandeln `csharp` bereits korrekt.
+
+- **Befund beim genaueren Hinsehen: ein tieferer, schwerwiegenderer Bug,
+  unabhängig vom letzten Fix.** `highlightContentHtml()`/die Tutorial-/
+  Tipp-Rendering-Pfade setzen den rohen Challenge-HTML-String direkt per
+  `container.innerHTML = html`. SQL/Python-Content verlässt sich seit
+  jeher bewusst auf nachsichtiges HTML-Parsing für unescapte `<`/`>`
+  (siehe bestehender Test-Kommentar in `contentHighlight.test.ts`:
+  "Some existing content has unescaped < ..., relying on lenient HTML
+  parsing") — das funktioniert für SQL-Vergleiche wie `n < 5` (Leerzeichen/
+  Ziffer direkt nach `<`, vom Parser nicht als Tag-Start erkannt) und für
+  Python (keine `<T>`-Generics-Syntax). **C#-Generics wie `List<int>`
+  haben dagegen einen Buchstaben direkt nach `<`** — der Browser
+  interpretiert das als Start eines echten (unbekannten) Elements und
+  verschluckt lautlos alles bis zum nächsten `>`. Empirisch mit JSDOM
+  bestätigt: `List<int> mengen = ...` wird nach dem Parsen zu
+  `List mengen = ...` — der Typ-Parameter ist komplett verschwunden,
+  nicht nur falsch dargestellt.
+
+- **Umfang systematisch ermittelt statt geraten:** ein Skript verglich
+  für jedes `tutorial`/`hints`/`syntaxExplanation`/`successCriteria`-Feld
+  aller 3 Tracks den `<pre>`/`<code>`-Inhalt vor und nach dem HTML-Parsen.
+  SQL/Python: 0 Treffer (bestätigt, dass deren Inhalte tatsächlich sicher
+  sind). C#: **9 betroffene Stellen**, alle im dritten Tipp
+  ("So sieht die Lösung aus") der Challenges 09, 17, 20, 21, 22, 23, 24,
+  25, 26 — durchgängig `List<T>`/`Box<T>`/`Func<...>`/`Dictionary<K,V>`/
+  `Action<T>`-Generics in roh eingefügtem Beispielcode. Auffällig: die
+  *anderen* Tipps derselben Dateien (kürzere `<code>`-Inline-Snippets)
+  waren bereits korrekt mit `&lt;`/`&gt;` escaped — nur der lange,
+  vermutlich direkt aus der echten Lösungsdatei kopierte `<pre>`-Block
+  im dritten Tipp nicht.
+
+- **Fix:** in allen 9 Dateien den Inhalt des betroffenen `<pre>`-Blocks
+  escaped (`<`→`&lt;`, `>`→`&gt;`), die umschließenden `<pre>`/`</pre>`-
+  Tags selbst unangetastet gelassen. Live mit echtem Playwright-Lauf
+  gegen den Dev-Server bestätigt: Challenge 17s dritter Tipp zeigt jetzt
+  korrekt `Box<string>`/`Box<int>` vollständig, keine verschluckten
+  Typ-Parameter mehr.
+
+- **Dauerhafter Regressionsschutz ergänzt:** neue Testdatei
+  `test/content/htmlContentIntegrity.test.ts` (jsdom, per
+  `vitest.config.ts`-Eintrag) — ein Test pro Challenge über alle 3
+  Tracks (172 Tests total), der `tutorial`/`hints`/`syntaxExplanation`/
+  `successCriteria` genau wie die echte App parst und den `<pre>`/
+  `<code>`-Inhalt vor/nach Vergleich prüft. Als aussagekräftig bestätigt:
+  einen der 9 Fixes testweise per `git stash` zurückgenommen — der Test
+  schlägt korrekt fehl, mit einer Fehlermeldung, die direkt auf die
+  Ursache hinweist (Generic-Typ, der als Tag verschluckt wurde).
+
+- **Tests:** 1060 → 1232 (+172, alle neu in `htmlContentIntegrity.test.ts`).
+  Gate 1/Gate 2 (`challengeRunner.test.ts`, `schema.test.ts`) separat
+  vorab laufen lassen, um sicherzustellen, dass die Content-Änderungen
+  keine Validierungslogik berühren — unverändert grün (384/384). `npx
+  tsc --noEmit` fehlerfrei, volle Suite 1232/1232 grün, `npm run build`
+  grün (829,96 kB), `npx knip` unverändert.
+
+- **Ergebnis:** echter, für Lernende bislang unsichtbar kaputter
+  Content-Bug behoben — nicht nur fehlende Hervorhebung wie im letzten
+  Durchgang, sondern tatsächlicher Datenverlust in Beispielcode, der
+  genau die C#-Generics-Konzepte zeigen soll, die er demonstrieren
+  will. Kein Artifact-Republish nötig (kein Konzept-Zahlen-Wechsel, nur
+  Bugfix + Testabdeckung).

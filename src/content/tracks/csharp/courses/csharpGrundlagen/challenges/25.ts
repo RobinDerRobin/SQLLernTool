@@ -8,15 +8,15 @@ export const challenge25: CSharpChallenge = {
   hints: [
     `<code>.OrderBy(z =&gt; z)</code> sortiert aufsteigend, <code>.OrderByDescending(z =&gt; z)</code> absteigend — beide geben ein neues <code>IEnumerable&lt;int&gt;</code> zurück, mit <code>.ToList()</code> materialisiert. <code>string.Join(", ", liste)</code> verbindet alle Elemente zu einem einzigen Text, getrennt durch <code>", "</code>.`,
     `<code>.GroupBy(z =&gt; z % 2 == 0 ? "Gerade" : "Ungerade")</code> erzeugt für jeden vorkommenden Schlüssel ("Gerade" oder "Ungerade") eine eigene Gruppe. Jede Gruppe hat eine <code>.Key</code>-Property (der Schlüssel) und lässt sich selbst wie eine Liste durchlaufen oder mit <code>string.Join(...)</code> zusammenfassen.`,
-    `So sieht die Lösung aus:<pre>List<int> zahlen = new List<int> { 42, 17, 8, 23, 4, 16 };
+    `So sieht die Lösung aus:<pre>List&lt;int&gt; zahlen = new List&lt;int&gt; { 42, 17, 8, 23, 4, 16 };
 
-var aufsteigend = zahlen.OrderBy(z => z).ToList();
-var absteigend = zahlen.OrderByDescending(z => z).ToList();
+var aufsteigend = zahlen.OrderBy(z =&gt; z).ToList();
+var absteigend = zahlen.OrderByDescending(z =&gt; z).ToList();
 
 Console.WriteLine("Aufsteigend: " + string.Join(", ", aufsteigend));
 Console.WriteLine("Absteigend: " + string.Join(", ", absteigend));
 
-var gruppen = zahlen.GroupBy(z => z % 2 == 0 ? "Gerade" : "Ungerade");
+var gruppen = zahlen.GroupBy(z =&gt; z % 2 == 0 ? "Gerade" : "Ungerade");
 foreach (var gruppe in gruppen)
 {
     Console.WriteLine(gruppe.Key + ": " + string.Join(", ", gruppe));
