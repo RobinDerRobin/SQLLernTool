@@ -5396,3 +5396,30 @@ sondern pro PR direkt in den Checks sichtbar.
 
 - **Ergebnis:** Tests/typecheck/build unverändert grün. Kein Artifact-
   Republish nötig. Dev-Server sauber beendet.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt — C#-Generics im Lösungs-Vergleich (sauber, bislang ungeprüft)
+
+- **Umfang:** Baseline sauber (1232/1232, typecheck/build grün, HEAD
+  `ae138ab`). Nachdem der eigentliche Tutorial-/Tipp-Rendering-Pfad
+  (`highlightContentHtml`) vor zwei Durchgängen als Ursache eines echten
+  Content-Korruptions-Bugs bei C#-Generics identifiziert wurde, war die
+  Sicherheit des STRUKTURELL ANDEREN "Mit Musterlösung vergleichen"-Pfads
+  (`compareView.ts`, nutzt explizit `escapeHtml()` statt `innerHTML =`
+  auf rohem HTML) bereits per Code-Lesen bestätigt — aber nie live in
+  einem echten Browser gegen echten C#-Generics-Content verifiziert.
+
+- **Vorgehen:** Dev-Server gestartet, C#-Challenge 09 gewählt (Lösung
+  enthält `List<string>`/`Dictionary<string, double>`), abweichenden
+  Code in den Editor getippt, "Mit Musterlösung vergleichen" geklickt.
+
+- **Ergebnis: bestätigt sicher, keine Korruption.** Vergleichs-Panel
+  öffnet korrekt, `List<string>` und `Dictionary<string, double>`
+  erscheinen vollständig und unverändert in der Musterlösungs-Spalte
+  (38 Diff-Zeilen, je 22 Zeilen pro Spalte, exakt passend zur echten
+  Zeilenzahl). Bestätigt live, was die Code-Analyse bereits nahelegte —
+  kein neuer Fund, aber echte statt nur angenommene Sicherheit für einen
+  Pfad, der genau die Art Content zeigt, die vor zwei Durchgängen
+  anderswo kaputt war.
+
+- **Ergebnis:** Tests/typecheck/build unverändert grün. Kein Artifact-
+  Republish nötig. Dev-Server sauber beendet.
