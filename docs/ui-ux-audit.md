@@ -5676,3 +5676,63 @@ sondern pro PR direkt in den Checks sichtbar.
   robustes `aria-label`) könnten in einem künftigen Durchgang noch
   geprüft werden. Kein Artifact-Republish nötig (kein Content, keine
   Konzept-Zahlen geändert).
+
+### 2026-08-12 — Stündliche Routine: Coverage-getriebene Lückensuche in `editorTab.ts`
+
+- **Umfang:** Baseline sauber (1244/1244, typecheck/build/knip grün, HEAD
+  `cca01b2`). Content-Coverage weiterhin maxed (SQL/Python 81/82, nur
+  permanente Ausnahmen offen; C# 86/86 — 27 Challenge-Dateien existieren
+  bereits, `docs/csharp-engine-poc.md`s "was fehlt"-Abschnitt ist an der
+  Stelle veraltet). WASM-Boot-Fehler weiterhin ohne neuen Ansatzpunkt,
+  nicht erneut angefasst. Statt einer weiteren A11y-Unterkategorie
+  diesen Durchgang `npx vitest run --coverage` als eigene Bug-Quelle
+  genutzt (Mandat-Priorität 2: "check coverage gaps").
+
+- **Befund:** projektweite Branch-Coverage liegt bei nur 74 % im
+  Aggregat, aber das täuscht — der Großteil der Differenz kommt von
+  reinen Typ-/Interface-Dateien (0 Statements, 0/0 wird als 0 %
+  gezählt). Gefiltert auf Dateien mit tatsächlichem Code fand sich
+  genau eine Datei unter 90 % Branch-Coverage: `editorTab.ts`
+  (94,66 % Branch, unabgedeckte Zeilen 64, 128–130, 248). Drei
+  konkrete, plausible Szenarien:
+  1. Zeile 64 (`renderExpectedResult`): der `!successCriteria`-Zweig —
+     nie mit `undefined` aufgerufen.
+  2. Zeile 130 (`run()`): `if (!code.trim()) return;` — "Ausführen"
+     mit leerem/nur-Leerzeichen-Editor klicken.
+  3. Zeile 248 (`syncEditorToSelection`): `challenge?.title ??
+     selection.challengeNum` — der Fallback, wenn die aktuelle
+     Selection auf eine im Registry nicht (mehr) existierende
+     Challenge zeigt (z. B. nach Content-Umnummerierung, wenn alte
+     `localStorage`-Progress-Daten eine gelöschte Challenge-Nummer
+     referenzieren). `selectChallenge()` selbst verweigert das Setzen
+     einer ungültigen Nummer, der Zustand ist aber über einen direkten
+     `ctx.store.update()` erreichbar — genau der Pfad, über den eine
+     wiederhergestellte, veraltete Selection in die Session gelangen
+     würde.
+
+- **Fix:** kein Code-Fix — beides ist bereits korrekt defensiv
+  implementiert, nur ungetestet. Zwei neue Tests in `editorTab.test.ts`
+  decken Fall 2 und den kombinierten Fall 1+3 ab (Zeile 64 und 248
+  hängen zusammen: derselbe `challenge === undefined`-Zustand löst
+  beide Zweige gleichzeitig aus — ein Test für die gestrichene/
+  umnummerierte Challenge deckt daher automatisch auch den fehlenden
+  `successCriteria`-Zweig ab).
+
+- **Verifikation, dass die Tests etwas prüfen:** beide Guards
+  temporär im Quellcode entfernt (`challenge!.title` statt
+  `challenge?.title ?? …` bzw. die `!code.trim()`-Zeile gestrichen),
+  gezielt nur die beiden neuen Tests laufen lassen — beide schlugen
+  mit dem erwarteten Fehler fehl (`TypeError: Cannot read properties
+  of undefined (reading 'title')` bzw. eine unerwartete
+  Ergebnis-Anzeige statt des leeren Placeholders). Quellcode danach via
+  Backup-Kopie exakt wiederhergestellt, volle `editorTab.test.ts`-Suite
+  (22/22) erneut grün bestätigt.
+
+- **Tests:** 1244 → 1246 (+2). `npx tsc --noEmit` fehlerfrei, volle
+  Suite 1246/1246 grün, `npm run build` grün (831,05 kB), `npx knip`
+  unverändert (gleiche 10 vorbestehende Funde).
+
+- **Ergebnis:** projektweite Coverage-Suche ergab nur diese eine
+  reale Lücke außerhalb der Typ-Dateien — die Codebasis ist insgesamt
+  bereits sehr gründlich getestet. Kein Artifact-Republish nötig (kein
+  Content, keine Konzept-Zahlen geändert).

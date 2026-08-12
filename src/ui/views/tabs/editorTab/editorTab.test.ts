@@ -16,6 +16,7 @@ import {
 import type { ProgressStore } from '../../../../persistence/ProgressStore';
 import { createAppContext, type AppContext, type EngineFactory } from '../../../context';
 import { selectChallenge } from '../../../state/actions';
+import { withSelection } from '../../../state/sessionState';
 import { mountEditorTab } from './editorTab';
 
 const c01 = sqlLernenToolCourse.challenges.find((c) => c.num === '01')!;
@@ -130,6 +131,36 @@ describe('mountEditorTab', () => {
     const banner = root.querySelector('.expected-result-banner')!;
     expect(banner.textContent).toContain('Erwartetes Ergebnis');
     expect(banner.innerHTML).toContain(c01.successCriteria);
+  });
+
+  it('falls back to a bare placeholder and hides the expected-result banner when the selection points at a challenge no longer in the registry', () => {
+    // Simulates stale persisted progress after content is renumbered/removed:
+    // selectChallenge() itself refuses to select a nonexistent num, so this
+    // reaches the same state only via a direct store update, same as a saved
+    // selection restored from localStorage would.
+    const ctx = makeCtx();
+    const { editor } = mountEditorTab(root, ctx);
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
+
+    ctx.store.update((s) => ({
+      ...s,
+      session: withSelection(s.session, { trackId: 'sqlite', courseId: 'sqlLernenTool', challengeNum: 'gone-999' }),
+    }));
+
+    expect(editor.getValue()).toBe('-- Schreib hier deine Lösung für: gone-999\n');
+    expect(root.querySelector('.expected-result-banner')!.innerHTML).toBe('');
+  });
+
+  it('running with an empty or whitespace-only editor is a no-op — no results, no crash', async () => {
+    const ctx = makeCtx();
+    const { editor } = mountEditorTab(root, ctx);
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
+    editor.setValue('   \n  ');
+
+    root.querySelector('.run-btn')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(root.querySelector('.results-body')!.innerHTML).toContain('Noch keine Query ausgeführt.');
   });
 
   it('seeds a placeholder comment when the challenge has no draft yet', () => {
