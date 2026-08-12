@@ -1,19 +1,20 @@
 import { escapeHtml } from '../../domain/text/escapeHtml';
+import { highlightCSharp } from '../../editor/languages/csharp/highlight';
 import { highlightPython } from '../../editor/languages/python/highlight';
 import { highlightSql } from '../../editor/languages/sql/highlight';
 
 type Highlighter = (code: string) => string;
 
 /**
- * One highlighter per track that has an editor tokenizer. Tracks without an
- * entry (currently: csharp, not live-registered yet, see
- * src/content/tracks/csharp/courses/csharpGrundlagen/course.ts) fall back to
- * plain HTML-escaping everywhere below, so this stays a no-op extension
- * point rather than something that needs updating in lockstep.
+ * One highlighter per track that has an editor tokenizer. A track without an
+ * entry here falls back to plain HTML-escaping everywhere below, so this
+ * stays a no-op extension point for any future track rather than something
+ * that needs updating in lockstep with every new tokenizer.
  */
 const HIGHLIGHTERS: Record<string, Highlighter> = {
   sqlite: highlightSql,
   python: highlightPython,
+  csharp: highlightCSharp,
 };
 
 /**

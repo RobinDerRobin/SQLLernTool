@@ -5204,3 +5204,53 @@ sondern pro PR direkt in den Checks sichtbar.
 
 - **Ergebnis:** keine neuen Funde. Tests/typecheck/build unverändert
   grün. Kein Artifact-Republish nötig. Dev-Server sauber beendet.
+
+### 2026-08-11 — Stündliche Routine: Echter Bug behoben — C#-Tutorial-/Tipp-Code war nie syntax-hervorgehoben (stale Kommentar entdeckt den Live-Zustand widersprach)
+
+- **Umfang:** Baseline sauber (1059/1059, typecheck/build/knip grün, HEAD
+  `d2c2589`). Beim Durchsehen bislang nicht geprüfter Coverage-Lücken
+  (`contentHighlight.ts`, `diff.ts`, `app.ts`) fiel beim Lesen von
+  `contentHighlight.ts`s eigenem Dokumentationskommentar etwas auf: er
+  behauptete, `csharp` sei "noch nicht live registriert" — eine Aussage,
+  die vor mehreren Durchgängen (als der C#-Track tatsächlich verdrahtet
+  wurde) hätte aktualisiert werden müssen, es aber nie wurde.
+
+- **Befund: echter, aktuell live sichtbarer Bug.** `HIGHLIGHTERS` (die
+  Map, die pro Track den passenden Tokenizer für eingebetteten Code in
+  Tutorial-/Tipp-Texten auswählt) hatte nur `sqlite`/`python` — kein
+  `csharp`-Eintrag, obwohl `highlightCSharp()`
+  (`src/editor/languages/csharp/highlight.ts`) bereits seit dem
+  C#-Editor-Plugin-Durchgang existiert und exakt dieselbe Signatur wie
+  `highlightSql`/`highlightPython` hat. Folge: jeder `<pre>`/`<code>`-
+  Codeausschnitt in einem C#-Tutorial oder -Tipp fiel auf reines
+  HTML-Escaping zurück (einfarbiger Text) statt wie bei SQL/Python
+  syntax-hervorgehoben zu werden — inkonsistent und degradiert gegenüber
+  den anderen beiden Tracks. Verifiziert, dass das kein theoretischer
+  Fall ist: **alle 27 C#-Challenges** enthalten `<pre>`/`<code>`-Blöcke
+  in ihrem Content.
+
+- **Fix:** `csharp: highlightCSharp` zur `HIGHLIGHTERS`-Map ergänzt,
+  Import ergänzt, den veralteten Dokumentationskommentar korrigiert
+  (beschreibt jetzt den Erweiterungspunkt allgemein statt eine konkrete,
+  inzwischen falsche Momentaufnahme festzuschreiben). Zwei bestehende
+  Tests, die das alte (fehlerhafte) Fallback-Verhalten für `csharp`
+  explizit erwarteten, korrigiert — sie prüfen jetzt echte C#-Syntax-
+  Hervorhebung; der generische "kein Highlighter"-Fallback wird jetzt
+  stattdessen mit einer echt unbekannten Track-ID getestet. Zwei neue
+  Tests ergänzt (Keyword-Hervorhebung in `highlightCodeForTrack`, echte
+  Hervorhebung eines eingebetteten C#-Snippets in
+  `highlightContentHtml`).
+
+- **Live verifiziert, nicht nur unit-getestet:** Dev-Server gestartet,
+  C#-Track gewählt, erste Challenge geöffnet — der Task-Tab zeigt jetzt
+  16 `tok-*`-Spans (vorher: 0, nur escapter Fließtext). Keine neuen
+  Konsolenfehler.
+
+- **Tests:** 1059 → 1060 (+1 netto: 2 Tests korrigiert, 2 neu ergänzt,
+  1 alter Test durch einen allgemeineren ersetzt). `npx tsc --noEmit`
+  fehlerfrei, volle Suite 1060/1060 grün, `npm run build` grün
+  (829,77 kB), `npx knip` unverändert.
+
+- **Ergebnis:** echter, sofort für alle 27 C#-Challenges sichtbarer
+  UX-Fix — kein Content, keine Konzept-Zahlen geändert, daher kein
+  Artifact-Republish nötig.
