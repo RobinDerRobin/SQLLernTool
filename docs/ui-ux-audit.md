@@ -5799,3 +5799,52 @@ sondern pro PR direkt in den Checks sichtbar.
   Treffer mehr; diese Unterkategorie jetzt tatsächlich erschöpft. Kein
   Artifact-Republish nötig (kein Content, keine Konzept-Zahlen
   geändert).
+
+### 2026-08-12 — Stündliche Routine: `mergeLoadedState` ließ einzelne kaputte Chat-Nachrichten unvalidiert durch
+
+- **Umfang:** Baseline sauber (1246/1246, typecheck/build/knip grün, HEAD
+  `ef91378`). Erneuter, breiterer Grep
+  (`classList\.(add|remove|toggle)\(['"](open|expanded|collapsed|
+  active|visible|hidden|show)['"]`) bestätigt: die A11y-Disclosure-
+  Kategorie ist jetzt wirklich vollständig durchsucht, keine weiteren
+  Treffer. Vor dem eigentlichen Fund mehrere Kandidaten per Code-Lesen
+  geprüft und verworfen (kein Bug): `setMode()`/`resetSchema()`/
+  `computeLineDiff()` — alle wie im vorigen Durchgang notiert bewusstes
+  Design, kein Defekt.
+
+- **Befund:** `src/domain/progress/progressModel.ts`s
+  `mergeLoadedState()` ist laut eigenem Docstring ein "defensive
+  load-time parser: any missing/malformed field falls back to its
+  default rather than throwing" — validiert aber `chatHistory` nur auf
+  `Array.isArray()`-Ebene und castet den Inhalt danach ungeprüft
+  (`raw.chatHistory as ChatMessage[]`). Eine einzelne kaputte Nachricht
+  in persistiertem `localStorage` (z. B. `content` kein String, `role`
+  kein `'user'|'assistant'`, fehlendes Feld) würde nicht beim Laden
+  auffallen, sondern erst beim Rendern in `chatTab.ts`s
+  `renderTranscript()` crashen (`escapeHtml(msg.content)` ruft
+  `.replace()` auf einem möglicherweise `undefined`-Wert auf) — genau
+  der Fehlerklasse, die dieser Parser laut eigener Absicht verhindern
+  soll.
+
+- **Fix:** neue `isChatMessage()`-Typprüfung + `mergeChatHistory()`,
+  die das Array filtert statt es pauschal zu casten — eine einzelne
+  kaputte Nachricht wird stillschweigend entfernt, der Rest der
+  Konversation bleibt erhalten (bewusst kein Alles-oder-nichts-
+  Verhalten, siehe Kommentar im Code).
+
+- **Verifikation, dass der Test etwas prüft:** Fix temporär auf den
+  alten ungeprüften Cast zurückgesetzt, gezielt nur den neuen Test
+  laufen lassen — schlägt wie erwartet fehl (empfangenes Array enthält
+  alle sechs Rohwerte statt nur der einen gültigen Nachricht).
+  Quellcode danach via Backup-Kopie exakt wiederhergestellt, volle
+  `progressModel.test.ts`-Suite (20/20) erneut grün bestätigt.
+
+- **Tests:** 1246 → 1247 (+1). `npx tsc --noEmit` fehlerfrei, volle
+  Suite 1247/1247 grün, `npm run build` grün (831,45 kB), `npx knip`
+  unverändert (gleiche 10 vorbestehende Funde).
+
+- **Ergebnis:** echter, wenn auch seltener Crash-Pfad geschlossen
+  (erfordert manuell manipulierten oder durch einen künftigen
+  Formatwechsel beschädigten `localStorage`-Inhalt, aber genau dafür
+  existiert dieser Parser laut eigenem Zweck). Kein Artifact-Republish
+  nötig (kein Content, keine Konzept-Zahlen geändert).

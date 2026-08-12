@@ -135,6 +135,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function isChatMessage(value: unknown): value is ChatMessage {
+  return isRecord(value) && (value.role === 'user' || value.role === 'assistant') && typeof value.content === 'string';
+}
+
+/** Drops individual malformed entries rather than discarding the whole history — one corrupted message shouldn't erase an otherwise-intact chat thread. */
+function mergeChatHistory(raw: unknown): ChatMessage[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(isChatMessage);
+}
+
 function mergeChallengeProgress(raw: unknown): ChallengeProgress {
   const defaults = createDefaultChallengeProgress();
   if (!isRecord(raw)) return defaults;
@@ -143,7 +153,7 @@ function mergeChallengeProgress(raw: unknown): ChallengeProgress {
     bestStars: typeof raw.bestStars === 'number' ? raw.bestStars : defaults.bestStars,
     solutionViewed: typeof raw.solutionViewed === 'boolean' ? raw.solutionViewed : defaults.solutionViewed,
     draftSql: typeof raw.draftSql === 'string' ? raw.draftSql : defaults.draftSql,
-    chatHistory: Array.isArray(raw.chatHistory) ? (raw.chatHistory as ChatMessage[]) : defaults.chatHistory,
+    chatHistory: Array.isArray(raw.chatHistory) ? mergeChatHistory(raw.chatHistory) : defaults.chatHistory,
   };
 }
 
