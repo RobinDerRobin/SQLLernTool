@@ -4961,3 +4961,37 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Ergebnis:** kleine, aber echte UX-Korrektur in einer aktuell live
   erreichbaren Fehlermeldung. Kein Artifact-Republish nötig (kein
   Content, keine Konzept-Zahlen geändert).
+
+### 2026-08-11 — Stündliche Routine: Timeout-Nachrichten-Fix live bestätigt — Boot-Fehler hängt, wird nicht als Rejection gemeldet
+
+- **Umfang:** Baseline sauber (1052/1052, typecheck/build grün, HEAD
+  `8d1d6c0`). Vor der letzten Nachrichten-Korrektur unklar, ob sie
+  überhaupt den tatsächlich ausgelösten Codepfad trifft: `host.html` hat
+  einen eigenen `Blazor.start().catch(...)`, der bei einem echten Startup-
+  Error eine spezifischere `csharp-boot-error`-Nachricht postet (`Der
+  C#-Motor konnte nicht gestartet werden: ...`) — falls *dieser* Pfad für
+  den bekannten MONO_WASM-Bug greift, hätte der reine 15s-Timeout-Text nie
+  angezeigt werden können. Live verifiziert statt angenommen.
+
+- **Vorgehen:** Dev-Server gestartet, echten C#-Track im Kurs-Picker
+  ausgewählt, eine Challenge geöffnet und bis zu 20 s auf sichtbare
+  Statusänderungen gewartet, dazu den sichtbaren Seitentext auf beide
+  möglichen Nachrichtenfragmente geprüft.
+
+- **Ergebnis: bestätigt, der Timeout-Pfad ist tatsächlich der einzig
+  erreichte.** Der `Blazor.start().catch()` in `host.html` feuert für
+  diesen speziellen MONO_WASM-Fehler nie — die Konsole zeigt zwar
+  `MONO_WASM: Error in bindings_init ...` und einen `[pageerror] Failed
+  to start platform`, aber keine `csharp-boot-error`-Nachricht erreicht
+  den Parent (kein `"C#-Motor konnte nicht gestartet"` im Seitentext).
+  Stattdessen bleibt die Ladepromise einfach hängen, bis nach 15 s
+  `withTimeout` greift — der Seitentext enthält korrekt `"nicht
+  geantwortet"` und `"experimentell"`, die neue, korrigierte Nachricht
+  aus dem letzten Durchgang. Bestätigt: der Fix trifft tatsächlich den
+  einzigen Pfad, den reale Nutzer bei diesem Bug sehen — keine zweite,
+  ungeprüfte Fehlermeldung daneben, die noch die alte falsche Erklärung
+  zeigen könnte.
+
+- **Ergebnis:** reine Verifikation, keine Code-Änderung. Tests/typecheck/
+  build unverändert grün. Kein Artifact-Republish nötig. Dev-Server
+  sauber beendet.
