@@ -5324,3 +5324,47 @@ sondern pro PR direkt in den Checks sichtbar.
   genau die C#-Generics-Konzepte zeigen soll, die er demonstrieren
   will. Kein Artifact-Republish nötig (kein Konzept-Zahlen-Wechsel, nur
   Bugfix + Testabdeckung).
+
+### 2026-08-11 — Stündliche Routine: Regressionsschutz aus letztem Durchgang um `task`/`prereqNote` erweitert (sauber, keine neuen Funde)
+
+- **Umfang:** Baseline sauber (1232/1232, typecheck/build/knip grün, HEAD
+  `321cf5a`). Nach dem Content-Korruptions-Fix gezielt nach weiteren
+  Stellen im Codebase gesucht, an denen `csharp` in einer Track-Map
+  fehlen könnte (Suche nach anderen `sqlite:`/`python:`-Objekten,
+  fehlenden Track-Fällen in Switches) — keine weiteren Lücken gefunden,
+  alle bereits korrekt.
+
+- **Dabei eine echte Lücke im eigenen Regressionstest von letztem
+  Durchgang entdeckt:** `htmlContentIntegrity.test.ts` prüfte nur
+  `tutorial`/`hints`/`syntaxExplanation`/`successCriteria` — aber
+  `taskTab.ts` rendert auch `task` und `prereqNote` direkt als rohes
+  HTML (`${slice.task}`, `${slice.prereqNote}`), ganz ohne über
+  `highlightContentHtml` zu laufen. Dieselbe Verwundbarkeit besteht
+  dort grundsätzlich genauso — beide landen letztlich in irgendeinem
+  `.innerHTML`.
+
+- **Systematisch geprüft statt angenommen:** eigenes Skript lief gegen
+  alle `task`-Felder aller 3 Tracks (JSDOM, derselbe Vorher/Nachher-
+  Vergleich wie beim letzten Fund) — **0 Treffer**, `task` ist
+  überall bereits korrekt escaped (die kürzeren `<code>`-Inline-
+  Schnipsel in `task` waren offenbar von Anfang an sorgfältiger
+  behandelt als der lange rohe `<pre>`-Block im dritten Tipp).
+  `prereqNote` wird nur von 15 SQL-Challenges gesetzt (reine
+  Prosa-Hinweise zu Voraussetzungsketten, keine Code-Beispiele) —
+  ebenfalls unauffällig.
+
+- **Trotzdem ergänzt:** `task`/`prereqNote` in `htmlContentIntegrity.test.ts`
+  aufgenommen, damit ein künftiger Content-Fehler in diesen Feldern
+  nicht unbemerkt bliebe — derselbe Schutz, den `tutorial`/`hints`/
+  `syntaxExplanation`/`successCriteria` bereits haben. Testanzahl
+  bleibt bei 172 (ein Test pro Challenge, jetzt mit erweiterter
+  Feldabdeckung innerhalb jedes Tests, keine neuen Testfälle).
+
+- **Tests:** 1232/1232 unverändert (reine Testabdeckungs-Erweiterung,
+  keine Produktcode-Änderung). `npx tsc --noEmit` fehlerfrei, volle
+  Suite grün, `npm run build` grün (829,96 kB, unverändert), `npx knip`
+  unverändert.
+
+- **Ergebnis:** keine neuen Content-Bugs gefunden, aber eine echte
+  Lücke im eigenen frisch geschriebenen Regressionsschutz geschlossen.
+  Kein Artifact-Republish nötig.

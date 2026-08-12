@@ -4,9 +4,11 @@ import { pythonGrundlagenCourse } from '../../src/content/tracks/python/courses/
 import { sqlLernenToolCourse } from '../../src/content/tracks/sqlite/courses/sqlLernenTool/course';
 
 /**
- * Every challenge's `tutorial`/`hints`/`syntaxExplanation`/`successCriteria` is raw HTML,
- * eventually assigned via `.innerHTML` (see highlightContentHtml, tutorialTab.ts,
- * hintsSection.ts, solutionSection.ts). A bare `<` immediately followed by a letter inside a
+ * Every challenge's `task`/`prereqNote`/`tutorial`/`hints`/`syntaxExplanation`/
+ * `successCriteria` is raw HTML, eventually assigned via `.innerHTML` — `task`/`prereqNote`
+ * directly in taskTab.ts, the rest via `highlightContentHtml` (tutorialTab.ts, hintsSection.ts,
+ * solutionSection.ts) — same underlying risk either way. A bare `<` immediately followed by a
+ * letter inside a
  * `<pre>`/`<code>` block — e.g. a C# generic like `List<int>` — is parsed by the browser as the
  * start of a real (unknown) element, silently swallowing everything up to and including the
  * next matching `>`. Found live: `List<int>` rendered as just `List`, with `int` gone entirely.
@@ -52,6 +54,11 @@ describe('challenge content survives HTML parsing without silent corruption', ()
   for (const [trackId, challenges] of courses) {
     for (const challenge of challenges) {
       it(`${trackId}/${challenge.num}`, () => {
+        // task and prereqNote are embedded raw by taskTab.ts (no highlightContentHtml step,
+        // unlike tutorial/hints/syntaxExplanation/successCriteria) — same underlying risk
+        // (any of these ends up as someone's .innerHTML), so covered the same way here.
+        assertNoHtmlParsingCorruption(challenge.task, `${trackId}/${challenge.num} task`);
+        if (challenge.prereqNote) assertNoHtmlParsingCorruption(challenge.prereqNote, `${trackId}/${challenge.num} prereqNote`);
         assertNoHtmlParsingCorruption(challenge.tutorial, `${trackId}/${challenge.num} tutorial`);
         challenge.hints.forEach((hint, i) => assertNoHtmlParsingCorruption(hint, `${trackId}/${challenge.num} hint[${i}]`));
         assertNoHtmlParsingCorruption(challenge.syntaxExplanation, `${trackId}/${challenge.num} syntaxExplanation`);
