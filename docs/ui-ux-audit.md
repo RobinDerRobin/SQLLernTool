@@ -5465,3 +5465,64 @@ sondern pro PR direkt in den Checks sichtbar.
   bei jedem einzelnen Query-/Code-Lauf betrifft — nicht nur ein
   Detailfall wie die letzten C#-spezifischen Funde. Kein Artifact-
   Republish nötig (kein Content, keine Konzept-Zahlen geändert).
+
+### 2026-08-11 — Stündliche Routine: Echte A11y-Lücke behoben — Theme-Picker-Modal ohne Fokus-Management/Trap
+
+- **Umfang:** Baseline sauber (1233/1233, typecheck/build/knip grün, HEAD
+  `77989a0`). Weiter in derselben A11y-Kategorie wie letzter Durchgang:
+  das Theme-Picker-Modal (per Code-Kommentar selbst als "Modal"
+  bezeichnet) hatte bislang nur Escape-zum-Schließen — kein
+  `role="dialog"`/`aria-modal`, kein Fokus-Verschieben beim Öffnen, keine
+  Fokus-Rückgabe beim Schließen, kein Tab-Trap.
+
+- **Befund: echte, aktuell live bestehende Lücke.** Da das Overlay per
+  `display: none` (nicht nur Opacity/Transform) versteckt wird, ist die
+  "geschlossen"-Seite immerhin sauber (Inhalt ist dann weder sichtbar
+  noch im Tab-Index) — aber solange das Modal offen ist: (1) Fokus bleibt
+  wo er vorher war, ein Tastatur-Nutzer müsste manuell zum Modal
+  vor-tabben, während der dahinterliegende Seiteninhalt weiterhin
+  erreichbar bleibt (Fokus kann hinter das Overlay "entkommen"); (2) beim
+  Schließen wird der Fokus nicht zurückgegeben — da das vorher fokussierte
+  Element (`.theme-picker-close` o. Ä.) beim Schließen `display: none`
+  wird, setzt der Browser den Fokus standardmäßig auf `<body>` zurück,
+  der Tastatur-Nutzer verliert komplett seine Position im Dokument.
+
+- **Fix:** `role="dialog"`, `aria-modal="true"`, `aria-labelledby`
+  (zeigt auf den bestehenden Titel-Text) auf das `.theme-picker`-Panel
+  ergänzt. `afterRender`-Hook (bereits vorhandener `mountView`-
+  Lifecycle) merkt sich beim Öffnen das vorher fokussierte Element und
+  verschiebt den Fokus auf den Schließen-Button; beim Schließen wird der
+  gemerkte Fokus zurückgegeben. Bestehender `keydown`-Handler (schon für
+  Escape da) um einen Tab-Trap erweitert — Tab vom letzten fokussierbaren
+  Element springt zum ersten, Shift+Tab vom ersten zum letzten; da der
+  Inhalt des Panels statisch ist (Schließen-Button + N Theme-Buttons,
+  ändert sich nie während das Modal offen ist), reicht ein einfacher
+  Grenzfall-Wrap ohne komplexere Neuberechnung bei jedem Tastendruck.
+
+- **Als aussagekräftig bestätigt, nicht nur angenommen:** die Tab-Trap-
+  Logik testweise per `if (true) return;` deaktiviert — beide Trap-Tests
+  schlagen dann korrekt fehl, mit einem Diff, der exakt zeigt, dass der
+  Fokus stattdessen auf ein Theme-Options-Element statt auf das erwartete
+  Trap-Ziel gewandert wäre. Danach wiederhergestellt, alle 17 Tests
+  wieder grün.
+
+- **Live mit echten Tastatur-Events verifiziert** (nicht nur unit-
+  getestet oder synthetische KeyboardEvents): Playwright mit echten
+  `page.keyboard.press('Tab')`-Aufrufen — Fokus landet beim Öffnen sofort
+  auf dem Schließen-Button; nach genau einer vollständigen Tab-Runde
+  durch alle 12 fokussierbaren Elemente im Panel ist der Fokus wieder
+  beim Schließen-Button (korrekter Wrap); Fokus bleibt während der
+  gesamten Runde nachweislich innerhalb `.theme-picker`; Escape schließt
+  das Modal UND gibt den Fokus korrekt an den ursprünglichen
+  Auslöser-Button (`.theme-btn`) zurück.
+
+- **Tests:** 1233 → 1239 (+6: Dialog-Semantik, Fokus-Verschiebung beim
+  Öffnen, Fokus-Rückgabe beim Schließen, Tab-Trap vorwärts, Tab-Trap
+  rückwärts/Shift+Tab, kein Trap-Eingriff bei geschlossenem Modal).
+  `npx tsc --noEmit` fehlerfrei, volle Suite 1239/1239 grün, `npm run
+  build` grün (830,68 kB), `npx knip` unverändert.
+
+- **Ergebnis:** zweite echte A11y-Lücke in Folge behoben, die reale
+  Tastatur-/Screenreader-Nutzer bei jeder Nutzung des Theme-Pickers
+  betrifft. Kein Artifact-Republish nötig (kein Content, keine
+  Konzept-Zahlen geändert).

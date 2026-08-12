@@ -134,4 +134,85 @@ describe('mountThemePicker', () => {
     expect(root.querySelector('[data-theme-id="ocean-depth"]')?.getAttribute('aria-pressed')).toBe('true');
     expect(root.querySelector('[data-theme-id="retro-amber"]')?.getAttribute('aria-pressed')).toBe('false');
   });
+
+  it('has dialog semantics (role="dialog", aria-modal, labelled by its own title)', () => {
+    const ctx = makeCtx();
+    mountThemePicker(root, ctx);
+    toggleThemePicker(ctx, true);
+
+    const panel = root.querySelector('.theme-picker');
+    expect(panel?.getAttribute('role')).toBe('dialog');
+    expect(panel?.getAttribute('aria-modal')).toBe('true');
+    const labelId = panel?.getAttribute('aria-labelledby');
+    expect(labelId).toBeTruthy();
+    expect(document.getElementById(labelId!)?.textContent).toBe('Design wählen');
+  });
+
+  it('moves focus to the close button when opened', () => {
+    const ctx = makeCtx();
+    mountThemePicker(root, ctx);
+    toggleThemePicker(ctx, true);
+
+    expect(document.activeElement).toBe(root.querySelector('.theme-picker-close'));
+  });
+
+  it('restores focus to whatever had it before opening, once closed', () => {
+    const trigger = document.createElement('button');
+    document.body.append(trigger);
+    trigger.focus();
+
+    const ctx = makeCtx();
+    mountThemePicker(root, ctx);
+    toggleThemePicker(ctx, true);
+    expect(document.activeElement).not.toBe(trigger);
+
+    toggleThemePicker(ctx, false);
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('traps Tab within the panel: Tab from the last focusable element wraps to the first', () => {
+    const ctx = makeCtx();
+    mountThemePicker(root, ctx);
+    toggleThemePicker(ctx, true);
+
+    const panel = root.querySelector('.theme-picker')!;
+    const focusable = panel.querySelectorAll<HTMLElement>('button');
+    focusable[focusable.length - 1]!.focus();
+
+    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    document.dispatchEvent(event);
+
+    expect(document.activeElement).toBe(focusable[0]);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('traps Shift+Tab within the panel: Shift+Tab from the first focusable element wraps to the last', () => {
+    const ctx = makeCtx();
+    mountThemePicker(root, ctx);
+    toggleThemePicker(ctx, true);
+
+    const panel = root.querySelector('.theme-picker')!;
+    const focusable = panel.querySelectorAll<HTMLElement>('button');
+    focusable[0]!.focus();
+
+    const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true });
+    document.dispatchEvent(event);
+
+    expect(document.activeElement).toBe(focusable[focusable.length - 1]);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('does not intercept Tab when the picker is closed', () => {
+    const trigger = document.createElement('button');
+    document.body.append(trigger);
+    trigger.focus();
+
+    const ctx = makeCtx();
+    mountThemePicker(root, ctx);
+
+    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    document.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+  });
 });
