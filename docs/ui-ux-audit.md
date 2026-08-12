@@ -4892,3 +4892,32 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Ergebnis:** reiner Recherche-/Dokumentations-Durchgang, keine Code-
   Änderung. Tests/typecheck/build unverändert grün (1052/1052, 829.51 kB).
   Kein Artifact-Republish nötig.
+
+### 2026-08-11 — Stündliche Routine: Endlosrekursions-Fix live im echten Editor bestätigt (sauber)
+
+- **Umfang:** Baseline sauber (1052/1052, typecheck/build/knip grün, HEAD
+  `57f1f25`). Kein aktionabler Content-Task (SQL/Python 81/82, C# 86/86);
+  der `WITH RECURSIVE`-Kommentar-Umgehungs-Fix von vor zwei Durchgängen
+  war bislang nur unit-getestet, nie live im echten Browser über die
+  echte Editor-UI verifiziert — Priorität-2-Arbeit, die den Verifikations-
+  Kreis schließt statt neue Fläche zu suchen.
+
+- **Vorgehen:** Dev-Server mit sql.js-CDN-Workaround gestartet, echten
+  SQL-Editor über drei Playwright-Läufe geprüft: (1) `WHERE` nur als
+  Kommentartext im rekursiven Teil → muss blockiert werden, (2) echtes
+  `WHERE` im rekursiven Teil → darf nicht vom Schutz blockiert werden,
+  (3) komplett unbeschränkt (Sanity-Check) → muss blockiert werden.
+
+- **Ergebnis: Fix bestätigt korrekt End-to-End.** Fall 1 und 3 zeigen
+  korrekt `status-err` mit der erwarteten deutschen Fehlermeldung
+  ("...läuft die Rekursion unendlich weiter..."), Umlaute (ä, ü) und
+  Gedankenstrich rendern korrekt über `escapeHtml`. Fall 2 löst den Guard
+  korrekt nicht aus (zeigt stattdessen `status-warn`, weil diese Query
+  nicht zur ausgewählten Challenge passt — die eigentliche Fach-
+  Validierung, unabhängig vom Rekursions-Schutz). Keine Konsolenfehler.
+  Kein neuer Befund — reine Bestätigung, dass der frühere Unit-Test-Fix
+  auch im echten UI-Pfad (Editor → `executeAndValidate` →
+  `resultsArea.ts`-Rendering) tatsächlich greift.
+
+- **Ergebnis:** Tests/typecheck/build unverändert grün. Kein Artifact-
+  Republish nötig (keine Zahlenänderung). Dev-Server sauber beendet.
