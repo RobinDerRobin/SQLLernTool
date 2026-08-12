@@ -78,6 +78,19 @@ let iframeLoadPromise: Promise<CSharpEngineExports> | null = null;
 export function loadCSharpEngineFromServer(baseUrl: string): Promise<CSharpEngineExports> {
   if (iframeLoadPromise) return iframeLoadPromise;
   iframeLoadPromise = new Promise<CSharpEngineExports>((resolve, reject) => {
+    let settled = false;
+    const settleResolve = (exports: CSharpEngineExports) => {
+      if (settled) return;
+      settled = true;
+      resolve(exports);
+    };
+    const settleReject = (err: Error) => {
+      if (settled) return;
+      settled = true;
+      iframeLoadPromise = null;
+      reject(err);
+    };
+
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     iframe.src = `${baseUrl}host.html`;
@@ -88,22 +101,38 @@ export function loadCSharpEngineFromServer(baseUrl: string): Promise<CSharpEngin
       if (!isCSharpHostMessage(data)) return;
       if (data.type === 'csharp-host-ready') {
         window.removeEventListener('message', onMessage);
-        resolve(createIframeExports(iframe));
+        settleResolve(createIframeExports(iframe));
       } else if (data.type === 'csharp-boot-error') {
         window.removeEventListener('message', onMessage);
-        iframeLoadPromise = null;
-        reject(new Error(`Der C#-Motor konnte nicht gestartet werden: ${data.message}`));
+        settleReject(new Error(`Der C#-Motor konnte nicht gestartet werden: ${data.message}`));
       }
     };
     window.addEventListener('message', onMessage);
 
     iframe.onerror = () => {
       window.removeEventListener('message', onMessage);
-      iframeLoadPromise = null;
-      reject(new Error('Der C#-Motor konnte nicht geladen werden — das iframe wurde blockiert.'));
+      settleReject(new Error('Der C#-Motor konnte nicht geladen werden — das iframe wurde blockiert.'));
     };
 
     document.body.appendChild(iframe);
+
+    // Fast path for deployments that don't serve this bundle at all yet (see
+    // docs/csharp-engine-poc.md's "still deliberately not done" production-hosting note — as of
+    // 2026-08-11 that's the real GitHub Pages deployment): a HEAD request coming back not-ok means
+    // host.html can never load here, so there's no reason to make the user sit through the full
+    // ensureCSharpEngineLoaded timeout for something that's certain to fail. A network-level fetch
+    // failure is left alone (not conclusive on its own — could be transient) and falls through to
+    // the iframe attempt and the outer timeout as before.
+    fetch(`${baseUrl}host.html`, { method: 'HEAD' })
+      .then((res) => {
+        if (!res.ok) {
+          window.removeEventListener('message', onMessage);
+          settleReject(new Error('Der C#-Motor ist in dieser Umgebung (noch) nicht bereitgestellt.'));
+        }
+      })
+      .catch(() => {
+        /* transient/network error in the fast-path check itself — let the iframe/timeout decide */
+      });
   });
   return iframeLoadPromise;
 }

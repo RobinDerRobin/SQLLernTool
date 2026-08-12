@@ -4995,3 +4995,77 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Ergebnis:** reine Verifikation, keine Code-Änderung. Tests/typecheck/
   build unverändert grün. Kein Artifact-Republish nötig. Dev-Server
   sauber beendet.
+
+### 2026-08-11 — Stündliche Routine: WICHTIG — C#-Track ist bereits live auf der echten Produktions-Seite und aktuell für niemanden nutzbar; Fix für schnelleres, ehrlicheres Scheitern verschickt
+
+- **Umfang:** Baseline sauber (1052/1052, typecheck/build/knip grün, HEAD
+  `d8a64c0`). Beim Nachdenken über die letzte Nachrichten-Korrektur fiel
+  auf, dass `docs/csharp-engine-poc.md` bislang behauptet, dies sei "kein
+  Live-Produktions-Vorfall", weil `deploy-pages.yml` die C#-Engine-Assets
+  angeblich nie mitausliefert — diese Annahme war nie tatsächlich gegen
+  den echten Repo-/Deploy-Zustand geprüft worden.
+
+- **Verifiziert via GitHub API (nicht angenommen):** `main`s
+  `src/content/registry.ts` (Commit `d0edb4f`, der frühere per Nutzeranfrage
+  gemergte Stand) registriert den `csharp`-Track bereits vollständig in
+  `TRACKS` — eingeführt in `5ab928d` ("C#-Engine live verdrahtet"), also
+  *vor* dem Merge nach `main`. Der `deploy-pages.yml`-Lauf gegen genau
+  diesen Merge-Commit (`31508705782`) lief erfolgreich durch
+  (`2026-08-11T15:44:49Z`). Der tatsächliche `gh-pages`-Branch enthält nur
+  `index.html` und `coi-serviceworker.js` — kein `csharp-engine/`-Ordner.
+
+- **Konsequenz: die "kein Live-Vorfall"-Einschätzung war falsch.** Der
+  C#-Track ist auf der echten, deployten Seite jetzt wählbar (im Build
+  fest einkompiliert, nicht environment-gated), aber für **jeden** realen
+  Besucher, der ihn versucht, komplett funktionsunfähig: `iframe.src`
+  zeigt auf `/csharp-engine/host.html`, das dort schlicht 404 liefert
+  (nicht der bekannte MONO_WASM-Boot-Bug — der tritt nur auf, wo die
+  Engine überhaupt ausgeliefert wird, z. B. lokal im Dev-Server). Vor
+  dem heutigen Fix bedeutete das: 15 Sekunden sinnloses Warten, bevor
+  überhaupt eine Erklärung erscheint.
+
+- **Fix (klein, sicher, reversibel):** `loadCSharpEngineFromServer`
+  schickt jetzt parallel zum iframe-Aufbau einen `HEAD`-Request auf
+  `${baseUrl}host.html`. Kommt eine Nicht-OK-Antwort zurück, wird die
+  Ladepromise sofort mit "Der C#-Motor ist in dieser Umgebung (noch)
+  nicht bereitgestellt." abgelehnt — kein Warten mehr auf etwas, das nie
+  klappen kann. Ein Netzwerkfehler des HEAD-Checks selbst gilt nicht als
+  eindeutig (fällt zurück auf den bisherigen iframe-/Timeout-Pfad). Live
+  mit echten Playwright-Läufen verifiziert, nicht nur Unit-Mocks: gegen
+  den echten Dev-Server (Engine vorhanden) braucht der bekannte
+  MONO_WASM-Bug weiterhin ~13,7 s (Fast-Path greift korrekt nicht, da der
+  HEAD-Check erfolgreich ist) — gegen ein Route-Mock, das `host.html` 404
+  liefert (bildet die echte Produktions-Lücke nach), erschien die neue
+  Nachricht nach **20 ms**.
+
+- **Bewusst NICHT gemacht:** den `csharp`-Track wieder aus `TRACKS`
+  entfernen. Das wäre eine echte Produkt-Entscheidung (ganzen Track
+  verstecken vs. ihn ehrlich und jetzt schnell scheitern lassen, mit
+  Verweis auf SQL/Python) — das Mandat rahmt C# ausdrücklich als
+  akzeptiertes Work-in-Progress über mehrere Durchgänge, und ein
+  einzelner autonomer Stundendurchgang sollte nicht einseitig
+  substanzielle, bewusste Vorarbeit rückgängig machen.
+
+- **Für den Nutzer, klar markiert:** der C#-Track ist gerade live auf der
+  echten Seite und für niemanden abschließbar. Ob das so bleiben soll,
+  bis die Engine fertig ist, oder der Track bis dahin lieber temporär
+  versteckt werden sollte, ist eine Entscheidung für den Repo-Besitzer —
+  hier bewusst dokumentiert statt eigenmächtig entschieden.
+
+- **Wichtig:** dieser Fix liegt nur auf `claude/github-projekt-b3ivo1`.
+  Er wird auf der echten Seite erst wirksam, wenn dieser Branch (wieder)
+  nach `main` gemergt und `deploy-pages.yml` erneut läuft — genau wie
+  beim vorherigen `main`-Merge nur auf explizite Nutzeranfrage, nicht
+  autonom ausgelöst.
+
+- **Tests:** 1052 → 1054 (+2 in `csharpEngine.test.ts`: Fast-Path-
+  Ablehnung bei Nicht-OK-HEAD-Antwort, kein Fast-Fail bei reinem
+  Netzwerkfehler des HEAD-Checks). `npx tsc --noEmit` fehlerfrei, volle
+  Suite 1054/1054 grün, `npm run build` grün (829,76 kB), `npx knip`
+  unverändert.
+
+- **Ergebnis:** echter, live bestätigter Bug behoben (schnelleres,
+  ehrlicheres Scheitern), plus eine korrigierte, jetzt verifizierte
+  Schweregrad-Einschätzung in `docs/csharp-engine-poc.md`. Kein
+  Artifact-Republish nötig (kein Content, keine Konzept-Zahlen
+  geändert).

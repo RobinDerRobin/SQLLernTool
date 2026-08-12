@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createCSharpEngine, loadCSharpEngineFromServer } from './csharpEngine';
 
 function fakeExports(runCodeResult: string) {
@@ -44,6 +44,10 @@ describe('loadCSharpEngineFromServer', () => {
   beforeEach(() => {
     vi.resetModules();
     document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   function getIframes(): HTMLIFrameElement[] {
@@ -144,6 +148,29 @@ describe('loadCSharpEngineFromServer', () => {
     iframe!.onerror?.(new Event('error'));
 
     await expect(pending).rejects.toThrow(/C#-Motor konnte nicht geladen werden/);
+  });
+
+  it('rejects fast (without waiting on the iframe) when a HEAD check shows host.html is not deployed here', async () => {
+    const headSpy = vi.fn().mockResolvedValue({ ok: false });
+    vi.stubGlobal('fetch', headSpy);
+    const { loadCSharpEngineFromServer } = await import('./csharpEngine');
+
+    const pending = loadCSharpEngineFromServer('/csharp-engine/');
+
+    await expect(pending).rejects.toThrow(/nicht bereitgestellt/);
+    expect(headSpy).toHaveBeenCalledWith('/csharp-engine/host.html', { method: 'HEAD' });
+  });
+
+  it('does not reject on a network-level failure of the HEAD check itself — falls through to the iframe', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    const { loadCSharpEngineFromServer } = await import('./csharpEngine');
+
+    const pending = loadCSharpEngineFromServer('/csharp-engine/');
+    await Promise.resolve();
+    await Promise.resolve();
+    postFromIframe(getIframes()[0]!, { type: 'csharp-host-ready' });
+
+    await expect(pending).resolves.toBeDefined();
   });
 
   it('allows a retry after a failed load instead of staying stuck on the first rejection', async () => {

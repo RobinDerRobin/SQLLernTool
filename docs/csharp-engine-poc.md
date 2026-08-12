@@ -1491,22 +1491,80 @@ has no display, so untested); whether a *newer* .NET 8 SDK patch/workload
 version (past `8.0.29`) resolves it — not available via apt in this
 sandbox to test.
 
-**Practical severity, calibrated:** this is **not currently a live
-production incident** — `deploy-pages.yml` still doesn't publish the C#
-engine's `wwwroot/` to `gh-pages` at all (see the "still deliberately not
-done" paragraph immediately above), so no real user on the deployed site
-can reach this path yet; it only affects local `npm run dev` and the
-not-yet-production-wired CI check. It **is** a hard blocker for the next
-planned step (wiring `deploy-pages.yml`) and for any further C# content
-or engine work, since nothing in this engine is currently verifiable
-end-to-end in a real browser. One piece of existing defensive engineering
-already holds up under this failure: `ensureCSharpEngineLoaded`'s
-pre-existing 15-second `withTimeout` wrapper (built proactively in an
-earlier firing, *not* in response to this bug) means a real user would
-still see an error message after 15s rather than an infinite loading
-spinner — though that message currently misattributes the cause to
-browser extensions/CSP, which is now known to be wrong and worth revisiting
-once the real cause is found.
+**Practical severity, calibrated — CORRECTED (2026-08-11, next firing):
+this WAS wrong. It is a live production issue right now.** The
+"not currently a live production incident" claim below rested on
+`deploy-pages.yml` never having run against a commit that registers the
+`csharp` track — that assumption was never actually checked against the
+real repository state, and turned out to be false. Verified directly via
+the GitHub API this firing: `main`'s `src/content/registry.ts` (commit
+`d0edb4f`, the merge from the earlier user-requested "merge mit main")
+already has the `csharp` entry in `TRACKS`, registered a few commits
+*before* that merge (`5ab928d`, "C#-Engine live verdrahtet"). The
+`deploy-pages.yml` run against that exact merge commit
+(`31508705782`) completed with `conclusion: success` on
+`2026-08-11T15:44:49Z`. And `gh-pages`'s actual current file listing is
+just `index.html` + `coi-serviceworker.js` — no `csharp-engine/`
+directory at all, confirmed by listing it directly. So: the C# track
+**is** selectable right now on the real deployed site (it's compiled
+into `dist/index.html` unconditionally, `TRACKS` isn't environment-
+gated), and any real visitor who opens a C# challenge and clicks "Run"
+gets a same-origin `iframe.src` pointed at `/csharp-engine/host.html`,
+which 404s there — not the MONO_WASM boot bug specifically (that only
+reproduces where the engine *is* served, like local dev), but a flatly
+missing resource. Before this firing's fix (see below), that meant a
+real, needless 15-second wait before any explanation appeared at all.
+
+**Fix shipped this firing:** `loadCSharpEngineFromServer` now fires a
+`HEAD ${baseUrl}host.html` request in parallel with creating the iframe.
+A non-ok response settles the load promise immediately with "Der
+C#-Motor ist in dieser Umgebung (noch) nicht bereitgestellt." — no more
+waiting out the full timeout for something that can never succeed. A
+network-level failure of the HEAD check itself is *not* treated as
+conclusive (left alone, falls through to the iframe/timeout path as
+before) — only an actual non-ok HTTP response short-circuits.
+Live-verified with real Playwright runs, not just unit mocks: against
+the real dev server (engine genuinely present), the known MONO_WASM boot
+bug still takes ~13.7s to surface its message — fast path correctly
+doesn't fire, since the HEAD check succeeds. Against a route-mocked
+"host.html returns 404" scenario (reproducing the real production gap
+above), the new message appeared in **20ms**. This does not fix the
+underlying MONO_WASM bug (still unresolved, see above) or deploy the
+engine to production (still not done, see below) — it only makes the
+*already-live* broken state fail fast and honestly instead of wasting 15
+seconds pretending to load something that was never going to arrive
+either way. One piece of existing defensive engineering already held up
+under this failure even before today's fix:
+`ensureCSharpEngineLoaded`'s pre-existing 15-second `withTimeout`
+wrapper (built proactively in an earlier firing, *not* in response to
+this bug) meant a real user would still see an error message after 15s
+rather than an infinite loading spinner — though that message
+misattributed the cause to browser extensions/CSP until a firing two
+sessions ago corrected it (see the UX-fix entry in
+`docs/ui-ux-audit.md`).
+
+**Note for whoever reads this:** this firing did **not** unregister the
+`csharp` track or otherwise hide it from the picker, despite it being
+currently unplayable for every real visitor. That's a genuine product
+call (hide a whole track vs. let it fail gracefully with an honest,
+now-fast message pointing to SQL/Python) that this session's standing
+mandate — which explicitly frames C# as an intentional, accepted
+multi-session work in progress — doesn't clearly settle either way, and
+reverting substantial deliberate prior wiring work isn't a call an
+autonomous hourly firing should make unilaterally. Flagging it here
+plainly instead: **the C# track is live on the real deployed site and
+currently cannot be completed by any visitor who tries it.** Whether
+that's acceptable while the engine is finished, or worth temporarily
+hiding the track until it works, is a decision for whoever owns this
+repository.
+
+**Original (now-corrected) text, kept for the record:** "this is not
+currently a live production incident — `deploy-pages.yml` still doesn't
+publish the C# engine's `wwwroot/` to `gh-pages` at all ..., so no real
+user on the deployed site can reach this path yet; it only affects local
+`npm run dev` and the not-yet-production-wired CI check." — this
+assumption was never actually verified against the real repo/deploy
+state and is now known to be wrong, per the correction above.
 
 **Deliberately not attempted this firing:** any speculative code fix.
 Every hypothesis tested came back negative, and shipping an unverified
