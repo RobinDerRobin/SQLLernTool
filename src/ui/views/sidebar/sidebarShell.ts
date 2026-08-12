@@ -52,7 +52,7 @@ function renderHead(slice: HeadSlice, ctx: AppContext): string {
 
 const FOOT_HTML = `
   <button type="button" class="theme-btn">🎨 Design wechseln</button>
-  <button type="button" class="reset-btn">Schema komplett zurücksetzen</button>
+  <button type="button" class="reset-btn" aria-expanded="false">Schema komplett zurücksetzen</button>
   <div class="reset-confirm-row">
     <span class="reset-confirm-text">Wirklich alles löschen?</span>
     <button type="button" class="btn reset-confirm-yes">Ja, löschen</button>
@@ -109,14 +109,22 @@ export function mountSidebarShell(elements: SidebarShellElements, ctx: AppContex
 
   footRoot.innerHTML = FOOT_HTML;
   const confirmRow = footRoot.querySelector('.reset-confirm-row');
+  const resetBtn = footRoot.querySelector('.reset-btn');
 
   const offTheme = on(footRoot, 'click', '.theme-btn', () => toggleThemePicker(ctx, true));
-  const offReset = on(footRoot, 'click', '.reset-btn', () => confirmRow?.classList.add('open'));
+  const offReset = on(footRoot, 'click', '.reset-btn', () => {
+    confirmRow?.classList.add('open');
+    resetBtn?.setAttribute('aria-expanded', 'true');
+  });
   const offYes = on(footRoot, 'click', '.reset-confirm-yes', () => {
     confirmRow?.classList.remove('open');
+    resetBtn?.setAttribute('aria-expanded', 'false');
     resetSchema(ctx);
   });
-  const offNo = on(footRoot, 'click', '.reset-confirm-no', () => confirmRow?.classList.remove('open'));
+  const offNo = on(footRoot, 'click', '.reset-confirm-no', () => {
+    confirmRow?.classList.remove('open');
+    resetBtn?.setAttribute('aria-expanded', 'false');
+  });
 
   // The backdrop only renders (via CSS) on narrow viewports while the sidebar
   // is expanded, so a click on it always means "close the drawer".

@@ -5736,3 +5736,66 @@ sondern pro PR direkt in den Checks sichtbar.
   reale Lücke außerhalb der Typ-Dateien — die Codebasis ist insgesamt
   bereits sehr gründlich getestet. Kein Artifact-Republish nötig (kein
   Content, keine Konzept-Zahlen geändert).
+
+### 2026-08-12 — Stündliche Routine: sechste und siebte A11y-Lücke — zwei mit `classList.add`/`.remove()` (statt `.toggle()`) implementierte Disclosure-Buttons übersehen
+
+- **Umfang:** Baseline sauber (1246/1246, typecheck/build/knip grün, HEAD
+  `2f9f69a`). Content-Coverage weiterhin maxed, C# WASM-Bug weiterhin
+  ohne neuen Ansatzpunkt. Vor dem eigentlichen Fund mehrere Code-Lese-
+  Sackgassen ausgeschlossen: `setMode()` setzt `examTipsRemaining` beim
+  Moduswechsel bewusst nicht zurück (UI-Label sagt explizit "gemeinsamer
+  Pool ... für den ganzen Kurs" — kein Bug); `resetSchema()`s
+  kursweiter `bestStars`-Reset ist beabsichtigt (Schema-Zustand ist
+  kursübergreifend kumulativ); `computeLineDiff()` ist laut eigenem
+  Kommentar bewusst eine simple positionale Zeile-für-Zeile-Diff, keine
+  echte LCS-Diff — kein Bug, Design-Entscheidung aus dem Prototyp.
+
+- **Befund:** der frühere `classList.toggle()`-Grep (voriger Durchgang,
+  als "wahrscheinlich ausgeschöpft" protokolliert) hatte eine Lücke:
+  zwei Disclosure-Buttons sind mit getrennten `classList.add('open')`/
+  `classList.remove('open')`-Aufrufen statt einem einzigen `.toggle()`
+  implementiert und wurden dadurch vom alten Grep-Muster nicht erfasst.
+  Ein neuer, breiterer Grep (`classList\.(add|remove)\(['"]open['"]\)`)
+  fand zwei echte, bisher unentdeckte Fälle:
+  1. `.reset-btn` (`sidebarShell.ts`) — öffnet die
+     "Wirklich alles löschen?"-Bestätigungszeile, schließt über zwei
+     eigene Buttons (Ja/Abbrechen). Kein `aria-expanded`.
+  2. `.compare-btn` (`compareView.ts`) — öffnet das Diff-Panel
+     "Mit Musterlösung vergleichen"; schließt nie über denselben Button
+     zurück (nur implizit beim Challenge-/Modus-Wechsel), aber genau
+     dafür ist `aria-expanded="true"` nach dem Öffnen trotzdem
+     korrekt — Screenreader-Nutzer erfahren so, dass zusätzlicher
+     Inhalt erschienen ist.
+
+- **Fix:** beide Buttons starten mit `aria-expanded="false"` im
+  Template; `.reset-btn` wird in den bestehenden Öffnen-/Ja-/Abbrechen-
+  Handlern in `sidebarShell.ts` synchron auf `true`/`false` gesetzt,
+  `.compare-btn` im bestehenden Klick-Handler in `compareView.ts` auf
+  `true` (kein eigener Schließen-Pfad nötig, da der Button selbst beim
+  Re-Render mit neuem `aria-expanded="false"` aus dem Template
+  zurückgesetzt wird).
+
+- **Live bestätigt:** echter Playwright-Lauf gegen den Dev-Server mit
+  dem `context.route()`-Workaround für sql.js aus dem Runbook (nötig,
+  da `selectChallenge()` für den SQL-Track ohne geladene Engine
+  stillschweigend early-returnt — ein erster Versuch ohne Route-Setup
+  zeigte genau das: Klick auf ein Challenge-Listenelement blieb
+  wirkungslos, alle Task-Tab-Regionen blieben leer, kein echter Bug,
+  nur fehlendes Setup im Diagnoseskript). Mit korrektem Setup: echte
+  Klicks bestätigen `.reset-btn` `false → true → false` (Öffnen →
+  Abbrechen) und `.compare-btn` `false → true` (Öffnen).
+
+- **Tests:** 1246 → 1246 (keine neuen `it()`-Blöcke; drei neue
+  Assertions in bereits bestehenden Tests in `sidebarShell.test.ts`
+  und `compareView.test.ts`, die dasselbe Verhalten ohnehin schon
+  über den `classList`-Zustand prüften). `npx tsc --noEmit` fehlerfrei,
+  volle Suite 1246/1246 grün, `npm run build` grün (831,30 kB),
+  `npx knip` unverändert (gleiche 10 vorbestehende Funde).
+
+- **Ergebnis:** die `classList.toggle()`-Kategorie war nicht wirklich
+  ausgeschöpft, nur unvollständig durchsucht — ein breiterer Grep nach
+  `.add()`/`.remove()`-Paaren fand zwei weitere echte Fälle. Erneuter
+  `classList\.(add|remove)\(` -Grep zeigt keine weiteren offenen
+  Treffer mehr; diese Unterkategorie jetzt tatsächlich erschöpft. Kein
+  Artifact-Republish nötig (kein Content, keine Konzept-Zahlen
+  geändert).

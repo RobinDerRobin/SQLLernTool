@@ -31,7 +31,7 @@ function renderCompare(slice: CompareSlice): string {
   if (!slice.num || slice.mode === 'exam') return '';
   return `
     <div class="compare-block">
-      <button type="button" class="btn compare-btn">Mit Musterlösung vergleichen</button>
+      <button type="button" class="btn compare-btn" aria-expanded="false">Mit Musterlösung vergleichen</button>
       <div class="compare-panel">
         <div class="compare-cols">
           <div class="compare-col compare-col-mine">
@@ -68,7 +68,7 @@ export function mountCompareView(root: HTMLElement, ctx: AppContext, editor: Edi
         renderedNum = slice.num;
       },
       bind: (rootEl) => {
-        on(rootEl, 'click', '.compare-btn', () => {
+        on(rootEl, 'click', '.compare-btn', (_e, target) => {
           const slice = sliceCompare(ctx.store.getState(), ctx.registry);
           if (!slice.num || slice.num !== renderedNum) return;
 
@@ -80,6 +80,7 @@ export function mountCompareView(root: HTMLElement, ctx: AppContext, editor: Edi
             solutionCol.innerHTML = `<div class="compare-col-label">Musterlösung</div>${renderColumn(diff.theirs)}`;
           }
           rootEl.querySelector('.compare-panel')?.classList.add('open');
+          target.setAttribute('aria-expanded', 'true');
 
           compareToSolution(ctx);
         });
