@@ -5423,3 +5423,45 @@ sondern pro PR direkt in den Checks sichtbar.
 
 - **Ergebnis:** Tests/typecheck/build unverändert grün. Kein Artifact-
   Republish nötig. Dev-Server sauber beendet.
+
+### 2026-08-11 — Stündliche Routine: Echte A11y-Lücke behoben — Ergebnis-/Engine-Status wurden nie an Screenreader angesagt
+
+- **Umfang:** Baseline sauber (1232/1232, typecheck/build/knip grün, HEAD
+  `badebef`). Nach mehreren Durchgängen mit C#-UI-Detailprüfungen diesmal
+  bewusst eine andere Kategorie: Grep über den gesamten Code nach
+  `aria-live`/`role="status"`/`role="alert"` — **null Treffer im gesamten
+  Projekt.** Die früheren A11y-Durchgänge (Tasks #1–5, ganz am Anfang
+  dieser Session) deckten ausschließlich statische Struktur ab (ARIA-
+  Rollen für Tabs, `aria-label`, Fokus-Sichtbarkeit, Tastaturnavigation)
+  — dynamische Inhalts-Änderungen wurden nie berücksichtigt.
+
+- **Befund: echte, aktuell live bestehende Lücke.** `.results-body`
+  (zeigt nach jedem Run-Klick Erfolg/Fehler/Warnung — `resultsArea.ts`,
+  `pythonResultsArea.ts`, `csharpResultsArea.ts`) und
+  `.python-engine-status` (zeigt Lade-Status sowie — bei C# besonders
+  relevant — die 15-Sekunden-Timeout-Fehlermeldung aus einem früheren
+  Durchgang) werden beide nur per `.innerHTML =` aktualisiert, ganz ohne
+  Live-Region-Markup. Für Screenreader-Nutzer bedeutet das: nach einem
+  Klick auf "Ausführen" gibt es **keine automatische Ansage** des
+  Ergebnisses — sie müssten manuell zum Ergebnisbereich zurücknavigieren,
+  bei jedem einzelnen Lauf.
+
+- **Fix:** `role="status"` (impliziert `aria-live="polite"`, das
+  etablierte WAI-ARIA-Muster für Status-Meldungen) auf beide stabilen
+  Container-Elemente in `editorTab.ts`s `SHELL_HTML`-Template ergänzt —
+  bewusst auf die Container selbst, nicht auf die per `innerHTML`
+  ausgetauschten Kind-Elemente, da nur ein niemals ersetztes Element das
+  Attribut zuverlässig behält. Live gegen den echten Dev-Server bestätigt
+  (nicht nur unit-getestet): `role="status"` ist vor dem ersten Lauf
+  vorhanden UND überlebt den `innerHTML`-Tausch nach einem echten
+  Query-Run unverändert.
+
+- **Tests:** 1232 → 1233 (+1, prüft beide `role="status"`-Attribute
+  direkt nach dem Mounten). `npx tsc --noEmit` fehlerfrei, volle Suite
+  1233/1233 grün, `npm run build` grün (829,98 kB), `npx knip`
+  unverändert.
+
+- **Ergebnis:** echte A11y-Lücke behoben, die reale Screenreader-Nutzer
+  bei jedem einzelnen Query-/Code-Lauf betrifft — nicht nur ein
+  Detailfall wie die letzten C#-spezifischen Funde. Kein Artifact-
+  Republish nötig (kein Content, keine Konzept-Zahlen geändert).

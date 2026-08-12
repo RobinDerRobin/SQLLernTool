@@ -103,6 +103,14 @@ describe('mountEditorTab', () => {
     expect(root.querySelector('.results-wrap')).not.toBeNull();
   });
 
+  it('marks the results area and engine-status banner as ARIA live regions so screen readers announce run outcomes and loading/error status', () => {
+    const ctx = makeCtx();
+    mountEditorTab(root, ctx);
+
+    expect(root.querySelector('.results-body')?.getAttribute('role')).toBe('status');
+    expect(root.querySelector('.python-engine-status')?.getAttribute('role')).toBe('status');
+  });
+
   it('loads the saved draft for the opened challenge into the editor', () => {
     const progress = withChallengeProgress(createDefaultProgressState(), 'sqlite', 'sqlLernenTool', '01', {
       draftSql: 'SELECT 42;',

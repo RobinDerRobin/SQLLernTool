@@ -20,7 +20,7 @@ import { mountTablesPanel } from './tablesPanel';
 const SHELL_HTML = `
   <div class="editor-wrap">
     <div class="expected-result-banner"></div>
-    <div class="python-engine-status"></div>
+    <div class="python-engine-status" role="status"></div>
     <div class="editor-toolbar">
       <span class="label">SQL</span>
       <div class="toolbar-actions">
@@ -40,7 +40,7 @@ const SHELL_HTML = `
   </div>
   <div class="results-wrap">
     <div class="results-label">Ergebnis</div>
-    <div class="results-body"><div class="empty-state">Noch keine Query ausgeführt.</div></div>
+    <div class="results-body" role="status"><div class="empty-state">Noch keine Query ausgeführt.</div></div>
   </div>`;
 
 interface MountedEditorTab {
