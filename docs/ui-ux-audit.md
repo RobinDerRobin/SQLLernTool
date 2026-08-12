@@ -5150,3 +5150,57 @@ sondern pro PR direkt in den Checks sichtbar.
 
 - **Ergebnis:** reine Verifikation + Testabdeckung, keine
   Verhaltensänderung im Produktcode. Kein Artifact-Republish nötig.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt — Theme × Editor-Sprache-Matrix (sauber)
+
+- **Umfang:** Baseline sauber (1059/1059, typecheck/build/knip grün, HEAD
+  `b3d8f41`). Kein aktionabler Content-Task, C#-Boot-Bug bereits mehrfach
+  ausführlich untersucht. Bisherige Bug-Hunts prüften meist funktionale
+  Abläufe (Run, Tipps, Lösung) mit dem Standard-Theme — die Kombination
+  aus allen 11 Themes × allen 3 Editor-Sprachen (SQL/Python/C#) war
+  bislang nicht gezielt geprüft — ein Muster, bei dem theme-spezifische
+  CSS-Variablen leicht mit sprachspezifischen Token-Typen kollidieren
+  könnten (z. B. ein Token-Typ, der nur in C# vorkommt, aber keine Farbe
+  für ein helles Theme definiert hat).
+
+- **Erster Fehlversuch, korrigiert:** die erste Prüfung fragte
+  `getComputedStyle()` direkt auf `textarea.editor` ab und fand
+  überall `color === backgroundColor` (transparent) — sah zunächst wie
+  ein flächendeckender Lesbarkeits-Bug aus. Beim Nachschauen im
+  DOM/CSS-Code stellte sich heraus: das ist die Editor-Architektur
+  selbst (`editorTab.ts`) — ein unsichtbares `<textarea>` für Eingabe/
+  Cursor liegt über einer separaten `.highlight-layer`, die die
+  tatsächlich eingefärbten Tokens rendert. Kein Bug, eigener Messfehler.
+  Skript korrigiert, um stattdessen die echten Token-Spans in
+  `.highlight-layer` zu prüfen.
+
+- **Vorgehen (korrigiert):** für jeden der 3 Tracks Beispielcode mit
+  Kommentar, String und Zahl in den Editor getippt, dann alle 11 Themes
+  nacheinander per direktem Klick auf die Theme-Picker-Buttons
+  durchgeschaltet (auch ohne das Modal sichtbar zu öffnen — der Klick-
+  Handler reagiert unabhängig von der Sichtbarkeit). Für jede der 33
+  Kombinationen geprüft: Anzahl unterschiedlicher Token-Farben und ob
+  irgendein Token dieselbe Farbe wie der Editor-Hintergrund hat
+  (= unsichtbar).
+
+- **Ergebnis: keine einzige der 33 Kombinationen zeigte einen Token mit
+  Hintergrundfarbe** — auch nicht bei den beiden hellen Themes
+  (Solar Flare, Paper & Ink), wo ein dunkles-Theme-Restfarbwert am
+  ehesten unsichtbaren Text verursacht hätte. 4-6 unterschiedliche
+  Token-Farben pro Kombination, konsistent über alle drei Sprachen.
+
+- **Nebenbeobachtung, nicht reproduzierbar:** ein einzelner
+  `console.error` ("Failed to load module script: ... MIME type of
+  application/octet-stream") tauchte einmal im ursprünglichen
+  kombinierten Lauf auf, war in `docs/csharp-engine-poc.md` bislang
+  nicht dokumentiert. Gezielt isoliert nachgestellt (direkte Navigation
+  zu `host.html`, dann nochmal über die echte App-Navigation zum
+  C#-Track) — beide Male **nicht** reproduzierbar, alle `_framework/*`-
+  Antworten hatten korrekte Content-Types. Vermutlich ein transientes
+  Sandbox-Artefakt durch die parallelen CDN-Route-Interceptions während
+  des schnellen Theme-Durchschaltens, kein reproduzierbarer Produktbug —
+  konsistent mit dem bereits mehrfach dokumentierten Sandbox-
+  Netzwerkrauschen-Muster. Nicht weiter verfolgt.
+
+- **Ergebnis:** keine neuen Funde. Tests/typecheck/build unverändert
+  grün. Kein Artifact-Republish nötig. Dev-Server sauber beendet.
