@@ -5563,3 +5563,56 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Ergebnis:** dritter echter A11y-Fund in Folge in derselben
   Kategorie (dynamischer Zustand nie an Screenreader kommuniziert).
   Kein Artifact-Republish nötig.
+
+### 2026-08-12 — Stündliche Routine: Vierte und fünfte A11y-Lücke — Lösungs- und Postgres-Frage-Panel ohne `aria-expanded`
+
+- **Umfang:** Baseline sauber (1240/1240, typecheck/build/knip grün, HEAD
+  `ebc51f8`). Dieselbe Kategorie systematisch zu Ende durchsucht: Grep
+  nach `classList.toggle(` in `src/ui` findet alle sechs Stellen im
+  Code. Drei waren bereits abgedeckt (Sidebar-Collapse mit dynamischem
+  `aria-label`, Tab-Aktiv-Klasse mit `aria-selected`, Tabellen-Toggle
+  aus dem vorigen Durchgang) oder kein Nutzer-Zustand (Boot-Banner-
+  Klasse). Zwei echte, bisher unentdeckte Lücken übrig:
+  `.solution-toggle-btn` (`solutionSection.ts`, "Lösung anzeigen"/
+  "Lösung verbergen") und `.pg-ask-toggle-btn` (`pgAskPanel.ts`,
+  "Claude hierzu befragen") — beide klappen ein Panel auf/zu, keiner
+  trägt `aria-expanded`.
+
+- **Fix:** in beiden Dateien `aria-expanded="false"` initial im
+  Template ergänzt und im jeweiligen Klick-Handler auf den
+  tatsächlichen `open`-Zustand synchronisiert (`solutionSection.ts`
+  in der bestehenden `applyPanelState`-Funktion neben dem Label-Text-
+  Wechsel; `pgAskPanel.ts` direkt im Klick-Handler anhand des
+  `classList.toggle()`-Rückgabewerts).
+
+- **Stolperfalle beim Testschreiben:** der erste Testentwurf hielt die
+  Button-Referenz einmalig fest und klickte sie zweimal — schlug beim
+  zweiten Klick fehl (`expected 'true' to be 'false'`), weil das
+  Aufdecken der Lösung `markSolutionViewed` auslöst, das den Store
+  ändert und die View neu rendert (der Button wird dabei ersetzt,
+  nicht nur mutiert). Die alte Referenz zeigte danach auf ein aus dem
+  DOM entferntes Element, an das der `on()`-Delegate keine Klicks mehr
+  weiterleitet. Behoben durch Neu-Query (`root.querySelector(...)`)
+  vor jeder Assertion statt einer gehaltenen Referenz — zugleich ein
+  guter Beleg dafür, dass der Test echte Rendering-Mechanik prüft und
+  nicht nur oberflächlich grün wird.
+
+- **Live bestätigt:** echte Klicks im Dev-Server (mit lokal per npm
+  installiertem `sql.js`, per `context.route()` anstelle des im
+  Sandbox blockierten CDN ausgeliefert — siehe Runbook oben) —
+  `aria-expanded` wechselt für beide Buttons korrekt
+  `false` → `true` (→ `false` beim Postgres-Panel, das erneut
+  schließbar ist; das Lösungspanel bleibt bewusst offen, sobald einmal
+  aufgedeckt).
+
+- **Tests:** 1240 → 1242 (+2). `npx tsc --noEmit` fehlerfrei, volle
+  Suite 1242/1242 grün, `npm run build` grün (830,93 kB), `npx knip`
+  unverändert (gleiche 10 vorbestehende Funde, nichts Neues).
+
+- **Ergebnis:** vierter und fünfter A11y-Fund in Folge in derselben
+  Kategorie — damit sind alle sechs `classList.toggle()`-Aufrufstellen
+  in `src/ui` auf `aria-expanded`/gleichwertige Zustandskommunikation
+  geprüft und, wo nötig, gefixt. Diese Kategorie ist jetzt
+  wahrscheinlich ausgeschöpft; ein künftiger Durchgang sollte auf eine
+  andere Bug-Kategorie wechseln. Kein Artifact-Republish nötig (kein
+  Content, keine Konzept-Zahlen geändert).

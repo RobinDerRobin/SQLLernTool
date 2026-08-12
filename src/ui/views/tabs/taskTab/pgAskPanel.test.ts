@@ -68,6 +68,21 @@ describe('mountPgAskPanel', () => {
     expect(root.querySelector('.ask-panel')?.classList.contains('open')).toBe(true);
   });
 
+  it('reflects the panel state via aria-expanded on the toggle button', () => {
+    const { ctx } = makeCtx();
+    mountPgAskPanel(root, ctx);
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
+
+    const toggle = root.querySelector('.pg-ask-toggle-btn')!;
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+
+    toggle.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+
+    toggle.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  });
+
   it('submitting a question renders the answer as markdown', async () => {
     const { ctx, sendMessage } = makeCtx('Antwort mit `code`.');
     mountPgAskPanel(root, ctx);

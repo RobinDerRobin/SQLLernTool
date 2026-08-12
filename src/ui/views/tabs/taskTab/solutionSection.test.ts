@@ -132,6 +132,23 @@ describe('mountSolutionSection', () => {
     expect(editor.getValue()).toBe(c01.solution);
   });
 
+  it('reflects the panel state via aria-expanded on the toggle button', () => {
+    // Revealing the solution marks it viewed, which changes store state and
+    // re-renders this view (replacing the button element) — re-query after
+    // each click instead of holding a single stale reference.
+    const ctx = makeCtx();
+    mountSolutionSection(root, ctx, fakeEditor());
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
+
+    expect(root.querySelector('.solution-toggle-btn')!.getAttribute('aria-expanded')).toBe('false');
+
+    root.querySelector('.solution-toggle-btn')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(root.querySelector('.solution-toggle-btn')!.getAttribute('aria-expanded')).toBe('true');
+
+    root.querySelector('.solution-toggle-btn')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(root.querySelector('.solution-toggle-btn')!.getAttribute('aria-expanded')).toBe('false');
+  });
+
   it('closes the panel again when a different challenge is opened', () => {
     const ctx = makeCtx();
     mountSolutionSection(root, ctx, fakeEditor());
