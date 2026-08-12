@@ -5107,3 +5107,46 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Ergebnis:** reine Verifikations-/Test-Ergänzung zu bereits
   verschicktem Code, kein neues Verhalten. Kein Artifact-Republish
   nötig.
+
+### 2026-08-11 — Stündliche Routine: doppelte Anführungszeichen-Escape-Logik in `unboundedRecursionCheck.ts` verifiziert, mislabelter Test korrigiert
+
+- **Umfang:** Baseline sauber (1055/1055, typecheck/build/knip grün, HEAD
+  `079a29f`). Coverage-Report zeigte für `unboundedRecursionCheck.ts`
+  weiterhin eine Lücke (91,55 % Stmts / 87,67 % Branch) — genau auf der
+  Escape-Behandlung für verdoppelte Anführungszeichen (`''` als
+  SQL-Escape für ein eingebettetes `'`) in `stripStringsAndComments()`,
+  der eigenen Hilfsfunktion aus dem `WITH RECURSIVE`-Kommentar-Fix von
+  vor vier Durchgängen — bislang komplett ungetestet.
+
+- **Verifiziert, kein Bug:** empirisch geprüft, ob die Escape-Logik einen
+  echten `WHERE` nach einem String mit verdoppeltem Anführungszeichen
+  noch korrekt erkennt, und ob ein `WHERE`-ähnlicher Text *innerhalb*
+  eines solchen Strings weiterhin korrekt ignoriert wird (beides
+  bestätigt, keine Fehlfunktion).
+
+- **Nebenfund beim Testschreiben:** ein bestehender Test
+  ("is not fooled by a WHERE inside a string literal in the recursive
+  member") war mislabelt — sein eigenes SQL enthielt gar keinen String,
+  nur ein echtes `WHERE` außerhalb jeder Anführungszeichen; der Kommentar
+  im Test selbst widersprach dem Titel bereits ("sanity: a real WHERE
+  outside a string..."). Der eigentliche "WHERE nur in einem String
+  literal"-Fall war nirgends getestet. Umbenannt auf das, was er
+  tatsächlich prüft, und den echten fehlenden Fall separat ergänzt.
+
+- **4 neue Tests:** (1) WHERE-ähnlicher Text nur in einem String literal
+  (ohne Escape) → weiterhin korrekt als unbegrenzt geflaggt, (2)
+  verdoppeltes Anführungszeichen + echtes WHERE danach → korrekt nicht
+  geflaggt, (3) verdoppeltes Anführungszeichen + WHERE-ähnlicher Text im
+  String → korrekt geflaggt, (4) fehlerhafte CTE ohne schließende Klammer
+  → stürzt nicht ab, liefert sicher `null` (deckt den bislang
+  ungetesteten `findParenBody`-Fallback für unausgeglichene Klammern ab,
+  konsistent mit der dokumentierten "eher False Negatives als Blockieren
+  von nicht-parsbarem SQL"-Absicht).
+
+- **Tests:** 1055 → 1059 (+4). Coverage von
+  `unboundedRecursionCheck.ts`: 91,55 % → 94,15 % Stmts, 87,67 % → 93,33 %
+  Branch. `npx tsc --noEmit` fehlerfrei, volle Suite 1059/1059 grün,
+  `npm run build` grün (829,76 kB, unverändert), `npx knip` unverändert.
+
+- **Ergebnis:** reine Verifikation + Testabdeckung, keine
+  Verhaltensänderung im Produktcode. Kein Artifact-Republish nötig.
