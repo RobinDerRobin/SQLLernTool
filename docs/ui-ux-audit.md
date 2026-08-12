@@ -4921,3 +4921,43 @@ sondern pro PR direkt in den Checks sichtbar.
 
 - **Ergebnis:** Tests/typecheck/build unverändert grün. Kein Artifact-
   Republish nötig (keine Zahlenänderung). Dev-Server sauber beendet.
+
+### 2026-08-11 — Stündliche Routine: Irreführende C#-Timeout-Fehlermeldung korrigiert
+
+- **Umfang:** Baseline sauber (1052/1052, typecheck/build/knip grün, HEAD
+  `ca46cb1`). Kein aktionabler Content-Task; C#-Boot-Bug bereits mehrfach
+  ausführlich untersucht ohne neuen Ansatz. Beim Lesen von
+  `ensureCSharpEngineLoaded` (`src/ui/state/actions.ts`) im Zuge der
+  letzten C#-Recherchen fiel eine echte, aktuell live im Produkt sichtbare
+  UX-Ungenauigkeit auf: `CSHARP_ENGINE_TIMEOUT_MESSAGE` behauptet nach
+  15 s Timeout, vermutlich blockiere "eine Browser-Erweiterung oder eine
+  Content-Security-Policy das Laden des Blazor-Bundles".
+
+- **Befund:** diese Erklärung ist nicht nur durch die inzwischen bekannte
+  tatsächliche Ursache (ein MONO_WASM-Interop-Bug, siehe
+  `docs/csharp-engine-poc.md`) überholt, sondern strukturell schon von
+  Anfang an unplausibel für diesen Fall: `loadCSharpEngineFromServer`
+  lädt alles von `CSHARP_ENGINE_BASE_URL = '/csharp-engine/'` — also
+  same-origin, keine externe CDN-Anfrage, die eine Erweiterung oder CSP
+  überhaupt blockieren könnte. Die Formulierung war offensichtlich 1:1
+  von `PYTHON_ENGINE_TIMEOUT_MESSAGE` übernommen, wo sie tatsächlich
+  zutrifft (Pyodide lädt echt von `cdn.jsdelivr.net`). Der C#-Track ist
+  über `src/content/registry.ts` live im Kurs-Picker wählbar — reale
+  Nutzer, die C# aktuell versuchen, sehen also diese falsche Diagnose.
+
+- **Fix:** Nachricht auf eine ehrliche Formulierung geändert ("C#-Track
+  ist noch experimentell, liegt nicht an deinem Browser oder an
+  Erweiterungen, bitte neu laden, in der Zwischenzeit SQL/Python
+  nutzen"), ohne eine Ursache zu behaupten, die dieser Code nicht belegen
+  kann. Kein Test hatte den exakten Nachrichtentext hart kodiert
+  (`actions.test.ts` prüft nur generisch den Fehlerzustand), daher keine
+  Testanpassung nötig — `actions.test.ts` (45 Tests) und die volle Suite
+  liefen trotzdem zur Sicherheit erneut durch.
+
+- **Tests:** 1052/1052 unverändert (reine String-Änderung, kein neuer
+  Codepfad). `npx tsc --noEmit` fehlerfrei, `npm run build` grün
+  (829.52 kB, Rundungsdifferenz zum String). `npx knip` unverändert.
+
+- **Ergebnis:** kleine, aber echte UX-Korrektur in einer aktuell live
+  erreichbaren Fehlermeldung. Kein Artifact-Republish nötig (kein
+  Content, keine Konzept-Zahlen geändert).
