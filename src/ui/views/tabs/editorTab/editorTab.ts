@@ -24,7 +24,7 @@ const SHELL_HTML = `
     <div class="editor-toolbar">
       <span class="label">SQL</span>
       <div class="toolbar-actions">
-        <button type="button" class="btn tables-toggle-btn">Tabellen</button>
+        <button type="button" class="btn tables-toggle-btn" aria-expanded="false">Tabellen</button>
         <span class="hint">Strg/Cmd + Enter</span>
         <button type="button" class="run-btn">▶ Ausführen</button>
       </div>
@@ -193,12 +193,18 @@ export function mountEditorTab(root: HTMLElement, ctx: AppContext): MountedEdito
     const isSql = trackId === 'sqlite';
     toolbarLabel.textContent = isSql ? 'SQL' : trackId === 'csharp' ? 'C#' : 'Python';
     tablesToggleBtn.style.display = isSql ? '' : 'none';
-    if (!isSql) tablesPanel.classList.remove('open');
+    if (!isSql) {
+      tablesPanel.classList.remove('open');
+      tablesToggleBtn.setAttribute('aria-expanded', 'false');
+    }
   }
 
   const unmountTables = mountTablesPanel(tablesPanel, ctx);
 
-  const offToggle = on(root, 'click', '.tables-toggle-btn', () => tablesPanel.classList.toggle('open'));
+  const offToggle = on(root, 'click', '.tables-toggle-btn', () => {
+    const nowOpen = tablesPanel.classList.toggle('open');
+    tablesToggleBtn.setAttribute('aria-expanded', String(nowOpen));
+  });
   const offRun = on(root, 'click', '.run-btn', run);
 
   // Swap the editor's content when the selection changes, flushing the

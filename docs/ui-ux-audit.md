@@ -5526,3 +5526,40 @@ sondern pro PR direkt in den Checks sichtbar.
   Tastatur-/Screenreader-Nutzer bei jeder Nutzung des Theme-Pickers
   betrifft. Kein Artifact-Republish nötig (kein Content, keine
   Konzept-Zahlen geändert).
+
+### 2026-08-11 — Stündliche Routine: Dritte A11y-Lücke in Folge — "Tabellen"-Toggle-Button ohne `aria-expanded`
+
+- **Umfang:** Baseline sauber (1239/1239, typecheck/build/knip grün, HEAD
+  `a449c00`). Weiter in derselben Kategorie: nach dem Theme-Picker-Modal
+  gezielt nach anderen Toggle-/Panel-Mustern im Code gesucht (Grep nach
+  `toggle`/`-overlay`/`.open {` in `src/ui`). Gefunden: der "Tabellen"-
+  Umschalt-Button im Editor-Toolbar (`editorTab.ts`), der das SQL-
+  Tabellen-Inspektor-Panel ein-/ausklappt — statischer Label-Text
+  "Tabellen", der sich nie ändert, und **kein** `aria-expanded`, das den
+  aktuellen Zustand ansagen könnte.
+
+- **Befund:** anders als der Sidebar-Collapse-Button (der immerhin einen
+  dynamischen `aria-label` hat, der Ein-/Ausklappen unterscheidet) gibt
+  der Tabellen-Button einem Screenreader-Nutzer null Hinweis, ob das
+  Panel gerade offen oder geschlossen ist — weder vorher noch nach dem
+  Klick.
+
+- **Fix:** `aria-expanded="false"` initial im Template ergänzt, im
+  Klick-Handler auf den tatsächlichen `open`-Zustand der Panel-Klasse
+  synchronisiert, zusätzlich beim Track-Wechsel weg von SQL (der das
+  Panel ohnehin zwangsschließt) korrekt zurückgesetzt.
+
+- **Als aussagekräftig bestätigt:** die `aria-expanded`-Aktualisierung
+  im Klick-Handler testweise entfernt — der neue Test schlägt korrekt
+  fehl (`expected 'false' to be 'true'`). Danach wiederhergestellt.
+
+- **Live bestätigt:** echter Klick im Dev-Server — `aria-expanded`
+  wechselt korrekt `false` → `true` → `false` über zwei echte Klicks.
+
+- **Tests:** 1239 → 1240 (+1). `npx tsc --noEmit` fehlerfrei, volle
+  Suite 1240/1240 grün, `npm run build` grün (830,79 kB), `npx knip`
+  unverändert.
+
+- **Ergebnis:** dritter echter A11y-Fund in Folge in derselben
+  Kategorie (dynamischer Zustand nie an Screenreader kommuniziert).
+  Kein Artifact-Republish nötig.

@@ -292,6 +292,19 @@ describe('mountEditorTab', () => {
     expect(root.querySelector('.tables-panel')?.classList.contains('open')).toBe(true);
   });
 
+  it('reflects the tables panel open/closed state via aria-expanded on its toggle button', () => {
+    const ctx = makeCtx();
+    mountEditorTab(root, ctx);
+    const toggleBtn = root.querySelector('.tables-toggle-btn')!;
+    expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
+
+    toggleBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(toggleBtn.getAttribute('aria-expanded')).toBe('true');
+
+    toggleBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
+  });
+
   it('persists edits through the debounced onChange', () => {
     vi.useFakeTimers();
     const ctx = makeCtx();
