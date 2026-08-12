@@ -5069,3 +5069,41 @@ sondern pro PR direkt in den Checks sichtbar.
   Schweregrad-Einschätzung in `docs/csharp-engine-poc.md`. Kein
   Artifact-Republish nötig (kein Content, keine Konzept-Zahlen
   geändert).
+
+### 2026-08-11 — Stündliche Routine: Race-Test für den Fast-Path-Fix aus dem letzten Durchgang
+
+- **Umfang:** Baseline sauber (1054/1054, typecheck/build/knip grün, HEAD
+  `595dfe9`). Coverage-Report zeigt für `csharpEngine.ts` (nach dem
+  letzten Durchgangs-Fix) 100 % Statements/Lines, aber nur 85,71 %
+  Branches — genau auf den `settled`-Guards in `settleResolve`/
+  `settleReject`, dem Sicherheitsmechanismus, der verhindert, dass ein
+  spät eintreffender HEAD-Check-Fehlschlag einen bereits erfolgreich
+  aufgelösten Cache kaputt macht. Da dieser Guard das Herzstück eines
+  gerade erst als Live-Produktions-Fix verschickten Increments ist, war
+  das die naheliegende Coverage-Lücke, die diesen Durchgang zu schließen
+  lohnte — kein generischer Bug-Hunt, sondern gezielte Verifikation
+  frisch verschickter, sicherheitsrelevanter Logik.
+
+- **Test:** simuliert die Race exakt — `fetch` liefert eine kontrolliert
+  verzögerte Promise, die iframe-Seite meldet zuerst erfolgreich
+  `csharp-host-ready` (Ladepromise löst korrekt auf), erst danach löst
+  der (jetzt zu späte) HEAD-Check mit `ok: false` auf. Ohne den Guard
+  würde `settleReject` trotzdem `iframeLoadPromise = null` setzen und
+  damit den Cache kaputt machen, obwohl die Ladung längst erfolgreich
+  war — ein weiterer Aufruf müsste dann unnötig ein zweites iframe
+  aufbauen.
+
+- **Test empirisch als aussagekräftig bestätigt, nicht nur angenommen:**
+  den `if (settled) return;`-Guard in `settleReject` testweise entfernt
+  — der neue Test schlägt dann tatsächlich fehl (`Der C#-Motor ist in
+  dieser Umgebung (noch) nicht bereitgestellt.` als unerwarteter Fehler),
+  bestätigt den exakten Fehlerfall. Guard danach wieder hergestellt,
+  alle 15 Tests in `csharpEngine.test.ts` wieder grün.
+
+- **Tests:** 1054 → 1055 (+1). `npx tsc --noEmit` fehlerfrei, volle
+  Suite 1055/1055 grün, `npm run build` grün (829,76 kB, unverändert),
+  `npx knip` unverändert.
+
+- **Ergebnis:** reine Verifikations-/Test-Ergänzung zu bereits
+  verschicktem Code, kein neues Verhalten. Kein Artifact-Republish
+  nötig.

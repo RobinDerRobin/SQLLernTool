@@ -161,6 +161,30 @@ describe('loadCSharpEngineFromServer', () => {
     expect(headSpy).toHaveBeenCalledWith('/csharp-engine/host.html', { method: 'HEAD' });
   });
 
+  it('does not corrupt the resolved cache when a slow fast-path HEAD check comes back not-ok after the iframe already succeeded (race)', async () => {
+    let resolveFetch: ((value: { ok: boolean }) => void) | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockReturnValue(new Promise<{ ok: boolean }>((resolve) => (resolveFetch = resolve))),
+    );
+    const { loadCSharpEngineFromServer } = await import('./csharpEngine');
+
+    const pending = loadCSharpEngineFromServer('/csharp-engine/');
+    postFromIframe(getIframes()[0]!, { type: 'csharp-host-ready' });
+    await expect(pending).resolves.toBeDefined();
+
+    // The (now too-late) HEAD check settles as not-ok — without the `settled` guard in
+    // settleReject, this would incorrectly null out the cached load promise even though it
+    // already resolved successfully, forcing every subsequent call to needlessly recreate the
+    // iframe. Must be a silent no-op instead.
+    resolveFetch!({ ok: false });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await loadCSharpEngineFromServer('/csharp-engine/');
+    expect(getIframes()).toHaveLength(1);
+  });
+
   it('does not reject on a network-level failure of the HEAD check itself — falls through to the iframe', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
     const { loadCSharpEngineFromServer } = await import('./csharpEngine');
