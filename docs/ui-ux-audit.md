@@ -5368,3 +5368,31 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Ergebnis:** keine neuen Content-Bugs gefunden, aber eine echte
   Lücke im eigenen frisch geschriebenen Regressionsschutz geschlossen.
   Kein Artifact-Republish nötig.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt — C#-Track auf Mobile-Viewport (sauber, bislang ungeprüfte Kombination)
+
+- **Umfang:** Baseline sauber (1232/1232, typecheck/build grün, HEAD
+  `a80b827`). C#-Boot-Bug erneut bestätigt unverändert reproduzierbar
+  (keine Drift). Priorität-2-Suche: alle bisherigen Mobile-Viewport-
+  Durchgänge (375×667) betrafen ausschließlich SQL/Python — seit der
+  C#-Live-Verdrahtung wurde die Kombination "C#-Track auf Mobile" nie
+  gezielt geprüft, obwohl das UI selbst (Tutorial, Aufgabe, Editor mit
+  Syntax-Highlighting) unabhängig vom kaputten Boot der Engine
+  funktioniert und genauso wie SQL/Python echtes Nutzer-Risiko trägt.
+
+- **Vorgehen:** Dev-Server im 375×667-Viewport (iPhone-SE-Breite)
+  gestartet, C#-Track gewählt (27 Challenges korrekt gelistet), Sidebar-
+  Drawer-Verhalten nach Auswahl geprüft (kollabiert korrekt auf 52px,
+  wie bei SQL/Python), horizontales Overflow bei jedem Schritt (initial,
+  nach Track-Wahl, nach Challenge-Auswahl, Tutorial-/Aufgabe-/Editor-Tab)
+  gemessen.
+
+- **Ergebnis: keine Funde.** Kein horizontales Overflow in keinem der 6
+  geprüften Zustände. Sidebar kollabiert korrekt. Tutorial-Tab zeigt 78
+  `tok-*`-Spans — bestätigt, dass der Syntax-Highlighting-Fix von vor
+  zwei Durchgängen auch auf Mobile korrekt greift. Editor-Textarea
+  sichtbar, Toolbar zeigt korrekt "C#". Keine neuen Konsolenfehler
+  (nur das bereits mehrfach dokumentierte Sandbox-Netzwerkrauschen).
+
+- **Ergebnis:** Tests/typecheck/build unverändert grün. Kein Artifact-
+  Republish nötig. Dev-Server sauber beendet.
