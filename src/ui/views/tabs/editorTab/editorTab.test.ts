@@ -305,6 +305,16 @@ describe('mountEditorTab', () => {
     expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
   });
 
+  it('gives the code editor an accessible name that reflects the active track', async () => {
+    const ctx = makeCtxWithPython();
+    mountEditorTab(root, ctx);
+    const textarea = root.querySelector<HTMLTextAreaElement>('textarea.editor')!;
+    expect(textarea.getAttribute('aria-label')).toBe('SQL-Code-Editor');
+
+    selectChallenge(ctx, 'python', 'pythonGrundlagen', '01');
+    expect(textarea.getAttribute('aria-label')).toBe('Python-Code-Editor');
+  });
+
   it('persists edits through the debounced onChange', () => {
     vi.useFakeTimers();
     const ctx = makeCtx();

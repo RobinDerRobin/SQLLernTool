@@ -5616,3 +5616,63 @@ sondern pro PR direkt in den Checks sichtbar.
   wahrscheinlich ausgeschöpft; ein künftiger Durchgang sollte auf eine
   andere Bug-Kategorie wechseln. Kein Artifact-Republish nötig (kein
   Content, keine Konzept-Zahlen geändert).
+
+### 2026-08-12 — Stündliche Routine: neue Bug-Kategorie — Formularelemente ohne Accessible Name
+
+- **Umfang:** Baseline sauber (1242/1242, typecheck/build/knip grün, HEAD
+  `eba151f`). Die `classList.toggle()`-Kategorie ist laut vorigem Eintrag
+  wahrscheinlich ausgeschöpft; Content-Coverage bleibt bei SQL/Python
+  81/82 (nur permanente Ausnahmen offen) und C# 86/86 (100 %) —
+  `docs/csharp-engine-poc.md` erneut geprüft: der "was fehlt"-Abschnitt
+  enthält veraltete Zwischenstände aus früheren Updates (z. B. "nur drei
+  Challenges"), tatsächlich existieren bereits 27 Challenge-Dateien und
+  die Tag-Bilanz am Dokumentende bestätigt 86/86 — kein Content-Gap
+  mehr. Der WASM-Boot-Fehler bleibt laut letztem Stand ohne neue
+  Ansatzpunkte unresolved; keine neue Idee diesen Durchgang, also nicht
+  erneut angefasst (Mandat: nicht künstlich weiterbohren ohne echten
+  neuen Ansatz).
+
+  Neue Kategorie systematisch gesucht: alle `<input>`/`<textarea>`/
+  `<select>`-Stellen in `src/ui` durchsucht. Zwei echte, bisher
+  unentdeckte Lücken gefunden — beides interaktive Formularelemente
+  ohne jede Beschriftung (weder `<label>` noch `aria-label` noch
+  Platzhaltertext):
+  1. `.track-course-select` (`trackCoursePicker.ts`) — der
+     Track-/Kurswechsler. Rendert live (3 Tracks × je 1 Kurs ⇒
+     `totalCourses > 1`, also immer der echte `<select>`-Zweig, nicht
+     der statische Text-Fallback), hat aber gar keine erreichbare
+     Beschriftung für Screenreader-Nutzer.
+  2. `textarea.editor` (`editorTab.ts`) — der zentrale Code-Editor
+     selbst, das wichtigste interaktive Element der gesamten App. Weder
+     `aria-label` noch Platzhaltertext, nur `spellcheck`/`autocomplete`/
+     `autocapitalize`-Attribute.
+
+- **Fix:** `trackCoursePicker.ts` bekommt
+  `aria-label="Track und Kurs wechseln"` fest im Template.
+  `editorTab.ts`s Editor-Textarea startet mit
+  `aria-label="SQL-Code-Editor"` und wird in der bestehenden
+  `syncChromeForTrack`-Funktion (die ohnehin schon `toolbarLabel` bei
+  jedem Trackwechsel aktualisiert) um eine Zeile ergänzt, die
+  `aria-label` auf `"${trackLabel}-Code-Editor"` synchron hält — SQL/
+  Python/C# jeweils mit passendem Namen.
+
+- **Live bestätigt:** echter Playwright-Lauf gegen den Dev-Server
+  (`npm run dev`, kein CDN-Workaround nötig, dieser Fund betrifft keine
+  sql.js/Pyodide-Ladepfade) — `select`-Element trägt das erwartete
+  `aria-label`, das Editor-Textarea startet mit `SQL-Code-Editor` und
+  wechselt nach einer echten `selectOption()`-Interaktion auf dem
+  Track-Picker korrekt zu `Python-Code-Editor`.
+
+- **Tests:** 1242 → 1244 (+2, in `trackCoursePicker.test.ts` und
+  `editorTab.test.ts`). `npx tsc --noEmit` fehlerfrei, volle Suite
+  1244/1244 grün, `npm run build` grün (831,05 kB), `npx knip`
+  unverändert (gleiche 10 vorbestehende Funde).
+
+- **Ergebnis:** erster Fund in einer neuen A11y-Unterkategorie
+  (Formularelemente ohne Accessible Name statt dynamischer Zustand).
+  Noch nicht erschöpfend durchsucht — weitere interaktive Elemente
+  (z. B. Chat-Eingabefeld `textarea.chat-input` hat immerhin einen
+  Platzhaltertext, was als Accessible-Name-Fallback zählt, aber kein
+  robustes `aria-label`) könnten in einem künftigen Durchgang noch
+  geprüft werden. Kein Artifact-Republish nötig (kein Content, keine
+  Konzept-Zahlen geändert).

@@ -34,7 +34,7 @@ const SHELL_HTML = `
       <div class="line-numbers"></div>
       <div class="code-wrap">
         <pre class="highlight-layer"></pre>
-        <textarea class="editor" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+        <textarea class="editor" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="SQL-Code-Editor"></textarea>
       </div>
     </div>
   </div>
@@ -191,7 +191,9 @@ export function mountEditorTab(root: HTMLElement, ctx: AppContext): MountedEdito
 
   function syncChromeForTrack(trackId: string): void {
     const isSql = trackId === 'sqlite';
-    toolbarLabel.textContent = isSql ? 'SQL' : trackId === 'csharp' ? 'C#' : 'Python';
+    const trackLabel = isSql ? 'SQL' : trackId === 'csharp' ? 'C#' : 'Python';
+    toolbarLabel.textContent = trackLabel;
+    textarea.setAttribute('aria-label', `${trackLabel}-Code-Editor`);
     tablesToggleBtn.style.display = isSql ? '' : 'none';
     if (!isSql) {
       tablesPanel.classList.remove('open');
