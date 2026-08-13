@@ -54,5 +54,5 @@ export function renderTrackCourseHeader({ registry, trackId, courseId }: TrackCo
     .join('');
 
   return `${header}
-    <select class="track-course-select" data-track-course>${options}</select>`;
+    <select class="track-course-select" data-track-course aria-label="Track und Kurs wechseln">${options}</select>`;
 }

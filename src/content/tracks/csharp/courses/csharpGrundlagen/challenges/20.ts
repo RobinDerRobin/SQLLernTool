@@ -11,10 +11,10 @@ export const challenge20: CSharpChallenge = {
     `So sieht die Lösung aus:<pre>RechenOperation operation1 = Addieren;
 int ergebnis1 = operation1(3, 4);
 
-RechenOperation operation2 = (a, b) => a * b;
+RechenOperation operation2 = (a, b) =&gt; a * b;
 int ergebnis2 = operation2(3, 4);
 
-Func<int, int, int> operation3 = (a, b) => a - b;
+Func&lt;int, int, int&gt; operation3 = (a, b) =&gt; a - b;
 int ergebnis3 = operation3(10, 4);
 
 Console.WriteLine("Addieren: " + ergebnis1);

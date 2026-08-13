@@ -20,11 +20,11 @@ import { mountTablesPanel } from './tablesPanel';
 const SHELL_HTML = `
   <div class="editor-wrap">
     <div class="expected-result-banner"></div>
-    <div class="python-engine-status"></div>
+    <div class="python-engine-status" role="status"></div>
     <div class="editor-toolbar">
       <span class="label">SQL</span>
       <div class="toolbar-actions">
-        <button type="button" class="btn tables-toggle-btn">Tabellen</button>
+        <button type="button" class="btn tables-toggle-btn" aria-expanded="false">Tabellen</button>
         <span class="hint">Strg/Cmd + Enter</span>
         <button type="button" class="run-btn">▶ Ausführen</button>
       </div>
@@ -34,13 +34,13 @@ const SHELL_HTML = `
       <div class="line-numbers"></div>
       <div class="code-wrap">
         <pre class="highlight-layer"></pre>
-        <textarea class="editor" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+        <textarea class="editor" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="SQL-Code-Editor"></textarea>
       </div>
     </div>
   </div>
   <div class="results-wrap">
     <div class="results-label">Ergebnis</div>
-    <div class="results-body"><div class="empty-state">Noch keine Query ausgeführt.</div></div>
+    <div class="results-body" role="status"><div class="empty-state">Noch keine Query ausgeführt.</div></div>
   </div>`;
 
 interface MountedEditorTab {
@@ -191,14 +191,22 @@ export function mountEditorTab(root: HTMLElement, ctx: AppContext): MountedEdito
 
   function syncChromeForTrack(trackId: string): void {
     const isSql = trackId === 'sqlite';
-    toolbarLabel.textContent = isSql ? 'SQL' : trackId === 'csharp' ? 'C#' : 'Python';
+    const trackLabel = isSql ? 'SQL' : trackId === 'csharp' ? 'C#' : 'Python';
+    toolbarLabel.textContent = trackLabel;
+    textarea.setAttribute('aria-label', `${trackLabel}-Code-Editor`);
     tablesToggleBtn.style.display = isSql ? '' : 'none';
-    if (!isSql) tablesPanel.classList.remove('open');
+    if (!isSql) {
+      tablesPanel.classList.remove('open');
+      tablesToggleBtn.setAttribute('aria-expanded', 'false');
+    }
   }
 
   const unmountTables = mountTablesPanel(tablesPanel, ctx);
 
-  const offToggle = on(root, 'click', '.tables-toggle-btn', () => tablesPanel.classList.toggle('open'));
+  const offToggle = on(root, 'click', '.tables-toggle-btn', () => {
+    const nowOpen = tablesPanel.classList.toggle('open');
+    tablesToggleBtn.setAttribute('aria-expanded', String(nowOpen));
+  });
   const offRun = on(root, 'click', '.run-btn', run);
 
   // Swap the editor's content when the selection changes, flushing the

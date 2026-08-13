@@ -3,7 +3,7 @@ export interface ValidateResult {
   message: string;
 }
 
-export type ValidateFn<TEngine, TResult> = (engine: TEngine, lastResult: TResult | null) => ValidateResult;
+type ValidateFn<TEngine, TResult> = (engine: TEngine, lastResult: TResult | null) => ValidateResult;
 
 /**
  * Shape shared by every track's challenge (SQL, later Python/C#/...). Track-specific

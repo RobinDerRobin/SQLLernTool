@@ -5,7 +5,7 @@ export interface SqlResultSet {
   values: unknown[][];
 }
 
-export interface TableColumnInfo {
+interface TableColumnInfo {
   name: string;
   type: string;
 }

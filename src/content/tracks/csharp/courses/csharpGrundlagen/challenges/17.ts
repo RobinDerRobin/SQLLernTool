@@ -8,8 +8,8 @@ export const challenge17: CSharpChallenge = {
   hints: [
     `Generische Klasse: <code>class Box&lt;T&gt; { public T Inhalt; public Box(T inhalt) { Inhalt = inhalt; } }</code>. Verwendung mit zwei verschiedenen Typen: <code>Box&lt;string&gt; textBox = new Box&lt;string&gt;("Hallo"); Box&lt;int&gt; zahlBox = new Box&lt;int&gt;(42);</code> — jede Instanz bekommt ihren eigenen konkreten Typ.`,
     `Generische Methode mit Einschränkung: <code>T Groesser&lt;T&gt;(T a, T b) where T : IComparable&lt;T&gt;</code> — die Einschränkung steht hinter der Parameterliste, vor der öffnenden geschweiften Klammer. Im Rumpf: <code>if (a.CompareTo(b) &gt; 0) { return a; } return b;</code>. Aufruf ohne <code>&lt;...&gt;</code>: <code>Groesser(3, 9)</code>, der Compiler erkennt <code>T</code> automatisch.`,
-    `So sieht die Lösung aus:<pre>Box<string> textBox = new Box<string>("Hallo");
-Box<int> zahlBox = new Box<int>(42);
+    `So sieht die Lösung aus:<pre>Box&lt;string&gt; textBox = new Box&lt;string&gt;("Hallo");
+Box&lt;int&gt; zahlBox = new Box&lt;int&gt;(42);
 
 int maxZahl = Groesser(3, 9);
 string maxWort = Groesser("Apfel", "Birne");
@@ -19,16 +19,16 @@ Console.WriteLine(zahlBox.Inhalt);
 Console.WriteLine(maxZahl);
 Console.WriteLine(maxWort);
 
-T Groesser<T>(T a, T b) where T : IComparable<T>
+T Groesser&lt;T&gt;(T a, T b) where T : IComparable&lt;T&gt;
 {
-    if (a.CompareTo(b) > 0)
+    if (a.CompareTo(b) &gt; 0)
     {
         return a;
     }
     return b;
 }
 
-class Box<T>
+class Box&lt;T&gt;
 {
     public T Inhalt;
 

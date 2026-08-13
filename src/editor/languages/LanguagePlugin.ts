@@ -1,9 +1,9 @@
-export interface EditorToken {
+interface EditorToken {
   type: string;
   value: string;
 }
 
-export interface EditorSelectionState {
+interface EditorSelectionState {
   text: string;
   selectionStart: number;
   selectionEnd: number;

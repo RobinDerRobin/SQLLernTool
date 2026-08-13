@@ -8,10 +8,10 @@ export const challenge24: CSharpChallenge = {
   hints: [
     `Die Query-Syntax hat eine feste Klausel-Reihenfolge: <code>from &lt;variable&gt; in &lt;quelle&gt;</code> zuerst, dann optional <code>where &lt;bedingung&gt;</code>, zuletzt <code>select &lt;ausdruck&gt;</code> — kein Semikolon zwischen den Klauseln, nur am Ende der ganzen Abfrage.`,
     `<code>where m &gt; 10</code> behält nur Elemente über 10 (aus <code>{ 12, 5, 18, 7, 24, 9, 30 }</code> bleiben <code>12, 18, 24, 30</code>), <code>select m * 3</code> verdreifacht jedes davon. Das Ergebnis ist ein <code>IEnumerable&lt;int&gt;</code>, deshalb <code>var</code> statt eines konkreten Typs für <code>grosse</code>.`,
-    `So sieht die Lösung aus:<pre>List<int> mengen = new List<int> { 12, 5, 18, 7, 24, 9, 30 };
+    `So sieht die Lösung aus:<pre>List&lt;int&gt; mengen = new List&lt;int&gt; { 12, 5, 18, 7, 24, 9, 30 };
 
 var grosse = from m in mengen
-             where m > 10
+             where m &gt; 10
              select m * 3;
 
 foreach (int m in grosse)

@@ -65,24 +65,18 @@ function findParenBody(sql: string, openParenIndex: number): { bodyStart: number
  * returning the text after the LAST such split — i.e. the recursive member
  * of a `WITH RECURSIVE anchor UNION ALL recursive` CTE body. Doesn't try to
  * handle CTEs with more than one recursive self-reference chained by
- * further UNIONs beyond the common two-part anchor/recursive shape.
+ * further UNIONs beyond the common two-part anchor/recursive shape. Expects
+ * `body` to already have strings/comments blanked out by
+ * `stripStringsAndComments` (see the caller) — a raw `(`/`)` inside a
+ * comment would otherwise throw off the depth count this relies on.
  */
 function recursiveMemberOf(body: string): string {
   let depth = 0;
-  let inString: string | null = null;
   let lastSplitEnd = 0;
   let result = body;
 
   for (let i = 0; i < body.length; i++) {
     const ch = body[i];
-    if (inString) {
-      if (ch === inString) inString = null;
-      continue;
-    }
-    if (ch === "'" || ch === '"' || ch === '`') {
-      inString = ch;
-      continue;
-    }
     if (ch === '(') {
       depth++;
       continue;
@@ -99,6 +93,75 @@ function recursiveMemberOf(body: string): string {
         result = body.slice(lastSplitEnd);
       }
     }
+  }
+  return result;
+}
+
+/**
+ * Blanks out string literals and comments in `text` (replacing their
+ * contents with spaces, preserving all other offsets), so a `WHERE`/`LIMIT`
+ * keyword written only inside a comment or a string literal — e.g. a
+ * student's own `-- WHERE n < 100` note-to-self, or a stray mention in a
+ * trailing remark — never satisfies the safety checks below. Only real,
+ * executable SQL can turn off this guard.
+ */
+function stripStringsAndComments(text: string): string {
+  let result = '';
+  let inString: string | null = null;
+  let inLineComment = false;
+  let inBlockComment = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+
+    if (inLineComment) {
+      result += ch === '\n' ? '\n' : ' ';
+      if (ch === '\n') inLineComment = false;
+      continue;
+    }
+    if (inBlockComment) {
+      if (ch === '*' && next === '/') {
+        inBlockComment = false;
+        result += '  ';
+        i++;
+      } else {
+        result += ch === '\n' ? '\n' : ' ';
+      }
+      continue;
+    }
+    if (inString) {
+      if (ch === inString) {
+        if (next === inString) {
+          result += '  ';
+          i++;
+        } else {
+          inString = null;
+          result += ' ';
+        }
+      } else {
+        result += ch === '\n' ? '\n' : ' ';
+      }
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === '`') {
+      inString = ch;
+      result += ' ';
+      continue;
+    }
+    if (ch === '-' && next === '-') {
+      inLineComment = true;
+      result += '  ';
+      i++;
+      continue;
+    }
+    if (ch === '/' && next === '*') {
+      inBlockComment = true;
+      result += '  ';
+      i++;
+      continue;
+    }
+    result += ch;
   }
   return result;
 }
@@ -122,13 +185,13 @@ export function findUnboundedRecursion(sql: string): string | null {
     const body = findParenBody(sql, openParenIndex);
     if (!body) continue;
 
-    const cteBody = sql.slice(body.bodyStart, body.bodyEnd);
+    const cteBody = stripStringsAndComments(sql.slice(body.bodyStart, body.bodyEnd));
     const recursivePart = recursiveMemberOf(cteBody);
     const hasWhere = /\bWHERE\b/i.test(recursivePart);
     if (hasWhere) continue;
 
     const afterCte = sql.slice(body.bodyEnd + 1);
-    const hasLimit = /\bLIMIT\b/i.test(afterCte);
+    const hasLimit = /\bLIMIT\b/i.test(stripStringsAndComments(afterCte));
     if (hasLimit) continue;
 
     return (

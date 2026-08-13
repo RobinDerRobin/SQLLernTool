@@ -81,23 +81,29 @@ describe('mountSidebarShell', () => {
     const ctx = makeCtx();
     selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
     mountSidebarShell(elements, ctx);
+    const resetBtn = elements.footRoot.querySelector('.reset-btn')!;
+    expect(resetBtn.getAttribute('aria-expanded')).toBe('false');
 
-    elements.footRoot.querySelector('.reset-btn')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    resetBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(elements.footRoot.querySelector('.reset-confirm-row')?.classList.contains('open')).toBe(true);
+    expect(resetBtn.getAttribute('aria-expanded')).toBe('true');
 
     elements.footRoot.querySelector('.reset-confirm-yes')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(elements.footRoot.querySelector('.reset-confirm-row')?.classList.contains('open')).toBe(false);
+    expect(resetBtn.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('reset "no" hides the confirm row without resetting', () => {
     const elements = buildElements();
     const ctx = makeCtx();
     mountSidebarShell(elements, ctx);
+    const resetBtn = elements.footRoot.querySelector('.reset-btn')!;
 
-    elements.footRoot.querySelector('.reset-btn')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    resetBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     elements.footRoot.querySelector('.reset-confirm-no')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(elements.footRoot.querySelector('.reset-confirm-row')?.classList.contains('open')).toBe(false);
+    expect(resetBtn.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('clicking the backdrop collapses an expanded sidebar (mobile overlay close)', () => {

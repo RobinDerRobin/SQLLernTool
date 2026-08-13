@@ -8,10 +8,10 @@ export const challenge22: CSharpChallenge = {
   hints: [
     `<code>.Where(z =&gt; z % 2 == 0)</code> behält nur Elemente, für die das Lambda <code>true</code> liefert — hier alle geraden Zahlen aus <code>zahlen</code>. Ohne <code>.ToList()</code> am Ende bleibt das Ergebnis ein <code>IEnumerable&lt;int&gt;</code> statt einer <code>List&lt;int&gt;</code>.`,
     `<code>.Select(z =&gt; z * 2)</code> wendet das Lambda auf <b>jedes</b> Element an und ersetzt es durch den Rückgabewert — hier wird jede (bereits gefilterte) Zahl verdoppelt. Wichtig: zuerst <code>.Where()</code>, dann <code>.Select()</code> — <code>zahlen.Where(...).Select(...)</code>, nicht umgekehrt, sonst filterst du auf den schon verdoppelten Werten statt auf den Originalen.`,
-    `So sieht die Lösung aus:<pre>List<int> zahlen = new List<int> { 3, 8, 15, 22, 4, 30, 11 };
+    `So sieht die Lösung aus:<pre>List&lt;int&gt; zahlen = new List&lt;int&gt; { 3, 8, 15, 22, 4, 30, 11 };
 
-List<int> gerade = zahlen.Where(z => z % 2 == 0).ToList();
-List<int> verdoppelt = gerade.Select(z => z * 2).ToList();
+List&lt;int&gt; gerade = zahlen.Where(z =&gt; z % 2 == 0).ToList();
+List&lt;int&gt; verdoppelt = gerade.Select(z =&gt; z * 2).ToList();
 
 foreach (int z in verdoppelt)
 {

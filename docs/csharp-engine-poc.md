@@ -1105,6 +1105,474 @@ Roughly in dependency order:
    that path yet — cross-origin isolation being present is a necessary
    precondition for the C# engine to work at all once it *is* hosted, not
    sufficient on its own yet.
+
+   **Update (2026-08-11, next firing): deferred item (2) split into two —
+   the CI-feasibility half is now done, the production-wiring half stays
+   deferred.** `main` was merged and pushed this session (67 commits,
+   at the user's explicit request) — the accumulated SQL/Python/C# work
+   is live in production for the first time, which raises the practical
+   stakes of the still-broken C# track from "known gap" to "a real user
+   could hit this." Before touching the actual `deploy-pages.yml`
+   (still the highest-risk piece — a mistake there breaks the live site,
+   not just this branch), this firing proves the untested part first: can
+   a real GitHub Actions runner even install the .NET SDK + `wasm-tools`
+   workload and `dotnet publish -c Release` the engine at all? Nothing in
+   this repo had exercised that outside this sandbox before.
+
+   New `.github/workflows/csharp-engine-ci.yml`: `actions/setup-dotnet@v4`
+   (`8.0.x`) → `dotnet workload install wasm-tools --skip-manifest-update`
+   → `dotnet publish -c Release` in `csharp-engine/` → asserts the exact
+   files the app's own loader needs actually exist (`_framework/
+   blazor.webassembly.js`, `_framework/CSharpEngineBlazor.wasm.gz`, and
+   at least one `refs/*.dll`) rather than just trusting a zero exit code.
+   Triggers on push/PR, but path-filtered to `csharp-engine/**` and the
+   workflow file itself, so ordinary frontend-only commits never pay for
+   a .NET SDK install. Deliberately a **separate** workflow from
+   `ci.yml` (different toolchain entirely, and no reason to slow down
+   every Node/TS change with a multi-minute .NET setup) and **not**
+   wired into `deploy-pages.yml` — this step proves feasibility, it does
+   not deploy anything.
+
+   Verified locally first, matching what the CI step will do: fresh
+   `dotnet publish -c Release` in `csharp-engine/` (this sandbox's SDK is
+   apt-installed 8.0.129 + `wasm-tools`, same workload the CI step
+   installs, just via a different install path — apt here, `dotnet
+   workload install` there, since GitHub's runners don't have it
+   preinstalled the way this sandbox now does) — succeeds in ~32s warm,
+   produces a 68 MB `wwwroot/` (matches the ~9 MB compressed figure
+   documented at the top of this doc: most of that 68 MB is the
+   uncompressed originals sitting alongside the `.gz`/`.br` variants
+   browsers actually fetch). Confirmed all three assertions the new CI
+   step makes actually pass against that real output (`blazor.
+   webassembly.js` present, `CSharpEngineBlazor.wasm.gz` present, 11
+   `refs/*.dll` files present — matches the "11 needed DLLs" figure from
+   step 2 above). This is exactly the `wwwroot/` shape
+   `vite.config.ts`'s dev-server middleware already serves under
+   `/csharp-engine/` locally, and the shape the eventual production step
+   would need to copy into `gh-pages`.
+
+   **Update, same firing: the real CI run caught a genuine environment
+   bug this sandbox could never have surfaced.** The workflow ran for
+   real immediately after pushing (the path filter includes the workflow
+   file itself) — and failed in 37 seconds, far too fast to be a real
+   build failure. The actual error, from `CopyCSharpEngineRefAssemblies`'s
+   own diagnostic message: `CSharpEngineRefPackDir ('/usr/share/dotnet/
+   packs/Microsoft.NETCore.App.Ref/10.0.10/ref/net8.0/') does not exist`.
+   Root cause: GitHub's `ubuntu-latest` runner image ships **multiple**
+   preinstalled .NET SDKs side by side (the log showed feature bands for
+   8.0, 9.0, *and* 10.0), and this repo had no `global.json` pinning
+   which one `dotnet` resolves to. `dotnet workload install` and `dotnet
+   publish` both picked the newest SDK on the machine (10.0.10) by
+   default — so `$(BundledNETCoreAppPackageVersion)` (the MSBuild
+   property the ref-copy target's path is built from) resolved to
+   `10.0.10`, while the project itself targets `net8.0`, producing a
+   path that doesn't exist. This sandbox never hits it: only one SDK
+   (8.0.129) is installed here, so there was never anything to pick
+   *wrong*. Exactly the kind of gap this increment's real-CI step was
+   for — no amount of local `dotnet publish` re-runs would have found
+   it.
+
+   **Fix:** `csharp-engine/global.json` — `{"sdk": {"version":
+   "8.0.100", "rollForward": "latestFeature"}}`, pinning every `dotnet`
+   command run from `csharp-engine/` (and its `driver/` subproject,
+   which inherits the same `global.json`) to the newest installed 8.0.x
+   SDK, never rolling forward to 9 or 10. Verified locally afterward
+   (`dotnet --version` inside `csharp-engine/` correctly reports
+   `8.0.129`, the only 8.0.x SDK here), then a fresh `rm -rf bin obj &&
+   dotnet publish -c Release` and `driver/`'s own `dotnet build -c
+   Release` both still succeed, and all three of the new CI step's
+   assertions still pass against the rebuilt output.
+
+   **Update, same firing again: the pushed fix's own real CI run caught
+   a second, related gap.** `dotnet publish` itself now succeeded (no
+   more `CSharpEngineRefPackDir` error — the fix worked) but the run
+   still failed, this time at the "verify output" step, and a new
+   warning appeared first: `Publishing without optimizations... we
+   strongly recommend using wasm-tools workload!`. Cause: the "Install
+   wasm-tools workload" step has no `working-directory`, so it ran from
+   the repo root — which, at that point, had no `global.json` either
+   (it was scoped to `csharp-engine/` only) — so `dotnet workload
+   install` *also* silently resolved to the 10.0.10 SDK and installed
+   the workload packs there, not for the 8.0.x SDK that the (correctly
+   pinned) publish step actually used. Right SDK for the publish, wrong
+   SDK for the workload it needed — two independently-resolved `dotnet`
+   invocations disagreeing on which SDK "the" installed workload belongs
+   to. Without wasm-tools available for the SDK actually publishing,
+   Blazor falls back to an unoptimized publish path that skips the
+   AOT/trimming pipeline — which is also what produces the `.gz`/`.br`
+   precompressed assets the verify step checks for, so `CSharpEngineBlazor.
+   wasm.gz` (and likely the `blazor.webassembly.js` check ahead of it, given
+   the step failed immediately on entry) never existed to find.
+
+   **Fix:** moved `global.json` from `csharp-engine/` to the **repo
+   root**, so every `dotnet` invocation anywhere in the checkout resolves
+   the same pinned 8.0.x SDK regardless of working directory — including
+   both CI steps in this workflow without needing a `working-directory`
+   on each one, *and* the pre-existing, already-in-production `ci.yml`
+   job that builds `csharp-engine/driver/` for the Node-side C# tests
+   (`test/helpers/nodeCSharpEngine.ts`'s `ensureDriverBuilt()`), which
+   had the exact same latent multi-SDK hazard and was simply never
+   caught because that build has so far always happened to land on a
+   working SDK by luck of default resolution order. Verified locally
+   again from all three relevant directories (repo root, `csharp-engine/`,
+   `csharp-engine/driver/`) that `dotnet --version` now reports `8.0.129`
+   consistently, then a fresh rebuild of both the engine and the driver,
+   both clean, all four verify-step assertions still pass. Workflow's
+   path filter extended to also watch the (now root-level) `global.json`.
+
+   **Update, third real CI round: both SDK-pinning fixes worked —
+   `dotnet workload install` this time correctly targeted the pinned
+   8.0.x SDK (packs installed for version `8.0.29`, matching), and the
+   full optimized AOT/trimming publish pipeline genuinely ran (~49s vs.
+   the earlier skipped, near-instant fallback) — but the job *still*
+   failed, in the verify step, immediately. Rather than guess a fourth
+   fix blind, the verify step was made diagnostic first (print the full
+   publish directory tree, `_framework/`, and `refs/` contents before
+   asserting) and pushed on its own. The resulting real-run output
+   showed the actual cause precisely: `_framework/` was fully populated
+   (including `blazor.webassembly.js`), but `refs/` **did not exist at
+   all** — `ls: cannot access '.../publish/wwwroot/refs': No such file
+   or directory`.
+
+   **This turned out to be reproducible locally too, and a genuinely
+   pre-existing bug in `CSharpEngineBlazor.csproj` that had been
+   silently masked in this sandbox for the entire project's history.**
+   `CopyCSharpEngineRefAssemblies` (the existing, `BeforeTargets="Build"`
+   target from step 2) copies the reference DLLs into the *source*
+   `csharp-engine/wwwroot/refs/` — but every previous "fresh" local
+   verification in this project only ever deleted `bin/`/`obj/` before
+   rebuilding, never that source folder itself, so it always had a stale
+   (git-ignored, several-days-old) copy sitting there from some earlier
+   build. Reproduced directly: `rm -rf bin obj wwwroot/refs && dotnet
+   publish -c Release` on this sandbox — same result as the real CI
+   runner, no `refs/` in the publish output. Root cause: Blazor's static-
+   web-asset discovery (an SDK-level, evaluation-time item glob over
+   `wwwroot/**`, not a `<Target>`) finishes before *any* `<Target>`
+   executes, including the ref-copy target — so on a truly clean
+   checkout, the files get physically copied to `wwwroot/refs/`
+   correctly, but too late for Blazor's publish manifest to have ever
+   known they exist. No `BeforeTargets` ordering trick can fix this
+   (confirmed empirically — tried adding `ResolveStaticWebAssetsInputs`
+   to the existing target's `BeforeTargets`, still failed identically),
+   since target execution as a whole happens strictly after project
+   evaluation, regardless of which target or how early.
+
+   **Fix:** a second target, `CopyCSharpEngineRefAssembliesToPublishOutput`
+   (`AfterTargets="Publish"`), copies the same reference DLLs a second
+   time, directly into `$(PublishDir)wwwroot/refs/` — independent of
+   Blazor's asset-discovery/manifest machinery entirely, so it can never
+   be affected by that timing issue again. The original build-time copy
+   is untouched (still needed for `dotnet run`/the local dev-server
+   middleware, which serves the *publish* output too, per
+   `vite.config.ts` — meaning this exact bug would also have silently
+   broken a genuinely fresh local dev setup, not just CI, had anyone
+   ever actually started from a truly clean checkout instead of this
+   long-lived sandbox's incrementally-built state). Verified by
+   repeating the exact clean-slate reproduction twice in a row: `rm -rf
+   bin obj wwwroot/refs && dotnet publish -c Release` now reliably
+   produces all 11 reference DLLs in the publish output, plus
+   `blazor.webassembly.js` and the `.gz` assets, both times. Also
+   confirmed live against the real dev server afterward (`npm run dev`,
+   `curl` against `/csharp-engine/refs/System.Console.dll` → 200) — the
+   fix benefits the local dev path too, not just the new CI check.
+
+   **Update, fifth real CI run: fully green.** After the publish-output
+   fix, the workflow ran again for real and every step succeeded —
+   `actions/setup-dotnet@v4`, the wasm-tools workload install (correctly
+   targeting 8.0.x this time), `dotnet publish -c Release` (the real
+   optimized pipeline, ~70s), and the verify step, all `conclusion:
+   success`. Four real CI round-trips, four different real environment
+   gaps found and fixed (SDK version resolution twice, then the
+   `wwwroot/refs/` publish-manifest timing bug) — none of which this
+   sandbox's own local testing could have caught on its own, and one of
+   which (the `refs/` bug) turned out to be a genuine, long-standing
+   product bug rather than a CI-only quirk, since the same publish
+   output is what the local dev-server middleware serves too.
+
+   **Still deliberately not done:** actually wiring this into
+   `deploy-pages.yml` and copying the published output into `gh-pages`
+   under `/csharp-engine/`. That remains its own increment — this
+   firing's job was narrowly "prove a clean GitHub Actions runner can
+   build this at all," and it now has, confirmed green for real, with
+   two real bugs fixed along the way rather than just a lucky green
+   checkmark. The next step is extending `deploy-pages.yml` with the
+   same pinned-SDK publish step plus a copy into `gh-pages`, and
+   verifying the deployed page's `/csharp-engine/` route actually boots
+   under production COOP/COEP (service-worker-provided, not the
+   dev-server's real headers) — a materially different test than
+   anything done so far.
+
+## CRITICAL, currently unresolved: the C# engine no longer boots at all in a real browser (2026-08-11, next firing)
+
+**Found during a live Playwright bug-hunt, not this firing's own change —
+substantial diagnostic work done, root cause not yet identified.** A
+fresh `npm run dev` + real headless Chromium check against the C# track
+found the WASM engine fails to boot entirely:
+
+```
+MONO_WASM [0x…-main]: Error in bindings_init Can't find System.Runtime.InteropServices.JavaScript.JavaScriptExports class
+MONO_WASM [0x…-main]: onRuntimeInitializedAsync() failed Can't find System.Runtime.InteropServices.JavaScript.JavaScriptExports class
+Failed to start platform. Reason: [object Object]
+```
+
+Confirmed this is real and not test-script noise by ruling out, in order:
+
+1. **Stale build artifacts** — the on-disk `csharp-engine/bin/` had June
+   timestamps predating this whole session (leftover from the sandbox's
+   base image, unrelated to git). Did a genuinely clean `rm -rf bin obj
+   wwwroot/refs && dotnet publish -c Release` — same failure.
+2. **The `wwwroot/refs/` publish-output fix from earlier this same
+   firing-chain** — bypassed the app entirely and navigated straight to
+   the raw published `csharp-engine/host.html` (the iframe's own hosting
+   document, see step 3's writeup), which doesn't touch `refs/` at all in
+   its boot path — identical failure. Not caused by that fix.
+3. **File serving** — every `_framework/*` request returns `200`,
+   confirmed via response-listener instrumentation (no missing assets).
+4. **COOP/COEP / cross-origin isolation** — `window.crossOriginIsolated`
+   is `true`, `typeof SharedArrayBuffer === 'function'`, and the expected
+   `dotnet.native.worker.*.js` Web Workers *do* get created (confirmed via
+   Playwright's `page.on('worker', …)`, 4 workers spawned, matching
+   `navigator.hardwareConcurrency`). The multithreading prerequisites this
+   engine depends on (see the WASM-bugs section near the top of this doc)
+   are all satisfied.
+5. **`wasm-tools` workload version drift** — `dotnet workload uninstall
+   wasm-tools` followed by a fresh `dotnet workload install wasm-tools
+   --skip-manifest-update`, then another clean rebuild — same failure,
+   same resolved version (`8.0.29`) before and after.
+6. **NuGet package version drift** — checked `obj/project.assets.json`
+   directly: `Microsoft.AspNetCore.Components.WebAssembly` resolved to
+   exactly the pinned `8.0.29`, no transitive-dependency bump.
+7. **Source corruption** — `git status`/`git diff HEAD` on
+   `CSharpEngine.cs`/`Program.cs`/the `.csproj` show zero uncommitted
+   changes; the checked-in source is exactly what's being built.
+8. **`blazor.boot.json` integrity-hash staleness** (a previously-known,
+   documented pitfall in this doc's WASM-bugs section) — inspected the
+   file directly; hashes are freshly generated by this build, and no SRI
+   "integrity check failed" message appears in the console (that would be
+   a distinctly different error from the one actually seen).
+
+None of these explain it. The Roslyn compilation layer itself is
+confirmed unaffected — `test/helpers/nodeCSharpEngine.test.ts` (the
+desktop-.NET driver, a structurally identical `CSharpCompilation`-based
+pipeline, just not running under Blazor/WASM) still passes 5/5 — so this
+is specifically a Blazor-WASM JS-interop bootstrap failure, not a Roslyn
+or C#-content issue.
+
+**What this doc's own 2026-08-10 entry (a few sections up) proves**: the
+exact same `WasmEnableThreads=true` + `credentialless` + real published
+bundle combination *did* boot and execute real C# successfully at that
+time, with `Blazor.start().then(...)`'s own embedded smoke-test snippet
+running automatically and returning a correct result. Something has
+changed since — either an environment drift this sandbox can't introspect
+further (the most likely candidate given everything *version-pinned* and
+locally re-verifiable checked out clean), or a regression whose actual
+trigger wasn't captured by any of the eight checks above.
+
+**Update (2026-08-11, next firing): two of the three candidates above are
+now checked — neither explains it, but the search narrowed the failure
+to something more specific than initially framed.**
+
+- **`WasmEnableThreads` ruled out as the cause.** Temporarily set to
+  `false` in a scratch edit (never committed), clean `rm -rf bin obj
+  wwwroot/refs && dotnet publish -c Release`, same exact failure
+  (`Can't find … JavaScriptExports class`, `Failed to start platform`) —
+  just without the `[0x…-main]` worker-context prefix in the log line,
+  since there's no multithreading context to report. Change reverted via
+  `git checkout` immediately after, working tree confirmed clean. This is
+  **not** a threading-path-specific failure.
+
+- **External web research** (now available this firing) surfaced several
+  historically similar `dotnet/runtime`/`dotnet/aspnetcore` issues
+  (`#72803`, `#38433`, `#48522`, `#103499`, `#87690`) — none an exact
+  match for this specific error string, and none with a confirmed,
+  documented root cause or fix in their visible content (GitHub's own
+  dynamically-loaded comment threads aren't fully retrievable through
+  this session's fetch tooling, only the initial issue body). Recurring
+  theme across them: `System.Runtime.InteropServices.JavaScript`
+  bindings failing to resolve correctly is a known *class* of issue in
+  .NET 8/9's Blazor WASM interop, not unique to this project, but no
+  single thread pinpoints this exact symptom with a fix.
+
+- **New, more targeted local diagnosis:** the generated interop glue
+  *does* run correctly. Forced `EmitCompilerGeneratedFiles=true` +
+  `CompilerGeneratedFilesOutputPath=generated` on a clean build —
+  `Microsoft.Interop.JavaScript.JSExportGenerator` **did** emit
+  `JSExports.g.cs`, correctly registering `CSharpEngine.RunCode` via
+  `JSFunctionBinding.BindManagedFunction` in a `[ModuleInitializer]`.
+  Separately confirmed the runtime-internal `JavaScriptExports` type the
+  boot error complains about missing — not something our generator
+  emits, it's a BCL-internal type inside the framework's own
+  `System.Runtime.InteropServices.JavaScript.wasm` — genuinely *is*
+  present in that assembly's compiled metadata (`strings` on the `.wasm`
+  finds the literal type name). Also confirmed the served file's actual
+  SHA-256 matches `blazor.boot.json`'s declared integrity hash exactly
+  (computed independently in Python, byte-for-byte match) — not a
+  stale-file-vs-stale-manifest mismatch either.
+
+  So: the generator runs, the wrapper code is correctly registered, the
+  type the runtime wants exists in the right assembly, and that assembly
+  is served correctly and matches its own integrity hash. The failure is
+  specifically in the MONO_WASM runtime's own internal resolution of that
+  type at `bindings_init` time — a layer below anything this project's
+  own code or build configuration controls. This is consistent with the
+  web research above: a genuine interop-plumbing issue in this specific
+  .NET 8.0.29 runtime-pack build, not a project misconfiguration.
+
+**Update (2026-08-11, next firing): a different .NET 8 SDK patch version
+tested — ruled out, and a genuine environment-consistency limitation
+found in the process.** The previous update above flagged "different SDK
+version" as untested. Tried it this firing: downgraded the apt
+`dotnet-sdk-8.0` package from the installed `8.0.129-0ubuntu1~24.04.1` to
+the older `8.0.104-0ubuntu1` (available from the base `noble` repo, vs.
+`noble-updates`/`noble-security` for the newer one). `dotnet workload
+list` auto-reinstalled `wasm-tools` at a correspondingly older runtime
+pack, `8.0.4` (vs. `8.0.29` used throughout every check above).
+
+A clean `rm -rf bin obj wwwroot/refs && dotnet publish -c Release` under
+this older toolchain **failed outright before ever reaching the boot
+test**: `CSharpEngineRefPackDir` resolved to
+`/usr/lib/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.4/ref/net8.0/`,
+which doesn't exist — only `8.0.29`'s ref pack is present on disk. The
+apt-installed `dotnet-sdk-8.0` downgrade moved the SDK CLI and (via the
+workload manager) the wasm runtime pack to `8.0.4`, but the separate
+`Microsoft.NETCore.App.Ref` targeting pack (laid down earlier, not
+tracked by the `dotnet-sdk-8.0` apt package itself) stayed at `8.0.29` —
+an orphaned, inconsistent environment, not a clean "older SDK" test.
+Pursuing a fully consistent older toolchain would mean manually sourcing
+a matching ref pack from elsewhere (not available via apt in this
+sandbox), which is a materially bigger, less-bounded side effort than
+this experiment was meant to be.
+
+Rolled the SDK back to the original `8.0.129-0ubuntu1~24.04.1` via
+`apt-get install --allow-downgrades`, then `dotnet workload install
+wasm-tools --skip-manifest-update` restored `wasm-tools` to `8.0.29`
+(confirmed via `dotnet workload list`). A clean rebuild under the
+restored, original toolchain published successfully (as it always has),
+and the canonical direct-boot repro
+(`http://localhost:5173/csharp-engine/host.html`) was re-run against it
+to confirm nothing about the sandbox itself had drifted:
+`git status`/`git diff` on `csharp-engine/` show zero changes — the
+environment is back to exactly its committed baseline, and the identical
+failure (`Can't find … JavaScriptExports class`, `Failed to start
+platform`) reproduces exactly as before. So: **not an SDK-8.0.29-vs-older
+issue** — same failure at both tested runtime-pack versions, so a genuine
+SDK-version test doesn't explain it either (to the extent apt makes a
+clean test of "genuinely older, fully consistent SDK" practical in this
+sandbox at all).
+
+**Update (2026-08-11, next firing): the "can't read comment threads"
+blocker is gone — tried it, still no fix.** The earlier limitation was
+specific to fetching the *rendered* GitHub issue page (comments load via
+client-side JS, invisible to this session's fetch tooling). GitHub's
+plain REST API (`https://api.github.com/repos/<owner>/<repo>/issues/<n>/
+comments`) returns comments as static JSON instead, and `WebFetch`
+retrieves it fine — a genuinely new capability for this sandbox, not
+tried in either prior firing. Read the full comment threads on `#87690`
+(12 comments) this way: turned out to be about a *different* bug entirely
+— `JSHost.ImportAsync()`/`OnInitializedAsync` timing in Razor components
+that render before an async import finishes — inapplicable here, since
+this project's `CSharpEngine.RunCode` is a bare `[JSExport]` static
+method with no Razor component involved at all. Also ran targeted GitHub
+code/issue searches (`"JavaScriptExports" bindings_init`,
+`"Can't find" "JavaScriptExports" repo:dotnet/runtime`) — the only hits
+were unrelated merged PRs (WASM threading/rendering work targeting *.NET
+9*, not 8). No exact-match report or maintainer-confirmed fix for this
+specific error text exists in what's searchable this way. Separately
+checked whether the Playwright/Chromium build itself drifted since the
+2026-08-10 working state (a genuinely new candidate, not previously
+considered) — it hasn't: that entry already pinned the exact same cached
+`chromium-1194` build (documented via the same `executablePath` fix) that
+every check this session has used, so browser version isn't the variable
+either.
+
+**Still not checked:** whether a different, non-headless or
+non-Playwright-automated browser context changes anything (this sandbox
+has no display, so untested); whether a *newer* .NET 8 SDK patch/workload
+version (past `8.0.29`) resolves it — not available via apt in this
+sandbox to test.
+
+**Practical severity, calibrated — CORRECTED (2026-08-11, next firing):
+this WAS wrong. It is a live production issue right now.** The
+"not currently a live production incident" claim below rested on
+`deploy-pages.yml` never having run against a commit that registers the
+`csharp` track — that assumption was never actually checked against the
+real repository state, and turned out to be false. Verified directly via
+the GitHub API this firing: `main`'s `src/content/registry.ts` (commit
+`d0edb4f`, the merge from the earlier user-requested "merge mit main")
+already has the `csharp` entry in `TRACKS`, registered a few commits
+*before* that merge (`5ab928d`, "C#-Engine live verdrahtet"). The
+`deploy-pages.yml` run against that exact merge commit
+(`31508705782`) completed with `conclusion: success` on
+`2026-08-11T15:44:49Z`. And `gh-pages`'s actual current file listing is
+just `index.html` + `coi-serviceworker.js` — no `csharp-engine/`
+directory at all, confirmed by listing it directly. So: the C# track
+**is** selectable right now on the real deployed site (it's compiled
+into `dist/index.html` unconditionally, `TRACKS` isn't environment-
+gated), and any real visitor who opens a C# challenge and clicks "Run"
+gets a same-origin `iframe.src` pointed at `/csharp-engine/host.html`,
+which 404s there — not the MONO_WASM boot bug specifically (that only
+reproduces where the engine *is* served, like local dev), but a flatly
+missing resource. Before this firing's fix (see below), that meant a
+real, needless 15-second wait before any explanation appeared at all.
+
+**Fix shipped this firing:** `loadCSharpEngineFromServer` now fires a
+`HEAD ${baseUrl}host.html` request in parallel with creating the iframe.
+A non-ok response settles the load promise immediately with "Der
+C#-Motor ist in dieser Umgebung (noch) nicht bereitgestellt." — no more
+waiting out the full timeout for something that can never succeed. A
+network-level failure of the HEAD check itself is *not* treated as
+conclusive (left alone, falls through to the iframe/timeout path as
+before) — only an actual non-ok HTTP response short-circuits.
+Live-verified with real Playwright runs, not just unit mocks: against
+the real dev server (engine genuinely present), the known MONO_WASM boot
+bug still takes ~13.7s to surface its message — fast path correctly
+doesn't fire, since the HEAD check succeeds. Against a route-mocked
+"host.html returns 404" scenario (reproducing the real production gap
+above), the new message appeared in **20ms**. This does not fix the
+underlying MONO_WASM bug (still unresolved, see above) or deploy the
+engine to production (still not done, see below) — it only makes the
+*already-live* broken state fail fast and honestly instead of wasting 15
+seconds pretending to load something that was never going to arrive
+either way. One piece of existing defensive engineering already held up
+under this failure even before today's fix:
+`ensureCSharpEngineLoaded`'s pre-existing 15-second `withTimeout`
+wrapper (built proactively in an earlier firing, *not* in response to
+this bug) meant a real user would still see an error message after 15s
+rather than an infinite loading spinner — though that message
+misattributed the cause to browser extensions/CSP until a firing two
+sessions ago corrected it (see the UX-fix entry in
+`docs/ui-ux-audit.md`).
+
+**Note for whoever reads this:** this firing did **not** unregister the
+`csharp` track or otherwise hide it from the picker, despite it being
+currently unplayable for every real visitor. That's a genuine product
+call (hide a whole track vs. let it fail gracefully with an honest,
+now-fast message pointing to SQL/Python) that this session's standing
+mandate — which explicitly frames C# as an intentional, accepted
+multi-session work in progress — doesn't clearly settle either way, and
+reverting substantial deliberate prior wiring work isn't a call an
+autonomous hourly firing should make unilaterally. Flagging it here
+plainly instead: **the C# track is live on the real deployed site and
+currently cannot be completed by any visitor who tries it.** Whether
+that's acceptable while the engine is finished, or worth temporarily
+hiding the track until it works, is a decision for whoever owns this
+repository.
+
+**Original (now-corrected) text, kept for the record:** "this is not
+currently a live production incident — `deploy-pages.yml` still doesn't
+publish the C# engine's `wwwroot/` to `gh-pages` at all ..., so no real
+user on the deployed site can reach this path yet; it only affects local
+`npm run dev` and the not-yet-production-wired CI check." — this
+assumption was never actually verified against the real repo/deploy
+state and is now known to be wrong, per the correction above.
+
+**Deliberately not attempted this firing:** any speculative code fix.
+Every hypothesis tested came back negative, and shipping an unverified
+change to `WasmEnableThreads`, package versions, or the workload
+toolchain without being able to confirm it actually fixes the boot
+failure would risk trading a known, well-documented problem for an
+unknown one. This finding is left for continued investigation rather than
+forced closure — no working tree changes accompany this doc update.
 6. ~~**Node-side test engine for CI** (`test/helpers/nodeCSharpEngine.ts`,
    mirroring `nodePythonEngine.ts`'s subprocess-based approach) — fully
    feasible now that `dotnet` works in this sandbox; likely just

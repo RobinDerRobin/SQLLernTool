@@ -1,4 +1,4 @@
-export type Listener<T> = (next: T, prev: T) => void;
+type Listener<T> = (next: T, prev: T) => void;
 export type Unsubscribe = () => void;
 
 export interface Store<T> {

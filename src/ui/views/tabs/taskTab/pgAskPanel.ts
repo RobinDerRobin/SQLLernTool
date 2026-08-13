@@ -35,7 +35,7 @@ function renderPgAsk(slice: PgAskSlice): string {
       <div class="pg-label">So sieht es in PostgreSQL aus</div>
       ${noteBody}
       <div class="ask-section">
-        <button type="button" class="btn pg-ask-toggle-btn">Claude hierzu befragen</button>
+        <button type="button" class="btn pg-ask-toggle-btn" aria-expanded="false">Claude hierzu befragen</button>
         <div class="ask-panel">
           <textarea class="ask-textarea" rows="2" placeholder="Frage zum Postgres-Unterschied …"></textarea>
           <button type="button" class="btn pg-ask-submit-btn">Fragen</button>
@@ -61,8 +61,9 @@ export function mountPgAskPanel(root: HTMLElement, ctx: AppContext): Unsubscribe
       render: renderPgAsk,
       shouldUpdate: (prev, next) => prev.num !== next.num,
       bind: (rootEl) => {
-        on(rootEl, 'click', '.pg-ask-toggle-btn', () => {
-          rootEl.querySelector('.ask-panel')?.classList.toggle('open');
+        on(rootEl, 'click', '.pg-ask-toggle-btn', (_e, target) => {
+          const nowOpen = rootEl.querySelector('.ask-panel')?.classList.toggle('open') ?? false;
+          target.setAttribute('aria-expanded', String(nowOpen));
         });
 
         on(rootEl, 'click', '.pg-ask-submit-btn', (_e, target) => {

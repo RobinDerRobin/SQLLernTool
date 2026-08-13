@@ -55,14 +55,51 @@ describe('findUnboundedRecursion', () => {
     expect(findUnboundedRecursion(sql)).not.toBeNull();
   });
 
-  it('is not fooled by a WHERE inside a string literal in the recursive member', () => {
+  it('sanity: a real WHERE (outside any string) in the recursive member is still detected fine', () => {
     const sql = `WITH RECURSIVE seq(n) AS (
       SELECT 1
       UNION ALL
       SELECT n + 1 FROM seq WHERE n < 5
     )
     SELECT * FROM seq;`;
-    // sanity: a real WHERE outside a string is still detected fine
+    expect(findUnboundedRecursion(sql)).toBeNull();
+  });
+
+  it('is not fooled by a WHERE-lookalike that only appears inside a string literal — still flags it as unbounded', () => {
+    const sql = `WITH RECURSIVE seq(n) AS (
+      SELECT 1
+      UNION ALL
+      SELECT n + 1, 'not a real WHERE n < 5 clause' FROM seq
+    )
+    SELECT * FROM seq;`;
+    expect(findUnboundedRecursion(sql)).not.toBeNull();
+  });
+
+  it('correctly skips a doubled single-quote (SQL escape for an embedded quote) without losing track of a real WHERE afterward', () => {
+    const sql = `WITH RECURSIVE seq(n) AS (
+      SELECT 1
+      UNION ALL
+      SELECT n + 1, 'it''s a test' FROM seq WHERE n < 5
+    )
+    SELECT * FROM seq;`;
+    expect(findUnboundedRecursion(sql)).toBeNull();
+  });
+
+  it('correctly skips a doubled single-quote inside a string containing a WHERE-lookalike — still flags it as unbounded', () => {
+    const sql = `WITH RECURSIVE seq(n) AS (
+      SELECT 1
+      UNION ALL
+      SELECT n + 1, 'it''s WHERE n < 5, or is it?' FROM seq
+    )
+    SELECT * FROM seq;`;
+    expect(findUnboundedRecursion(sql)).not.toBeNull();
+  });
+
+  it('does not crash and safely returns null for a malformed CTE missing its closing paren', () => {
+    const sql = `WITH RECURSIVE seq(n) AS (
+      SELECT 1
+      UNION ALL
+      SELECT n + 1 FROM seq`;
     expect(findUnboundedRecursion(sql)).toBeNull();
   });
 
@@ -78,6 +115,36 @@ describe('findUnboundedRecursion', () => {
 
   it('returns null for SQL with no recursive CTE at all', () => {
     expect(findUnboundedRecursion('SELECT * FROM users;')).toBeNull();
+  });
+
+  it('is not fooled by a WHERE that only appears inside a line comment in the recursive member', () => {
+    const sql = `WITH RECURSIVE seq(n) AS (
+      SELECT 1
+      UNION ALL
+      SELECT n + 1 FROM seq -- WHERE n < 100
+    )
+    SELECT * FROM seq;`;
+    expect(findUnboundedRecursion(sql)).not.toBeNull();
+  });
+
+  it('is not fooled by a LIMIT that only appears inside a block comment after the CTE', () => {
+    const sql = `WITH RECURSIVE seq(n) AS (
+      SELECT 1
+      UNION ALL
+      SELECT n + 1 FROM seq
+    )
+    SELECT * FROM seq; /* LIMIT 10 */`;
+    expect(findUnboundedRecursion(sql)).not.toBeNull();
+  });
+
+  it('is not thrown off by an unbalanced paren inside a comment in the recursive member', () => {
+    const sql = `WITH RECURSIVE seq(n) AS (
+      SELECT 1
+      UNION ALL
+      SELECT n + 1 FROM seq -- a stray ( paren in a comment
+    )
+    SELECT * FROM seq;`;
+    expect(findUnboundedRecursion(sql)).not.toBeNull();
   });
 
   it('handles multiple statements, flagging only the unbounded one', () => {

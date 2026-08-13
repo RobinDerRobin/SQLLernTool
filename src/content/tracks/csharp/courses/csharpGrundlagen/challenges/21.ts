@@ -12,7 +12,7 @@ export const challenge21: CSharpChallenge = {
 int letzterSaldo = -1;
 
 Kontostand konto = new Kontostand(100);
-konto.SaldoNiedrig += saldo =>
+konto.SaldoNiedrig += saldo =&gt;
 {
     status = "Warnung ausgelöst";
     letzterSaldo = saldo;
@@ -26,7 +26,7 @@ Console.WriteLine("Nach zweiter Abhebung: " + status + ", Saldo: " + letzterSald
 
 class Kontostand
 {
-    public event Action<int>? SaldoNiedrig;
+    public event Action&lt;int&gt;? SaldoNiedrig;
     private int saldo;
 
     public Kontostand(int startSaldo)
@@ -37,7 +37,7 @@ class Kontostand
     public void Abheben(int betrag)
     {
         saldo -= betrag;
-        if (saldo < 50)
+        if (saldo &lt; 50)
         {
             SaldoNiedrig?.Invoke(saldo);
         }

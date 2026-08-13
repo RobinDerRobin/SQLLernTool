@@ -19,9 +19,14 @@ describe('highlightCodeForTrack', () => {
     expect(result).toContain('&lt;script&gt;');
   });
 
-  it('falls back to plain HTML-escaping for a track without a highlighter', () => {
-    const result = highlightCodeForTrack('Console.WriteLine("<b>hi</b>");', 'csharp');
-    expect(result).toBe('Console.WriteLine(&quot;&lt;b&gt;hi&lt;/b&gt;&quot;);');
+  it('wraps C# keywords in tok-keyword spans', () => {
+    const result = highlightCodeForTrack('if (x > 0) return;', 'csharp');
+    expect(result).toContain('<span class="tok-keyword">if</span>');
+  });
+
+  it('falls back to plain HTML-escaping for a track without any highlighter at all', () => {
+    const result = highlightCodeForTrack('<b>hi</b>', 'nonexistent');
+    expect(result).toBe('&lt;b&gt;hi&lt;/b&gt;');
   });
 });
 
@@ -55,10 +60,11 @@ describe('highlightContentHtml', () => {
     expect(matches.length).toBe(2);
   });
 
-  it('is a no-op for a track without a highlighter', () => {
-    const html = `Text <code>Console.WriteLine("hi");</code> mehr Text.`;
+  it('highlights a C# code sample embedded in tutorial/hint content', () => {
+    const html = `Text <code>if (x > 0) return;</code> mehr Text.`;
     const result = highlightContentHtml(html, 'csharp');
-    expect(result).toBe(html);
+    expect(result).toContain('<span class="tok-keyword">if</span>');
+    expect(result).toContain('mehr Text.');
   });
 
   it('is a no-op for an unknown track id', () => {

@@ -63,13 +63,16 @@ describe('mountCompareView', () => {
     const ctx = makeCtx();
     mountCompareView(root, ctx, fakeEditor(c01.solution));
     selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
+    const compareBtn = root.querySelector('.compare-btn')!;
+    expect(compareBtn.getAttribute('aria-expanded')).toBe('false');
 
-    root.querySelector('.compare-btn')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    compareBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     const expectedLines = c01.solution.split('\n').length;
     expect(root.querySelectorAll('.compare-col-mine .cmp-line')).toHaveLength(expectedLines);
     expect(root.querySelectorAll('.compare-col-solution .cmp-line')).toHaveLength(expectedLines);
     expect(root.querySelector('.compare-panel')?.classList.contains('open')).toBe(true);
+    expect(compareBtn.getAttribute('aria-expanded')).toBe('true');
   });
 
   it('highlights only the lines that actually differ', () => {

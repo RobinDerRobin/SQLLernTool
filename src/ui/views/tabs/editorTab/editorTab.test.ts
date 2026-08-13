@@ -16,6 +16,7 @@ import {
 import type { ProgressStore } from '../../../../persistence/ProgressStore';
 import { createAppContext, type AppContext, type EngineFactory } from '../../../context';
 import { selectChallenge } from '../../../state/actions';
+import { withSelection } from '../../../state/sessionState';
 import { mountEditorTab } from './editorTab';
 
 const c01 = sqlLernenToolCourse.challenges.find((c) => c.num === '01')!;
@@ -103,6 +104,14 @@ describe('mountEditorTab', () => {
     expect(root.querySelector('.results-wrap')).not.toBeNull();
   });
 
+  it('marks the results area and engine-status banner as ARIA live regions so screen readers announce run outcomes and loading/error status', () => {
+    const ctx = makeCtx();
+    mountEditorTab(root, ctx);
+
+    expect(root.querySelector('.results-body')?.getAttribute('role')).toBe('status');
+    expect(root.querySelector('.python-engine-status')?.getAttribute('role')).toBe('status');
+  });
+
   it('loads the saved draft for the opened challenge into the editor', () => {
     const progress = withChallengeProgress(createDefaultProgressState(), 'sqlite', 'sqlLernenTool', '01', {
       draftSql: 'SELECT 42;',
@@ -122,6 +131,36 @@ describe('mountEditorTab', () => {
     const banner = root.querySelector('.expected-result-banner')!;
     expect(banner.textContent).toContain('Erwartetes Ergebnis');
     expect(banner.innerHTML).toContain(c01.successCriteria);
+  });
+
+  it('falls back to a bare placeholder and hides the expected-result banner when the selection points at a challenge no longer in the registry', () => {
+    // Simulates stale persisted progress after content is renumbered/removed:
+    // selectChallenge() itself refuses to select a nonexistent num, so this
+    // reaches the same state only via a direct store update, same as a saved
+    // selection restored from localStorage would.
+    const ctx = makeCtx();
+    const { editor } = mountEditorTab(root, ctx);
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
+
+    ctx.store.update((s) => ({
+      ...s,
+      session: withSelection(s.session, { trackId: 'sqlite', courseId: 'sqlLernenTool', challengeNum: 'gone-999' }),
+    }));
+
+    expect(editor.getValue()).toBe('-- Schreib hier deine Lösung für: gone-999\n');
+    expect(root.querySelector('.expected-result-banner')!.innerHTML).toBe('');
+  });
+
+  it('running with an empty or whitespace-only editor is a no-op — no results, no crash', async () => {
+    const ctx = makeCtx();
+    const { editor } = mountEditorTab(root, ctx);
+    selectChallenge(ctx, 'sqlite', 'sqlLernenTool', '01');
+    editor.setValue('   \n  ');
+
+    root.querySelector('.run-btn')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(root.querySelector('.results-body')!.innerHTML).toContain('Noch keine Query ausgeführt.');
   });
 
   it('seeds a placeholder comment when the challenge has no draft yet', () => {
@@ -282,6 +321,29 @@ describe('mountEditorTab', () => {
     root.querySelector('.tables-toggle-btn')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(root.querySelector('.tables-panel')?.classList.contains('open')).toBe(true);
+  });
+
+  it('reflects the tables panel open/closed state via aria-expanded on its toggle button', () => {
+    const ctx = makeCtx();
+    mountEditorTab(root, ctx);
+    const toggleBtn = root.querySelector('.tables-toggle-btn')!;
+    expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
+
+    toggleBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(toggleBtn.getAttribute('aria-expanded')).toBe('true');
+
+    toggleBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('gives the code editor an accessible name that reflects the active track', async () => {
+    const ctx = makeCtxWithPython();
+    mountEditorTab(root, ctx);
+    const textarea = root.querySelector<HTMLTextAreaElement>('textarea.editor')!;
+    expect(textarea.getAttribute('aria-label')).toBe('SQL-Code-Editor');
+
+    selectChallenge(ctx, 'python', 'pythonGrundlagen', '01');
+    expect(textarea.getAttribute('aria-label')).toBe('Python-Code-Editor');
   });
 
   it('persists edits through the debounced onChange', () => {

@@ -8,7 +8,7 @@ export const challenge23: CSharpChallenge = {
   hints: [
     `<code>punkte.Sum()</code> addiert alle Elemente (80+90+70+60+100 = 400), <code>punkte.Count()</code> zählt sie (5 Elemente). Beide geben ein <code>int</code> zurück, wenn die Liste <code>int</code>-Elemente enthält.`,
     `<code>punkte.Average()</code> gibt immer ein <code>double</code> zurück (hier 400 / 5 = 80). <code>punkte.Max()</code> und <code>punkte.Min()</code> geben das größte bzw. kleinste Element zurück — bei der Zuweisung nicht vertauschen, sonst landet das Maximum in der Minimum-Variable und umgekehrt.`,
-    `So sieht die Lösung aus:<pre>List<int> punkte = new List<int> { 80, 90, 70, 60, 100 };
+    `So sieht die Lösung aus:<pre>List&lt;int&gt; punkte = new List&lt;int&gt; { 80, 90, 70, 60, 100 };
 
 int summe = punkte.Sum();
 int anzahl = punkte.Count();

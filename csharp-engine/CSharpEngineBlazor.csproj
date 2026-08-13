@@ -63,4 +63,23 @@
     <Copy SourceFiles="@(_CSharpEngineRefDll)" DestinationFolder="$(MSBuildProjectDirectory)/wwwroot/refs" SkipUnchangedFiles="true" />
   </Target>
 
+  <!-- The build-time copy above lands in the *source* wwwroot/refs/ (used directly by `dotnet run`
+       and the local dev-server middleware) — but on a from-scratch checkout, that folder doesn't
+       exist yet the first time Blazor's own static-web-asset discovery runs (an evaluation-time
+       item glob over wwwroot/**, which finishes before any <Target>, including the one above, ever
+       executes), so those files never make it into `dotnet publish`'s output even though the copy
+       itself succeeds. Confirmed empirically: a truly clean `rm -rf bin obj wwwroot/refs && dotnet
+       publish` reproduces a publish/wwwroot/ with no refs/ at all, both locally and on a real
+       GitHub Actions runner — every previous local verification of this project accidentally had a
+       stale wwwroot/refs/ left over from an earlier build, masking the bug. Fix: copy directly into
+       the publish output too, as an independent step that runs after publish already decided what
+       to copy, so it never depends on Blazor's asset-discovery timing at all. -->
+  <Target Name="CopyCSharpEngineRefAssembliesToPublishOutput" AfterTargets="Publish" Condition="'$(CSharpEngineRefPackDir)' != ''">
+    <ItemGroup>
+      <_CSharpEngineRefDllForPublish Include="@(CSharpEngineRefAssemblyName -> '$(CSharpEngineRefPackDir)%(Identity).dll')" />
+    </ItemGroup>
+    <MakeDir Directories="$(PublishDir)wwwroot/refs" />
+    <Copy SourceFiles="@(_CSharpEngineRefDllForPublish)" DestinationFolder="$(PublishDir)wwwroot/refs" SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>

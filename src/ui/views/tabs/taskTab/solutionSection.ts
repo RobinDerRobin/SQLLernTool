@@ -46,7 +46,7 @@ function renderSolution(slice: SolutionSlice): string {
   if (!slice.num || slice.mode === 'exam') return '';
   return `
     <div class="solution-block">
-      <button type="button" class="btn solution-toggle-btn">Lösung anzeigen</button>
+      <button type="button" class="btn solution-toggle-btn" aria-expanded="false">Lösung anzeigen</button>
       <div class="solution-panel">
         ${slice.solutionViewed ? '<div class="solution-cost-note">Lösung angesehen — diese Challenge zählt mit 0 Sternen.</div>' : ''}
         <span class="sp-label">Musterlösung</span>
@@ -71,7 +71,10 @@ export function mountSolutionSection(root: HTMLElement, ctx: AppContext, editor:
   function applyPanelState(rootEl: HTMLElement): void {
     rootEl.querySelector('.solution-panel')?.classList.toggle('open', panelOpen);
     const toggle = rootEl.querySelector('.solution-toggle-btn');
-    if (toggle) toggle.textContent = panelOpen ? 'Lösung verbergen' : 'Lösung anzeigen';
+    if (toggle) {
+      toggle.textContent = panelOpen ? 'Lösung verbergen' : 'Lösung anzeigen';
+      toggle.setAttribute('aria-expanded', String(panelOpen));
+    }
   }
 
   return mountView(

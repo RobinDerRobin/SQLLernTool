@@ -141,10 +141,20 @@ async function ensurePythonEngineLoaded(ctx: AppContext): Promise<void> {
 }
 
 const CSHARP_ENGINE_LOAD_TIMEOUT_MS = 15_000;
+/**
+ * Unlike PYTHON_ENGINE_TIMEOUT_MESSAGE, this can't plausibly blame a browser
+ * extension or CSP blocking an external CDN — loadCSharpEngineFromServer
+ * loads everything from this app's own same-origin /csharp-engine/ path
+ * (CSHARP_ENGINE_BASE_URL below), so there's no third-party request for
+ * either of those to interfere with. The C# engine is newer/more
+ * experimental than the SQL/Python ones, so the honest framing is "this
+ * track isn't working right now," not a diagnosis this code can't actually
+ * back up.
+ */
 const CSHARP_ENGINE_TIMEOUT_MESSAGE =
-  'Die C#-Umgebung hat nach 15 Sekunden nicht geantwortet. Vermutlich blockiert eine Browser-Erweiterung ' +
-  'oder eine Content-Security-Policy das Laden des Blazor-Bundles. Prüfe die Browser-Konsole (F12) auf eine ' +
-  'Fehlermeldung und versuche es notfalls in einem Inkognito-Fenster ohne Erweiterungen.';
+  'Die C#-Umgebung hat nach 15 Sekunden nicht geantwortet. Der C#-Track ist noch experimentell — dieses ' +
+  'Problem liegt nicht an deinem Browser oder an Erweiterungen. Bitte lade die Seite neu und versuche es ' +
+  'erneut; besteht das Problem weiterhin, nutze in der Zwischenzeit die SQL- oder Python-Tracks.';
 
 /**
  * Loads the C# engine exactly once (cached by EngineFactory itself) and

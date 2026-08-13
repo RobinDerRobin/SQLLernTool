@@ -12,6 +12,7 @@ export default defineConfig({
       ['src/persistence/**', 'jsdom'],
       ['src/ui/**', 'jsdom'],
       ['src/theme/**', 'jsdom'],
+      ['test/content/htmlContentIntegrity.test.ts', 'jsdom'],
     ],
     coverage: {
       provider: 'v8',

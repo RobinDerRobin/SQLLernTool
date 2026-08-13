@@ -16,11 +16,11 @@ foreach (int p in punkte)
     summe += p;
 }
 
-List<string> einkaufsliste = new List<string> { "Brot", "Milch", "Eier" };
+List&lt;string&gt; einkaufsliste = new List&lt;string&gt; { "Brot", "Milch", "Eier" };
 einkaufsliste.Add("Butter");
 einkaufsliste.Remove("Milch");
 
-Dictionary<string, double> preise = new Dictionary<string, double>();
+Dictionary&lt;string, double&gt; preise = new Dictionary&lt;string, double&gt;();
 preise["Brot"] = 2.50;
 preise["Eier"] = 3.20;
 bool hatButter = preise.ContainsKey("Butter");

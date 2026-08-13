@@ -8,8 +8,8 @@ export const challenge26: CSharpChallenge = {
   hints: [
     `<code>zahlen.Where(z =&gt; z &gt; 3)</code> ohne <code>.ToList()</code> wertet noch nichts aus — <code>query</code> ist nur ein Bauplan. Erst das <code>foreach</code> führt die Filterung wirklich durch, und zwar mit dem Stand von <code>zahlen</code>, der zu diesem Zeitpunkt gilt (also inklusive aller vorherigen <code>.Add()</code>-Aufrufe).`,
     `Das zweite <code>foreach</code> über dieselbe <code>query</code>-Variable wertet die Filterung <b>erneut</b> aus — mit dem dann aktuellen Stand von <code>zahlen</code>, der inzwischen zwei weitere Zahlen enthält. Deshalb unterscheiden sich die Ausgaben des ersten und zweiten Durchlaufs.`,
-    `So sieht die Lösung aus:<pre>List<int> zahlen = new List<int> { 2, 5, 8 };
-var query = zahlen.Where(z => z > 3);
+    `So sieht die Lösung aus:<pre>List&lt;int&gt; zahlen = new List&lt;int&gt; { 2, 5, 8 };
+var query = zahlen.Where(z =&gt; z &gt; 3);
 
 zahlen.Add(10);
 

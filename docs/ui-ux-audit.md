@@ -4364,3 +4364,1528 @@ sondern pro PR direkt in den Checks sichtbar.
   zweiten, tieferliegenden Fund nicht automatisch aus — lohnt sich, nach
   der ersten Erklärung trotzdem einmal mit funktionierendem Setup
   nachzuprüfen.
+
+### 2026-08-11 — Auf Nutzeranfrage: `main` gemerged, echter Produktions-Deploy ausgelöst
+
+- **Umfang:** Nutzeranfrage außerhalb der stündlichen Routine ("merge mit
+  main"). `main` war 67 Commits hinter `claude/github-projekt-b3ivo1`
+  zurück — vor dem Merge explizit auf den Live-Deploy-Trigger
+  (`deploy-pages.yml` triggert nur auf Push nach `main`) hingewiesen und
+  den Merge-Weg abgefragt: direkter Merge + Push gewählt (statt PR).
+  Kein Fast-Forward möglich (`main` hatte eigene Merge-Commits aus den
+  PRs #1–#4, unser Branch enthält deren Inhalt aber über eine andere
+  Commit-Historie) — echter Merge-Commit nötig, Konfliktprüfung per
+  `git merge --no-commit --no-ff` vorab: sauber, keine Konflikte.
+- **Vor dem Push verifiziert** (nicht nur der übliche Branch-Check,
+  sondern bewusst noch einmal auf dem gemergten `main`-Stand selbst, weil
+  dieser Push einen echten Produktions-Deploy auslöst): `npx tsc --noEmit`
+  sauber, `npm ci && npm run build` sauber (829,19 kB, identisch zum
+  Branch-Stand), volle Testsuite **1049/1049 grün**.
+- **Ergebnis:** `main` steht jetzt bei Commit `d0edb4f`, gepusht — SQL
+  (81/82), Python (81/82), C# (86/86 Content, Engine live im Dev-Server
+  verdrahtet, zwei von drei Produktions-Hosting-Schritten fertig) sind
+  damit erstmals seit Session-Beginn vollständig auf der echten
+  Produktionsseite unterwegs statt nur auf dem Arbeits-Branch. Der
+  `deploy-pages.yml`-Workflow läuft dadurch automatisch an.
+  `claude/github-projekt-b3ivo1` bleibt der Arbeits-Branch für die
+  stündliche Routine, unverändert bei `cf1c10d`.
+
+### 2026-08-11 — Stündliche Routine: `main`-Deploy verifiziert (grün) + C#-Produktions-Hosting, Schritt 3 — CI-Machbarkeit für `dotnet publish` bewiesen
+
+- **Umfang:** Baseline sauber (1049/1049, typecheck/build/knip grün, HEAD
+  `22d3ab5`). Erster Schritt dieses Durchgangs: den `deploy-pages.yml`-
+  Lauf, den der Merge nach `main` in der letzten Nutzeranfrage ausgelöst
+  hat, tatsächlich geprüft — `conclusion: success` für Commit `d0edb4f`,
+  keine "irgendwas ist kaputt"-Situation. Ein direkter Zugriff auf die
+  Live-Seite selbst (`robinderrobin.github.io`) scheitert an derselben
+  Sandbox-Netzwerksperre wie die CDN-Domains (403 auf den Proxy-
+  CONNECT-Tunnel) — kein Signal über den Deploy, nur eine bekannte
+  Umgebungseinschränkung dieser Sandbox.
+
+- **C#-Schritt:** SQL/Python haben keine aktionable Content-Lücke mehr,
+  daher laut Mandat-Priorität dieser Durchgang für C#. Der zuletzt
+  benannte nächste Schritt (`dotnet publish` + C#-Engine-`wwwroot` im
+  Deploy-Workflow) ist laut eigener Doku "das riskanteste Teilstück des
+  gesamten Vorhabens" — direkt in `deploy-pages.yml` schreiben, ohne
+  vorher zu wissen, ob ein echter GitHub-Actions-Runner die .NET-SDK-
+  und `wasm-tools`-Workload-Installation überhaupt schafft, wäre grob
+  fahrlässig. Stattdessen den Schritt aufgeteilt: zuerst die reine
+  CI-Machbarkeit in einem separaten, ungefährlichen Workflow beweisen,
+  danach (nächster Durchgang) erst die eigentliche Produktions-Verdrahtung.
+
+- **Neu:** `.github/workflows/csharp-engine-ci.yml` — `actions/setup-
+  dotnet@v4` (8.0.x) → `wasm-tools`-Workload → `dotnet publish -c
+  Release` in `csharp-engine/` → prüft die drei konkreten Dateien, die
+  der App-Loader tatsächlich braucht (`blazor.webassembly.js`,
+  `CSharpEngineBlazor.wasm.gz`, mindestens eine `refs/*.dll`), statt nur
+  auf einen Exit-Code 0 zu vertrauen. Pfadgefiltert auf `csharp-engine/**`
+  und die Workflow-Datei selbst — reine Frontend-Commits zahlen nicht für
+  eine .NET-SDK-Installation. Bewusst ein **separater** Workflow von
+  `ci.yml` (komplett anderes Toolchain, keine Deploy-Wirkung) statt in
+  `deploy-pages.yml` eingebaut.
+
+- **Lokal vorab verifiziert, exakt was der CI-Schritt tut:** frisches
+  `dotnet publish -c Release` in `csharp-engine/` (~32 s warm), 68 MB
+  `wwwroot/`-Output — deckt sich mit der schon dokumentierten ~9-MB-
+  komprimiert-Angabe (die 68 MB sind unkomprimierte Originale neben den
+  `.gz`/`.br`-Varianten, die der Browser tatsächlich lädt). Alle drei
+  Prüfungen des neuen CI-Schritts gegen dieses echte Ergebnis manuell
+  nachvollzogen: `blazor.webassembly.js` vorhanden, `CSharpEngineBlazor.
+  wasm.gz` vorhanden, 11 `refs/*.dll`-Dateien (deckt sich mit der aus
+  Schritt 2 bekannten "11 benötigte DLLs"-Zahl). Exakt die `wwwroot/`-
+  Form, die die lokale Dev-Server-Middleware bereits unter
+  `/csharp-engine/` ausliefert.
+
+- **Bewusst weiterhin offen:** die eigentliche Verdrahtung in
+  `deploy-pages.yml` (Publish-Schritt + Kopie nach `gh-pages` unter
+  `/csharp-engine/`) sowie die Verifikation, dass die produktiv
+  deployte Seite unter echten (Service-Worker-basierten, nicht
+  Dev-Server-echten) COOP/COEP-Headern tatsächlich bootet — bleibt der
+  nächste, eigenständige Schritt, erst nachdem dieser Workflow real in
+  CI gelaufen ist und sich bestätigt hat.
+
+- **Ergebnis:** Tests unverändert 1049/1049 grün (keine `src/`-Änderung,
+  reine Workflow-Datei). Typecheck/Build/Knip unverändert grün. Keine
+  Coverage-Änderung, kein Artifact-Republish nötig.
+
+- **Nachtrag, gleicher Durchgang — der neue Workflow lief tatsächlich und
+  fand einen echten Bug:** Direkt nach dem Push (Pfadfilter greift auch
+  auf die Workflow-Datei selbst) lief `csharp-engine-ci.yml` real auf
+  einem GitHub-Actions-Runner — und scheiterte nach nur 37 Sekunden,
+  viel zu schnell für einen echten Build-Fehler. Ursache: `ubuntu-latest`
+  bringt **mehrere** .NET-SDKs gleichzeitig mit (Feature-Bands für 8.0,
+  9.0 **und** 10.0 im Log sichtbar), und dieses Repo hatte kein
+  `global.json`, das festlegt, welches `dotnet` tatsächlich verwendet.
+  `dotnet workload install`/`dotnet publish` griffen dadurch auf die
+  neueste SDK (10.0.10) zu, obwohl das Projekt `net8.0` als Target hat —
+  die MSBuild-Eigenschaft, aus der der Referenz-Pfad gebaut wird, zeigte
+  dadurch auf einen nicht existierenden `10.0.10/ref/net8.0/`-Pfad. Diese
+  Sandbox hat nur eine SDK-Version installiert und hätte diesen Fehler
+  nie finden können — genau der Grund, warum dieser Durchgang bewusst
+  einen echten CI-Lauf statt nur lokaler Verifikation eingeplant hatte.
+  **Fix:** `csharp-engine/global.json` pinnt jedes `dotnet`-Kommando aus
+  `csharp-engine/` (und dem verschachtelten `driver/`-Unterprojekt) auf
+  die neueste installierte 8.0.x-SDK. Lokal erneut verifiziert (frischer
+  `dotnet publish -c Release` und `driver/`s `dotnet build -c Release`,
+  beide sauber, alle drei CI-Prüfungen weiterhin erfüllt) und mitgepusht
+  — der nächste reale CI-Lauf (durch genau diesen Fix selbst getriggert,
+  da er `csharp-engine/**` berührt) wird zeigen, ob das Problem behoben
+  ist.
+
+- **Zweiter Nachtrag, gleicher Durchgang — der Fix-Lauf fand einen
+  zweiten, verwandten Lücke:** `dotnet publish` lief diesmal tatsächlich
+  durch (kein `CSharpEngineRefPackDir`-Fehler mehr), der Job scheiterte
+  aber trotzdem — mit einer neuen Warnung davor: `Publishing without
+  optimizations... wasm-tools workload!`. Ursache: der
+  "Install wasm-tools workload"-Schritt hatte kein `working-directory`,
+  lief also vom Repo-Root aus — der zu diesem Zeitpunkt noch **kein**
+  `global.json` hatte (das lag nur unter `csharp-engine/`). Die
+  Workload-Installation griff dadurch selbst wieder auf die 10.0.10-SDK
+  zu, obwohl der (korrekt gepinnte) Publish-Schritt die 8.0.x-SDK nutzte
+  — zwei unabhängig aufgelöste `dotnet`-Aufrufe, uneinig darüber, wessen
+  installierte Workload gilt. Ohne wasm-tools für die tatsächlich
+  publizierende SDK fällt Blazor auf einen unoptimierten Pfad zurück, der
+  auch die vorkomprimierten `.gz`/`.br`-Dateien nicht erzeugt — genau die,
+  die die Verifikation prüft.
+  **Fix:** `global.json` vom `csharp-engine/`-Unterordner in den
+  **Repo-Root** verschoben, sodass jeder `dotnet`-Aufruf im gesamten
+  Checkout dieselbe gepinnte SDK auflöst — unabhängig vom Arbeitsverzeichnis,
+  ohne `working-directory` an jedem einzelnen Schritt nachpflegen zu
+  müssen. Als Nebeneffekt schützt das jetzt auch den bereits produktiven
+  `ci.yml`-Job, der `csharp-engine/driver/` für die Node-seitigen
+  C#-Tests baut und exakt dieselbe latente Mehrfach-SDK-Gefahr hatte,
+  bisher nur durch Zufall nie getroffen. Lokal aus allen drei relevanten
+  Verzeichnissen erneut bestätigt (`dotnet --version` konsistent
+  `8.0.129`), beide Projekte frisch neu gebaut, alle vier
+  Verify-Prüfungen erfüllt. Workflow-Pfadfilter um das jetzt
+  root-liegende `global.json` erweitert.
+
+- **Dritter Nachtrag, gleicher Durchgang — echter, seit Projektbeginn
+  verdeckter Bug gefunden und behoben:** Der dritte reale CI-Lauf zeigte,
+  dass beide SDK-Fixes tatsächlich griffen (Workload korrekt für 8.0.29
+  installiert, die optimierte AOT/Trimming-Publish-Pipeline lief
+  wirklich, ~49 s statt des vorherigen übersprungenen Schnelldurchlaufs)
+  — der Job scheiterte trotzdem, sofort in der Verifikation. Statt einen
+  vierten Fix zu raten, wurde der Verify-Schritt erst diagnostisch
+  gemacht (druckt das komplette Publish-Verzeichnis vor den Prüfungen
+  aus) und einzeln gepusht. Ergebnis eindeutig: `_framework/` komplett
+  vorhanden, aber `refs/` fehlte komplett im Publish-Output.
+
+  **Das ließ sich lokal reproduzieren — ein echter, seit jeher im Projekt
+  vorhandener Bug**, den diese Sandbox die ganze Zeit über durch
+  Zufall verdeckt hatte: Jede bisherige "frische" lokale Verifikation
+  in dieser Session hat nur `bin/`/`obj/` gelöscht, nie das
+  Quellverzeichnis `csharp-engine/wwwroot/refs/` selbst — das enthielt
+  die ganze Zeit einen mehrere Tage alten, gitignorten Leichenrest aus
+  einem früheren Build. `rm -rf bin obj wwwroot/refs && dotnet publish
+  -c Release` reproduziert exakt denselben Fehler wie der echte
+  CI-Runner. Ursache: Blazors Statische-Web-Asset-Erkennung ist ein
+  SDK-seitiger, zur Auswertungszeit ausgeführter Item-Glob über
+  `wwwroot/**` — keine `<Target>` — und läuft dadurch immer VOR jedem
+  `<Target>`, auch dem Ref-Kopier-Target. Auf einem wirklich sauberen
+  Checkout landen die DLLs zwar physisch korrekt in `wwwroot/refs/`,
+  aber zu spät, damit Blazors Publish-Manifest sie je kennt. Keine
+  `BeforeTargets`-Reihenfolge kann das beheben (empirisch mit
+  `ResolveStaticWebAssetsInputs` probiert — identischer Fehler).
+
+  **Fix:** zweites Target `CopyCSharpEngineRefAssembliesToPublishOutput`
+  (`AfterTargets="Publish"`) kopiert dieselben Referenz-DLLs zusätzlich
+  direkt nach `$(PublishDir)wwwroot/refs/` — unabhängig von Blazors
+  Asset-Manifest-Mechanismus, kann also nie wieder an diesem Timing
+  scheitern. Betrifft nicht nur CI: `vite.config.ts`s Dev-Server-
+  Middleware liefert denselben Publish-Output aus, ein echter frischer
+  lokaler Checkout wäre also genauso betroffen gewesen. Zweimal
+  hintereinander mit derselben Clean-Slate-Reproduktion verifiziert
+  (beide Male alle 11 Referenz-DLLs korrekt vorhanden), zusätzlich live
+  gegen den echten Dev-Server bestätigt (`curl` auf
+  `/csharp-engine/refs/System.Console.dll` → 200).
+
+- **Vierter Nachtrag, gleicher Durchgang — fünfter echter CI-Lauf,
+  vollständig grün:** Nach dem Publish-Output-Fix lief der Workflow
+  erneut real durch — alle Schritte erfolgreich (`setup-dotnet`,
+  Workload-Installation korrekt für 8.0.x, `dotnet publish -c Release`
+  mit der echten optimierten Pipeline, ~70 s, und die Verifikation).
+  Vier echte CI-Durchläufe, vier verschiedene echte Umgebungslücken
+  gefunden und behoben (SDK-Auflösung zweimal, dann der
+  `wwwroot/refs/`-Publish-Timing-Bug) — keine davon hätte diese Sandbox
+  allein finden können, und eine davon (der `refs/`-Bug) war ein echter,
+  seit Projektbeginn bestehender Produktbug, kein reines CI-Artefakt.
+  Genau das war der Sinn dieses Durchgangs: CI-Machbarkeit real
+  bewiesen, nicht nur angenommen — mit zwei echten Bugfixes als Nebenertrag.
+
+### 2026-08-11 — Stündliche Routine: KRITISCH — C#-Engine bootet aktuell überhaupt nicht mehr im echten Browser (Ursache ungeklärt)
+
+- **Umfang:** Baseline sauber (1049/1049, typecheck/build/knip grün, HEAD
+  `19ff91b`). Kein aktionabler SQL/Python-Content-Schritt, letzte
+  Durchgänge haben bereits einen C#-CI-Meilenstein erreicht — also Live-
+  Bug-Hunt gegen den echten Dev-Server (volles CDN-Workaround für sql.js/
+  Pyodide, dazu ein frisches `npm install sql.js pyodide playwright
+  --no-save`, da `npm ci` aus dem letzten Hauptmerge diese Ad-hoc-Pakete
+  wieder entfernt hatte).
+
+- **SQL/Python sauber, Regressionschecks bestätigt:** kanonische Python-
+  Lösung inkl. abschließendem Kommentar → `status-ok` (kein Analogon zum
+  früheren SQL-Bug); der SQL-Endkommentar-Fix aus einem früheren
+  Durchgang hält weiterhin (`status-ok`, `users enthält 5 Zeilen.`);
+  Track-Wechsel-Stress (SQL → Python → C# → SQL) hält Toolbar/Zustand
+  korrekt synchron.
+
+- **Kritischer Fund beim C#-Teil:** Die WASM-Engine bootet im echten
+  Browser nicht mehr — `MONO_WASM: Error in bindings_init Can't find
+  System.Runtime.InteropServices.JavaScript.JavaScriptExports class`,
+  `Failed to start platform`. Acht mögliche Ursachen einzeln geprüft und
+  ausgeschlossen (siehe ausführliche Analyse in
+  `docs/csharp-engine-poc.md`, neuer Abschnitt "CRITICAL, currently
+  unresolved"): alte Build-Artefakte (Juni-Zeitstempel, echt frisch
+  neugebaut — gleicher Fehler), der `wwwroot/refs/`-Fix aus früheren
+  Durchgängen (direkt gegen die rohe `host.html` getestet, umgeht die App
+  komplett — gleicher Fehler), fehlende Dateien (alle 200), COOP/COEP/
+  `crossOriginIsolated`/`SharedArrayBuffer`/Worker-Erzeugung (alle
+  korrekt), `wasm-tools`-Workload-Drift (frisch deinstalliert und neu
+  installiert, identische Version), NuGet-Paketversionen (`project.assets.
+  json` direkt geprüft, exakt gepinnt), Quellcode-Korruption (kein Diff
+  gegen HEAD), veraltete Integrity-Hashes in `blazor.boot.json` (frisch,
+  keine SRI-Fehlermeldung).
+
+- **Roslyn/Compiler-Ebene bestätigt unbetroffen:** der Desktop-.NET-
+  Treiber (`test/helpers/nodeCSharpEngine.test.ts`, strukturell
+  identische `CSharpCompilation`-Pipeline, nur nicht unter Blazor/WASM)
+  läuft weiterhin 5/5 grün — der Fehler sitzt spezifisch im Blazor-WASM-
+  JS-Interop-Bootstrap, nicht im C#-Compiler oder Content.
+
+- **Einordnung:** Dieses Dokument selbst belegt (Eintrag vom 2026-08-10),
+  dass exakt dieselbe Kombination (`WasmEnableThreads=true` +
+  `credentialless` + echter Publish-Output) damals erfolgreich gebootet
+  und echten C#-Code ausgeführt hat. Seitdem hat sich etwas geändert —
+  vermutlich eine für diese Sandbox nicht weiter introspizierbare
+  Umgebungsänderung, da alles version-gepinnte lokal exakt nachgeprüft
+  sauber ist.
+
+- **Praktischer Schweregrad:** **kein aktueller Produktions-Vorfall** —
+  `deploy-pages.yml` liefert die C#-Engine noch gar nicht nach
+  `gh-pages` aus, kein echter Nutzer kann diesen Pfad aktuell erreichen.
+  Betrifft nur `npm run dev` und den noch nicht produktiv verdrahteten
+  CI-Check. Ist aber ein harter Blocker für den nächsten geplanten
+  Schritt (`deploy-pages.yml`-Verdrahtung) und für jede weitere C#-Arbeit,
+  da nichts an der Engine gerade end-to-end im echten Browser verifizierbar
+  ist. Der bereits vorher eingebaute 15-Sekunden-Timeout in
+  `ensureCSharpEngineLoaded` (aus einem früheren, nicht mit diesem Bug
+  zusammenhängenden Durchgang) fängt das UX-seitig ab — Nutzer sähen nach
+  15s einen Fehler statt eines endlosen Ladezustands, auch wenn die
+  Fehlermeldung aktuell fälschlich Browser-Erweiterungen/CSP nennt.
+
+- **Bewusst kein Code-Fix versucht:** jede geprüfte Hypothese kam negativ
+  zurück; ein ungetesteter, spekulativer Eingriff (`WasmEnableThreads`,
+  Paketversionen, Toolchain) hätte riskiert, ein bekanntes, gut
+  dokumentiertes Problem gegen ein unbekanntes einzutauschen. Kein
+  Working-Tree-Change begleitet diesen Log-Eintrag — reine Diagnose.
+
+- **Ergebnis:** Tests/typecheck/build/knip unverändert grün (keine
+  Code-Änderung). Kein Artifact-Republish nötig (keine Zahlenänderung).
+  **Nächster Schritt für eine künftige Sitzung:** in
+  `docs/csharp-engine-poc.md`s neuem Abschnitt dokumentierte
+  Kandidaten prüfen (testweise `WasmEnableThreads` deaktivieren, um zu
+  isolieren, ob spezifisch der Multithreading-Pfad betroffen ist;
+  externe Recherche zu bekannten Issues für diese exakte SDK/
+  Workload-Kombination, sobald Netzwerkzugriff das erlaubt).
+
+### 2026-08-11 — Stündliche Routine: C#-Boot-Bug — zwei weitere Kandidaten geprüft, Ursache weiter eingegrenzt, noch ungelöst
+
+- **Umfang:** Baseline sauber (1049/1049, typecheck/build/knip grün, HEAD
+  `eaaf190`). Fortsetzung der im letzten Durchgang begonnenen Diagnose
+  des kritischen C#-Boot-Fehlers — diesmal mit Web-Zugriff verfügbar,
+  zusätzlich die im letzten Durchgang benannten "noch nicht geprüft"-
+  Kandidaten abgearbeitet.
+
+- **`WasmEnableThreads` als Ursache ausgeschlossen:** testweise auf
+  `false` gesetzt (nie committet), sauberer Rebuild — identischer Fehler.
+  Kein Multithreading-spezifisches Problem. Änderung sofort per `git
+  checkout` zurückgesetzt, Arbeitsbaum sauber bestätigt.
+
+- **Externe Recherche:** mehrere ähnliche, historische `dotnet/runtime`-/
+  `dotnet/aspnetcore`-Issues gefunden (u. a. #72803, #38433, #48522,
+  #103499), keins exakt passend, keins mit dokumentierter Lösung im für
+  dieses Fetch-Tooling sichtbaren Bereich (nur Issue-Text, keine dynamisch
+  geladenen Kommentar-Threads). Bestätigt aber: diese Klasse von
+  JS-Interop-Bindungsfehlern ist ein bekanntes, wiederkehrendes Muster in
+  .NET 8/9 Blazor WASM, kein Einzelfall dieses Projekts.
+
+- **Neue, gezieltere lokale Diagnose:** `EmitCompilerGeneratedFiles=true`
+  erzwungen — der `[JSExport]`-Quellgenerator läuft korrekt und
+  registriert `CSharpEngine.RunCode` einwandfrei. Die vom Bootfehler
+  vermisste `JavaScriptExports`-Klasse ist kein Generator-Artefakt
+  dieses Projekts, sondern ein BCL-interner Typ in
+  `System.Runtime.InteropServices.JavaScript.wasm` — per `strings`
+  bestätigt, dass er in dieser Assembly tatsächlich vorhanden ist.
+  Zusätzlich den SHA-256-Hash der ausgelieferten Datei unabhängig in
+  Python nachgerechnet — deckt sich exakt mit `blazor.boot.json`s
+  Integritäts-Hash. Damit: Generator läuft, Wrapper korrekt registriert,
+  der gesuchte Typ existiert in der richtigen Assembly, die Datei wird
+  korrekt und unverändert ausgeliefert — der Fehler sitzt spezifisch in
+  der MONO_WASM-Laufzeit selbst beim Auflösen dieses Typs, unterhalb
+  jeder von diesem Projekt kontrollierbaren Ebene.
+
+- **Weiterhin ungeklärt:** ob ein anderer Browser-Kontext (kein
+  Headless/Playwright) etwas ändert (keine Anzeige in dieser Sandbox,
+  ungetestet); die tatsächlichen Kommentar-Threads der gefundenen
+  GitHub-Issues (vom Fetch-Tooling nicht vollständig ladbar); ob eine
+  andere .NET-8-SDK-Patch-/Workload-Version das Problem löst
+  (ungetestet, da ein Versionswechsel ohne Verifikationsmöglichkeit nur
+  einen unbestätigten Zustand gegen einen anderen tauschen würde).
+
+- **Ergebnis:** Tests/typecheck/build/knip unverändert grün (keine
+  Code-Änderung, working tree sauber). Kein Artifact-Republish nötig.
+  Der Fehler bleibt bestehen, aber die Ursachenraum ist jetzt deutlich
+  enger als am Ende des letzten Durchgangs.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt SQL/Editor/Tutorial (sauber)
+
+- **Umfang:** Baseline sauber (1049/1049, typecheck/build/knip grün, HEAD
+  `9ba8784`). Der C#-Boot-Bug hat bereits zwei eigene Durchgänge bekommen
+  und ist kein Produktions-Vorfall — ein dritter Durchgang in Folge auf
+  demselben festgefahrenen Problem hätte sinkende Grenzerträge riskiert.
+  Stattdessen laut Prioritätenliste Punkt 2: Live-Bug-Hunt auf Flächen,
+  die in den letzten (C#-fokussierten) Durchgängen nicht geprüft wurden —
+  Tutorial-Rendering, Tipp-Flow, localStorage-Persistenz, Lösungs-
+  Vergleichsansicht.
+
+- **Vorgehen:** Dev-Server mit sql.js-CDN-Workaround gestartet. Tutorial-
+  Tab über 5 Stichproben verteilt über alle 78 SQL-Challenges geprüft
+  (kein rohes escaptes HTML sichtbar, `&lt;b&gt;`/`&lt;code&gt;` o. ä.
+  nirgends gefunden — Markdown/HTML-Rendering korrekt). Tipp-Button
+  viermal geklickt (3 Tipps + ein Overflow-Klick) — Tipp-Elemente
+  erscheinen wie erwartet. Editor-Entwurf getippt, echten Seiten-Reload
+  ausgelöst (nicht nur SPA-State) — Entwurf via localStorage korrekt
+  wiederhergestellt. Lösungs-/Vergleichsansicht im Task-Tab geöffnet —
+  öffnet korrekt.
+
+- **Bewusst nicht getestet:** der Chat-Tab (`src/chat/claudeChatClient.ts`)
+  — ein echtes Absenden hätte einen echten API-Call an Claude ausgelöst,
+  unnötiges Risiko für einen reinen UI-Check. Bereits durch bestehende
+  Unit-Tests abgedeckt.
+
+- **Keine neuen Funde:** die drei beobachteten Konsolenfehler
+  (`ERR_CERT_AUTHORITY_INVALID`) sind das bereits mehrfach dokumentierte
+  Sandbox-Netzwerkrauschen (blockierte externe Domains), kein Produktbug.
+
+- **Ergebnis:** Tests/typecheck/build/knip unverändert grün. Kein
+  Artifact-Republish nötig (keine Zahlenänderung). Dev-Server sauber
+  beendet.
+
+### 2026-08-11 — Stündliche Routine: C#-Boot-Bug — anderer SDK-Patch getestet, ausgeschlossen; Sandbox-Umgebung wiederhergestellt
+
+- **Umfang:** Baseline vor Beginn geprüft (HEAD `d5e9783`, 1049/1049
+  Tests, typecheck/build grün, `git status` sauber). Letzter noch offener,
+  konkret umsetzbarer Kandidat aus den vorherigen zwei C#-Boot-Bug-
+  Durchgängen: ein anderer .NET-8-SDK-Patch könnte den Fehler
+  (`Can't find … JavaScriptExports class`, `Failed to start platform`)
+  beheben — bisher ungetestet, da eine Versionsänderung ohne Verifikation
+  nur einen unverifizierten Zustand gegen einen anderen getauscht hätte.
+  Diesen Durchgang tatsächlich getestet.
+
+- **Vorgehen:** `dotnet-sdk-8.0` per apt von `8.0.129-0ubuntu1~24.04.1`
+  auf die ältere `8.0.104-0ubuntu1` (aus dem Basis-`noble`-Repo statt
+  `noble-updates`) downgraded. `dotnet workload list` installierte
+  daraufhin automatisch `wasm-tools` auf dem passenden älteren
+  Runtime-Pack `8.0.4` (statt der bisher durchgängig verwendeten
+  `8.0.29`) neu.
+
+- **Befund — Umgebungsinkonsistenz statt sauberem Test:** ein
+  Clean-Rebuild (`rm -rf bin obj wwwroot/refs && dotnet publish -c
+  Release`) unter diesem älteren Toolchain schlug schon vor dem
+  eigentlichen Boot-Test fehl: `CSharpEngineRefPackDir` zeigte auf
+  `.../Microsoft.NETCore.App.Ref/8.0.4/ref/net8.0/`, das es auf der
+  Platte nicht gibt — nur das `8.0.29`-Ref-Pack ist vorhanden. Das
+  apt-Downgrade hat SDK-CLI und (über den Workload-Manager) das
+  Wasm-Runtime-Pack auf `8.0.4` verschoben, aber das separate
+  `Microsoft.NETCore.App.Ref`-Targeting-Pack (nicht vom
+  `dotnet-sdk-8.0`-Paket selbst verwaltet) blieb bei `8.0.29` —
+  ein verwaistes, inkonsistentes Sandbox-Environment, kein sauberer
+  "älteres SDK"-Test. Ein wirklich konsistentes älteres Toolchain hätte
+  ein manuell beschafftes, passendes Ref-Pack erfordert, das über apt in
+  dieser Sandbox nicht verfügbar ist — ein deutlich größerer, weniger
+  begrenzter Nebenaufwand als für dieses Experiment vorgesehen.
+
+- **Wiederherstellung:** SDK zurück auf `8.0.129-0ubuntu1~24.04.1`
+  (`apt-get install --allow-downgrades`), danach `dotnet workload install
+  wasm-tools --skip-manifest-update` — stellte `wasm-tools` korrekt auf
+  `8.0.29` wieder her (per `dotnet workload list` bestätigt). Clean-Build
+  unter dem wiederhergestellten Original-Toolchain publiziert wieder
+  fehlerfrei. Der kanonische Boot-Repro-Check
+  (`http://localhost:5173/csharp-engine/host.html`) wurde erneut
+  ausgeführt, um sicherzustellen, dass die Sandbox selbst nicht
+  driftete: `git status`/`git diff` auf `csharp-engine/` zeigen null
+  Änderungen — Umgebung exakt auf committetem Stand — und derselbe Fehler
+  reproduziert exakt wie zuvor.
+
+- **Schlussfolgerung:** kein SDK-`8.0.29`-vs-älter-Problem — derselbe
+  Fehler bei beiden getesteten Runtime-Pack-Versionen, soweit ein
+  wirklich sauberer, konsistenter SDK-Versionstest über apt in dieser
+  Sandbox überhaupt praktikabel ist. Kein spekulativer Code-Fix
+  verschickt. Vollständig dokumentiert in
+  `docs/csharp-engine-poc.md`s "CRITICAL, currently unresolved"-Abschnitt.
+
+- **Ergebnis:** Tests/typecheck/build unverändert grün (keine Code-
+  Änderung, working tree sauber vor und nach dem Experiment). Kein
+  Artifact-Republish nötig (keine Zahlenänderung, reiner Diagnose-
+  Durchgang).
+
+### 2026-08-11 — Stündliche Routine: Echter Bug gefunden und behoben — SQL-Kommentare konnten den Endlosrekursions-Schutz aushebeln
+
+- **Umfang:** Baseline sauber (1049/1049, typecheck/build/knip grün, HEAD
+  `cf915c8`). SQL/Python-Content ist bei 81/82 (nur permanente Ausnahmen
+  offen), C# bei 86/86 — kein aktionabler Content-Task mehr verfügbar.
+  Statt eines weiteren generischen Live-Bug-Hunts (bereits mehrfach in
+  Folge "sauber" ohne Befund) diesmal gezielt `npx vitest run --coverage`
+  laufen lassen, um echte Coverage-Lücken in echtem Source-Code (nicht
+  Content-Dateien) zu finden — Priorität-2-Arbeit, aber datengetrieben
+  statt Klick-für-Klick.
+
+- **Befund:** `src/domain/sql/unboundedRecursionCheck.ts` (der
+  Sicherheitscheck, der `WITH RECURSIVE`-Abfragen ohne `WHERE`/`LIMIT`
+  vor der Ausführung abfängt, weil sql.js 1.10.2 keine Möglichkeit hat,
+  eine einmal gestartete Endlosrekursion abzubrechen — würde den Tab
+  einfrieren) hatte niedrige Branch-Coverage (88 %) auf genau den Zeilen,
+  die Kommentare behandeln. Empirisch verifiziert, dass das ein echter
+  Bug ist, kein Coverage-Kosmetikproblem: `findUnboundedRecursion()`
+  prüfte `WHERE`/`LIMIT` per Regex direkt auf dem Rohtext, ohne SQL-
+  Kommentare vorher zu entfernen. Eine Abfrage wie
+  ```sql
+  WITH RECURSIVE cnt(n) AS (
+    SELECT 1
+    UNION ALL
+    SELECT n+1 FROM cnt -- WHERE n < 100
+  )
+  SELECT n FROM cnt;
+  ```
+  (ein `WHERE` nur als Kommentartext, z. B. eine Lernende Notiz-an-sich-
+  selbst oder ein auskommentierter Versuch) wurde fälschlich als
+  "sicher" durchgelassen — obwohl die tatsächliche Rekursion komplett
+  unbeschränkt ist. Dasselbe für ein `LIMIT` nur in einem Kommentar nach
+  der CTE. Genau das Szenario, das dieser Check verhindern soll, konnte
+  ihn also durch einen völlig harmlosen Kommentar aushebeln.
+
+- **Fix:** neue private Funktion `stripStringsAndComments()` (gleiches
+  Zeichen-für-Zeichen-Tracking-Muster wie `findParenBody`/
+  `statementSplitter.ts`, das dieses Modul schon durchgängig verwendet)
+  ersetzt String-Literale und Kommentare durch Leerzeichen (Offsets
+  bleiben erhalten), bevor die `WHERE`/`LIMIT`-Prüfungen laufen. Auf den
+  CTE-Body selbst angewendet, bevor `recursiveMemberOf()` dessen eigene
+  (kommentarblinde) Klammer-Tiefenzählung durchführt — sonst hätte ein
+  unausgeglichener Klammer-Kommentar dieselbe Tiefenzählung durcheinander
+  bringen können. `recursiveMemberOf()`s eigenes String-Tracking wurde
+  dabei entfernt, da es nach dem Strippen nie mehr erreichbar war (hätte
+  sonst denselben toten-Code-Zustand erzeugt, den der nächste Punkt in
+  `statementSplitter.ts` beschreibt). Drei neue Regressionstests decken
+  Kommentar-`WHERE`, Kommentar-`LIMIT` und einen unausgeglichenen
+  Klammer-Kommentar ab; alle bisherigen Tests (String-Literal-Fälle,
+  echtes `WHERE`/`LIMIT` usw.) bleiben unverändert grün — empirisch mit
+  einem eigenen Vorher/Nachher-Skript gegen sieben Fallunterscheidungen
+  verifiziert, nicht nur angenommen.
+
+- **Nebenfund beim Lesen der Coverage-Tabelle:** `statementSplitter.ts`s
+  `hasSqlContent()` hatte ebenfalls eine Coverage-Lücke (Zeilen 41-49) —
+  hier aber echter toter Code, kein Bug: die Funktion `return`et sofort
+  `true`, sobald sie das erste Anführungszeichen sieht, sodass der
+  `inString`-Zweig (der das Ende eines Strings verfolgen würde) niemals
+  in einer späteren Iteration erreicht werden kann. Verhalten war schon
+  immer korrekt, nur unnötig verschachtelt. Bereinigt (String-Tracking-
+  Variable und -Zweig entfernt, Kommentar erklärt jetzt explizit, warum
+  das hier anders ist als in `splitStatements`, das dieselbe String-
+  Erkennung tatsächlich über mehrere Iterationen braucht).
+
+- **Tests:** 1049 → 1052 (+3, alle in
+  `unboundedRecursionCheck.test.ts`). `npx tsc --noEmit` fehlerfrei,
+  volle Testsuite 1052/1052 grün, `npm run build` grün (829.51 kB),
+  `npx knip` unverändert (10 Funde, alle bereits bekannt).
+
+- **Ergebnis:** echter, ausnutzbarer (wenn auch nicht böswillig
+  gemeinter) Sicherheitslücken-Fix in einer produktionsrelevanten
+  Schutzfunktion — nicht nur eine Coverage-Zahl verbessert. Kein
+  Artifact-Republish nötig (kein Content, keine Konzept-Zahlen
+  geändert).
+
+### 2026-08-11 — Stündliche Routine: C#-Boot-Bug — GitHub-Kommentar-Threads jetzt lesbar, aber kein Treffer; keine weiteren Befunde
+
+- **Umfang:** Baseline sauber (1052/1052, typecheck/build/knip grün, HEAD
+  `853b23f`). SQL/Python bei 81/82 (nur permanente Ausnahmen offen), C#
+  bei 86/86 — kein aktionabler Content-Task. Letzter Firing fand über
+  Coverage-Analyse einen echten Bug; diesmal dieselbe Coverage-Tabelle
+  (nicht neu erzeugt, da unverändert) nochmal auf verbleibende Nicht-
+  Content-Lücken geprüft (`actions.ts` Chat-Helfer — bewusst nicht live
+  getestet, s. frühere Begründung; leerer `catch`-Block in
+  `localStorageProgressStore.ts` — trivial; C#/Python-Tokenizer — rein
+  kosmetisch, betrifft keine Ausführung/Bewertung) — nichts Neues
+  gefunden. Daher diesen Durchgang stattdessen den C#-Boot-Bug mit einem
+  bislang ungenutzten Werkzeug angegangen.
+
+- **Neue Fähigkeit entdeckt:** die frühere Einschränkung "GitHub-
+  Kommentar-Threads sind für dieses Sandbox-Fetch-Tooling nicht lesbar"
+  betraf nur die gerenderte Issue-Seite (Kommentare laden per Client-
+  JavaScript nach). GitHubs einfache REST-API
+  (`https://api.github.com/repos/<owner>/<repo>/issues/<n>/comments`)
+  liefert Kommentare als statisches JSON — `WebFetch` funktioniert damit
+  einwandfrei. Bislang in keinem der beiden vorherigen Durchgänge
+  probiert.
+
+- **Ergebnis der eigentlichen Recherche: kein neuer Treffer.** Alle 12
+  Kommentare zu `dotnet/runtime#87690` gelesen — stellte sich als
+  komplett anderer Bug heraus (`JSHost.ImportAsync()`-Timing in Razor-
+  Komponenten, die vor Abschluss eines async Imports rendern) und ist
+  hier nicht anwendbar, da `CSharpEngine.RunCode` eine reine
+  `[JSExport]`-statische Methode ohne jede Razor-Komponente ist. Gezielte
+  GitHub-Suchen (`"JavaScriptExports" bindings_init`,
+  `"Can't find" "JavaScriptExports" repo:dotnet/runtime`) fanden nur
+  unrelated gemergte PRs zu WASM-Threading/Rendering, alle für **.NET 9**
+  gezielt, nicht 8. Zusätzlich geprüft, ob die Playwright/Chromium-Version
+  selbst seit dem funktionierenden 2026-08-10-Stand gedriftet ist (ein
+  bislang nicht betrachteter Kandidat) — hat sie nicht: derselbe gecachte
+  `chromium-1194`-Build (per `executablePath` fixiert) war schon am
+  2026-08-10 im Einsatz, dokumentiert im selben Abschnitt.
+
+- **Fazit:** die "Kommentare nicht lesbar"-Einschränkung ist behoben,
+  aber die eigentliche Recherche bringt weiterhin keinen Fix — sauber als
+  ausgeschöpft dokumentiert, damit kein künftiger Durchgang dieselbe
+  jetzt-beantwortete Frage nochmal stellt. Kein spekulativer Code-Fix
+  verschickt. Vollständig in `docs/csharp-engine-poc.md` festgehalten.
+
+- **Ergebnis:** reiner Recherche-/Dokumentations-Durchgang, keine Code-
+  Änderung. Tests/typecheck/build unverändert grün (1052/1052, 829.51 kB).
+  Kein Artifact-Republish nötig.
+
+### 2026-08-11 — Stündliche Routine: Endlosrekursions-Fix live im echten Editor bestätigt (sauber)
+
+- **Umfang:** Baseline sauber (1052/1052, typecheck/build/knip grün, HEAD
+  `57f1f25`). Kein aktionabler Content-Task (SQL/Python 81/82, C# 86/86);
+  der `WITH RECURSIVE`-Kommentar-Umgehungs-Fix von vor zwei Durchgängen
+  war bislang nur unit-getestet, nie live im echten Browser über die
+  echte Editor-UI verifiziert — Priorität-2-Arbeit, die den Verifikations-
+  Kreis schließt statt neue Fläche zu suchen.
+
+- **Vorgehen:** Dev-Server mit sql.js-CDN-Workaround gestartet, echten
+  SQL-Editor über drei Playwright-Läufe geprüft: (1) `WHERE` nur als
+  Kommentartext im rekursiven Teil → muss blockiert werden, (2) echtes
+  `WHERE` im rekursiven Teil → darf nicht vom Schutz blockiert werden,
+  (3) komplett unbeschränkt (Sanity-Check) → muss blockiert werden.
+
+- **Ergebnis: Fix bestätigt korrekt End-to-End.** Fall 1 und 3 zeigen
+  korrekt `status-err` mit der erwarteten deutschen Fehlermeldung
+  ("...läuft die Rekursion unendlich weiter..."), Umlaute (ä, ü) und
+  Gedankenstrich rendern korrekt über `escapeHtml`. Fall 2 löst den Guard
+  korrekt nicht aus (zeigt stattdessen `status-warn`, weil diese Query
+  nicht zur ausgewählten Challenge passt — die eigentliche Fach-
+  Validierung, unabhängig vom Rekursions-Schutz). Keine Konsolenfehler.
+  Kein neuer Befund — reine Bestätigung, dass der frühere Unit-Test-Fix
+  auch im echten UI-Pfad (Editor → `executeAndValidate` →
+  `resultsArea.ts`-Rendering) tatsächlich greift.
+
+- **Ergebnis:** Tests/typecheck/build unverändert grün. Kein Artifact-
+  Republish nötig (keine Zahlenänderung). Dev-Server sauber beendet.
+
+### 2026-08-11 — Stündliche Routine: Irreführende C#-Timeout-Fehlermeldung korrigiert
+
+- **Umfang:** Baseline sauber (1052/1052, typecheck/build/knip grün, HEAD
+  `ca46cb1`). Kein aktionabler Content-Task; C#-Boot-Bug bereits mehrfach
+  ausführlich untersucht ohne neuen Ansatz. Beim Lesen von
+  `ensureCSharpEngineLoaded` (`src/ui/state/actions.ts`) im Zuge der
+  letzten C#-Recherchen fiel eine echte, aktuell live im Produkt sichtbare
+  UX-Ungenauigkeit auf: `CSHARP_ENGINE_TIMEOUT_MESSAGE` behauptet nach
+  15 s Timeout, vermutlich blockiere "eine Browser-Erweiterung oder eine
+  Content-Security-Policy das Laden des Blazor-Bundles".
+
+- **Befund:** diese Erklärung ist nicht nur durch die inzwischen bekannte
+  tatsächliche Ursache (ein MONO_WASM-Interop-Bug, siehe
+  `docs/csharp-engine-poc.md`) überholt, sondern strukturell schon von
+  Anfang an unplausibel für diesen Fall: `loadCSharpEngineFromServer`
+  lädt alles von `CSHARP_ENGINE_BASE_URL = '/csharp-engine/'` — also
+  same-origin, keine externe CDN-Anfrage, die eine Erweiterung oder CSP
+  überhaupt blockieren könnte. Die Formulierung war offensichtlich 1:1
+  von `PYTHON_ENGINE_TIMEOUT_MESSAGE` übernommen, wo sie tatsächlich
+  zutrifft (Pyodide lädt echt von `cdn.jsdelivr.net`). Der C#-Track ist
+  über `src/content/registry.ts` live im Kurs-Picker wählbar — reale
+  Nutzer, die C# aktuell versuchen, sehen also diese falsche Diagnose.
+
+- **Fix:** Nachricht auf eine ehrliche Formulierung geändert ("C#-Track
+  ist noch experimentell, liegt nicht an deinem Browser oder an
+  Erweiterungen, bitte neu laden, in der Zwischenzeit SQL/Python
+  nutzen"), ohne eine Ursache zu behaupten, die dieser Code nicht belegen
+  kann. Kein Test hatte den exakten Nachrichtentext hart kodiert
+  (`actions.test.ts` prüft nur generisch den Fehlerzustand), daher keine
+  Testanpassung nötig — `actions.test.ts` (45 Tests) und die volle Suite
+  liefen trotzdem zur Sicherheit erneut durch.
+
+- **Tests:** 1052/1052 unverändert (reine String-Änderung, kein neuer
+  Codepfad). `npx tsc --noEmit` fehlerfrei, `npm run build` grün
+  (829.52 kB, Rundungsdifferenz zum String). `npx knip` unverändert.
+
+- **Ergebnis:** kleine, aber echte UX-Korrektur in einer aktuell live
+  erreichbaren Fehlermeldung. Kein Artifact-Republish nötig (kein
+  Content, keine Konzept-Zahlen geändert).
+
+### 2026-08-11 — Stündliche Routine: Timeout-Nachrichten-Fix live bestätigt — Boot-Fehler hängt, wird nicht als Rejection gemeldet
+
+- **Umfang:** Baseline sauber (1052/1052, typecheck/build grün, HEAD
+  `8d1d6c0`). Vor der letzten Nachrichten-Korrektur unklar, ob sie
+  überhaupt den tatsächlich ausgelösten Codepfad trifft: `host.html` hat
+  einen eigenen `Blazor.start().catch(...)`, der bei einem echten Startup-
+  Error eine spezifischere `csharp-boot-error`-Nachricht postet (`Der
+  C#-Motor konnte nicht gestartet werden: ...`) — falls *dieser* Pfad für
+  den bekannten MONO_WASM-Bug greift, hätte der reine 15s-Timeout-Text nie
+  angezeigt werden können. Live verifiziert statt angenommen.
+
+- **Vorgehen:** Dev-Server gestartet, echten C#-Track im Kurs-Picker
+  ausgewählt, eine Challenge geöffnet und bis zu 20 s auf sichtbare
+  Statusänderungen gewartet, dazu den sichtbaren Seitentext auf beide
+  möglichen Nachrichtenfragmente geprüft.
+
+- **Ergebnis: bestätigt, der Timeout-Pfad ist tatsächlich der einzig
+  erreichte.** Der `Blazor.start().catch()` in `host.html` feuert für
+  diesen speziellen MONO_WASM-Fehler nie — die Konsole zeigt zwar
+  `MONO_WASM: Error in bindings_init ...` und einen `[pageerror] Failed
+  to start platform`, aber keine `csharp-boot-error`-Nachricht erreicht
+  den Parent (kein `"C#-Motor konnte nicht gestartet"` im Seitentext).
+  Stattdessen bleibt die Ladepromise einfach hängen, bis nach 15 s
+  `withTimeout` greift — der Seitentext enthält korrekt `"nicht
+  geantwortet"` und `"experimentell"`, die neue, korrigierte Nachricht
+  aus dem letzten Durchgang. Bestätigt: der Fix trifft tatsächlich den
+  einzigen Pfad, den reale Nutzer bei diesem Bug sehen — keine zweite,
+  ungeprüfte Fehlermeldung daneben, die noch die alte falsche Erklärung
+  zeigen könnte.
+
+- **Ergebnis:** reine Verifikation, keine Code-Änderung. Tests/typecheck/
+  build unverändert grün. Kein Artifact-Republish nötig. Dev-Server
+  sauber beendet.
+
+### 2026-08-11 — Stündliche Routine: WICHTIG — C#-Track ist bereits live auf der echten Produktions-Seite und aktuell für niemanden nutzbar; Fix für schnelleres, ehrlicheres Scheitern verschickt
+
+- **Umfang:** Baseline sauber (1052/1052, typecheck/build/knip grün, HEAD
+  `d8a64c0`). Beim Nachdenken über die letzte Nachrichten-Korrektur fiel
+  auf, dass `docs/csharp-engine-poc.md` bislang behauptet, dies sei "kein
+  Live-Produktions-Vorfall", weil `deploy-pages.yml` die C#-Engine-Assets
+  angeblich nie mitausliefert — diese Annahme war nie tatsächlich gegen
+  den echten Repo-/Deploy-Zustand geprüft worden.
+
+- **Verifiziert via GitHub API (nicht angenommen):** `main`s
+  `src/content/registry.ts` (Commit `d0edb4f`, der frühere per Nutzeranfrage
+  gemergte Stand) registriert den `csharp`-Track bereits vollständig in
+  `TRACKS` — eingeführt in `5ab928d` ("C#-Engine live verdrahtet"), also
+  *vor* dem Merge nach `main`. Der `deploy-pages.yml`-Lauf gegen genau
+  diesen Merge-Commit (`31508705782`) lief erfolgreich durch
+  (`2026-08-11T15:44:49Z`). Der tatsächliche `gh-pages`-Branch enthält nur
+  `index.html` und `coi-serviceworker.js` — kein `csharp-engine/`-Ordner.
+
+- **Konsequenz: die "kein Live-Vorfall"-Einschätzung war falsch.** Der
+  C#-Track ist auf der echten, deployten Seite jetzt wählbar (im Build
+  fest einkompiliert, nicht environment-gated), aber für **jeden** realen
+  Besucher, der ihn versucht, komplett funktionsunfähig: `iframe.src`
+  zeigt auf `/csharp-engine/host.html`, das dort schlicht 404 liefert
+  (nicht der bekannte MONO_WASM-Boot-Bug — der tritt nur auf, wo die
+  Engine überhaupt ausgeliefert wird, z. B. lokal im Dev-Server). Vor
+  dem heutigen Fix bedeutete das: 15 Sekunden sinnloses Warten, bevor
+  überhaupt eine Erklärung erscheint.
+
+- **Fix (klein, sicher, reversibel):** `loadCSharpEngineFromServer`
+  schickt jetzt parallel zum iframe-Aufbau einen `HEAD`-Request auf
+  `${baseUrl}host.html`. Kommt eine Nicht-OK-Antwort zurück, wird die
+  Ladepromise sofort mit "Der C#-Motor ist in dieser Umgebung (noch)
+  nicht bereitgestellt." abgelehnt — kein Warten mehr auf etwas, das nie
+  klappen kann. Ein Netzwerkfehler des HEAD-Checks selbst gilt nicht als
+  eindeutig (fällt zurück auf den bisherigen iframe-/Timeout-Pfad). Live
+  mit echten Playwright-Läufen verifiziert, nicht nur Unit-Mocks: gegen
+  den echten Dev-Server (Engine vorhanden) braucht der bekannte
+  MONO_WASM-Bug weiterhin ~13,7 s (Fast-Path greift korrekt nicht, da der
+  HEAD-Check erfolgreich ist) — gegen ein Route-Mock, das `host.html` 404
+  liefert (bildet die echte Produktions-Lücke nach), erschien die neue
+  Nachricht nach **20 ms**.
+
+- **Bewusst NICHT gemacht:** den `csharp`-Track wieder aus `TRACKS`
+  entfernen. Das wäre eine echte Produkt-Entscheidung (ganzen Track
+  verstecken vs. ihn ehrlich und jetzt schnell scheitern lassen, mit
+  Verweis auf SQL/Python) — das Mandat rahmt C# ausdrücklich als
+  akzeptiertes Work-in-Progress über mehrere Durchgänge, und ein
+  einzelner autonomer Stundendurchgang sollte nicht einseitig
+  substanzielle, bewusste Vorarbeit rückgängig machen.
+
+- **Für den Nutzer, klar markiert:** der C#-Track ist gerade live auf der
+  echten Seite und für niemanden abschließbar. Ob das so bleiben soll,
+  bis die Engine fertig ist, oder der Track bis dahin lieber temporär
+  versteckt werden sollte, ist eine Entscheidung für den Repo-Besitzer —
+  hier bewusst dokumentiert statt eigenmächtig entschieden.
+
+- **Wichtig:** dieser Fix liegt nur auf `claude/github-projekt-b3ivo1`.
+  Er wird auf der echten Seite erst wirksam, wenn dieser Branch (wieder)
+  nach `main` gemergt und `deploy-pages.yml` erneut läuft — genau wie
+  beim vorherigen `main`-Merge nur auf explizite Nutzeranfrage, nicht
+  autonom ausgelöst.
+
+- **Tests:** 1052 → 1054 (+2 in `csharpEngine.test.ts`: Fast-Path-
+  Ablehnung bei Nicht-OK-HEAD-Antwort, kein Fast-Fail bei reinem
+  Netzwerkfehler des HEAD-Checks). `npx tsc --noEmit` fehlerfrei, volle
+  Suite 1054/1054 grün, `npm run build` grün (829,76 kB), `npx knip`
+  unverändert.
+
+- **Ergebnis:** echter, live bestätigter Bug behoben (schnelleres,
+  ehrlicheres Scheitern), plus eine korrigierte, jetzt verifizierte
+  Schweregrad-Einschätzung in `docs/csharp-engine-poc.md`. Kein
+  Artifact-Republish nötig (kein Content, keine Konzept-Zahlen
+  geändert).
+
+### 2026-08-11 — Stündliche Routine: Race-Test für den Fast-Path-Fix aus dem letzten Durchgang
+
+- **Umfang:** Baseline sauber (1054/1054, typecheck/build/knip grün, HEAD
+  `595dfe9`). Coverage-Report zeigt für `csharpEngine.ts` (nach dem
+  letzten Durchgangs-Fix) 100 % Statements/Lines, aber nur 85,71 %
+  Branches — genau auf den `settled`-Guards in `settleResolve`/
+  `settleReject`, dem Sicherheitsmechanismus, der verhindert, dass ein
+  spät eintreffender HEAD-Check-Fehlschlag einen bereits erfolgreich
+  aufgelösten Cache kaputt macht. Da dieser Guard das Herzstück eines
+  gerade erst als Live-Produktions-Fix verschickten Increments ist, war
+  das die naheliegende Coverage-Lücke, die diesen Durchgang zu schließen
+  lohnte — kein generischer Bug-Hunt, sondern gezielte Verifikation
+  frisch verschickter, sicherheitsrelevanter Logik.
+
+- **Test:** simuliert die Race exakt — `fetch` liefert eine kontrolliert
+  verzögerte Promise, die iframe-Seite meldet zuerst erfolgreich
+  `csharp-host-ready` (Ladepromise löst korrekt auf), erst danach löst
+  der (jetzt zu späte) HEAD-Check mit `ok: false` auf. Ohne den Guard
+  würde `settleReject` trotzdem `iframeLoadPromise = null` setzen und
+  damit den Cache kaputt machen, obwohl die Ladung längst erfolgreich
+  war — ein weiterer Aufruf müsste dann unnötig ein zweites iframe
+  aufbauen.
+
+- **Test empirisch als aussagekräftig bestätigt, nicht nur angenommen:**
+  den `if (settled) return;`-Guard in `settleReject` testweise entfernt
+  — der neue Test schlägt dann tatsächlich fehl (`Der C#-Motor ist in
+  dieser Umgebung (noch) nicht bereitgestellt.` als unerwarteter Fehler),
+  bestätigt den exakten Fehlerfall. Guard danach wieder hergestellt,
+  alle 15 Tests in `csharpEngine.test.ts` wieder grün.
+
+- **Tests:** 1054 → 1055 (+1). `npx tsc --noEmit` fehlerfrei, volle
+  Suite 1055/1055 grün, `npm run build` grün (829,76 kB, unverändert),
+  `npx knip` unverändert.
+
+- **Ergebnis:** reine Verifikations-/Test-Ergänzung zu bereits
+  verschicktem Code, kein neues Verhalten. Kein Artifact-Republish
+  nötig.
+
+### 2026-08-11 — Stündliche Routine: doppelte Anführungszeichen-Escape-Logik in `unboundedRecursionCheck.ts` verifiziert, mislabelter Test korrigiert
+
+- **Umfang:** Baseline sauber (1055/1055, typecheck/build/knip grün, HEAD
+  `079a29f`). Coverage-Report zeigte für `unboundedRecursionCheck.ts`
+  weiterhin eine Lücke (91,55 % Stmts / 87,67 % Branch) — genau auf der
+  Escape-Behandlung für verdoppelte Anführungszeichen (`''` als
+  SQL-Escape für ein eingebettetes `'`) in `stripStringsAndComments()`,
+  der eigenen Hilfsfunktion aus dem `WITH RECURSIVE`-Kommentar-Fix von
+  vor vier Durchgängen — bislang komplett ungetestet.
+
+- **Verifiziert, kein Bug:** empirisch geprüft, ob die Escape-Logik einen
+  echten `WHERE` nach einem String mit verdoppeltem Anführungszeichen
+  noch korrekt erkennt, und ob ein `WHERE`-ähnlicher Text *innerhalb*
+  eines solchen Strings weiterhin korrekt ignoriert wird (beides
+  bestätigt, keine Fehlfunktion).
+
+- **Nebenfund beim Testschreiben:** ein bestehender Test
+  ("is not fooled by a WHERE inside a string literal in the recursive
+  member") war mislabelt — sein eigenes SQL enthielt gar keinen String,
+  nur ein echtes `WHERE` außerhalb jeder Anführungszeichen; der Kommentar
+  im Test selbst widersprach dem Titel bereits ("sanity: a real WHERE
+  outside a string..."). Der eigentliche "WHERE nur in einem String
+  literal"-Fall war nirgends getestet. Umbenannt auf das, was er
+  tatsächlich prüft, und den echten fehlenden Fall separat ergänzt.
+
+- **4 neue Tests:** (1) WHERE-ähnlicher Text nur in einem String literal
+  (ohne Escape) → weiterhin korrekt als unbegrenzt geflaggt, (2)
+  verdoppeltes Anführungszeichen + echtes WHERE danach → korrekt nicht
+  geflaggt, (3) verdoppeltes Anführungszeichen + WHERE-ähnlicher Text im
+  String → korrekt geflaggt, (4) fehlerhafte CTE ohne schließende Klammer
+  → stürzt nicht ab, liefert sicher `null` (deckt den bislang
+  ungetesteten `findParenBody`-Fallback für unausgeglichene Klammern ab,
+  konsistent mit der dokumentierten "eher False Negatives als Blockieren
+  von nicht-parsbarem SQL"-Absicht).
+
+- **Tests:** 1055 → 1059 (+4). Coverage von
+  `unboundedRecursionCheck.ts`: 91,55 % → 94,15 % Stmts, 87,67 % → 93,33 %
+  Branch. `npx tsc --noEmit` fehlerfrei, volle Suite 1059/1059 grün,
+  `npm run build` grün (829,76 kB, unverändert), `npx knip` unverändert.
+
+- **Ergebnis:** reine Verifikation + Testabdeckung, keine
+  Verhaltensänderung im Produktcode. Kein Artifact-Republish nötig.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt — Theme × Editor-Sprache-Matrix (sauber)
+
+- **Umfang:** Baseline sauber (1059/1059, typecheck/build/knip grün, HEAD
+  `b3d8f41`). Kein aktionabler Content-Task, C#-Boot-Bug bereits mehrfach
+  ausführlich untersucht. Bisherige Bug-Hunts prüften meist funktionale
+  Abläufe (Run, Tipps, Lösung) mit dem Standard-Theme — die Kombination
+  aus allen 11 Themes × allen 3 Editor-Sprachen (SQL/Python/C#) war
+  bislang nicht gezielt geprüft — ein Muster, bei dem theme-spezifische
+  CSS-Variablen leicht mit sprachspezifischen Token-Typen kollidieren
+  könnten (z. B. ein Token-Typ, der nur in C# vorkommt, aber keine Farbe
+  für ein helles Theme definiert hat).
+
+- **Erster Fehlversuch, korrigiert:** die erste Prüfung fragte
+  `getComputedStyle()` direkt auf `textarea.editor` ab und fand
+  überall `color === backgroundColor` (transparent) — sah zunächst wie
+  ein flächendeckender Lesbarkeits-Bug aus. Beim Nachschauen im
+  DOM/CSS-Code stellte sich heraus: das ist die Editor-Architektur
+  selbst (`editorTab.ts`) — ein unsichtbares `<textarea>` für Eingabe/
+  Cursor liegt über einer separaten `.highlight-layer`, die die
+  tatsächlich eingefärbten Tokens rendert. Kein Bug, eigener Messfehler.
+  Skript korrigiert, um stattdessen die echten Token-Spans in
+  `.highlight-layer` zu prüfen.
+
+- **Vorgehen (korrigiert):** für jeden der 3 Tracks Beispielcode mit
+  Kommentar, String und Zahl in den Editor getippt, dann alle 11 Themes
+  nacheinander per direktem Klick auf die Theme-Picker-Buttons
+  durchgeschaltet (auch ohne das Modal sichtbar zu öffnen — der Klick-
+  Handler reagiert unabhängig von der Sichtbarkeit). Für jede der 33
+  Kombinationen geprüft: Anzahl unterschiedlicher Token-Farben und ob
+  irgendein Token dieselbe Farbe wie der Editor-Hintergrund hat
+  (= unsichtbar).
+
+- **Ergebnis: keine einzige der 33 Kombinationen zeigte einen Token mit
+  Hintergrundfarbe** — auch nicht bei den beiden hellen Themes
+  (Solar Flare, Paper & Ink), wo ein dunkles-Theme-Restfarbwert am
+  ehesten unsichtbaren Text verursacht hätte. 4-6 unterschiedliche
+  Token-Farben pro Kombination, konsistent über alle drei Sprachen.
+
+- **Nebenbeobachtung, nicht reproduzierbar:** ein einzelner
+  `console.error` ("Failed to load module script: ... MIME type of
+  application/octet-stream") tauchte einmal im ursprünglichen
+  kombinierten Lauf auf, war in `docs/csharp-engine-poc.md` bislang
+  nicht dokumentiert. Gezielt isoliert nachgestellt (direkte Navigation
+  zu `host.html`, dann nochmal über die echte App-Navigation zum
+  C#-Track) — beide Male **nicht** reproduzierbar, alle `_framework/*`-
+  Antworten hatten korrekte Content-Types. Vermutlich ein transientes
+  Sandbox-Artefakt durch die parallelen CDN-Route-Interceptions während
+  des schnellen Theme-Durchschaltens, kein reproduzierbarer Produktbug —
+  konsistent mit dem bereits mehrfach dokumentierten Sandbox-
+  Netzwerkrauschen-Muster. Nicht weiter verfolgt.
+
+- **Ergebnis:** keine neuen Funde. Tests/typecheck/build unverändert
+  grün. Kein Artifact-Republish nötig. Dev-Server sauber beendet.
+
+### 2026-08-11 — Stündliche Routine: Echter Bug behoben — C#-Tutorial-/Tipp-Code war nie syntax-hervorgehoben (stale Kommentar entdeckt den Live-Zustand widersprach)
+
+- **Umfang:** Baseline sauber (1059/1059, typecheck/build/knip grün, HEAD
+  `d2c2589`). Beim Durchsehen bislang nicht geprüfter Coverage-Lücken
+  (`contentHighlight.ts`, `diff.ts`, `app.ts`) fiel beim Lesen von
+  `contentHighlight.ts`s eigenem Dokumentationskommentar etwas auf: er
+  behauptete, `csharp` sei "noch nicht live registriert" — eine Aussage,
+  die vor mehreren Durchgängen (als der C#-Track tatsächlich verdrahtet
+  wurde) hätte aktualisiert werden müssen, es aber nie wurde.
+
+- **Befund: echter, aktuell live sichtbarer Bug.** `HIGHLIGHTERS` (die
+  Map, die pro Track den passenden Tokenizer für eingebetteten Code in
+  Tutorial-/Tipp-Texten auswählt) hatte nur `sqlite`/`python` — kein
+  `csharp`-Eintrag, obwohl `highlightCSharp()`
+  (`src/editor/languages/csharp/highlight.ts`) bereits seit dem
+  C#-Editor-Plugin-Durchgang existiert und exakt dieselbe Signatur wie
+  `highlightSql`/`highlightPython` hat. Folge: jeder `<pre>`/`<code>`-
+  Codeausschnitt in einem C#-Tutorial oder -Tipp fiel auf reines
+  HTML-Escaping zurück (einfarbiger Text) statt wie bei SQL/Python
+  syntax-hervorgehoben zu werden — inkonsistent und degradiert gegenüber
+  den anderen beiden Tracks. Verifiziert, dass das kein theoretischer
+  Fall ist: **alle 27 C#-Challenges** enthalten `<pre>`/`<code>`-Blöcke
+  in ihrem Content.
+
+- **Fix:** `csharp: highlightCSharp` zur `HIGHLIGHTERS`-Map ergänzt,
+  Import ergänzt, den veralteten Dokumentationskommentar korrigiert
+  (beschreibt jetzt den Erweiterungspunkt allgemein statt eine konkrete,
+  inzwischen falsche Momentaufnahme festzuschreiben). Zwei bestehende
+  Tests, die das alte (fehlerhafte) Fallback-Verhalten für `csharp`
+  explizit erwarteten, korrigiert — sie prüfen jetzt echte C#-Syntax-
+  Hervorhebung; der generische "kein Highlighter"-Fallback wird jetzt
+  stattdessen mit einer echt unbekannten Track-ID getestet. Zwei neue
+  Tests ergänzt (Keyword-Hervorhebung in `highlightCodeForTrack`, echte
+  Hervorhebung eines eingebetteten C#-Snippets in
+  `highlightContentHtml`).
+
+- **Live verifiziert, nicht nur unit-getestet:** Dev-Server gestartet,
+  C#-Track gewählt, erste Challenge geöffnet — der Task-Tab zeigt jetzt
+  16 `tok-*`-Spans (vorher: 0, nur escapter Fließtext). Keine neuen
+  Konsolenfehler.
+
+- **Tests:** 1059 → 1060 (+1 netto: 2 Tests korrigiert, 2 neu ergänzt,
+  1 alter Test durch einen allgemeineren ersetzt). `npx tsc --noEmit`
+  fehlerfrei, volle Suite 1060/1060 grün, `npm run build` grün
+  (829,77 kB), `npx knip` unverändert.
+
+- **Ergebnis:** echter, sofort für alle 27 C#-Challenges sichtbarer
+  UX-Fix — kein Content, keine Konzept-Zahlen geändert, daher kein
+  Artifact-Republish nötig.
+
+### 2026-08-11 — Stündliche Routine: Echter Content-Korruptions-Bug behoben — generische C#-Typen verschwanden lautlos in 9 Challenges
+
+- **Umfang:** Baseline sauber (1060/1060, typecheck/build/knip grün, HEAD
+  `b093906`). Nach dem Highlight-Fix aus dem letzten Durchgang gezielt
+  nach ähnlichen "csharp fehlt in einer Track-Map"-Bugs gesucht (Suche
+  nach anderen `sqlite:`/`python:`-Maps, TODO/FIXME, stale "noch nicht
+  registriert"-Kommentare) — nichts gefunden, alle anderen Track-
+  Switches behandeln `csharp` bereits korrekt.
+
+- **Befund beim genaueren Hinsehen: ein tieferer, schwerwiegenderer Bug,
+  unabhängig vom letzten Fix.** `highlightContentHtml()`/die Tutorial-/
+  Tipp-Rendering-Pfade setzen den rohen Challenge-HTML-String direkt per
+  `container.innerHTML = html`. SQL/Python-Content verlässt sich seit
+  jeher bewusst auf nachsichtiges HTML-Parsing für unescapte `<`/`>`
+  (siehe bestehender Test-Kommentar in `contentHighlight.test.ts`:
+  "Some existing content has unescaped < ..., relying on lenient HTML
+  parsing") — das funktioniert für SQL-Vergleiche wie `n < 5` (Leerzeichen/
+  Ziffer direkt nach `<`, vom Parser nicht als Tag-Start erkannt) und für
+  Python (keine `<T>`-Generics-Syntax). **C#-Generics wie `List<int>`
+  haben dagegen einen Buchstaben direkt nach `<`** — der Browser
+  interpretiert das als Start eines echten (unbekannten) Elements und
+  verschluckt lautlos alles bis zum nächsten `>`. Empirisch mit JSDOM
+  bestätigt: `List<int> mengen = ...` wird nach dem Parsen zu
+  `List mengen = ...` — der Typ-Parameter ist komplett verschwunden,
+  nicht nur falsch dargestellt.
+
+- **Umfang systematisch ermittelt statt geraten:** ein Skript verglich
+  für jedes `tutorial`/`hints`/`syntaxExplanation`/`successCriteria`-Feld
+  aller 3 Tracks den `<pre>`/`<code>`-Inhalt vor und nach dem HTML-Parsen.
+  SQL/Python: 0 Treffer (bestätigt, dass deren Inhalte tatsächlich sicher
+  sind). C#: **9 betroffene Stellen**, alle im dritten Tipp
+  ("So sieht die Lösung aus") der Challenges 09, 17, 20, 21, 22, 23, 24,
+  25, 26 — durchgängig `List<T>`/`Box<T>`/`Func<...>`/`Dictionary<K,V>`/
+  `Action<T>`-Generics in roh eingefügtem Beispielcode. Auffällig: die
+  *anderen* Tipps derselben Dateien (kürzere `<code>`-Inline-Snippets)
+  waren bereits korrekt mit `&lt;`/`&gt;` escaped — nur der lange,
+  vermutlich direkt aus der echten Lösungsdatei kopierte `<pre>`-Block
+  im dritten Tipp nicht.
+
+- **Fix:** in allen 9 Dateien den Inhalt des betroffenen `<pre>`-Blocks
+  escaped (`<`→`&lt;`, `>`→`&gt;`), die umschließenden `<pre>`/`</pre>`-
+  Tags selbst unangetastet gelassen. Live mit echtem Playwright-Lauf
+  gegen den Dev-Server bestätigt: Challenge 17s dritter Tipp zeigt jetzt
+  korrekt `Box<string>`/`Box<int>` vollständig, keine verschluckten
+  Typ-Parameter mehr.
+
+- **Dauerhafter Regressionsschutz ergänzt:** neue Testdatei
+  `test/content/htmlContentIntegrity.test.ts` (jsdom, per
+  `vitest.config.ts`-Eintrag) — ein Test pro Challenge über alle 3
+  Tracks (172 Tests total), der `tutorial`/`hints`/`syntaxExplanation`/
+  `successCriteria` genau wie die echte App parst und den `<pre>`/
+  `<code>`-Inhalt vor/nach Vergleich prüft. Als aussagekräftig bestätigt:
+  einen der 9 Fixes testweise per `git stash` zurückgenommen — der Test
+  schlägt korrekt fehl, mit einer Fehlermeldung, die direkt auf die
+  Ursache hinweist (Generic-Typ, der als Tag verschluckt wurde).
+
+- **Tests:** 1060 → 1232 (+172, alle neu in `htmlContentIntegrity.test.ts`).
+  Gate 1/Gate 2 (`challengeRunner.test.ts`, `schema.test.ts`) separat
+  vorab laufen lassen, um sicherzustellen, dass die Content-Änderungen
+  keine Validierungslogik berühren — unverändert grün (384/384). `npx
+  tsc --noEmit` fehlerfrei, volle Suite 1232/1232 grün, `npm run build`
+  grün (829,96 kB), `npx knip` unverändert.
+
+- **Ergebnis:** echter, für Lernende bislang unsichtbar kaputter
+  Content-Bug behoben — nicht nur fehlende Hervorhebung wie im letzten
+  Durchgang, sondern tatsächlicher Datenverlust in Beispielcode, der
+  genau die C#-Generics-Konzepte zeigen soll, die er demonstrieren
+  will. Kein Artifact-Republish nötig (kein Konzept-Zahlen-Wechsel, nur
+  Bugfix + Testabdeckung).
+
+### 2026-08-11 — Stündliche Routine: Regressionsschutz aus letztem Durchgang um `task`/`prereqNote` erweitert (sauber, keine neuen Funde)
+
+- **Umfang:** Baseline sauber (1232/1232, typecheck/build/knip grün, HEAD
+  `321cf5a`). Nach dem Content-Korruptions-Fix gezielt nach weiteren
+  Stellen im Codebase gesucht, an denen `csharp` in einer Track-Map
+  fehlen könnte (Suche nach anderen `sqlite:`/`python:`-Objekten,
+  fehlenden Track-Fällen in Switches) — keine weiteren Lücken gefunden,
+  alle bereits korrekt.
+
+- **Dabei eine echte Lücke im eigenen Regressionstest von letztem
+  Durchgang entdeckt:** `htmlContentIntegrity.test.ts` prüfte nur
+  `tutorial`/`hints`/`syntaxExplanation`/`successCriteria` — aber
+  `taskTab.ts` rendert auch `task` und `prereqNote` direkt als rohes
+  HTML (`${slice.task}`, `${slice.prereqNote}`), ganz ohne über
+  `highlightContentHtml` zu laufen. Dieselbe Verwundbarkeit besteht
+  dort grundsätzlich genauso — beide landen letztlich in irgendeinem
+  `.innerHTML`.
+
+- **Systematisch geprüft statt angenommen:** eigenes Skript lief gegen
+  alle `task`-Felder aller 3 Tracks (JSDOM, derselbe Vorher/Nachher-
+  Vergleich wie beim letzten Fund) — **0 Treffer**, `task` ist
+  überall bereits korrekt escaped (die kürzeren `<code>`-Inline-
+  Schnipsel in `task` waren offenbar von Anfang an sorgfältiger
+  behandelt als der lange rohe `<pre>`-Block im dritten Tipp).
+  `prereqNote` wird nur von 15 SQL-Challenges gesetzt (reine
+  Prosa-Hinweise zu Voraussetzungsketten, keine Code-Beispiele) —
+  ebenfalls unauffällig.
+
+- **Trotzdem ergänzt:** `task`/`prereqNote` in `htmlContentIntegrity.test.ts`
+  aufgenommen, damit ein künftiger Content-Fehler in diesen Feldern
+  nicht unbemerkt bliebe — derselbe Schutz, den `tutorial`/`hints`/
+  `syntaxExplanation`/`successCriteria` bereits haben. Testanzahl
+  bleibt bei 172 (ein Test pro Challenge, jetzt mit erweiterter
+  Feldabdeckung innerhalb jedes Tests, keine neuen Testfälle).
+
+- **Tests:** 1232/1232 unverändert (reine Testabdeckungs-Erweiterung,
+  keine Produktcode-Änderung). `npx tsc --noEmit` fehlerfrei, volle
+  Suite grün, `npm run build` grün (829,96 kB, unverändert), `npx knip`
+  unverändert.
+
+- **Ergebnis:** keine neuen Content-Bugs gefunden, aber eine echte
+  Lücke im eigenen frisch geschriebenen Regressionsschutz geschlossen.
+  Kein Artifact-Republish nötig.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt — C#-Track auf Mobile-Viewport (sauber, bislang ungeprüfte Kombination)
+
+- **Umfang:** Baseline sauber (1232/1232, typecheck/build grün, HEAD
+  `a80b827`). C#-Boot-Bug erneut bestätigt unverändert reproduzierbar
+  (keine Drift). Priorität-2-Suche: alle bisherigen Mobile-Viewport-
+  Durchgänge (375×667) betrafen ausschließlich SQL/Python — seit der
+  C#-Live-Verdrahtung wurde die Kombination "C#-Track auf Mobile" nie
+  gezielt geprüft, obwohl das UI selbst (Tutorial, Aufgabe, Editor mit
+  Syntax-Highlighting) unabhängig vom kaputten Boot der Engine
+  funktioniert und genauso wie SQL/Python echtes Nutzer-Risiko trägt.
+
+- **Vorgehen:** Dev-Server im 375×667-Viewport (iPhone-SE-Breite)
+  gestartet, C#-Track gewählt (27 Challenges korrekt gelistet), Sidebar-
+  Drawer-Verhalten nach Auswahl geprüft (kollabiert korrekt auf 52px,
+  wie bei SQL/Python), horizontales Overflow bei jedem Schritt (initial,
+  nach Track-Wahl, nach Challenge-Auswahl, Tutorial-/Aufgabe-/Editor-Tab)
+  gemessen.
+
+- **Ergebnis: keine Funde.** Kein horizontales Overflow in keinem der 6
+  geprüften Zustände. Sidebar kollabiert korrekt. Tutorial-Tab zeigt 78
+  `tok-*`-Spans — bestätigt, dass der Syntax-Highlighting-Fix von vor
+  zwei Durchgängen auch auf Mobile korrekt greift. Editor-Textarea
+  sichtbar, Toolbar zeigt korrekt "C#". Keine neuen Konsolenfehler
+  (nur das bereits mehrfach dokumentierte Sandbox-Netzwerkrauschen).
+
+- **Ergebnis:** Tests/typecheck/build unverändert grün. Kein Artifact-
+  Republish nötig. Dev-Server sauber beendet.
+
+### 2026-08-11 — Stündliche Routine: Live-Bug-Hunt — C#-Generics im Lösungs-Vergleich (sauber, bislang ungeprüft)
+
+- **Umfang:** Baseline sauber (1232/1232, typecheck/build grün, HEAD
+  `ae138ab`). Nachdem der eigentliche Tutorial-/Tipp-Rendering-Pfad
+  (`highlightContentHtml`) vor zwei Durchgängen als Ursache eines echten
+  Content-Korruptions-Bugs bei C#-Generics identifiziert wurde, war die
+  Sicherheit des STRUKTURELL ANDEREN "Mit Musterlösung vergleichen"-Pfads
+  (`compareView.ts`, nutzt explizit `escapeHtml()` statt `innerHTML =`
+  auf rohem HTML) bereits per Code-Lesen bestätigt — aber nie live in
+  einem echten Browser gegen echten C#-Generics-Content verifiziert.
+
+- **Vorgehen:** Dev-Server gestartet, C#-Challenge 09 gewählt (Lösung
+  enthält `List<string>`/`Dictionary<string, double>`), abweichenden
+  Code in den Editor getippt, "Mit Musterlösung vergleichen" geklickt.
+
+- **Ergebnis: bestätigt sicher, keine Korruption.** Vergleichs-Panel
+  öffnet korrekt, `List<string>` und `Dictionary<string, double>`
+  erscheinen vollständig und unverändert in der Musterlösungs-Spalte
+  (38 Diff-Zeilen, je 22 Zeilen pro Spalte, exakt passend zur echten
+  Zeilenzahl). Bestätigt live, was die Code-Analyse bereits nahelegte —
+  kein neuer Fund, aber echte statt nur angenommene Sicherheit für einen
+  Pfad, der genau die Art Content zeigt, die vor zwei Durchgängen
+  anderswo kaputt war.
+
+- **Ergebnis:** Tests/typecheck/build unverändert grün. Kein Artifact-
+  Republish nötig. Dev-Server sauber beendet.
+
+### 2026-08-11 — Stündliche Routine: Echte A11y-Lücke behoben — Ergebnis-/Engine-Status wurden nie an Screenreader angesagt
+
+- **Umfang:** Baseline sauber (1232/1232, typecheck/build/knip grün, HEAD
+  `badebef`). Nach mehreren Durchgängen mit C#-UI-Detailprüfungen diesmal
+  bewusst eine andere Kategorie: Grep über den gesamten Code nach
+  `aria-live`/`role="status"`/`role="alert"` — **null Treffer im gesamten
+  Projekt.** Die früheren A11y-Durchgänge (Tasks #1–5, ganz am Anfang
+  dieser Session) deckten ausschließlich statische Struktur ab (ARIA-
+  Rollen für Tabs, `aria-label`, Fokus-Sichtbarkeit, Tastaturnavigation)
+  — dynamische Inhalts-Änderungen wurden nie berücksichtigt.
+
+- **Befund: echte, aktuell live bestehende Lücke.** `.results-body`
+  (zeigt nach jedem Run-Klick Erfolg/Fehler/Warnung — `resultsArea.ts`,
+  `pythonResultsArea.ts`, `csharpResultsArea.ts`) und
+  `.python-engine-status` (zeigt Lade-Status sowie — bei C# besonders
+  relevant — die 15-Sekunden-Timeout-Fehlermeldung aus einem früheren
+  Durchgang) werden beide nur per `.innerHTML =` aktualisiert, ganz ohne
+  Live-Region-Markup. Für Screenreader-Nutzer bedeutet das: nach einem
+  Klick auf "Ausführen" gibt es **keine automatische Ansage** des
+  Ergebnisses — sie müssten manuell zum Ergebnisbereich zurücknavigieren,
+  bei jedem einzelnen Lauf.
+
+- **Fix:** `role="status"` (impliziert `aria-live="polite"`, das
+  etablierte WAI-ARIA-Muster für Status-Meldungen) auf beide stabilen
+  Container-Elemente in `editorTab.ts`s `SHELL_HTML`-Template ergänzt —
+  bewusst auf die Container selbst, nicht auf die per `innerHTML`
+  ausgetauschten Kind-Elemente, da nur ein niemals ersetztes Element das
+  Attribut zuverlässig behält. Live gegen den echten Dev-Server bestätigt
+  (nicht nur unit-getestet): `role="status"` ist vor dem ersten Lauf
+  vorhanden UND überlebt den `innerHTML`-Tausch nach einem echten
+  Query-Run unverändert.
+
+- **Tests:** 1232 → 1233 (+1, prüft beide `role="status"`-Attribute
+  direkt nach dem Mounten). `npx tsc --noEmit` fehlerfrei, volle Suite
+  1233/1233 grün, `npm run build` grün (829,98 kB), `npx knip`
+  unverändert.
+
+- **Ergebnis:** echte A11y-Lücke behoben, die reale Screenreader-Nutzer
+  bei jedem einzelnen Query-/Code-Lauf betrifft — nicht nur ein
+  Detailfall wie die letzten C#-spezifischen Funde. Kein Artifact-
+  Republish nötig (kein Content, keine Konzept-Zahlen geändert).
+
+### 2026-08-11 — Stündliche Routine: Echte A11y-Lücke behoben — Theme-Picker-Modal ohne Fokus-Management/Trap
+
+- **Umfang:** Baseline sauber (1233/1233, typecheck/build/knip grün, HEAD
+  `77989a0`). Weiter in derselben A11y-Kategorie wie letzter Durchgang:
+  das Theme-Picker-Modal (per Code-Kommentar selbst als "Modal"
+  bezeichnet) hatte bislang nur Escape-zum-Schließen — kein
+  `role="dialog"`/`aria-modal`, kein Fokus-Verschieben beim Öffnen, keine
+  Fokus-Rückgabe beim Schließen, kein Tab-Trap.
+
+- **Befund: echte, aktuell live bestehende Lücke.** Da das Overlay per
+  `display: none` (nicht nur Opacity/Transform) versteckt wird, ist die
+  "geschlossen"-Seite immerhin sauber (Inhalt ist dann weder sichtbar
+  noch im Tab-Index) — aber solange das Modal offen ist: (1) Fokus bleibt
+  wo er vorher war, ein Tastatur-Nutzer müsste manuell zum Modal
+  vor-tabben, während der dahinterliegende Seiteninhalt weiterhin
+  erreichbar bleibt (Fokus kann hinter das Overlay "entkommen"); (2) beim
+  Schließen wird der Fokus nicht zurückgegeben — da das vorher fokussierte
+  Element (`.theme-picker-close` o. Ä.) beim Schließen `display: none`
+  wird, setzt der Browser den Fokus standardmäßig auf `<body>` zurück,
+  der Tastatur-Nutzer verliert komplett seine Position im Dokument.
+
+- **Fix:** `role="dialog"`, `aria-modal="true"`, `aria-labelledby`
+  (zeigt auf den bestehenden Titel-Text) auf das `.theme-picker`-Panel
+  ergänzt. `afterRender`-Hook (bereits vorhandener `mountView`-
+  Lifecycle) merkt sich beim Öffnen das vorher fokussierte Element und
+  verschiebt den Fokus auf den Schließen-Button; beim Schließen wird der
+  gemerkte Fokus zurückgegeben. Bestehender `keydown`-Handler (schon für
+  Escape da) um einen Tab-Trap erweitert — Tab vom letzten fokussierbaren
+  Element springt zum ersten, Shift+Tab vom ersten zum letzten; da der
+  Inhalt des Panels statisch ist (Schließen-Button + N Theme-Buttons,
+  ändert sich nie während das Modal offen ist), reicht ein einfacher
+  Grenzfall-Wrap ohne komplexere Neuberechnung bei jedem Tastendruck.
+
+- **Als aussagekräftig bestätigt, nicht nur angenommen:** die Tab-Trap-
+  Logik testweise per `if (true) return;` deaktiviert — beide Trap-Tests
+  schlagen dann korrekt fehl, mit einem Diff, der exakt zeigt, dass der
+  Fokus stattdessen auf ein Theme-Options-Element statt auf das erwartete
+  Trap-Ziel gewandert wäre. Danach wiederhergestellt, alle 17 Tests
+  wieder grün.
+
+- **Live mit echten Tastatur-Events verifiziert** (nicht nur unit-
+  getestet oder synthetische KeyboardEvents): Playwright mit echten
+  `page.keyboard.press('Tab')`-Aufrufen — Fokus landet beim Öffnen sofort
+  auf dem Schließen-Button; nach genau einer vollständigen Tab-Runde
+  durch alle 12 fokussierbaren Elemente im Panel ist der Fokus wieder
+  beim Schließen-Button (korrekter Wrap); Fokus bleibt während der
+  gesamten Runde nachweislich innerhalb `.theme-picker`; Escape schließt
+  das Modal UND gibt den Fokus korrekt an den ursprünglichen
+  Auslöser-Button (`.theme-btn`) zurück.
+
+- **Tests:** 1233 → 1239 (+6: Dialog-Semantik, Fokus-Verschiebung beim
+  Öffnen, Fokus-Rückgabe beim Schließen, Tab-Trap vorwärts, Tab-Trap
+  rückwärts/Shift+Tab, kein Trap-Eingriff bei geschlossenem Modal).
+  `npx tsc --noEmit` fehlerfrei, volle Suite 1239/1239 grün, `npm run
+  build` grün (830,68 kB), `npx knip` unverändert.
+
+- **Ergebnis:** zweite echte A11y-Lücke in Folge behoben, die reale
+  Tastatur-/Screenreader-Nutzer bei jeder Nutzung des Theme-Pickers
+  betrifft. Kein Artifact-Republish nötig (kein Content, keine
+  Konzept-Zahlen geändert).
+
+### 2026-08-11 — Stündliche Routine: Dritte A11y-Lücke in Folge — "Tabellen"-Toggle-Button ohne `aria-expanded`
+
+- **Umfang:** Baseline sauber (1239/1239, typecheck/build/knip grün, HEAD
+  `a449c00`). Weiter in derselben Kategorie: nach dem Theme-Picker-Modal
+  gezielt nach anderen Toggle-/Panel-Mustern im Code gesucht (Grep nach
+  `toggle`/`-overlay`/`.open {` in `src/ui`). Gefunden: der "Tabellen"-
+  Umschalt-Button im Editor-Toolbar (`editorTab.ts`), der das SQL-
+  Tabellen-Inspektor-Panel ein-/ausklappt — statischer Label-Text
+  "Tabellen", der sich nie ändert, und **kein** `aria-expanded`, das den
+  aktuellen Zustand ansagen könnte.
+
+- **Befund:** anders als der Sidebar-Collapse-Button (der immerhin einen
+  dynamischen `aria-label` hat, der Ein-/Ausklappen unterscheidet) gibt
+  der Tabellen-Button einem Screenreader-Nutzer null Hinweis, ob das
+  Panel gerade offen oder geschlossen ist — weder vorher noch nach dem
+  Klick.
+
+- **Fix:** `aria-expanded="false"` initial im Template ergänzt, im
+  Klick-Handler auf den tatsächlichen `open`-Zustand der Panel-Klasse
+  synchronisiert, zusätzlich beim Track-Wechsel weg von SQL (der das
+  Panel ohnehin zwangsschließt) korrekt zurückgesetzt.
+
+- **Als aussagekräftig bestätigt:** die `aria-expanded`-Aktualisierung
+  im Klick-Handler testweise entfernt — der neue Test schlägt korrekt
+  fehl (`expected 'false' to be 'true'`). Danach wiederhergestellt.
+
+- **Live bestätigt:** echter Klick im Dev-Server — `aria-expanded`
+  wechselt korrekt `false` → `true` → `false` über zwei echte Klicks.
+
+- **Tests:** 1239 → 1240 (+1). `npx tsc --noEmit` fehlerfrei, volle
+  Suite 1240/1240 grün, `npm run build` grün (830,79 kB), `npx knip`
+  unverändert.
+
+- **Ergebnis:** dritter echter A11y-Fund in Folge in derselben
+  Kategorie (dynamischer Zustand nie an Screenreader kommuniziert).
+  Kein Artifact-Republish nötig.
+
+### 2026-08-12 — Stündliche Routine: Vierte und fünfte A11y-Lücke — Lösungs- und Postgres-Frage-Panel ohne `aria-expanded`
+
+- **Umfang:** Baseline sauber (1240/1240, typecheck/build/knip grün, HEAD
+  `ebc51f8`). Dieselbe Kategorie systematisch zu Ende durchsucht: Grep
+  nach `classList.toggle(` in `src/ui` findet alle sechs Stellen im
+  Code. Drei waren bereits abgedeckt (Sidebar-Collapse mit dynamischem
+  `aria-label`, Tab-Aktiv-Klasse mit `aria-selected`, Tabellen-Toggle
+  aus dem vorigen Durchgang) oder kein Nutzer-Zustand (Boot-Banner-
+  Klasse). Zwei echte, bisher unentdeckte Lücken übrig:
+  `.solution-toggle-btn` (`solutionSection.ts`, "Lösung anzeigen"/
+  "Lösung verbergen") und `.pg-ask-toggle-btn` (`pgAskPanel.ts`,
+  "Claude hierzu befragen") — beide klappen ein Panel auf/zu, keiner
+  trägt `aria-expanded`.
+
+- **Fix:** in beiden Dateien `aria-expanded="false"` initial im
+  Template ergänzt und im jeweiligen Klick-Handler auf den
+  tatsächlichen `open`-Zustand synchronisiert (`solutionSection.ts`
+  in der bestehenden `applyPanelState`-Funktion neben dem Label-Text-
+  Wechsel; `pgAskPanel.ts` direkt im Klick-Handler anhand des
+  `classList.toggle()`-Rückgabewerts).
+
+- **Stolperfalle beim Testschreiben:** der erste Testentwurf hielt die
+  Button-Referenz einmalig fest und klickte sie zweimal — schlug beim
+  zweiten Klick fehl (`expected 'true' to be 'false'`), weil das
+  Aufdecken der Lösung `markSolutionViewed` auslöst, das den Store
+  ändert und die View neu rendert (der Button wird dabei ersetzt,
+  nicht nur mutiert). Die alte Referenz zeigte danach auf ein aus dem
+  DOM entferntes Element, an das der `on()`-Delegate keine Klicks mehr
+  weiterleitet. Behoben durch Neu-Query (`root.querySelector(...)`)
+  vor jeder Assertion statt einer gehaltenen Referenz — zugleich ein
+  guter Beleg dafür, dass der Test echte Rendering-Mechanik prüft und
+  nicht nur oberflächlich grün wird.
+
+- **Live bestätigt:** echte Klicks im Dev-Server (mit lokal per npm
+  installiertem `sql.js`, per `context.route()` anstelle des im
+  Sandbox blockierten CDN ausgeliefert — siehe Runbook oben) —
+  `aria-expanded` wechselt für beide Buttons korrekt
+  `false` → `true` (→ `false` beim Postgres-Panel, das erneut
+  schließbar ist; das Lösungspanel bleibt bewusst offen, sobald einmal
+  aufgedeckt).
+
+- **Tests:** 1240 → 1242 (+2). `npx tsc --noEmit` fehlerfrei, volle
+  Suite 1242/1242 grün, `npm run build` grün (830,93 kB), `npx knip`
+  unverändert (gleiche 10 vorbestehende Funde, nichts Neues).
+
+- **Ergebnis:** vierter und fünfter A11y-Fund in Folge in derselben
+  Kategorie — damit sind alle sechs `classList.toggle()`-Aufrufstellen
+  in `src/ui` auf `aria-expanded`/gleichwertige Zustandskommunikation
+  geprüft und, wo nötig, gefixt. Diese Kategorie ist jetzt
+  wahrscheinlich ausgeschöpft; ein künftiger Durchgang sollte auf eine
+  andere Bug-Kategorie wechseln. Kein Artifact-Republish nötig (kein
+  Content, keine Konzept-Zahlen geändert).
+
+### 2026-08-12 — Stündliche Routine: neue Bug-Kategorie — Formularelemente ohne Accessible Name
+
+- **Umfang:** Baseline sauber (1242/1242, typecheck/build/knip grün, HEAD
+  `eba151f`). Die `classList.toggle()`-Kategorie ist laut vorigem Eintrag
+  wahrscheinlich ausgeschöpft; Content-Coverage bleibt bei SQL/Python
+  81/82 (nur permanente Ausnahmen offen) und C# 86/86 (100 %) —
+  `docs/csharp-engine-poc.md` erneut geprüft: der "was fehlt"-Abschnitt
+  enthält veraltete Zwischenstände aus früheren Updates (z. B. "nur drei
+  Challenges"), tatsächlich existieren bereits 27 Challenge-Dateien und
+  die Tag-Bilanz am Dokumentende bestätigt 86/86 — kein Content-Gap
+  mehr. Der WASM-Boot-Fehler bleibt laut letztem Stand ohne neue
+  Ansatzpunkte unresolved; keine neue Idee diesen Durchgang, also nicht
+  erneut angefasst (Mandat: nicht künstlich weiterbohren ohne echten
+  neuen Ansatz).
+
+  Neue Kategorie systematisch gesucht: alle `<input>`/`<textarea>`/
+  `<select>`-Stellen in `src/ui` durchsucht. Zwei echte, bisher
+  unentdeckte Lücken gefunden — beides interaktive Formularelemente
+  ohne jede Beschriftung (weder `<label>` noch `aria-label` noch
+  Platzhaltertext):
+  1. `.track-course-select` (`trackCoursePicker.ts`) — der
+     Track-/Kurswechsler. Rendert live (3 Tracks × je 1 Kurs ⇒
+     `totalCourses > 1`, also immer der echte `<select>`-Zweig, nicht
+     der statische Text-Fallback), hat aber gar keine erreichbare
+     Beschriftung für Screenreader-Nutzer.
+  2. `textarea.editor` (`editorTab.ts`) — der zentrale Code-Editor
+     selbst, das wichtigste interaktive Element der gesamten App. Weder
+     `aria-label` noch Platzhaltertext, nur `spellcheck`/`autocomplete`/
+     `autocapitalize`-Attribute.
+
+- **Fix:** `trackCoursePicker.ts` bekommt
+  `aria-label="Track und Kurs wechseln"` fest im Template.
+  `editorTab.ts`s Editor-Textarea startet mit
+  `aria-label="SQL-Code-Editor"` und wird in der bestehenden
+  `syncChromeForTrack`-Funktion (die ohnehin schon `toolbarLabel` bei
+  jedem Trackwechsel aktualisiert) um eine Zeile ergänzt, die
+  `aria-label` auf `"${trackLabel}-Code-Editor"` synchron hält — SQL/
+  Python/C# jeweils mit passendem Namen.
+
+- **Live bestätigt:** echter Playwright-Lauf gegen den Dev-Server
+  (`npm run dev`, kein CDN-Workaround nötig, dieser Fund betrifft keine
+  sql.js/Pyodide-Ladepfade) — `select`-Element trägt das erwartete
+  `aria-label`, das Editor-Textarea startet mit `SQL-Code-Editor` und
+  wechselt nach einer echten `selectOption()`-Interaktion auf dem
+  Track-Picker korrekt zu `Python-Code-Editor`.
+
+- **Tests:** 1242 → 1244 (+2, in `trackCoursePicker.test.ts` und
+  `editorTab.test.ts`). `npx tsc --noEmit` fehlerfrei, volle Suite
+  1244/1244 grün, `npm run build` grün (831,05 kB), `npx knip`
+  unverändert (gleiche 10 vorbestehende Funde).
+
+- **Ergebnis:** erster Fund in einer neuen A11y-Unterkategorie
+  (Formularelemente ohne Accessible Name statt dynamischer Zustand).
+  Noch nicht erschöpfend durchsucht — weitere interaktive Elemente
+  (z. B. Chat-Eingabefeld `textarea.chat-input` hat immerhin einen
+  Platzhaltertext, was als Accessible-Name-Fallback zählt, aber kein
+  robustes `aria-label`) könnten in einem künftigen Durchgang noch
+  geprüft werden. Kein Artifact-Republish nötig (kein Content, keine
+  Konzept-Zahlen geändert).
+
+### 2026-08-12 — Stündliche Routine: Coverage-getriebene Lückensuche in `editorTab.ts`
+
+- **Umfang:** Baseline sauber (1244/1244, typecheck/build/knip grün, HEAD
+  `cca01b2`). Content-Coverage weiterhin maxed (SQL/Python 81/82, nur
+  permanente Ausnahmen offen; C# 86/86 — 27 Challenge-Dateien existieren
+  bereits, `docs/csharp-engine-poc.md`s "was fehlt"-Abschnitt ist an der
+  Stelle veraltet). WASM-Boot-Fehler weiterhin ohne neuen Ansatzpunkt,
+  nicht erneut angefasst. Statt einer weiteren A11y-Unterkategorie
+  diesen Durchgang `npx vitest run --coverage` als eigene Bug-Quelle
+  genutzt (Mandat-Priorität 2: "check coverage gaps").
+
+- **Befund:** projektweite Branch-Coverage liegt bei nur 74 % im
+  Aggregat, aber das täuscht — der Großteil der Differenz kommt von
+  reinen Typ-/Interface-Dateien (0 Statements, 0/0 wird als 0 %
+  gezählt). Gefiltert auf Dateien mit tatsächlichem Code fand sich
+  genau eine Datei unter 90 % Branch-Coverage: `editorTab.ts`
+  (94,66 % Branch, unabgedeckte Zeilen 64, 128–130, 248). Drei
+  konkrete, plausible Szenarien:
+  1. Zeile 64 (`renderExpectedResult`): der `!successCriteria`-Zweig —
+     nie mit `undefined` aufgerufen.
+  2. Zeile 130 (`run()`): `if (!code.trim()) return;` — "Ausführen"
+     mit leerem/nur-Leerzeichen-Editor klicken.
+  3. Zeile 248 (`syncEditorToSelection`): `challenge?.title ??
+     selection.challengeNum` — der Fallback, wenn die aktuelle
+     Selection auf eine im Registry nicht (mehr) existierende
+     Challenge zeigt (z. B. nach Content-Umnummerierung, wenn alte
+     `localStorage`-Progress-Daten eine gelöschte Challenge-Nummer
+     referenzieren). `selectChallenge()` selbst verweigert das Setzen
+     einer ungültigen Nummer, der Zustand ist aber über einen direkten
+     `ctx.store.update()` erreichbar — genau der Pfad, über den eine
+     wiederhergestellte, veraltete Selection in die Session gelangen
+     würde.
+
+- **Fix:** kein Code-Fix — beides ist bereits korrekt defensiv
+  implementiert, nur ungetestet. Zwei neue Tests in `editorTab.test.ts`
+  decken Fall 2 und den kombinierten Fall 1+3 ab (Zeile 64 und 248
+  hängen zusammen: derselbe `challenge === undefined`-Zustand löst
+  beide Zweige gleichzeitig aus — ein Test für die gestrichene/
+  umnummerierte Challenge deckt daher automatisch auch den fehlenden
+  `successCriteria`-Zweig ab).
+
+- **Verifikation, dass die Tests etwas prüfen:** beide Guards
+  temporär im Quellcode entfernt (`challenge!.title` statt
+  `challenge?.title ?? …` bzw. die `!code.trim()`-Zeile gestrichen),
+  gezielt nur die beiden neuen Tests laufen lassen — beide schlugen
+  mit dem erwarteten Fehler fehl (`TypeError: Cannot read properties
+  of undefined (reading 'title')` bzw. eine unerwartete
+  Ergebnis-Anzeige statt des leeren Placeholders). Quellcode danach via
+  Backup-Kopie exakt wiederhergestellt, volle `editorTab.test.ts`-Suite
+  (22/22) erneut grün bestätigt.
+
+- **Tests:** 1244 → 1246 (+2). `npx tsc --noEmit` fehlerfrei, volle
+  Suite 1246/1246 grün, `npm run build` grün (831,05 kB), `npx knip`
+  unverändert (gleiche 10 vorbestehende Funde).
+
+- **Ergebnis:** projektweite Coverage-Suche ergab nur diese eine
+  reale Lücke außerhalb der Typ-Dateien — die Codebasis ist insgesamt
+  bereits sehr gründlich getestet. Kein Artifact-Republish nötig (kein
+  Content, keine Konzept-Zahlen geändert).
+
+### 2026-08-12 — Stündliche Routine: sechste und siebte A11y-Lücke — zwei mit `classList.add`/`.remove()` (statt `.toggle()`) implementierte Disclosure-Buttons übersehen
+
+- **Umfang:** Baseline sauber (1246/1246, typecheck/build/knip grün, HEAD
+  `2f9f69a`). Content-Coverage weiterhin maxed, C# WASM-Bug weiterhin
+  ohne neuen Ansatzpunkt. Vor dem eigentlichen Fund mehrere Code-Lese-
+  Sackgassen ausgeschlossen: `setMode()` setzt `examTipsRemaining` beim
+  Moduswechsel bewusst nicht zurück (UI-Label sagt explizit "gemeinsamer
+  Pool ... für den ganzen Kurs" — kein Bug); `resetSchema()`s
+  kursweiter `bestStars`-Reset ist beabsichtigt (Schema-Zustand ist
+  kursübergreifend kumulativ); `computeLineDiff()` ist laut eigenem
+  Kommentar bewusst eine simple positionale Zeile-für-Zeile-Diff, keine
+  echte LCS-Diff — kein Bug, Design-Entscheidung aus dem Prototyp.
+
+- **Befund:** der frühere `classList.toggle()`-Grep (voriger Durchgang,
+  als "wahrscheinlich ausgeschöpft" protokolliert) hatte eine Lücke:
+  zwei Disclosure-Buttons sind mit getrennten `classList.add('open')`/
+  `classList.remove('open')`-Aufrufen statt einem einzigen `.toggle()`
+  implementiert und wurden dadurch vom alten Grep-Muster nicht erfasst.
+  Ein neuer, breiterer Grep (`classList\.(add|remove)\(['"]open['"]\)`)
+  fand zwei echte, bisher unentdeckte Fälle:
+  1. `.reset-btn` (`sidebarShell.ts`) — öffnet die
+     "Wirklich alles löschen?"-Bestätigungszeile, schließt über zwei
+     eigene Buttons (Ja/Abbrechen). Kein `aria-expanded`.
+  2. `.compare-btn` (`compareView.ts`) — öffnet das Diff-Panel
+     "Mit Musterlösung vergleichen"; schließt nie über denselben Button
+     zurück (nur implizit beim Challenge-/Modus-Wechsel), aber genau
+     dafür ist `aria-expanded="true"` nach dem Öffnen trotzdem
+     korrekt — Screenreader-Nutzer erfahren so, dass zusätzlicher
+     Inhalt erschienen ist.
+
+- **Fix:** beide Buttons starten mit `aria-expanded="false"` im
+  Template; `.reset-btn` wird in den bestehenden Öffnen-/Ja-/Abbrechen-
+  Handlern in `sidebarShell.ts` synchron auf `true`/`false` gesetzt,
+  `.compare-btn` im bestehenden Klick-Handler in `compareView.ts` auf
+  `true` (kein eigener Schließen-Pfad nötig, da der Button selbst beim
+  Re-Render mit neuem `aria-expanded="false"` aus dem Template
+  zurückgesetzt wird).
+
+- **Live bestätigt:** echter Playwright-Lauf gegen den Dev-Server mit
+  dem `context.route()`-Workaround für sql.js aus dem Runbook (nötig,
+  da `selectChallenge()` für den SQL-Track ohne geladene Engine
+  stillschweigend early-returnt — ein erster Versuch ohne Route-Setup
+  zeigte genau das: Klick auf ein Challenge-Listenelement blieb
+  wirkungslos, alle Task-Tab-Regionen blieben leer, kein echter Bug,
+  nur fehlendes Setup im Diagnoseskript). Mit korrektem Setup: echte
+  Klicks bestätigen `.reset-btn` `false → true → false` (Öffnen →
+  Abbrechen) und `.compare-btn` `false → true` (Öffnen).
+
+- **Tests:** 1246 → 1246 (keine neuen `it()`-Blöcke; drei neue
+  Assertions in bereits bestehenden Tests in `sidebarShell.test.ts`
+  und `compareView.test.ts`, die dasselbe Verhalten ohnehin schon
+  über den `classList`-Zustand prüften). `npx tsc --noEmit` fehlerfrei,
+  volle Suite 1246/1246 grün, `npm run build` grün (831,30 kB),
+  `npx knip` unverändert (gleiche 10 vorbestehende Funde).
+
+- **Ergebnis:** die `classList.toggle()`-Kategorie war nicht wirklich
+  ausgeschöpft, nur unvollständig durchsucht — ein breiterer Grep nach
+  `.add()`/`.remove()`-Paaren fand zwei weitere echte Fälle. Erneuter
+  `classList\.(add|remove)\(` -Grep zeigt keine weiteren offenen
+  Treffer mehr; diese Unterkategorie jetzt tatsächlich erschöpft. Kein
+  Artifact-Republish nötig (kein Content, keine Konzept-Zahlen
+  geändert).
+
+### 2026-08-12 — Stündliche Routine: `mergeLoadedState` ließ einzelne kaputte Chat-Nachrichten unvalidiert durch
+
+- **Umfang:** Baseline sauber (1246/1246, typecheck/build/knip grün, HEAD
+  `ef91378`). Erneuter, breiterer Grep
+  (`classList\.(add|remove|toggle)\(['"](open|expanded|collapsed|
+  active|visible|hidden|show)['"]`) bestätigt: die A11y-Disclosure-
+  Kategorie ist jetzt wirklich vollständig durchsucht, keine weiteren
+  Treffer. Vor dem eigentlichen Fund mehrere Kandidaten per Code-Lesen
+  geprüft und verworfen (kein Bug): `setMode()`/`resetSchema()`/
+  `computeLineDiff()` — alle wie im vorigen Durchgang notiert bewusstes
+  Design, kein Defekt.
+
+- **Befund:** `src/domain/progress/progressModel.ts`s
+  `mergeLoadedState()` ist laut eigenem Docstring ein "defensive
+  load-time parser: any missing/malformed field falls back to its
+  default rather than throwing" — validiert aber `chatHistory` nur auf
+  `Array.isArray()`-Ebene und castet den Inhalt danach ungeprüft
+  (`raw.chatHistory as ChatMessage[]`). Eine einzelne kaputte Nachricht
+  in persistiertem `localStorage` (z. B. `content` kein String, `role`
+  kein `'user'|'assistant'`, fehlendes Feld) würde nicht beim Laden
+  auffallen, sondern erst beim Rendern in `chatTab.ts`s
+  `renderTranscript()` crashen (`escapeHtml(msg.content)` ruft
+  `.replace()` auf einem möglicherweise `undefined`-Wert auf) — genau
+  der Fehlerklasse, die dieser Parser laut eigener Absicht verhindern
+  soll.
+
+- **Fix:** neue `isChatMessage()`-Typprüfung + `mergeChatHistory()`,
+  die das Array filtert statt es pauschal zu casten — eine einzelne
+  kaputte Nachricht wird stillschweigend entfernt, der Rest der
+  Konversation bleibt erhalten (bewusst kein Alles-oder-nichts-
+  Verhalten, siehe Kommentar im Code).
+
+- **Verifikation, dass der Test etwas prüft:** Fix temporär auf den
+  alten ungeprüften Cast zurückgesetzt, gezielt nur den neuen Test
+  laufen lassen — schlägt wie erwartet fehl (empfangenes Array enthält
+  alle sechs Rohwerte statt nur der einen gültigen Nachricht).
+  Quellcode danach via Backup-Kopie exakt wiederhergestellt, volle
+  `progressModel.test.ts`-Suite (20/20) erneut grün bestätigt.
+
+- **Tests:** 1246 → 1247 (+1). `npx tsc --noEmit` fehlerfrei, volle
+  Suite 1247/1247 grün, `npm run build` grün (831,45 kB), `npx knip`
+  unverändert (gleiche 10 vorbestehende Funde).
+
+- **Ergebnis:** echter, wenn auch seltener Crash-Pfad geschlossen
+  (erfordert manuell manipulierten oder durch einen künftigen
+  Formatwechsel beschädigten `localStorage`-Inhalt, aber genau dafür
+  existiert dieser Parser laut eigenem Zweck). Kein Artifact-Republish
+  nötig (kein Content, keine Konzept-Zahlen geändert).
+
+### 2026-08-12 — Stündliche Routine: `knip` erneut auf 0 Funde — 10 seit F-012 neu angesammelte unnötige Exports entfernt
+
+- **Umfang:** Baseline sauber (1247/1247, typecheck/build/knip-mit-10-
+  Funden unverändert, HEAD `82f31f6`). Vor der Suche nach einem neuen
+  Bug geprüft, ob ähnliche ungeprüfte Casts wie beim letzten Fund
+  (`chatHistory`) anderswo existieren: alle drei `JSON.parse()`-Stellen
+  im Projekt durchgesehen (`localStorageProgressStore.ts` bereits
+  korrekt defensiv über `mergeLoadedState`; `csharpEngine.ts` und
+  `pyodideEngine.ts` parsen selbstkontrollierte Ausgabe der eigenen
+  Treiber, nicht Nutzereingabe oder `localStorage` — anderes
+  Risikoprofil, kein Bug). `claudeChatClient.ts`s `response.json()`
+  bereits korrekt abgesichert (fehlender Text wirft explizit). Keine
+  weitere Instanz dieses Bug-Musters gefunden.
+
+- **Befund:** `npx knip` zeigt seit mehreren Durchgängen konstant
+  dieselben 10 Funde (`Unused exported types`) — F-012 hatte das
+  Projekt 2026 einmal auf 0 Funde gebracht, seither sind durch neuen
+  Code (v. a. den C#-Track) 10 weitere `export`-Keywords auf Typen
+  angesammelt, die nirgends außerhalb ihrer eigenen Datei importiert
+  werden: `SendMessageParams`, `CSharpChallengeExtra`,
+  `PythonChallengeExtra`, `SqlChallengeExtra`, `ValidateFn`,
+  `CourseProgress`, `EditorToken`, `EditorSelectionState`,
+  `TableColumnInfo`, `Listener`.
+
+- **Fix:** für alle 10 einzeln per Grep bestätigt, dass keine andere
+  Datei sie importiert (nicht nur auf `knip`s Wort verlassen), dann
+  `export` entfernt — reine Sichtbarkeitsänderung, keine
+  Verhaltensänderung. `EditorSelectionState` brauchte besondere
+  Vorsicht: `autoClosePairs.ts` deklariert zufällig einen
+  gleichnamigen, aber unabhängigen lokalen Typ — kein tatsächlicher
+  Nutzer des exportierten Typs aus `LanguagePlugin.ts`.
+
+- **Tests:** 1247 → 1247 (reines Cleanup, keine neuen Tests nötig oder
+  sinnvoll). `npx tsc --noEmit` fehlerfrei, volle Suite 1247/1247
+  grün, `npm run build` grün (831,45 kB), `npx knip` jetzt wieder bei
+  **0 Funden** (vorher 10).
+
+- **Ergebnis:** Projekt zum zweiten Mal seit F-012 auf einen sauberen
+  `knip`-Stand gebracht. Kein Artifact-Republish nötig (kein Content,
+  keine Konzept-Zahlen geändert).

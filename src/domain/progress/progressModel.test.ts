@@ -157,4 +157,29 @@ describe('mergeLoadedState', () => {
     const mergedNonObject = mergeLoadedState({ app: { lastChallenge: 'nope' } });
     expect(mergedNonObject.app.lastChallenge).toBeUndefined();
   });
+
+  it('drops individual malformed chat messages instead of discarding the whole history or throwing', () => {
+    const merged = mergeLoadedState({
+      tracks: {
+        sqlite: {
+          sqlLernenTool: {
+            challenges: {
+              '01': {
+                chatHistory: [
+                  { role: 'user', content: 'echte Frage' },
+                  { role: 'assistant', content: 42 }, // content not a string
+                  { role: 'admin', content: 'unbekannte Rolle' }, // invalid role
+                  { content: 'fehlende role' }, // missing role
+                  'not even an object',
+                  null,
+                ],
+              },
+            },
+          },
+        },
+      },
+    });
+    const progress = getChallengeProgress(merged, 'sqlite', 'sqlLernenTool', '01');
+    expect(progress.chatHistory).toEqual([{ role: 'user', content: 'echte Frage' }]);
+  });
 });

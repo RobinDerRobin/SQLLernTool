@@ -27,6 +27,12 @@ describe('renderTrackCourseHeader', () => {
     expect(html).toContain('data-track-course');
   });
 
+  it('gives the select an accessible name, since it has no associated <label>', () => {
+    const registry = { a: fakeTrack('a', ['one', 'two']) };
+    const html = renderTrackCourseHeader({ registry, trackId: 'a', courseId: 'one' });
+    expect(html).toMatch(/<select[^>]*aria-label="[^"]+"/);
+  });
+
   it('renders a picker once more than one track exists', () => {
     const registry = { a: fakeTrack('a', ['one']), b: fakeTrack('b', ['other']) };
     const html = renderTrackCourseHeader({ registry, trackId: 'a', courseId: 'one' });
