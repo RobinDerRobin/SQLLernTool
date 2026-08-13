@@ -5848,3 +5848,44 @@ sondern pro PR direkt in den Checks sichtbar.
   Formatwechsel beschädigten `localStorage`-Inhalt, aber genau dafür
   existiert dieser Parser laut eigenem Zweck). Kein Artifact-Republish
   nötig (kein Content, keine Konzept-Zahlen geändert).
+
+### 2026-08-12 — Stündliche Routine: `knip` erneut auf 0 Funde — 10 seit F-012 neu angesammelte unnötige Exports entfernt
+
+- **Umfang:** Baseline sauber (1247/1247, typecheck/build/knip-mit-10-
+  Funden unverändert, HEAD `82f31f6`). Vor der Suche nach einem neuen
+  Bug geprüft, ob ähnliche ungeprüfte Casts wie beim letzten Fund
+  (`chatHistory`) anderswo existieren: alle drei `JSON.parse()`-Stellen
+  im Projekt durchgesehen (`localStorageProgressStore.ts` bereits
+  korrekt defensiv über `mergeLoadedState`; `csharpEngine.ts` und
+  `pyodideEngine.ts` parsen selbstkontrollierte Ausgabe der eigenen
+  Treiber, nicht Nutzereingabe oder `localStorage` — anderes
+  Risikoprofil, kein Bug). `claudeChatClient.ts`s `response.json()`
+  bereits korrekt abgesichert (fehlender Text wirft explizit). Keine
+  weitere Instanz dieses Bug-Musters gefunden.
+
+- **Befund:** `npx knip` zeigt seit mehreren Durchgängen konstant
+  dieselben 10 Funde (`Unused exported types`) — F-012 hatte das
+  Projekt 2026 einmal auf 0 Funde gebracht, seither sind durch neuen
+  Code (v. a. den C#-Track) 10 weitere `export`-Keywords auf Typen
+  angesammelt, die nirgends außerhalb ihrer eigenen Datei importiert
+  werden: `SendMessageParams`, `CSharpChallengeExtra`,
+  `PythonChallengeExtra`, `SqlChallengeExtra`, `ValidateFn`,
+  `CourseProgress`, `EditorToken`, `EditorSelectionState`,
+  `TableColumnInfo`, `Listener`.
+
+- **Fix:** für alle 10 einzeln per Grep bestätigt, dass keine andere
+  Datei sie importiert (nicht nur auf `knip`s Wort verlassen), dann
+  `export` entfernt — reine Sichtbarkeitsänderung, keine
+  Verhaltensänderung. `EditorSelectionState` brauchte besondere
+  Vorsicht: `autoClosePairs.ts` deklariert zufällig einen
+  gleichnamigen, aber unabhängigen lokalen Typ — kein tatsächlicher
+  Nutzer des exportierten Typs aus `LanguagePlugin.ts`.
+
+- **Tests:** 1247 → 1247 (reines Cleanup, keine neuen Tests nötig oder
+  sinnvoll). `npx tsc --noEmit` fehlerfrei, volle Suite 1247/1247
+  grün, `npm run build` grün (831,45 kB), `npx knip` jetzt wieder bei
+  **0 Funden** (vorher 10).
+
+- **Ergebnis:** Projekt zum zweiten Mal seit F-012 auf einen sauberen
+  `knip`-Stand gebracht. Kein Artifact-Republish nötig (kein Content,
+  keine Konzept-Zahlen geändert).

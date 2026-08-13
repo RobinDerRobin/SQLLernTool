@@ -16,7 +16,7 @@ export interface CourseSettings {
   examTipsRemaining: number;
 }
 
-export interface CourseProgress extends CourseSettings {
+interface CourseProgress extends CourseSettings {
   challenges: Record<string, ChallengeProgress>;
 }
 

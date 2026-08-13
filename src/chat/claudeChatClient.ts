@@ -4,7 +4,7 @@ const ANTHROPIC_MESSAGES_URL = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-sonnet-4-6';
 const MAX_TOKENS = 1000;
 
-export interface SendMessageParams {
+interface SendMessageParams {
   system: string;
   history: ChatMessage[];
   userText: string;
