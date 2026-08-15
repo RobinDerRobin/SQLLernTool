@@ -5910,3 +5910,41 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Tests:** 1247 → 1247 (keine neuen, reine Dokumentation/Planung). `npx tsc --noEmit` fehlerfrei, volle Suite 1247/1247 grün, `npm run build` grün (831.45 kB), `npx knip` 0 Funde.
 
 - **Ergebnis:** Klarheit für Mobile-Arbeiten der nächsten Routinen geschaffen — Sprint A kann sofort starten (Low-Risk CSS), B/C folgen nach Richtungsentscheidung. Kein Artifact-Republish nötig (keine Content-, keine Konzept-Zahlen-Änderung).
+
+### 2026-08-15 — Stündliche Routine: Sprint A — Mobile Editor Usability (WCAG compliance + code width + typography)
+
+- **Umfang:** (1) Baseline-Verifikation: `git status` sauber (HEAD `d593855`), `npx tsc --noEmit` fehlerfrei, volle Testsuite 1247/1247 grün, `npm run build` grün (831.80 kB). (2) Implementierung der Sprint A des Mobile-Editor-Usability-Plans (`docs/mobile-editor-usability-plan.md`, erstellt letzter Durchgang).
+
+- **Probleme adressiert:**
+  1. **Touch-Target WCAG-Verletzungen:** `.play-btn` war 20×20px (erwartet ≥24×24), `.sidebar-toggle-btn` war 22×22px (auch < 24×24)
+  2. **Code-Breite zu eng:** Line-Numbers beanspruchten 42px (~11% von 375px), zwangen Code-Text in mehrfache Umbrüche
+  3. **Typografie zu klein:** Labels/Status-Text bei 10–11px wirken "für Desktop gemacht" auf Handheld
+
+- **Sprint A.1 — Touch-Target Compliance:**
+  - `.play-btn`: `padding: 2px; box-sizing: content-box;` → effektive Trefferfläche 24×24px
+  - `.sidebar-toggle-btn`: `padding: 1px; box-sizing: content-box;` → effektive Trefferfläche 24×24px
+  - Sichtbare Button-Größe bleibt unverändert; nur Pointer-Event-Fläche wächst (WCAG 2.5.8 erfüllt)
+
+- **Sprint A.2 — Code-Breite Reclaim:**
+  - `.line-numbers { display: none }` auf Mobile-Breakpoint
+  - `textarea.editor`, `.highlight-layer`: `padding-left: 8px` statt `margin-left` (visueller Rand bleibt, aber keine 42px Spalte mehr)
+  - Effektive Code-Breite: ~330px → ~375px (≈13% Gewinn)
+  - Folge: Längere SQL/Python-Snippets brechen weniger um, sind lesbarer auf schmalem Viewport
+
+- **Sprint A.3 — Typografie-Skala:**
+  - `.challenge-num`: 11px → 12px
+  - `.course-name`: 11px → 12px
+  - `.mode-btn`: 11px → 12px
+  - `.stars`: 11px → 12px
+  - `.reset-confirm-text`: 11px → 12px
+  - `.sidebar-head h1`: 16px → 18px (bessere visuelle Hierarchie)
+  - Folge: Bessere Lesbarkeit auf Hand-held-Abstand, entfernt „wirkt nach Desktop" Gefühl
+
+- **Tests:** 1247 → 1247 (keine neuen Tests nötig, reine CSS-Änderungen). `npx tsc --noEmit` fehlerfrei, volle Suite 1247/1247 grün, `npm run build` grün (831.80 kB), `npx knip` 0 Funde.
+
+- **Ergebnis:** Sprint A komplett implementiert. Nächste Schritte sind abhängig von Richtungsentscheidung Read-and-Run (dann Sprint B: Compare stapeln, Lösung-Button prominent) vs. Full-Authoring (dann Sprint C: Tastatur-Toolbar, etc.). Kein Artifact-Republish nötig (keine Content-, keine Konzept-Zahlen-Änderung).
+
+- **Commits:**
+  - `0cf5a5b` Touch-targets ≥24×24 (A.1)
+  - `07f6e75` Line-numbers hiding (A.2)
+  - `d593855` Typography scale (A.3)
