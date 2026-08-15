@@ -623,6 +623,33 @@ textarea.editor {
     margin-left: 0;
     padding-left: 8px; /* Visual margin replaces missing line-number column */
   }
+
+  /* Sprint A.3: Typography scale — labels/status text 10-11px feels too small on hand-held device */
+  /* Increase to 12-13px for better legibility; still compact, no layout impact */
+  .challenge-num {
+    font-size: 12px; /* was 11px */
+  }
+
+  .course-name {
+    font-size: 12px; /* was 11px */
+  }
+
+  .mode-btn {
+    font-size: 12px; /* was 11px */
+  }
+
+  .stars {
+    font-size: 12px; /* was 11px */
+  }
+
+  .reset-confirm-text {
+    font-size: 12px; /* was 11px */
+  }
+
+  /* Slightly larger main header for better visual hierarchy */
+  .sidebar-head h1 {
+    font-size: 18px; /* was 16px — makes sidebar heading more prominent on mobile */
+  }
 }
 
 .tok-keyword { color: var(--accent); font-weight: 600; }
