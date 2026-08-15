@@ -609,6 +609,20 @@ textarea.editor {
     padding: 1px;
     box-sizing: content-box; /* Padding addiert sich zu 22×22 → 24×24 effektiv */
   }
+
+  /* Sprint A.2: Hide line-numbers to reclaim ~11% of code width (42px / 375px ≈ 11%) */
+  /* Consequence: code width grows ~330px → ~375px, reduces line-breaking in narrow layouts */
+  .line-numbers {
+    display: none;
+  }
+
+  /* Since line-numbers gone, textarea + highlight need no margin-left adjustment */
+  /* They already sit flush-left; padding compensates for lost visual margin */
+  textarea.editor,
+  .highlight-layer {
+    margin-left: 0;
+    padding-left: 8px; /* Visual margin replaces missing line-number column */
+  }
 }
 
 .tok-keyword { color: var(--accent); font-weight: 600; }
