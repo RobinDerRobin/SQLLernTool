@@ -5889,3 +5889,24 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Ergebnis:** Projekt zum zweiten Mal seit F-012 auf einen sauberen
   `knip`-Stand gebracht. Kein Artifact-Republish nötig (kein Content,
   keine Konzept-Zahlen geändert).
+
+### 2026-08-15 — Stündliche Routine: Baseline-Verifikation + Mobile-Editor-Usability-Plan
+
+- **Umfang:** (1) Baseline-Verifikation nach Plan-Mode-Reentry: `git status` sauber (HEAD `50f391f`), `npx tsc --noEmit` fehlerfrei, volle Testsuite 1247/1247 grün, `npm run build` grün (831.45 kB), `npx knip` 0 Funde — nichts kaputt. (2) Benutzer-Feedback "Der Editor ist auf dem Handy nicht gut nutzbar. Er ist abgeschnitten und unübersichtlich" bewertete und operationalisierte.
+
+- **Befund:** Keine neuen Bugs in dieser Runde. Stattdessen: Umfassende Problemanalyse für Mobile-Editor-Usability dokumentiert, die seit F-020/F-021/F-022 (2026-08-09) bekannten technischen Fixes sind an ihre Grenzen gestoßen — der Eindruck "abgeschnitten und unübersichtlich" kommt von Layout-Hebeln, nicht von fehlender CSS-Sichtbarkeit.
+
+- **Analyse:**
+  - **"Abgeschnitten"** = Nutzer sieht Editor erst nach Scroll (Tutorial sitzt davor), wirkt versteckt
+  - **"Unübersichtlich"** = Mehrere Faktoren: (a) Compare-Ansicht bricht in zwei 135px-Spalten um (unlesbar), (b) Line-Numbers verschwenden 11% der Breite, (c) Touch-Targets (Play-Button 20×20, Sidebar-Toggle 22×22) unterschreiten WCAG 24×24
+  - **Tastatur-Realität** = SQL/Python-Syntax ist auf Mobile-Tastatur frustrierend → offene Richtungsfrage, ob App Full-Authoring oder Read-and-Run sein soll (siehe `docs/mobile-roadmap.md` Abschnitt 0)
+
+- **Ergebnis:** Neue Plan-Datei `docs/mobile-editor-usability-plan.md` geschrieben:
+  - **Sprint A (sofort, Low-Risk):** Touch-Targets vergrößern (WCAG), Line-Numbers unter 760px verstecken (+13% Code-Breite), Typography 10→12px (+Lesbarkeit) — keine Richtungs-Abhängigkeit
+  - **Sprint B (wenn Read-and-Run):** Compare stapeln, "Lösung laden" prominent, Editor-Panel-Swap
+  - **Sprint C (wenn Full-Authoring):** Tastatur-Toolbar, Snippets, Auto-Complete — großere Projekte
+  - Mit konkreten CSS-Snippets, Messwerten (24×24 Targets, ~333px effektive Code-Breite), Playwright-Tests und Validierungskriterien pro Sprint
+
+- **Tests:** 1247 → 1247 (keine neuen, reine Dokumentation/Planung). `npx tsc --noEmit` fehlerfrei, volle Suite 1247/1247 grün, `npm run build` grün (831.45 kB), `npx knip` 0 Funde.
+
+- **Ergebnis:** Klarheit für Mobile-Arbeiten der nächsten Routinen geschaffen — Sprint A kann sofort starten (Low-Risk CSS), B/C folgen nach Richtungsentscheidung. Kein Artifact-Republish nötig (keine Content-, keine Konzept-Zahlen-Änderung).
