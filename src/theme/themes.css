@@ -592,6 +592,23 @@ textarea.editor {
   }
   /* 36px fits three digits at 13px, but not at 16px (~9.6px per mono char). */
   .line-numbers { width: 42px; }
+
+  /* Sprint A: WCAG 2.5.8 (Target Size) compliance — touch-targets must be ≥24×24 */
+  /* .play-btn: sichtbar 20×20, aber Padding macht effektive Trefferfläche 24×24 */
+  .play-btn {
+    width: 20px;
+    height: 20px;
+    padding: 2px;
+    box-sizing: content-box; /* Padding addiert sich zu 20×20 → 24×24 effektiv */
+  }
+
+  /* .sidebar-toggle-btn: sichtbar 22×22, Padding macht effektive Trefferfläche ≥24×24 */
+  .sidebar-toggle-btn {
+    width: 22px;
+    height: 22px;
+    padding: 1px;
+    box-sizing: content-box; /* Padding addiert sich zu 22×22 → 24×24 effektiv */
+  }
 }
 
 .tok-keyword { color: var(--accent); font-weight: 600; }
