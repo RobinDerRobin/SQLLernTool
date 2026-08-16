@@ -5948,3 +5948,18 @@ sondern pro PR direkt in den Checks sichtbar.
   - `0cf5a5b` Touch-targets ≥24×24 (A.1)
   - `07f6e75` Line-numbers hiding (A.2)
   - `d593855` Typography scale (A.3)
+
+### 2026-08-16 — Stündliche Routine: Baseline-Verifikation — all green, no actionable next steps
+
+- **Umfang:** Stündliche Baseline-Verifikation nach Sprint A (2026-08-15). Typecheck, Build, Test Suite, Coverage-Analyse, Content-Track-Status-Prüfung.
+
+- **Befund:** Keine neuen Bugs. Alle Systeme grün:
+  - **Typecheck:** `npx tsc --noEmit` fehlerfrei
+  - **Build:** `npm run build` erfolgreich (831.80 kB, identisch mit gestern)
+  - **Tests:** `npx vitest run` alle 1247/1247 grün
+  - **Coverage:** Statements 92.76% (9907/10680), Branches 74.22% (2122/2859), Functions 99.38% (486/489), Lines 92.76% (9907/10680) — stabil
+  - **Content Tracks:** SQL 81/82 (aktionabel vollständig), Python 81/82 (aktionabel vollständig), C# 86/86 (100% abgedeckt)
+
+- **Ergebnis:** Keine actionable neue Aufgaben erkannt. SQL + Python Concept-Hierarchien vollständig (alle aktionablen Tags abgedeckt). C# Engine mit 27 Challenges bei 86/86 Tags (100%). Keine Regressions oder Coverage-Lücken identifiziert seit Sprint A. Kein Artifact-Republish nötig (keine Änderungen).
+
+- **Status:** Firing abgeschlossen. Nächste offene Arbeiten erfordern User-Input (z. B. Read-and-Run vs. Full-Authoring-Richtungsentscheidung für Sprint B Mobile, oder tiefere C#-Engine-Debugging des bekannten MONO_WASM-Boot-Fehlers).
