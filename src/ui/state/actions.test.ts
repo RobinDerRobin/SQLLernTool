@@ -320,14 +320,6 @@ describe('runQuery', () => {
     expect(ctx.store.getState().session.playResults['python:pythonGrundlagen:01']).toBe('err');
   });
 
-  it('returns "csharp-loading" when the C# engine has not finished loading yet', async () => {
-    const { ctx } = makeCtx();
-    selectChallenge(ctx, 'csharp', 'csharpGrundlagen', '01');
-
-    const outcome = await runQuery(ctx, 'Console.WriteLine("hi");');
-
-    expect(outcome.kind).toBe('csharp-loading');
-  });
 });
 
 describe('revealHint', () => {

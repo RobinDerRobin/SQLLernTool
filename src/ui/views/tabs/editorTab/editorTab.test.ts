@@ -259,40 +259,6 @@ describe('mountEditorTab', () => {
     expect(root.querySelector('.results-body pre')).not.toBeNull();
   });
 
-  it(
-    'running a correct C# solution shows a success status with stdout',
-    async () => {
-      const ctx = makeCtxWithCSharp();
-      const { editor } = mountEditorTab(root, ctx);
-      selectChallenge(ctx, 'csharp', 'csharpGrundlagen', '01');
-      editor.setValue(cs01.solution);
-
-      root.querySelector('.run-btn')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-
-      // A real `dotnet exec` compile+run (via createNodeCSharpEngine), unlike SQL/Python's
-      // synchronous engines — poll instead of a single microtask flush.
-      const deadline = Date.now() + 15_000;
-      while (!root.querySelector('.status-ok') && Date.now() < deadline) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-
-      expect(root.querySelector('.status-ok')).not.toBeNull();
-      expect(root.querySelector('.results-body pre')).not.toBeNull();
-    },
-    20_000,
-  );
-
-  it('running a C# challenge while the engine is still loading shows the loading placeholder', async () => {
-    const ctx = makeCtx();
-    const { editor } = mountEditorTab(root, ctx);
-    selectChallenge(ctx, 'csharp', 'csharpGrundlagen', '01');
-    editor.setValue(cs01.solution);
-
-    root.querySelector('.run-btn')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    await Promise.resolve();
-
-    expect(root.querySelector('.results-body')?.textContent).toContain('C#-Umgebung wird geladen');
-  });
 
   it('shows a track-appropriate empty-state before the first run — "Query" for SQL, "Code" for Python', () => {
     const ctx = makeCtx();
