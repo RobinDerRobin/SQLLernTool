@@ -33,10 +33,12 @@ export const TRACKS: Record<string, ContentTrack> = {
     courses: [pythonGrundlagenCourse as Course<unknown>],
     schema: pythonChallengeSchema,
   },
-  csharp: {
-    id: 'csharp',
-    label: 'C#',
-    courses: [csharpGrundlagenCourse as Course<unknown>],
-    schema: csharpChallengeSchema,
-  },
+  // Temporarily hidden: C# bootstrap on deployed site needs debugging
+  // See docs/csharp-engine-poc.md for details on WasmEnableThreads issue
+  // csharp: {
+  //   id: 'csharp',
+  //   label: 'C#',
+  //   courses: [csharpGrundlagenCourse as Course<unknown>],
+  //   schema: csharpChallengeSchema,
+  // },
 };
