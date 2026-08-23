@@ -592,6 +592,64 @@ textarea.editor {
   }
   /* 36px fits three digits at 13px, but not at 16px (~9.6px per mono char). */
   .line-numbers { width: 42px; }
+
+  /* Sprint A: WCAG 2.5.8 (Target Size) compliance — touch-targets must be ≥24×24 */
+  /* .play-btn: sichtbar 20×20, aber Padding macht effektive Trefferfläche 24×24 */
+  .play-btn {
+    width: 20px;
+    height: 20px;
+    padding: 2px;
+    box-sizing: content-box; /* Padding addiert sich zu 20×20 → 24×24 effektiv */
+  }
+
+  /* .sidebar-toggle-btn: sichtbar 22×22, Padding macht effektive Trefferfläche ≥24×24 */
+  .sidebar-toggle-btn {
+    width: 22px;
+    height: 22px;
+    padding: 1px;
+    box-sizing: content-box; /* Padding addiert sich zu 22×22 → 24×24 effektiv */
+  }
+
+  /* Sprint A.2: Hide line-numbers to reclaim ~11% of code width (42px / 375px ≈ 11%) */
+  /* Consequence: code width grows ~330px → ~375px, reduces line-breaking in narrow layouts */
+  .line-numbers {
+    display: none;
+  }
+
+  /* Since line-numbers gone, textarea + highlight need no margin-left adjustment */
+  /* They already sit flush-left; padding compensates for lost visual margin */
+  textarea.editor,
+  .highlight-layer {
+    margin-left: 0;
+    padding-left: 8px; /* Visual margin replaces missing line-number column */
+  }
+
+  /* Sprint A.3: Typography scale — labels/status text 10-11px feels too small on hand-held device */
+  /* Increase to 12-13px for better legibility; still compact, no layout impact */
+  .challenge-num {
+    font-size: 12px; /* was 11px */
+  }
+
+  .course-name {
+    font-size: 12px; /* was 11px */
+  }
+
+  .mode-btn {
+    font-size: 12px; /* was 11px */
+  }
+
+  .stars {
+    font-size: 12px; /* was 11px */
+  }
+
+  .reset-confirm-text {
+    font-size: 12px; /* was 11px */
+  }
+
+  /* Slightly larger main header for better visual hierarchy */
+  .sidebar-head h1 {
+    font-size: 18px; /* was 16px — makes sidebar heading more prominent on mobile */
+  }
 }
 
 .tok-keyword { color: var(--accent); font-weight: 600; }

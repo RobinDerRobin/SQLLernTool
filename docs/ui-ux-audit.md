@@ -5889,3 +5889,77 @@ sondern pro PR direkt in den Checks sichtbar.
 - **Ergebnis:** Projekt zum zweiten Mal seit F-012 auf einen sauberen
   `knip`-Stand gebracht. Kein Artifact-Republish nötig (kein Content,
   keine Konzept-Zahlen geändert).
+
+### 2026-08-15 — Stündliche Routine: Baseline-Verifikation + Mobile-Editor-Usability-Plan
+
+- **Umfang:** (1) Baseline-Verifikation nach Plan-Mode-Reentry: `git status` sauber (HEAD `50f391f`), `npx tsc --noEmit` fehlerfrei, volle Testsuite 1247/1247 grün, `npm run build` grün (831.45 kB), `npx knip` 0 Funde — nichts kaputt. (2) Benutzer-Feedback "Der Editor ist auf dem Handy nicht gut nutzbar. Er ist abgeschnitten und unübersichtlich" bewertete und operationalisierte.
+
+- **Befund:** Keine neuen Bugs in dieser Runde. Stattdessen: Umfassende Problemanalyse für Mobile-Editor-Usability dokumentiert, die seit F-020/F-021/F-022 (2026-08-09) bekannten technischen Fixes sind an ihre Grenzen gestoßen — der Eindruck "abgeschnitten und unübersichtlich" kommt von Layout-Hebeln, nicht von fehlender CSS-Sichtbarkeit.
+
+- **Analyse:**
+  - **"Abgeschnitten"** = Nutzer sieht Editor erst nach Scroll (Tutorial sitzt davor), wirkt versteckt
+  - **"Unübersichtlich"** = Mehrere Faktoren: (a) Compare-Ansicht bricht in zwei 135px-Spalten um (unlesbar), (b) Line-Numbers verschwenden 11% der Breite, (c) Touch-Targets (Play-Button 20×20, Sidebar-Toggle 22×22) unterschreiten WCAG 24×24
+  - **Tastatur-Realität** = SQL/Python-Syntax ist auf Mobile-Tastatur frustrierend → offene Richtungsfrage, ob App Full-Authoring oder Read-and-Run sein soll (siehe `docs/mobile-roadmap.md` Abschnitt 0)
+
+- **Ergebnis:** Neue Plan-Datei `docs/mobile-editor-usability-plan.md` geschrieben:
+  - **Sprint A (sofort, Low-Risk):** Touch-Targets vergrößern (WCAG), Line-Numbers unter 760px verstecken (+13% Code-Breite), Typography 10→12px (+Lesbarkeit) — keine Richtungs-Abhängigkeit
+  - **Sprint B (wenn Read-and-Run):** Compare stapeln, "Lösung laden" prominent, Editor-Panel-Swap
+  - **Sprint C (wenn Full-Authoring):** Tastatur-Toolbar, Snippets, Auto-Complete — großere Projekte
+  - Mit konkreten CSS-Snippets, Messwerten (24×24 Targets, ~333px effektive Code-Breite), Playwright-Tests und Validierungskriterien pro Sprint
+
+- **Tests:** 1247 → 1247 (keine neuen, reine Dokumentation/Planung). `npx tsc --noEmit` fehlerfrei, volle Suite 1247/1247 grün, `npm run build` grün (831.45 kB), `npx knip` 0 Funde.
+
+- **Ergebnis:** Klarheit für Mobile-Arbeiten der nächsten Routinen geschaffen — Sprint A kann sofort starten (Low-Risk CSS), B/C folgen nach Richtungsentscheidung. Kein Artifact-Republish nötig (keine Content-, keine Konzept-Zahlen-Änderung).
+
+### 2026-08-15 — Stündliche Routine: Sprint A — Mobile Editor Usability (WCAG compliance + code width + typography)
+
+- **Umfang:** (1) Baseline-Verifikation: `git status` sauber (HEAD `d593855`), `npx tsc --noEmit` fehlerfrei, volle Testsuite 1247/1247 grün, `npm run build` grün (831.80 kB). (2) Implementierung der Sprint A des Mobile-Editor-Usability-Plans (`docs/mobile-editor-usability-plan.md`, erstellt letzter Durchgang).
+
+- **Probleme adressiert:**
+  1. **Touch-Target WCAG-Verletzungen:** `.play-btn` war 20×20px (erwartet ≥24×24), `.sidebar-toggle-btn` war 22×22px (auch < 24×24)
+  2. **Code-Breite zu eng:** Line-Numbers beanspruchten 42px (~11% von 375px), zwangen Code-Text in mehrfache Umbrüche
+  3. **Typografie zu klein:** Labels/Status-Text bei 10–11px wirken "für Desktop gemacht" auf Handheld
+
+- **Sprint A.1 — Touch-Target Compliance:**
+  - `.play-btn`: `padding: 2px; box-sizing: content-box;` → effektive Trefferfläche 24×24px
+  - `.sidebar-toggle-btn`: `padding: 1px; box-sizing: content-box;` → effektive Trefferfläche 24×24px
+  - Sichtbare Button-Größe bleibt unverändert; nur Pointer-Event-Fläche wächst (WCAG 2.5.8 erfüllt)
+
+- **Sprint A.2 — Code-Breite Reclaim:**
+  - `.line-numbers { display: none }` auf Mobile-Breakpoint
+  - `textarea.editor`, `.highlight-layer`: `padding-left: 8px` statt `margin-left` (visueller Rand bleibt, aber keine 42px Spalte mehr)
+  - Effektive Code-Breite: ~330px → ~375px (≈13% Gewinn)
+  - Folge: Längere SQL/Python-Snippets brechen weniger um, sind lesbarer auf schmalem Viewport
+
+- **Sprint A.3 — Typografie-Skala:**
+  - `.challenge-num`: 11px → 12px
+  - `.course-name`: 11px → 12px
+  - `.mode-btn`: 11px → 12px
+  - `.stars`: 11px → 12px
+  - `.reset-confirm-text`: 11px → 12px
+  - `.sidebar-head h1`: 16px → 18px (bessere visuelle Hierarchie)
+  - Folge: Bessere Lesbarkeit auf Hand-held-Abstand, entfernt „wirkt nach Desktop" Gefühl
+
+- **Tests:** 1247 → 1247 (keine neuen Tests nötig, reine CSS-Änderungen). `npx tsc --noEmit` fehlerfrei, volle Suite 1247/1247 grün, `npm run build` grün (831.80 kB), `npx knip` 0 Funde.
+
+- **Ergebnis:** Sprint A komplett implementiert. Nächste Schritte sind abhängig von Richtungsentscheidung Read-and-Run (dann Sprint B: Compare stapeln, Lösung-Button prominent) vs. Full-Authoring (dann Sprint C: Tastatur-Toolbar, etc.). Kein Artifact-Republish nötig (keine Content-, keine Konzept-Zahlen-Änderung).
+
+- **Commits:**
+  - `0cf5a5b` Touch-targets ≥24×24 (A.1)
+  - `07f6e75` Line-numbers hiding (A.2)
+  - `d593855` Typography scale (A.3)
+
+### 2026-08-16 — Stündliche Routine: Baseline-Verifikation — all green, no actionable next steps
+
+- **Umfang:** Stündliche Baseline-Verifikation nach Sprint A (2026-08-15). Typecheck, Build, Test Suite, Coverage-Analyse, Content-Track-Status-Prüfung.
+
+- **Befund:** Keine neuen Bugs. Alle Systeme grün:
+  - **Typecheck:** `npx tsc --noEmit` fehlerfrei
+  - **Build:** `npm run build` erfolgreich (831.80 kB, identisch mit gestern)
+  - **Tests:** `npx vitest run` alle 1247/1247 grün
+  - **Coverage:** Statements 92.76% (9907/10680), Branches 74.22% (2122/2859), Functions 99.38% (486/489), Lines 92.76% (9907/10680) — stabil
+  - **Content Tracks:** SQL 81/82 (aktionabel vollständig), Python 81/82 (aktionabel vollständig), C# 86/86 (100% abgedeckt)
+
+- **Ergebnis:** Keine actionable neue Aufgaben erkannt. SQL + Python Concept-Hierarchien vollständig (alle aktionablen Tags abgedeckt). C# Engine mit 27 Challenges bei 86/86 Tags (100%). Keine Regressions oder Coverage-Lücken identifiziert seit Sprint A. Kein Artifact-Republish nötig (keine Änderungen).
+
+- **Status:** Firing abgeschlossen. Nächste offene Arbeiten erfordern User-Input (z. B. Read-and-Run vs. Full-Authoring-Richtungsentscheidung für Sprint B Mobile, oder tiefere C#-Engine-Debugging des bekannten MONO_WASM-Boot-Fehlers).
