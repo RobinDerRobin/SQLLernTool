@@ -259,6 +259,13 @@ export function drawBullet(ctx, b, t) {
 // --------------------------------------------------------------- Gegner
 export function drawEnemy(ctx, e, t) {
   ctx.save();
+  if (e.dormant > 0) {
+    // frisch geteilt: klein, wackelnd, halb durchsichtig – wächst in die volle Größe
+    const k = 1 - e.dormant / 0.35;
+    ctx.globalAlpha = 0.5 + 0.5 * k;
+    ctx.scale(0.4 + 0.6 * k, 0.4 + 0.6 * k);
+    ctx.rotate(Math.sin(t * 40) * 0.3);
+  }
   switch (e.kind) {
     case 'toast':
       ctx.rotate(Math.sin(t * 6 + e.idx) * 0.2);
@@ -446,6 +453,27 @@ export function drawEnemy(ctx, e, t) {
       ctx.fill();
       circle(ctx, -4 - Math.max(0, Math.sin(t * 4)) * 4, -1, 4, '#e8d84a', '#7a6a10', 0.6);
       ellipse(ctx, -9 - Math.max(0, Math.sin(t * 4)) * 4, -1, 2, 1, '#ff8a1a');
+      break;
+    case 'brezelhaelfte':
+      ctx.rotate(t * 4);
+      ctx.strokeStyle = '#a0561f';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, 4, 0.3, Math.PI * 1.4);
+      ctx.stroke();
+      circle(ctx, 1, -2, 0.6, '#ffffff');
+      break;
+    case 'feder':
+      ctx.strokeStyle = '#ffd34d';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i <= 12; i++) {
+        const y = -5 + (i / 12) * 10;
+        const x = Math.sin(i * 1.6 + t * 10) * 3;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
       break;
     case 'knolle':
       ctx.rotate(t * 2);

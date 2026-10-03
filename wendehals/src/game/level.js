@@ -27,7 +27,7 @@ import { generateLevel } from './levelgen.js';
 import { LEVELS } from '../data/levels.js';
 import { TILE, isSolid } from './terrain.js';
 import { dynState, dynHitsBox, mirrorDyn, corridorAt } from './dynamics.js';
-import { ENEMIES, FORMATION_KINDS } from './enemies.js';
+import { ENEMIES, FORMATION_KINDS, SPLIT_DELAY, MAX_SPLIT_GENERATION } from './enemies.js';
 import { BOSSES, defaultHitTest } from './bosses.js';
 import { addCapsule, activate, freshPowers } from './powerups.js';
 
@@ -395,6 +395,10 @@ export class Level {
     this.hazards.length = 0;
     for (const g of this.gates) if (g.blocks) for (const b of g.blocks) if (b.flash) b.flash = Math.max(0, b.flash - dt);
     for (const e of this.enemies) {
+      if (e.dormant > 0) {
+        e.dormant -= dt; // frisch geteilt: wackelt kurz an Ort und Stelle, harmlos und unverwundbar
+        continue;
+      }
       e.t += dt;
       if (e.flash) e.flash = Math.max(0, e.flash - dt);
       ENEMIES[e.kind].update(e, this, dt);
@@ -849,7 +853,7 @@ export class Level {
       }
       if (s.dead) continue;
       for (const e of this.enemies) {
-        if (e.dead) continue;
+        if (e.dead || e.dormant > 0) continue;
         if (s.hit && s.hit.has(e)) continue;
         const rr = e.r + s.r + (s.kind === 'laser' ? 6 : 0);
         if (Math.abs(s.a - e.a) > rr + (s.len || 0) || Math.abs(this.dc(s.c, e.c)) > rr) continue;
@@ -905,6 +909,17 @@ export class Level {
       }
     }
     if (def.onDeath) def.onDeath(e, this);
+    this.trySplit(e, def, byPlayer);
+  }
+
+  /** Verzögertes Teilen: Die Teile erscheinen "schlafend" und werden erst nach kurzer Zeit aktiv. */
+  trySplit(e, def, byPlayer) {
+    const sp = def.split;
+    if (!sp || (e.gen || 0) >= MAX_SPLIT_GENERATION) return;
+    if (!byPlayer && !sp.always) return;
+    for (const vc of sp.spread) {
+      this.spawn(sp.into, e.a, e.c, { vc, gen: (e.gen || 0) + 1, dormant: SPLIT_DELAY, c0: e.c });
+    }
   }
 
   dropCapsule(a, c) {
@@ -932,7 +947,7 @@ export class Level {
       }
     }
     for (const e of this.enemies) {
-      if (e.dead) continue;
+      if (e.dead || e.dormant > 0) continue;
       if (dist2(p.a, 0, e.a, this.dc(e.c, p.c)) < (e.r + r) ** 2) {
         // Unzerstörbares (Zahnräder) ist ein fester Gegenstand: sofort tödlich.
         if (ENEMIES[e.kind].invulnerable) this.instantDeath();

@@ -288,3 +288,46 @@ test('Show don\'t tell: vor einer unüberwindbaren Wand kehrt der Dackel nach ei
   assert.equal(result?.type, 'retreat');
   assert.ok(seconds < 60);
 });
+
+test('Splitter: Teile erscheinen verzögert, sind solange harmlos und teilen sich nicht weiter', () => {
+  const edge = EDGE_BY_ID[EDGES.find((e) => !e.boss).id];
+  const lv = new Level({ edge, forward: true, items: withAll(), seed: 3 });
+  clearTerrain(lv);
+  lv.enemies.length = 0;
+  for (const kind of ['seife', 'wurst', 'brezel', 'wecker']) {
+    const parent = lv.spawn(kind, lv.player.a + 200, lv.player.c);
+    lv.kill(parent, true);
+    const kids = lv.enemies.filter((e) => !e.dead && e.gen === 1);
+    assert.equal(kids.length, 2, kind + ' teilt sich in 2');
+    for (const k of kids) {
+      assert.ok(k.dormant > 0.3, 'Teile schlafen zuerst');
+      assert.equal(k.wave, -1, 'Teile zählen nicht zur Welle');
+    }
+    // Teile wandern während der Verzögerung nicht und sind unverwundbar
+    const pos = kids.map((k) => [k.a, k.c]);
+    lv.shots.push({ kind: 'main', a: kids[0].a, c: kids[0].c, va: 0, vc: 0, r: 3, dmg: 9, t: 0 });
+    lv.update(1 / 60, {});
+    kids.forEach((k, i) => {
+      assert.ok(!k.dead && k.hp === k.maxHp, 'schlafendes Teil wurde getroffen');
+      assert.deepEqual([k.a, k.c], pos[i]);
+    });
+    // Abschuss eines Teils erzeugt keine weiteren Teile
+    const before = lv.enemies.length;
+    for (const k of kids) lv.kill(k, true);
+    assert.equal(lv.enemies.length, before, kind + ': Kettenreaktion');
+    lv.enemies.length = 0;
+  }
+});
+
+test('Splitter: nach der Verzögerung werden die Teile aktiv', () => {
+  const lv = new Level({ edge: EDGES.find((e) => !e.boss), forward: true, items: withAll(), seed: 3 });
+  clearTerrain(lv);
+  lv.enemies.length = 0;
+  lv.kill(lv.spawn('seife', lv.player.a + 300, lv.player.c), true);
+  const kids = lv.enemies.filter((e) => e.gen === 1);
+  for (let i = 0; i < 30; i++) lv.update(1 / 60, {});
+  for (const k of kids) {
+    assert.ok(!(k.dormant > 0));
+    assert.ok(k.t > 0, 'Teil bewegt sich');
+  }
+});

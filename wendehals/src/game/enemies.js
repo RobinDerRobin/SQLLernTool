@@ -41,6 +41,7 @@ export const ENEMIES = {
   },
   brezel: {
     name: 'Brezel',
+    split: { into: 'brezelhaelfte', spread: [-55, 55] },
     hp: 1,
     r: 8,
     score: 100,
@@ -109,10 +110,7 @@ export const ENEMIES = {
       e.a -= 30 * dt;
       e.c = e.c0 + 30 * Math.sin(e.t * 1.3 + e.idx);
     },
-    onDeath(e, lv) {
-      lv.spawn('miniseife', e.a, e.c, { vc: -60 });
-      lv.spawn('miniseife', e.a, e.c, { vc: 60 });
-    },
+    split: { into: 'miniseife', spread: [-60, 60] },
   },
   miniseife: {
     name: 'Bläschen',
@@ -211,9 +209,7 @@ export const ENEMIES = {
         lv.kill(e, false);
       }
     },
-    onDeath(e, lv) {
-      for (const vc of [-70, 0, 70]) lv.spawn('gurke', e.a, e.c, { vc });
-    },
+    split: { into: 'gurke', spread: [-70, 0, 70], always: true },
   },
   gurke: {
     name: 'Gewürzgurke',
@@ -250,10 +246,7 @@ export const ENEMIES = {
       e.a -= 55 * dt;
       e.c = e.c0 + 20 * Math.sin(e.t * 3);
     },
-    onDeath(e, lv) {
-      lv.spawn('miniwurst', e.a, e.c, { vc: -50 });
-      lv.spawn('miniwurst', e.a, e.c, { vc: 50 });
-    },
+    split: { into: 'miniwurst', spread: [-50, 50] },
   },
   miniwurst: {
     name: 'Cocktailwürstchen',
@@ -291,6 +284,7 @@ export const ENEMIES = {
   },
   wecker: {
     name: 'Wecker',
+    split: { into: 'feder', spread: [-60, 60] },
     hp: 4,
     r: 10,
     score: 300,
@@ -317,6 +311,27 @@ export const ENEMIES = {
           aimShot(e, lv, lv.bulletSpeed(100), 'kugel', 0.18, 2);
         }
       } else e.a -= 150 * dt;
+    },
+  },
+  brezelhaelfte: {
+    name: 'Brezelhälfte',
+    hp: 1,
+    r: 5,
+    score: 40,
+    update(e, lv, dt) {
+      e.a -= 70 * dt;
+      e.c += (e.vc || 0) * dt;
+      e.vc *= 1 - 0.6 * dt;
+    },
+  },
+  feder: {
+    name: 'Uhrfeder',
+    hp: 1,
+    r: 5,
+    score: 40,
+    update(e, lv, dt) {
+      e.a -= 60 * dt;
+      e.c += (e.vc || 0) * Math.cos(e.t * 6) * dt;
     },
   },
   // --- Boss-Helfer ---
@@ -351,6 +366,13 @@ export const ENEMIES = {
     },
   },
 };
+
+/**
+ * Teilen: Gegner mit "split" zerfallen beim Abschuss in kleinere – aber erst nach SPLIT_DELAY
+ * (sichtbares Wackeln), und die Teile teilen sich nie weiter (keine Kettenreaktion).
+ */
+export const SPLIT_DELAY = 0.35;
+export const MAX_SPLIT_GENERATION = 1;
 
 /** Gegner, die in Formationen auftreten (mehrere hintereinander). */
 export const FORMATION_KINDS = new Set(['toast', 'brezel', 'ente', 'socke', 'vinyl']);
