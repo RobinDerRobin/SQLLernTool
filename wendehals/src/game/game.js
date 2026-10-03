@@ -84,8 +84,10 @@ export class Game {
   }
 
   /** "Geht nicht" ohne Worte: das Schiff auf der Karte ruckelt kurz, dazu ein Ton. */
-  nudge() {
-    this.nudgeT = 0.3;
+  nudge(dir = null) {
+    this.nudgeT = 0.45;
+    this.nudgeEdge = null;
+    this.nudgeDir = dir; // gewünschte Richtung: das Schiff kippt kurz dorthin und federt zurück
     this.sfx('nope');
   }
 
@@ -331,11 +333,12 @@ export class Game {
   launch() {
     const link = linkAt(this.node, this.heading);
     if (!link) {
-      this.nudge();
+      this.nudge(this.heading);
       return;
     }
     if (!directionAllowed(link)) {
-      this.nudge();
+      this.nudge(this.heading);
+      this.nudgeEdge = link.edge.id; // gesperrte Kante blinkt rot
       return;
     }
     this.levelOrigin = { node: this.node, heading: this.heading };
@@ -388,6 +391,14 @@ export class Game {
 
   handleLevelResult(res) {
     const lv = this.level;
+    if (res.type === 'retreat') {
+      // Umgekehrt vor einer unüberwindbaren Wand: wie "Etappe abbrechen", ohne Text
+      this.progress.score += lv.score;
+      this.abortLevel();
+      this.toasts = [];
+      this.nudge();
+      return;
+    }
     this.progress.score += lv.score;
     if (res.type === 'dead') {
       this.returnToStation(true);
@@ -490,7 +501,7 @@ export class Game {
         this.heading = dir;
         this.sfx('turn');
       } else {
-        this.nudge();
+        this.nudge(dir);
       }
       break;
     }

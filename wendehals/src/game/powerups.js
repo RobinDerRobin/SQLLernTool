@@ -61,7 +61,10 @@ export function activate(p) {
       break;
   }
   p.cursor = -1;
-  (p.order ||= []).push(i);
+  p.order ||= [];
+  // Doppel und Laser schließen sich aus: der Wechsel ersetzt den alten Eintrag
+  if (i === 2 || i === 3) p.order = p.order.filter((x) => x !== 2 && x !== 3);
+  p.order.push(i);
   return POWER_LABELS[i];
 }
 
@@ -78,7 +81,8 @@ function apply(p, i) {
 export function powerupsAfterDeath(p, hasSparstrumpf) {
   const fresh = freshPowers();
   if (!hasSparstrumpf || !p || !Array.isArray(p.order)) return fresh;
-  const keep = p.order.filter((i) => i !== 5).slice(0, Math.floor(p.order.length / 2));
+  const buys = p.order.filter((i) => i !== 5); // Schild zählt nie mit
+  const keep = buys.slice(0, Math.floor(buys.length / 2));
   for (const i of keep) if (slotAvailable(fresh, i)) apply(fresh, i);
   fresh.cursor = -1;
   return fresh;

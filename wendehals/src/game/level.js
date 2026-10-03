@@ -24,6 +24,9 @@ import { maxHpFor } from '../data/items.js';
 import { HINTS } from '../data/text.js';
 import { edgeDir } from './worldgraph.js';
 import { generateLevel } from './levelgen.js';
+import { LEVELS } from '../data/levels.js';
+import { TILE, isSolid } from './terrain.js';
+import { dynState, dynHitsBox, mirrorDyn, corridorAt } from './dynamics.js';
 import { ENEMIES, FORMATION_KINDS } from './enemies.js';
 import { BOSSES, defaultHitTest } from './bosses.js';
 import { addCapsule, activate, freshPowers } from './powerups.js';
@@ -66,24 +69,30 @@ export class Level {
     this.powers = o.powers || freshPowers();
     this.invincible = !!o.invincible;
     this.rng = new Rng(o.seed ?? 12345);
-    this.L = this.edge.length;
+    this.L = Math.ceil(this.edge.length / TILE) * TILE; // ganze Kacheln (für saubere Spiegelung)
     this.diff = this.edge.difficulty || 1;
     this.heading = this.forward ? edgeDir(this.edge) : opposite(edgeDir(this.edge));
-    this.H = crossPeriod(this.heading);
+    this.H = crossPeriod(this.heading, (LEVELS[this.edge.id] || { wrap: true }).wrap);
     const dims = viewDims(this.heading);
     this.zoom = dims.zoom;
+    // Bewegungsweite der Bosse quer: wie in einer horizontalen Arena (sonst rasen sie im Zoom hin und her)
+    this.swing = Math.min(dims.vc, 300);
     this.va = dims.va;
     this.vc = dims.vc;
 
-    const gen = generateLevel(this.edge, this.forward, this.H);
+    const gen = generateLevel(this.edge, this.forward, this.H, this.L);
     this.gates = gen.gates;
     this.events = gen.events;
     this.evIdx = 0;
+    this.map = gen.map;
+    this.wrap = this.map.wrap;
+    this.dyn = gen.dyn;
+    this.dynStates = [];
 
     this.small = this.items.has('PILZ');
     this.player = {
       a: 70,
-      c: this.H / 2,
+      c: this.startC(),
       hp: maxHpFor(this.items),
       maxHp: maxHpFor(this.items),
       inv: 1.2,
@@ -94,7 +103,7 @@ export class Level {
       history: [],
     };
     this.camA = 0;
-    this.camC = this.H / 2 - this.vc / 2;
+    this.camC = this.clampCam(this.player.c - this.vc / 2);
     this.time = 0;
     this.state = 'play'; // play | boss | bossdown | clear | dead
     this.timer = 0;
@@ -129,8 +138,37 @@ export class Level {
   }
 
   // ---------------------------------------------------------------- Hilfen
+  /** Querabstand c1 - c2 (bei Wrap der kürzere Weg über die Naht). */
   dc(c1, c2) {
-    return wrapDelta(c1 - c2, this.H);
+    return this.wrap ? wrapDelta(c1 - c2, this.H) : c1 - c2;
+  }
+
+  /** Querposition normalisieren: periodisch oder auf die Levelbreite begrenzt. */
+  nc(c) {
+    return this.wrap ? wrap(c, this.H) : clamp(c, 0, this.H);
+  }
+
+  clampCam(camC) {
+    return this.wrap ? wrap(camC, this.H) : clamp(camC, 0, Math.max(0, this.H - this.vc));
+  }
+
+  /** Startposition quer: Mitte des freien Korridors am Levelanfang. */
+  startC() {
+    if (this.wrap) return this.H / 2;
+    const [lo, hi] = corridorAt(this.map, Math.floor(70 / TILE));
+    return (lo + hi) / 2;
+  }
+
+  /** Nächste freie Querposition in einer Spalte (für Gegner, die sonst im Terrain erscheinen). */
+  freeC(a, c) {
+    if (!isSolid(this.map.at(a, c))) return c;
+    for (let d = TILE; d < this.H; d += TILE) {
+      for (const cc of [c - d, c + d]) {
+        const n = this.nc(cc);
+        if (!isSolid(this.map.at(a, n))) return n;
+      }
+    }
+    return c;
   }
 
   aim(a, c) {
@@ -146,13 +184,13 @@ export class Level {
 
   bullet(a, c, va, vc, o = {}) {
     if (this.bullets.length >= MAX_ENEMY_BULLETS) return;
-    this.bullets.push({ a, c: wrap(c, this.H), va, vc, r: o.r || 3, kind: o.kind || 'kugel', t: 0 });
+    this.bullets.push({ a, c: this.nc(c), va, vc, r: o.r || 3, kind: o.kind || 'kugel', t: 0 });
   }
 
   spawn(kind, a, c, params = {}) {
     const def = ENEMIES[kind];
     if (!def) throw new Error('Unbekannter Gegner ' + kind);
-    const e = { kind, a, c: wrap(c, this.H), c0: c, a0: a, hp: def.hp, maxHp: def.hp, r: def.r, t: 0, idx: 0, wave: -1, ...params };
+    const e = { kind, a, c: this.nc(c), c0: c, a0: a, hp: def.hp, maxHp: def.hp, r: def.r, t: 0, idx: 0, wave: -1, ...params };
     if (def.init) def.init(e, this);
     this.enemies.push(e);
     return e;
@@ -201,7 +239,9 @@ export class Level {
 
   /** Anteil der Etappe, der geschafft ist (0..1), in aktueller Flugrichtung. */
   progress() {
-    return clamp(this.camA / Math.max(1, this.L - this.va), 0, 1);
+    const k = clamp(this.camA / Math.max(1, this.L - this.va), 0, 1);
+    // Nach einer Kehrtwende läuft die Leiste zurück zum Start (statt zu springen)
+    return this.forward === this.startForward ? k : 1 - k;
   }
 
   /** Winkel, um den der Renderer die Welt dreht (inkl. Wende-Animation). */
@@ -237,7 +277,15 @@ export class Level {
 
   // ------------------------------------------------------------- Kollision
   /** Prüft, ob eine Spielerbox an (a, c) eine feste Wand berührt. */
+  /** Berührt die Box festes Terrain oder ein bewegliches Teil? */
   wallHit(a, c, ha, hc) {
+    for (const st of this.dynStates) if (dynHitsBox(st, a, c, ha, hc, (x, y) => this.dc(x, y))) return st;
+    return this.staticWallHit(a, c, ha, hc);
+  }
+
+  /** Nur unbewegliches: Kacheln und Hindernis-Wände. */
+  staticWallHit(a, c, ha, hc) {
+    if (this.map.touch(a, c, ha, hc) & 1) return this.map;
     for (const g of this.gates) {
       if (g.type !== 'rock' && g.type !== 'narrow') continue;
       if (a + ha <= g.a0 || a - ha >= g.a1) continue;
@@ -306,6 +354,11 @@ export class Level {
       if (this.timer <= 0) this.result = { type: 'dead' };
       return;
     }
+    if (this.state === 'retreat') {
+      this.timer -= dt;
+      if (this.timer <= 0) this.result = { type: 'retreat' };
+      return;
+    }
     if (this.state === 'clear') {
       this.player.a += 190 * dt;
       this.camA += SCROLL_SPEED * dt;
@@ -332,6 +385,8 @@ export class Level {
     }
 
     this.updateCamera(dt);
+    this.checkStuck(dt);
+    this.updateDynamics();
     this.updatePlayer(dt, input, true);
     if (input.power) this.tryPower();
     if (input.wende) this.tryWende();
@@ -343,7 +398,7 @@ export class Level {
       e.t += dt;
       if (e.flash) e.flash = Math.max(0, e.flash - dt);
       ENEMIES[e.kind].update(e, this, dt);
-      e.c = wrap(e.c, this.H);
+      e.c = this.nc(e.c);
       if (e.shootAt && e.t >= e.shootAt) {
         e.shootAt = 0;
         const [ua, uc] = this.aim(e.a, e.c);
@@ -361,6 +416,27 @@ export class Level {
     this.stats.maxBullets = Math.max(this.stats.maxBullets, this.bullets.length);
   }
 
+  /**
+   * Show don't tell: Steht man lange vor einer Wand, die man (noch) nicht überwinden kann,
+   * schüttelt der Dackel den Kopf und kehrt um – ohne Strafe, zurück zum Startknoten.
+   */
+  checkStuck(dt) {
+    const p = this.player;
+    const g = this.gates.find(
+      (x) =>
+        ((x.type === 'rock' && !this.items.has('BOHRER')) || (x.type === 'narrow' && !this.small)) &&
+        x.a0 > p.a &&
+        x.a0 - this.camA < this.va,
+    );
+    const held = g && this.camA >= g.a0 - this.va * WALL_HOLD - 1;
+    this.stuckT = held ? (this.stuckT || 0) + dt : 0;
+    if (this.stuckT > 6) {
+      this.state = 'retreat';
+      this.timer = 1.6;
+      this.sfx('nope');
+    }
+  }
+
   updateCamera(dt) {
     if (this.arena) return;
     const maxA = this.L - this.va;
@@ -373,8 +449,9 @@ export class Level {
     this.camA = Math.min(target, maxA);
     const p = this.player;
     const desired = p.c - this.vc / 2;
-    this.camC += wrapDelta(desired - this.camC, this.H) * Math.min(1, 6 * dt);
-    this.camC = wrap(this.camC, this.H);
+    if (this.wrap) this.camC += wrapDelta(desired - this.camC, this.H) * Math.min(1, 6 * dt);
+    else this.camC += (this.clampCam(desired) - this.camC) * Math.min(1, 6 * dt);
+    this.camC = this.clampCam(this.camC);
 
     if (this.camA >= maxA - 0.001) {
       if (this.hasBoss && !this.boss) this.startBoss();
@@ -385,6 +462,12 @@ export class Level {
         this.say('Etappe geschafft!', 1.6, 'big');
       }
     }
+  }
+
+  updateDynamics() {
+    const st = this.dynStates;
+    st.length = this.dyn.length;
+    for (let i = 0; i < this.dyn.length; i++) st[i] = dynState(this.dyn[i], this.time);
   }
 
   updatePlayer(dt, input, canFire) {
@@ -399,7 +482,7 @@ export class Level {
       my /= len;
     }
     const [da, dcv] = screenToLocalVec(this.heading, mx, my);
-    const speed = BASE_SPEED * this.char.speed * (1 + 0.22 * this.powers.speed);
+    const speed = BASE_SPEED * this.char.speed * (1 + 0.22 * this.powers.speed) * (p.slow ? 0.55 : 1);
 
     // Trichter vor engen Spalten: wer winzig ist und ungefähr trifft, wird sanft eingelenkt.
     if (this.small) this.funnel(p, dt, ha, hc);
@@ -414,12 +497,26 @@ export class Level {
     else p.c = nc;
 
     const [back, front] = this.margins();
+    const pushed = p.a < this.camA + back;
     p.a = clamp(p.a, this.camA + back, this.camA + this.va - front);
     if (this.arena) {
       const rel = clamp(this.dc(p.c, this.camC + this.vc / 2), -this.vc / 2 + 10, this.vc / 2 - 10);
       p.c = this.camC + this.vc / 2 + rel;
     }
-    p.c = wrap(p.c, this.H);
+    if (!this.wrap) p.c = clamp(p.c, hc + 1, this.H - hc - 1);
+    p.c = this.nc(p.c);
+    // Vom Bildrand gegen Terrain gedrückt: zerquetscht (wie bei Gradius)
+    if (pushed && this.wallHit(p.a, p.c, ha, hc)) this.instantDeath();
+    // Zähe Zonen bremsen, Strömungen schieben
+    const touch = this.map.touch(p.a, p.c, ha, hc);
+    p.slow = (touch & 4) !== 0;
+    if (touch & 2 && !this.items.has('GUMMIHAUT')) this.instantDeath();
+    for (const st of this.dynStates) {
+      if (st && st.kind === 'zone' && Math.abs(p.a - st.a) < st.ha && Math.abs(this.dc(p.c, st.c)) < st.hc) {
+        const nc2 = p.c + st.push * dt;
+        if (!this.wallHit(p.a, nc2, ha, hc)) p.c = this.nc(nc2);
+      }
+    }
 
     p.history.unshift([p.a, p.c]);
     if (p.history.length > 40) p.history.length = 40;
@@ -450,7 +547,7 @@ export class Level {
       // Trichter: wer winzig ist und ungefähr trifft, wird sanft in die Spalte gelenkt.
       if (Math.abs(d) < FUNNEL && hc <= g.gapW / 2) {
         const step = Math.sign(d) * Math.min(Math.abs(d), 90 * dt);
-        if (!this.wallHit(p.a, p.c + step, ha, hc)) p.c = wrap(p.c + step, this.H);
+        if (!this.wallHit(p.a, p.c + step, ha, hc)) p.c = this.nc(p.c + step);
       }
     }
   }
@@ -536,7 +633,7 @@ export class Level {
     const L = this.L;
     const H = this.H;
     const ma = (a) => L - a;
-    const mc = (c) => wrap(H - c, H);
+    const mc = (c) => this.nc(H - c);
     this.forward = !this.forward;
     this.heading = opposite(this.heading);
     const p = this.player;
@@ -548,7 +645,10 @@ export class Level {
     this.camA = clamp(p.a - rel, 0, L - this.va);
     // Die Figur stünde sonst plötzlich an der Vorderkante; die Kamera gleitet hinterher.
     this.turnAnim.pan = { from: mirroredCam, to: this.camA };
-    this.camC = wrap(H - this.camC - this.vc, H);
+    this.camC = this.clampCam(H - this.camC - this.vc);
+    this.map.mirror();
+    this.dyn = this.dyn.map((o) => mirrorDyn(o, L, H, true));
+    this.dynStates = this.dyn.map((o) => dynState(o, this.time));
     for (const g of this.gates) {
       const a0 = ma(g.a1);
       g.a1 = ma(g.a0);
@@ -603,7 +703,7 @@ export class Level {
       for (let i = 0; i < ev.count; i++) {
         const a = front + 20 + (formation ? i * ev.spacing : i * 8);
         const cf = clamp(ev.cf + (formation ? 0 : (i - (ev.count - 1) / 2) * ev.spread), 0.08, 0.92);
-        const c = this.camC + this.vc * cf;
+        const c = this.freeC(a, this.nc(this.camC + this.vc * cf));
         const e = this.spawn(ev.kind, a, c, { idx: i, wave: ev.wave, c0: c });
         // Einige Formationsgegner schießen einmal gezielt ("Popcorn mit Biss").
         if (formation && this.diff >= 2 && this.rng.chance(0.08 + 0.06 * this.diff)) e.shootAt = 0.7 + this.rng.next() * 1.2;
@@ -614,7 +714,7 @@ export class Level {
   startBoss() {
     const def = BOSSES[this.edge.boss];
     this.arena = true;
-    this.arenaC = wrap(this.camC + this.vc / 2, this.H);
+    this.arenaC = this.nc(this.camC + this.vc / 2);
     this.state = 'boss';
     this.boss = {
       kind: this.edge.boss,
@@ -645,7 +745,7 @@ export class Level {
     }
     b.t += dt;
     BOSSES[b.kind].update(b, this, dt);
-    b.c = wrap(b.c, this.H);
+    b.c = this.nc(b.c);
   }
 
   bossHit(s) {
@@ -683,12 +783,13 @@ export class Level {
     for (const s of this.shots) {
       s.t += dt;
       s.a += s.va * dt;
-      s.c = wrap(s.c + s.vc * dt, this.H);
+      s.c = this.nc(s.c + s.vc * dt);
     }
     for (const b of this.bullets) {
       b.t += dt;
       b.a += b.va * dt;
-      b.c = wrap(b.c + b.vc * dt, this.H);
+      b.c = this.nc(b.c + b.vc * dt);
+      if (isSolid(this.map.at(b.a, b.c))) b.dead = true; // Kugeln zerschellen am Terrain
     }
   }
 
@@ -696,6 +797,25 @@ export class Level {
     const camMid = this.camC + this.vc / 2;
     for (const s of this.shots) {
       if (s.dead) continue;
+      // Terrain: zerbrechliche Blöcke gehen kaputt, Fels nur mit Bohrer, der Rest schluckt den Schuss
+      const res = this.map.shoot(s.a, s.c, s.dmg, s.drill);
+      if (res) {
+        s.dead = true;
+        if (res === 'destroy') {
+          this.burst(s.a, s.c, '#c9a86a', 8, 80, 3);
+          this.sfx('crack');
+          this.score += 10;
+        } else if (res === 'hit') {
+          this.burst(s.a, s.c, '#e8d8b0', 3, 50, 2);
+          this.sfx('drill');
+        } else this.burst(s.a, s.c, '#cccccc', 2, 40, 2);
+        continue;
+      }
+      if (this.dynStates.some((st) => dynHitsBox(st, s.a, s.c, s.r, s.r, (x, y) => this.dc(x, y)))) {
+        s.dead = true;
+        this.burst(s.a, s.c, '#cccccc', 2, 40, 2);
+        continue;
+      }
       // Wände
       for (const g of this.gates) {
         if (s.dead) break;
@@ -846,7 +966,7 @@ export class Level {
   /** Berührung mit festem Terrain, Stacheln oder Unzerstörbarem: sofort vorbei (kein Schild, keine Energie). */
   instantDeath() {
     const p = this.player;
-    if (this.state === 'dead' || this.state === 'clear') return;
+    if (this.state === 'dead' || this.state === 'clear' || this.state === 'bossdown') return;
     if (this.invincible) {
       if (p.inv <= 0) {
         this.stats.hits++;

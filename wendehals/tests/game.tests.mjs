@@ -380,3 +380,40 @@ test('Sparstrumpf wirkt im echten Spiel beim Tod', () => {
   assert.equal(game.powers.missile, true);
   assert.equal(game.powers.double, false);
 });
+
+test('Sparstrumpf: Schild und Doppel/Laser-Wechsel verfälschen die Hälfte nicht (Befund Software-Tester)', async () => {
+  const { freshPowers, activate, powerupsAfterDeath } = await import('../src/game/powerups.js');
+  const buyAll = (seq) => {
+    const p = freshPowers();
+    for (const i of seq) {
+      p.cursor = i;
+      activate(p);
+    }
+    return p;
+  };
+  // [Schild, Tempo, Rakete]: Hälfte von 2 echten Käufen = Tempo
+  let k = powerupsAfterDeath(buyAll([5, 0, 1]), true);
+  assert.equal(k.speed, 1);
+  // Viele Doppel/Laser-Wechsel zählen nur einmal
+  const p = buyAll([2, 3, 2, 3, 2, 3, 0, 0, 1, 4]);
+  assert.deepEqual(p.order, [3, 0, 0, 1, 4]);
+  k = powerupsAfterDeath(p, true);
+  assert.equal(k.laser, true);
+  assert.equal(k.speed, 1);
+});
+
+test('Rückzug vor der Wand: zurück an den Startknoten, ohne Strafe', () => {
+  const { game } = newGame();
+  game.node = 'kartoffelkiste';
+  game.heading = W;
+  game.powers.speed = 2;
+  press(game, { confirm: true });
+  assert.equal(game.screen, 'level');
+  game.level.events = [];
+  for (let i = 0; i < 60 * 90 && game.screen === 'level'; i++) press(game, {});
+  assert.equal(game.screen, 'map');
+  assert.equal(game.node, 'kartoffelkiste');
+  assert.equal(game.heading, W);
+  assert.equal(game.powers.speed, 2);
+  assert.equal(game.progress.deaths, 0);
+});

@@ -7,6 +7,14 @@ import { edgeDir } from '../src/game/worldgraph.js';
 import { opposite, headingAngle } from '../src/core/math.js';
 import { freshPowers } from '../src/game/powerups.js';
 import { runLevel, botInput } from './helpers/bot.mjs';
+import { TileMap } from '../src/game/terrain.js';
+
+/** Terrain entfernen, um ein einzelnes Hindernis isoliert zu prüfen. */
+function clearTerrain(lv) {
+  lv.map = new TileMap(lv.map.cols, lv.map.rows, true);
+  lv.wrap = true;
+  lv.dyn = [];
+}
 
 const ALL = new Set(ITEM_IDS);
 const withAll = (except = []) => {
@@ -26,7 +34,8 @@ function checkInvariants(lv) {
   assert.ok(lv.bullets.length <= 220);
   // Spieler steckt nie in einer Wand
   const { ha, hc } = lv.playerHalf;
-  assert.equal(lv.wallHit(p.a, p.c, ha, hc), null, 'Spieler steckt in einer Wand');
+  // Statisches Terrain: nie drin. (Bewegliche Teile können im Testmodus in den Spieler fahren.)
+  if (!lv.invincible || !lv.stats.crashes) assert.equal(lv.staticWallHit(p.a, p.c, ha, hc), null, 'Spieler steckt in einer Wand');
 }
 
 for (const edge of EDGES) {
@@ -55,7 +64,8 @@ for (const edge of EDGES.filter((e) => (e.gates || []).some((g) => !GATES[g.type
     for (const missing of hard) {
       const lv = new Level({ edge, forward: true, items: withAll([missing, edge.reward]), invincible: true, seed: 3 });
       runLevel(lv, edge.length / 42 + 40, { check: checkInvariants });
-      assert.equal(lv.result, null, `ohne ${missing} trotzdem geschafft`);
+      // Man kommt nicht durch: entweder hängt man noch vor der Wand, oder der Dackel kehrt von selbst um
+      assert.ok(!lv.result || lv.result.type === 'retreat', `ohne ${missing} trotzdem geschafft`);
       assert.ok(lv.camA < edge.length - lv.va - 50, 'Kamera hätte vor der Wand anhalten müssen');
     }
   });
@@ -80,6 +90,7 @@ test('Stacheln verletzen ohne Quietscheentenhaut, mit ihr nicht', () => {
   const sit = (items) => {
     const lv = new Level({ edge, forward: true, items, seed: 1 });
     lv.events = [];
+    clearTerrain(lv);
     // Spieler gerade durch das Stachelfeld steuern, ohne auszuweichen
     runLevel(lv, edge.length / 42 + 10, { input: () => ({ mx: 0.4, my: 0, fire: false }) });
     return lv;
@@ -106,6 +117,7 @@ test('Felswand: normale Schüsse prallen ab, Bohrer zerstört Blöcke', () => {
   for (const drill of [false, true]) {
     const lv = new Level({ edge, forward: true, items: drill ? new Set(['BOHRER']) : new Set(), invincible: true });
     lv.events = [];
+    clearTerrain(lv);
     runLevel(lv, 40, { input: () => ({ mx: 0.3, my: 0, fire: true }) });
     const g = lv.gates.find((x) => x.type === 'rock');
     const broken = g.blocks.filter((b) => b.hp <= 0).length;
@@ -267,4 +279,12 @@ test('Show don\'t tell: Level-Meldungen verraten keine Items und keine Lösungen
   }
   // Item-Texte enthalten höchstens eine Tastenbelegung
   for (const [id, it] of Object.entries(ITEMS)) assert.ok(it.desc === '' || /[A-Z] ?\/ ?[A-Z]|Pfeile|\(X\)/.test(it.desc), id + ': ' + it.desc);
+});
+
+test('Show don\'t tell: vor einer unüberwindbaren Wand kehrt der Dackel nach einigen Sekunden selbst um', () => {
+  const lv = new Level({ edge: EDGE_BY_ID.gurkengasse, forward: true, items: new Set(), invincible: true });
+  lv.events = [];
+  const { result, seconds } = runLevel(lv, 120);
+  assert.equal(result?.type, 'retreat');
+  assert.ok(seconds < 60);
 });

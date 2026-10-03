@@ -65,9 +65,13 @@ export function viewDims(heading) {
   return { va: SCREEN_W, vc: SCREEN_W / zoom, zoom };
 }
 
-/** Periode der Querachse: horizontal 544 (34 Kacheln), vertikal 960 (60 Kacheln, > Sichtbreite 853). */
-export function crossPeriod(heading) {
-  return heading % 2 === 0 ? 544 : 960;
+/**
+ * Höhe der Querachse. Vertikal 960 (60 Kacheln, > Sichtbreite 853). Horizontal mit Wrap 544
+ * (34 Kacheln), mit Boden und Decke nur 288 – dann sieht man beide fast immer (wie bei Parodius).
+ */
+export function crossPeriod(heading, wrap = true) {
+  if (heading % 2 === 1) return 960;
+  return wrap ? 544 : 288;
 }
 
 /** Drehwinkel der Welt auf dem Bildschirm für eine Flugrichtung. */

@@ -1,6 +1,18 @@
 // Einfacher Autopilot für Tests: weicht Wänden aus, zielt auf Lücken und Gegner.
 import { localToScreenVec, screenToLocalVec, clamp } from '../../src/core/math.js';
 import { ENEMIES } from '../../src/game/enemies.js';
+import { findPath, TILE, isSolid } from '../../src/game/terrain.js';
+import { dynState } from '../../src/game/dynamics.js';
+
+/** Weg durchs Terrain (eine Zeile pro Spalte), zwischengespeichert pro Level und Spiegelzustand. */
+function navPath(lv) {
+  const m = lv.map;
+  const key = m.flipA + ':' + m.flipC + ':' + lv.small;
+  if (lv._nav && lv._nav.key === key) return lv._nav;
+  const path = findPath(m, { size: lv.small ? 1 : 2, drill: true, rubber: lv.items.has('GUMMIHAUT') });
+  lv._nav = { key, path, half: lv.small ? TILE / 2 : TILE };
+  return lv._nav;
+}
 
 export function botInput(lv, opts = {}) {
   const p = lv.player;
@@ -31,7 +43,8 @@ export function botInput(lv, opts = {}) {
       targetA = solid.a0 - 40;
     }
   } else if (spikes && !opts.ignoreSpikes) {
-    const col = spikes.cols.find((c) => c.a > p.a - 8);
+    // Eine Reihe gilt erst als passiert, wenn die Figur sie ganz hinter sich hat
+    const col = spikes.cols.find((c) => c.a > p.a - (lv.playerHalf.ha + 8));
     if (col) {
       // Lücke etwas vorausberechnen
       const dt = Math.max(0, (col.a - p.a) / 120);
@@ -41,8 +54,14 @@ export function botInput(lv, opts = {}) {
       targetA = aligned ? col.a + 30 : col.a - 30;
     }
   } else if (lv.boss && lv.boss.enter <= 0) {
+    // In der Arena zählt der Boss (Wände hält die Wandvorschau fern)
     targetC = lv.boss.c + (lv.boss.kind === 'walross' ? -22 : 0);
     targetA = lv.boss.a - 140;
+  } else if (terrainAhead(lv)) {
+    // Terrain voraus: dem geplanten Weg folgen
+    const nav = navPath(lv);
+    const ix = Math.min(lv.map.cols - 1, Math.floor((p.a + 40) / TILE));
+    if (nav.path && nav.path[ix] >= 0) targetC = nav.path[ix] * TILE + nav.half;
   } else {
     let best = null;
     for (const e of lv.enemies) {
@@ -59,6 +78,17 @@ export function botInput(lv, opts = {}) {
   return safeInput(lv, { mx, my, fire, power: lv.powers.cursor >= 0 && opts.buyPowers !== false });
 }
 
+/** Liegt Terrain in der eigenen Flugbahn (±3 Kacheln quer) in den nächsten Spalten? */
+function terrainAhead(lv) {
+  const p = lv.player;
+  const ix0 = Math.floor(p.a / TILE);
+  const iy0 = Math.floor(p.c / TILE);
+  for (let ix = ix0; ix < ix0 + 16; ix++) {
+    for (let iy = iy0 - 3; iy <= iy0 + 3; iy++) if (isSolid(lv.map.cell(ix, iy))) return true;
+  }
+  return false;
+}
+
 /**
  * Wandvorschau: Bewegungsanteile, die in den nächsten Momenten in festes Terrain führen
  * würden, werden gestrichen (Terrain ist tödlich).
@@ -69,16 +99,22 @@ export function safeInput(lv, inp) {
   let [da, dc] = screenToLocalVec(lv.heading, inp.mx || 0, inp.my || 0);
   const look = 0.18 * 110 * (1 + 0.22 * lv.powers.speed) * (lv.char ? lv.char.speed : 1);
   if (da !== 0 && lv.wallHit(p.a + da * look + Math.sign(da) * 2, p.c, ha + 1, hc + 1)) da = 0;
-  if (dc !== 0 && (lv.wallHit(p.a, p.c + dc * look, ha + 1, hc + 1) || lv.wallHit(p.a + da * look, p.c + dc * look, ha + 1, hc + 1))) dc = 0;
+  // Quer ausrichten hat Vorrang: wenn nur die Kombination mit Vorwärts kollidiert, Vorwärts streichen
+  if (dc !== 0) {
+    const lc = Math.min(look, 6); // quer nur kurz vorausschauen (sonst blockiert die Vorschau das Feinjustieren)
+    if (lv.wallHit(p.a, p.c + dc * lc, ha + 1, hc + 1)) dc = 0;
+    else if (lv.wallHit(p.a + da * look, p.c + dc * lc, ha + 1, hc + 1)) da = 0;
+  }
   // Stachelreihen: nicht hineinfliegen, solange man nicht in der Lücke ist, und darin nicht quer abdriften
   for (const g of lv.gates) {
     if (g.type !== 'spikes' || lv.items.has('GUMMIHAUT')) continue;
     for (const col of g.cols) {
       const d = col.a - p.a;
-      if (d < -(ha + 8) || d > ha + 14) continue;
+      if (d < -(ha + 20) || d > ha + 14) continue;
       const off = lv.dc(p.c, lv.spikeGapAt(col));
       const safe = g.gap / 2 - hc - 6;
-      if (Math.abs(off) > safe && da > 0 && d > 0) da = 0;
+      if (Math.abs(off) > safe && da > 0 && d > 0) da = 0; // nicht vorwärts in die Reihe
+      if (Math.abs(off) > safe && da < 0 && d < 0) da = 0; // und nicht rückwärts zurück hinein
       if (Math.abs(off + dc * 4) > safe && Math.sign(dc) === Math.sign(off)) dc = 0;
     }
   }
@@ -119,6 +155,13 @@ export function dodgeInput(lv) {
       r: e.r,
     })),
   ];
+  for (const o of lv.dyn) {
+    const st = dynState(o, lv.time);
+    const nx = dynState(o, lv.time + 0.1);
+    if (!st || st.kind === 'zone') continue;
+    const r = st.kind === 'circle' ? st.r : Math.max(st.ha, st.hc);
+    threats.push({ a: st.a, c: st.c, va: (nx.a - st.a) * 10, vc: lv.dc(nx.c, st.c) * 10, r });
+  }
   for (const t of threats) {
     for (const T of [0.1, 0.25, 0.4, 0.6]) {
       const da = t.a + t.va * T - p.a;
@@ -141,7 +184,10 @@ export function dodgeInput(lv) {
       fa -= 1;
     }
   }
-  if (Math.hypot(fa, fc) > 0.5) {
+  // Terrain direkt voraus hat Vorrang vor dem Ausweichen (Terrain ist tödlich, Kugeln nur Schaden)
+  const { ha, hc } = lv.playerHalf;
+  const wallSoon = lv.staticWallHit(p.a + 56, p.c, ha + 2, hc + 2) || lv.staticWallHit(p.a + 28, p.c, ha + 2, hc + 2);
+  if (Math.hypot(fa, fc) > 0.5 && !wallSoon) {
     const [mx, my] = localToScreenVec(lv.heading, clamp(fa, -1, 1), clamp(fc, -1, 1));
     return safeInput(lv, { ...base, mx, my });
   }

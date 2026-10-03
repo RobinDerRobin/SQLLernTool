@@ -25,6 +25,7 @@ import {
   drawDackel,
 } from './sprites.js';
 import { cached, fillTiled, fillTiledScreen, drawWithFlash } from './canvas.js';
+import { TILE, T } from '../game/terrain.js';
 
 const FONT = "'Trebuchet MS', 'Segoe UI', 'DejaVu Sans', Verdana, sans-serif";
 const W = SCREEN_W;
@@ -88,6 +89,8 @@ export function drawSpikeColumn(ctx, x, gy, half, H, vc) {
     ctx.fillStyle = '#5a4a6a';
     ctx.fillRect(x - 2, s0, 4, s1 - s0);
     ctx.fillStyle = '#dfe6f0';
+    ctx.strokeStyle = '#3a2a48';
+    ctx.lineWidth = 1;
     ctx.beginPath();
     const first = Math.max(0, Math.floor((s0 - start) / step));
     for (let i = first; i < n; i++) {
@@ -101,6 +104,7 @@ export function drawSpikeColumn(ctx, x, gy, half, H, vc) {
       ctx.lineTo(x + 2, y + step);
     }
     ctx.fill();
+    ctx.stroke(); // dunkle Kontur: auch auf hellem Grund (Bad) gut sichtbar
   }
   // Lücke dezent markieren
   ctx.strokeStyle = 'rgba(120,255,140,0.6)';
@@ -266,6 +270,8 @@ export class Renderer {
     // Etwas größer zeichnen, damit bei der Drehanimation keine Ränder sichtbar werden
     const pad = lv.turnAnim ? 140 : 0;
     this.drawBackground(theme, lv, t, pad);
+    this.drawTerrain(lv, theme, t);
+    this.drawDynamics(lv, theme, t);
     this.drawGates(lv, t);
     for (const pk of lv.pickups) this.at(pk.a, pk.c, () => drawCapsule(ctx, pk.t));
     for (const e of lv.enemies) {
@@ -294,6 +300,11 @@ export class Renderer {
         }
         const spin = lv.playerSpin();
         if (spin) ctx.rotate(spin);
+        if (lv.state === 'retreat') {
+          ctx.rotate(Math.sin(t * 22) * 0.25); // Kopfschütteln
+          circle(ctx, 0, -22, 8, '#ffffff', '#1a1020', 1.2);
+          text(ctx, '?', 0, -21.5, 10, '#1a1020', 'center', null);
+        }
         drawPlayer(ctx, lv.charId, t, lv.small, p.inv);
       });
     }
@@ -313,7 +324,7 @@ export class Renderer {
     if (lv.hurtFlash > 0) this.drawHurtVignette(lv.hurtFlash / 0.45);
     for (const pp of lv.popups) {
       const [sx, sy] = this.toScreen(lv, pp.a, pp.c);
-      text(ctx, pp.text, sx, sy - pp.t * 20, 9, '#fff3a0');
+      text(ctx, pp.text, Math.max(44, Math.min(W - 44, sx)), Math.max(30, Math.min(H - 30, sy - pp.t * 20)), 9, '#fff3a0');
     }
     this.drawHud(game, lv);
   }
@@ -326,6 +337,7 @@ export class Renderer {
   }
 
   viewPos(lv, a, c) {
+    if (!lv.wrap) return [a - this.camA, c - this.camC];
     return [a - this.camA, wrapDelta(c - this.camC - lv.vc / 2, lv.H) + lv.vc / 2];
   }
 
@@ -472,6 +484,165 @@ export class Renderer {
           ctx.restore();
         }
         break;
+      }
+    }
+  }
+
+  /**
+   * Kachel-Terrain: pro Kachelart ein gemeinsamer Pfad (wenige Zeichenbefehle), Kanten nur
+   * dort, wo freier Raum angrenzt. Bei 90°-Drehung bleiben Rechtecke achsenparallel (schnell).
+   */
+  drawTerrain(lv, theme, t) {
+    const ctx = this.ctx;
+    const map = lv.map;
+    const pal = theme.terrain;
+    if (!map || !pal) return;
+    const S = TILE;
+    const ix0 = Math.max(0, Math.floor(this.camA / S) - 1);
+    const ix1 = Math.min(map.cols - 1, Math.floor((this.camA + lv.va) / S) + 1);
+    const iy0 = Math.floor(this.camC / S) - 1;
+    const iy1 = Math.floor((this.camC + lv.vc) / S) + 1;
+    const groups = { [T.SOLID]: [], [T.BREAK]: [], [T.ROCK]: [], [T.METAL]: [], [T.SPIKE]: [], [T.SLOW]: [] };
+    for (let ix = ix0; ix <= ix1; ix++) {
+      for (let iy = iy0; iy <= iy1; iy++) {
+        const k = map.cell(ix, iy);
+        if (k === T.FREE) continue;
+        if (!map.wrap && (iy < 0 || iy >= map.rows)) continue;
+        groups[k].push(ix, iy);
+      }
+    }
+    const x = (ix) => ix * S - this.camA;
+    const y = (iy) => (map.wrap ? wrapDelta(iy * S - this.camC - lv.vc / 2, lv.H) + lv.vc / 2 : iy * S - this.camC);
+    const fillGroup = (list, color, inset = 0) => {
+      if (!list.length) return;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      for (let i = 0; i < list.length; i += 2) ctx.rect(x(list[i]) + inset, y(list[i + 1]) + inset, S - inset * 2, S - inset * 2);
+      ctx.fill();
+    };
+    // Grundflächen (leicht überlappend, damit keine Haarlinien entstehen)
+    for (const [k, color] of [
+      [T.SOLID, pal.solid],
+      [T.ROCK, '#8a6a4a'],
+      [T.METAL, pal.metal],
+    ]) {
+      const list = groups[k];
+      if (!list.length) continue;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      for (let i = 0; i < list.length; i += 2) ctx.rect(x(list[i]) - 0.3, y(list[i + 1]) - 0.3, S + 0.6, S + 0.6);
+      ctx.fill();
+    }
+    // Zerbrechliches als einzelne Klötzchen mit Fuge
+    fillGroup(groups[T.BREAK], pal.brkEdge, 0);
+    fillGroup(groups[T.BREAK], pal.brk, 1.5);
+    // Kanten zum freien Raum: helle Oberkante (Richtung -c) und dunkle Kontur
+    const solidLike = (k) => k >= T.SOLID && k <= T.METAL;
+    ctx.fillStyle = pal.edge;
+    ctx.beginPath();
+    const hi = [];
+    for (const k of [T.SOLID, T.ROCK, T.METAL]) {
+      const list = groups[k];
+      for (let i = 0; i < list.length; i += 2) {
+        const ix = list[i];
+        const iy = list[i + 1];
+        const px = x(ix);
+        const py = y(iy);
+        if (!solidLike(map.cell(ix, iy - 1))) {
+          ctx.rect(px, py, S, 2);
+          hi.push(px, py + 2);
+        }
+        if (!solidLike(map.cell(ix, iy + 1))) ctx.rect(px, py + S - 2, S, 2);
+        if (!solidLike(map.cell(ix - 1, iy))) ctx.rect(px, py, 2, S);
+        if (!solidLike(map.cell(ix + 1, iy))) ctx.rect(px + S - 2, py, 2, S);
+      }
+    }
+    ctx.fill();
+    if (hi.length) {
+      ctx.fillStyle = pal.light;
+      ctx.beginPath();
+      for (let i = 0; i < hi.length; i += 2) ctx.rect(hi[i], hi[i + 1], S, 2);
+      ctx.fill();
+    }
+    // Metall-Nieten
+    if (groups[T.METAL].length) {
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.beginPath();
+      const list = groups[T.METAL];
+      for (let i = 0; i < list.length; i += 2) {
+        ctx.rect(x(list[i]) + 3, y(list[i + 1]) + 3, 2, 2);
+        ctx.rect(x(list[i]) + S - 5, y(list[i + 1]) + S - 5, 2, 2);
+      }
+      ctx.fill();
+    }
+    // Zähe Zonen (Marmelade, Wasser, Spinnweben)
+    fillGroup(groups[T.SLOW], pal.slow, 0);
+    // Stacheln
+    const sp = groups[T.SPIKE];
+    if (sp.length) {
+      ctx.fillStyle = '#dfe6f0';
+      ctx.strokeStyle = '#3a2a48';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0; i < sp.length; i += 2) {
+        const px = x(sp[i]);
+        const py = y(sp[i + 1]);
+        for (let k = 0; k < 2; k++) {
+          ctx.moveTo(px + k * 8, py + S);
+          ctx.lineTo(px + k * 8 + 4, py + 2);
+          ctx.lineTo(px + k * 8 + 8, py + S);
+        }
+      }
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+
+  /** Bewegliches Terrain: Schieber, Kolben, Zahnräder, Pendel, Strömungen. */
+  drawDynamics(lv, theme, t) {
+    const ctx = this.ctx;
+    const pal = theme.terrain || { solid: '#888', edge: '#333', metal: '#999' };
+    for (const st of lv.dynStates) {
+      if (!st) continue;
+      const [px, py] = this.viewPos(lv, st.a, st.c);
+      if (px < -120 || px > lv.va + 120) continue;
+      if (st.kind === 'rect') {
+        rrect(ctx, px - st.ha, py - st.hc, st.ha * 2, st.hc * 2, 4, pal.metal, pal.edge, 2);
+        ctx.fillStyle = 'rgba(255,220,60,0.8)';
+        for (let yy = py - st.hc + 4; yy < py + st.hc - 4; yy += 10) ctx.fillRect(px - st.ha + 3, yy, st.ha * 2 - 6, 3);
+      } else if (st.kind === 'circle') {
+        if (st.pivotA !== undefined) {
+          const [qx, qy] = this.viewPos(lv, st.pivotA, st.pivotC);
+          ctx.strokeStyle = pal.edge;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(qx, qy);
+          ctx.lineTo(px, py);
+          ctx.stroke();
+          circle(ctx, px, py, st.r, '#ffd34d', '#7a5a10', 2);
+        } else {
+          // Bewegliche Zahnräder kräftig gefärbt mit roter Nabe – klar von der Kulisse unterscheidbar
+          ctx.save();
+          ctx.translate(px, py);
+          drawGear(ctx, st.r, 10, st.rot || 0, '#f0c050', '#5a3a10');
+          circle(ctx, 0, 0, st.r * 0.28, '#e84a4a', '#5a3a10', 1.5);
+          ctx.restore();
+        }
+      } else if (st.kind === 'zone') {
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.fillRect(px - st.ha, py - st.hc, st.ha * 2, st.hc * 2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+        ctx.lineWidth = 1.5;
+        const dir = Math.sign(st.push);
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const ax = px - st.ha + 14 + ((i * 47) % (st.ha * 2 - 28));
+          const ay = py + dir * ((((t * 60 + i * 37) % (st.hc * 2)) - st.hc));
+          ctx.moveTo(ax - 4, ay - dir * 4);
+          ctx.lineTo(ax, ay);
+          ctx.lineTo(ax + 4, ay - dir * 4);
+        }
+        ctx.stroke();
       }
     }
   }
@@ -760,7 +931,14 @@ export class Renderer {
       const known = game.progress.knownEdges.includes(e.id);
       const active = link && link.edge === e;
       ctx.lineCap = 'round';
-      if (active) {
+      if (game.nudgeT > 0 && game.nudgeEdge === e.id) {
+        ctx.strokeStyle = `rgba(255,60,60,${0.5 + 0.5 * Math.sin(t * 30)})`;
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      } else if (active) {
         ctx.strokeStyle = `rgba(255,225,77,${0.5 + 0.5 * Math.sin(t * 6)})`;
         ctx.lineWidth = 7;
         ctx.beginPath();
@@ -844,9 +1022,23 @@ export class Renderer {
     const [px, py] = this.mapPos(cur);
     ctx.save();
     ctx.translate(px, py);
-    // "Geht nicht": kurzes Ruckeln statt Erklärtext
-    if (game.nudgeT > 0) ctx.translate(Math.sin(game.nudgeT * 60) * 2.5 * (game.nudgeT / 0.3), 0);
-    ctx.rotate((game.shipAngle * Math.PI) / 2);
+    // "Geht nicht" ohne Worte: das Schiff stupst in die gewünschte Richtung und federt zurück
+    let ang = (game.shipAngle * Math.PI) / 2;
+    if (game.nudgeT > 0) {
+      const k = Math.sin((1 - game.nudgeT / 0.45) * Math.PI); // 0 → 1 → 0
+      const wobble = Math.sin(game.nudgeT * 50) * 0.5;
+      if (game.nudgeDir === null || game.nudgeDir === game.heading) {
+        const [dx, dy] = DIR_VEC[game.heading];
+        ctx.translate(dx * 7 * k, dy * 7 * k); // Anlauf nach vorn – und zurück
+      } else {
+        let d = game.nudgeDir - game.heading;
+        if (d > 2) d -= 4;
+        if (d < -2) d += 4;
+        ang += Math.sign(d) * 0.45 * k; // Ansatz zum Drehen – und zurück
+      }
+      ang += wobble * 0.15 * k;
+    }
+    ctx.rotate(ang);
     ctx.translate(14, 0);
     ctx.scale(0.65, 0.65);
     drawPlayer(ctx, game.progress.character, t, false, 0);

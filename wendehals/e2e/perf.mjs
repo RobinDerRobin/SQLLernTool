@@ -51,7 +51,7 @@ await page.goto(pathToFileURL(path.join(root, 'dist/index.html')).href);
 await page.waitForFunction(() => window.__wendehals && window.__wendehals.perf);
 const cdp = await page.context().newCDPSession(page);
 
-async function runScene(scene) {
+async function runScene(scene, measureMs = 3000) {
   await page.evaluate((sc) => {
     const g = window.__wendehals.game;
     g.startNewGame();
@@ -96,7 +96,7 @@ async function runScene(scene) {
   // Aufwärmen (Bosseinflug dauert gut 2 s), dann messen
   await page.waitForTimeout(scene.boss ? 3000 : 800);
   await page.evaluate(() => window.__wendehals.perf.reset());
-  await page.waitForTimeout(3000);
+  await page.waitForTimeout(measureMs);
   return page.evaluate(() => {
     const s = window.__wendehals.perf.summary();
     const g = window.__wendehals.game;
@@ -110,7 +110,8 @@ let failed = 0;
 for (const mode of ['normal', 'throttled']) {
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: mode === 'throttled' ? 4 : 1 });
   for (const scene of SCENES) {
-    const r = await runScene(scene);
+    // Gedrosselt gibt es weniger Bilder pro Sekunde: länger messen, damit p95 stabil ist
+    const r = await runScene(scene, mode === 'throttled' ? 9000 : 3000);
     const b = BUDGETS[mode];
     const ok = r.workP95 <= b.workP95 && r.frameP95 <= b.frameP95 && r.frames50 <= b.frames50;
     if (!ok) failed++;

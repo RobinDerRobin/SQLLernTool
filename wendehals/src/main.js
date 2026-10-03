@@ -143,7 +143,8 @@ export function boot() {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(scale, 0, 0, scale, offX, offY);
       // alpha: Anteil bis zum nächsten Simulationsschritt – für flüssige Darstellung auf 90/120/144 Hz
-      renderer.draw(game, acc / STEP);
+      // Bei offenem Menü steht die Simulation: nicht interpolieren (sonst zittert das Bild)
+      renderer.draw(game, game.overlay ? 1 : acc / STEP);
       perf.push(frameMs, t1 - t0, performance.now() - t1);
       errors = 0;
     } catch (err) {

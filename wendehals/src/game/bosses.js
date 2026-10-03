@@ -44,7 +44,7 @@ export const BOSSES = {
     r: 30,
     update(b, lv, dt) {
       b.a = b.homeA + 10 * Math.sin(b.t * 1.3);
-      b.c = lv.arenaC + lv.vc * 0.3 * Math.sin(b.t * 0.8);
+      b.c = lv.arenaC + lv.swing * 0.3 * Math.sin(b.t * 0.8);
       const angry = b.hp < b.maxHp * 0.5;
       b.angry = angry;
       // Kaffeestrahl: kurze Salve aus der Tülle
@@ -83,7 +83,7 @@ export const BOSSES = {
     r: 34,
     update(b, lv, dt) {
       b.a = b.homeA;
-      b.c = lv.arenaC + lv.vc * 0.28 * Math.sin(b.t * 0.6);
+      b.c = lv.arenaC + lv.swing * 0.28 * Math.sin(b.t * 0.6);
       const angry = b.hp < b.maxHp * 0.5;
       b.angry = angry;
       schedule(b, dt, angry ? 1.4 : 2.0, [
@@ -113,7 +113,7 @@ export const BOSSES = {
       b.a = b.homeA + 18 * Math.sin(b.t * 0.9);
       b.vcc = b.vcc ?? 70;
       b.c += b.vcc * dt;
-      const lim = lv.vc * 0.26;
+      const lim = lv.swing * 0.26;
       const off = lv.dc(b.c, lv.arenaC);
       if (off > lim) b.vcc = -Math.abs(b.vcc);
       if (off < -lim) b.vcc = Math.abs(b.vcc);
@@ -162,7 +162,7 @@ export const BOSSES = {
     r: 28,
     update(b, lv, dt) {
       b.a = b.homeA - 20 + 22 * Math.sin(b.t * 1.4);
-      b.c = lv.arenaC + lv.vc * 0.25 * Math.sin(b.t * 0.7);
+      b.c = lv.arenaC + lv.swing * 0.25 * Math.sin(b.t * 0.7);
       const angry = b.hp < b.maxHp * 0.5;
       b.angry = angry;
       // Rotierende Laser: erst Warnlinie, dann aktiv
@@ -192,7 +192,7 @@ export const BOSSES = {
     r: 36,
     update(b, lv, dt) {
       b.a = b.homeA - 10;
-      b.c = lv.arenaC + lv.vc * 0.18 * Math.sin(b.t * 0.5);
+      b.c = lv.arenaC + lv.swing * 0.18 * Math.sin(b.t * 0.5);
       const ratio = b.hp / b.maxHp;
       b.phase = ratio > 0.6 ? 1 : ratio > 0.25 ? 2 : 3;
       // Uhrzeiger als rotierende Gefahrenlinien
