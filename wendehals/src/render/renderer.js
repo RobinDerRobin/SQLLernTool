@@ -8,6 +8,7 @@ import { CHARACTERS } from '../data/characters.js';
 import { ENDING_LINES } from '../data/text.js';
 import { POWER_LABELS, slotAvailable } from '../game/powerups.js';
 import { linkAt, directionAllowed } from '../game/worldgraph.js';
+import { ARENA_W, ARENA_H, WALL, EXIT_HALF, SPOTS } from '../game/arena.js';
 import { BOSSES } from '../game/bosses.js';
 import {
   circle,
@@ -197,6 +198,14 @@ function backgroundTile(pattern) {
   }
 }
 
+/** Öffnung eines Arena-Ausgangs in der Wand: [x, y, w, h]. */
+function exitRect(ex) {
+  if (ex.side === 0) return [ARENA_W - WALL, ex.y - EXIT_HALF, WALL, EXIT_HALF * 2];
+  if (ex.side === 2) return [0, ex.y - EXIT_HALF, WALL, EXIT_HALF * 2];
+  if (ex.side === 1) return [ex.x - EXIT_HALF, ARENA_H - WALL, EXIT_HALF * 2, WALL];
+  return [ex.x - EXIT_HALF, 0, EXIT_HALF * 2, WALL];
+}
+
 /** Dunkelmaske: einmal gerendert, danach nur noch verschoben (statt Verlauf in jedem Frame). */
 function darknessMask(radius) {
   const r = Math.round(radius / 10) * 10;
@@ -230,8 +239,8 @@ export class Renderer {
       case 'title':
         this.drawTitle(game);
         break;
-      case 'map':
-        this.drawMap(game);
+      case 'arena':
+        this.drawArena(game);
         break;
       case 'level':
         this.drawLevel(game, game.level);
@@ -241,7 +250,9 @@ export class Renderer {
         break;
     }
     this.drawToasts(game);
-    if (game.overlay) {
+    if (game.overlay && game.overlay.type === 'map') {
+      this.drawMap(game);
+    } else if (game.overlay) {
       ctx.fillStyle = 'rgba(10,5,20,0.45)';
       ctx.fillRect(0, 0, W, H);
       if (game.overlay.type === 'menu') this.drawMenu(game, game.overlay);
@@ -887,6 +898,176 @@ export class Renderer {
     }
   }
 
+  // ================================================================ ARENA
+  drawArena(game) {
+    const ctx = this.ctx;
+    const ar = game.arena;
+    const t = ar.time;
+    const node = NODES[ar.node];
+    const theme = THEMES[node.area];
+    const tc = theme.terrain;
+    // Boden und Wände ändern sich nie: einmal pro Arena vorrendern
+    const base = cached('arena:' + ar.node, ARENA_W, ARENA_H, 2, (c) => {
+      c.fillStyle = theme.bg[0];
+      c.fillRect(0, 0, ARENA_W, ARENA_H);
+      const tile = backgroundTile(theme.pattern);
+      if (tile) fillTiled(c, tile, 0, 0, 0, 0, ARENA_W, ARENA_H);
+      c.fillStyle = tc.solid;
+      c.fillRect(0, 0, ARENA_W, WALL);
+      c.fillRect(0, ARENA_H - WALL, ARENA_W, WALL);
+      c.fillRect(0, 0, WALL, ARENA_H);
+      c.fillRect(ARENA_W - WALL, 0, WALL, ARENA_H);
+      c.strokeStyle = tc.edge;
+      c.lineWidth = 2;
+      c.strokeRect(WALL - 1, WALL - 1, ARENA_W - 2 * WALL + 2, ARENA_H - 2 * WALL + 2);
+      c.fillStyle = tc.light;
+      for (let x = WALL + 12; x < ARENA_W - WALL; x += 32) {
+        c.fillRect(x, 6, 4, 4);
+        c.fillRect(x, ARENA_H - 10, 4, 4);
+      }
+      for (const ex of ar.exits) {
+        const [gx, gy, gw, gh] = exitRect(ex);
+        c.fillStyle = '#140c20';
+        c.fillRect(gx, gy, gw, gh);
+      }
+    });
+    if (base) ctx.drawImage(base.canvas, 0, 0, ARENA_W, ARENA_H);
+    else {
+      ctx.fillStyle = theme.bg[0];
+      ctx.fillRect(0, 0, W, H);
+    }
+    // Ausgänge: offene zeigen nach draußen laufende Pfeile, geschlossene eine Klappe
+    for (const ex of ar.exits) {
+      const [gx, gy, gw, gh] = exitRect(ex);
+      const [dx, dy] = DIR_VEC[ex.side];
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(gx, gy, gw, gh);
+      ctx.clip();
+      if (ex.open > 0) {
+        ctx.globalAlpha = ex.open;
+        ctx.strokeStyle = theme.accent;
+        ctx.lineWidth = 2.5;
+        const cx = gx + gw / 2;
+        const cy = gy + gh / 2;
+        for (let k = 0; k < 3; k++) {
+          const f = ((t * 1.6 + k / 3) % 1) - 0.5;
+          const px = cx + dx * f * WALL * 1.6;
+          const py = cy + dy * f * WALL * 1.6;
+          ctx.beginPath();
+          ctx.moveTo(px - dx * 4 - dy * 7, py - dy * 4 - dx * 7);
+          ctx.lineTo(px + dx * 3, py + dy * 3);
+          ctx.lineTo(px - dx * 4 + dy * 7, py - dy * 4 + dx * 7);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+      const closed = 1 - ex.open;
+      if (closed > 0) {
+        let shake = 0;
+        if (ar.bumpExit === ex && ar.nudgeT > 0) shake = Math.sin(ar.nudgeT * 60) * 2;
+        // Klappe gleitet seitlich aus der Öffnung
+        const fx = gx + (dy !== 0 ? 0 : 0) + shake * (dx === 0 ? 1 : 0);
+        const fy = gy + shake * (dy === 0 ? 1 : 0);
+        const fw = dx === 0 ? gw * closed : gw;
+        const fh = dx === 0 ? gh : gh * closed;
+        ctx.fillStyle = tc.metal;
+        ctx.fillRect(fx, fy, fw, fh);
+        ctx.strokeStyle = tc.edge;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(fx + 0.75, fy + 0.75, fw - 1.5, fh - 1.5);
+        // Einbahnstraße gegen die Richtung: Pfeil nach innen
+        if (ex.side === ar.heading && !directionAllowed(ex.link)) {
+          ctx.strokeStyle = '#ff6a5a';
+          ctx.lineWidth = 2;
+          const cx = gx + gw / 2;
+          const cy = gy + gh / 2;
+          ctx.beginPath();
+          ctx.moveTo(cx + dx * 4 - dy * 6, cy + dy * 4 - dx * 6);
+          ctx.lineTo(cx - dx * 3, cy - dy * 3);
+          ctx.lineTo(cx + dx * 4 + dy * 6, cy + dy * 4 + dx * 6);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+    // Drehscheibe: Ring mit kreisenden Pfeilen (Uhrzeigersinn)
+    if (node.turntable) {
+      const s = SPOTS.turntable;
+      const pulse = ar.turnFx > 0 ? 1 + ar.turnFx : 1;
+      circle(ctx, s.x, s.y, s.r * pulse, 'rgba(255,255,255,0.08)', theme.accent, 3);
+      circle(ctx, s.x, s.y, s.r * pulse - 6, null, 'rgba(255,255,255,0.5)', 1);
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(t * 1.5 + (ar.turnFx > 0 ? ar.turnFx * 8 : 0));
+      ctx.fillStyle = '#ffffff';
+      for (let k = 0; k < 3; k++) {
+        ctx.rotate((Math.PI * 2) / 3);
+        ctx.beginPath();
+        ctx.moveTo(s.r - 3, -5);
+        ctx.lineTo(s.r + 3, -5);
+        ctx.lineTo(s.r, 1);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    // Speicherstation: Briefkasten mit Diskette
+    if (node.save) {
+      const s = SPOTS.save;
+      const glow = game.savedHere ? 0.35 + 0.15 * Math.sin(t * 6) : 0;
+      if (glow) circle(ctx, s.x, s.y, s.r + 6, `rgba(120,200,255,${glow})`);
+      rrect(ctx, s.x - 15, s.y - 15, 30, 30, 5, '#2a3a7a', '#ffffff', 1.5);
+      rrect(ctx, s.x - 8, s.y - 9, 16, 18, 1.5, '#e8e8f0', '#1a1020', 1);
+      ctx.fillStyle = '#1a1020';
+      ctx.fillRect(s.x - 4, s.y - 9, 8, 6);
+      ctx.fillStyle = '#d8584a';
+      ctx.fillRect(s.x - 6, s.y + 1, 12, 6);
+      if (ar.near('save')) this.keyBadge(s.x, s.y - 26, 'X', t);
+    }
+    // Rückholstation: Wirbel in der Farbe des Zielgebiets
+    if (node.ret) {
+      const s = SPOTS.ret;
+      const col = AREAS[NODES[node.ret.to].area].color;
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      circle(ctx, 0, 0, s.r, '#1a1020', col, 2);
+      ctx.rotate(-t * 3);
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let k = 0; k < 40; k++) {
+        const a = k * 0.45;
+        const r = (k / 40) * (s.r - 3);
+        ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      ctx.stroke();
+      ctx.restore();
+      if (ar.near('ret')) this.keyBadge(s.x, s.y - 26, 'X', t);
+    }
+    // Schiff
+    const k = this.alpha;
+    let x = ar.px + (ar.x - ar.px) * k;
+    let y = ar.py + (ar.y - ar.py) * k;
+    if (ar.nudgeT > 0) {
+      x += Math.sin(ar.nudgeT * 55) * 1.5;
+      y += Math.cos(ar.nudgeT * 47) * 1;
+    }
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate((ar.shipAngle * Math.PI) / 2);
+    drawPlayer(ctx, game.progress.character, t, false, 0);
+    ctx.restore();
+    // Kopfzeile
+    text(ctx, node.name, 22, 8, 8, '#ffe14d', 'left');
+    this.drawItemBar(game);
+  }
+
+  keyBadge(x, y, label, t) {
+    const b = Math.sin(t * 5) * 1.5;
+    rrect(this.ctx, x - 7, y - 7 + b, 14, 14, 3, '#ffffff', '#1a1020', 1.2);
+    text(this.ctx, label, x, y + b + 0.5, 8, '#1a1020', 'center', null);
+  }
+
   // ================================================================ KARTE
   mapPos(n) {
     return [54 + n.x * 62, 24 + n.y * 44];
@@ -931,14 +1112,7 @@ export class Renderer {
       const known = game.progress.knownEdges.includes(e.id);
       const active = link && link.edge === e;
       ctx.lineCap = 'round';
-      if (game.nudgeT > 0 && game.nudgeEdge === e.id) {
-        ctx.strokeStyle = `rgba(255,60,60,${0.5 + 0.5 * Math.sin(t * 30)})`;
-        ctx.lineWidth = 8;
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
-      } else if (active) {
+      if (active) {
         ctx.strokeStyle = `rgba(255,225,77,${0.5 + 0.5 * Math.sin(t * 6)})`;
         ctx.lineWidth = 7;
         ctx.beginPath();
@@ -1022,22 +1196,7 @@ export class Renderer {
     const [px, py] = this.mapPos(cur);
     ctx.save();
     ctx.translate(px, py);
-    // "Geht nicht" ohne Worte: das Schiff stupst in die gewünschte Richtung und federt zurück
-    let ang = (game.shipAngle * Math.PI) / 2;
-    if (game.nudgeT > 0) {
-      const k = Math.sin((1 - game.nudgeT / 0.45) * Math.PI); // 0 → 1 → 0
-      const wobble = Math.sin(game.nudgeT * 50) * 0.5;
-      if (game.nudgeDir === null || game.nudgeDir === game.heading) {
-        const [dx, dy] = DIR_VEC[game.heading];
-        ctx.translate(dx * 7 * k, dy * 7 * k); // Anlauf nach vorn – und zurück
-      } else {
-        let d = game.nudgeDir - game.heading;
-        if (d > 2) d -= 4;
-        if (d < -2) d += 4;
-        ang += Math.sign(d) * 0.45 * k; // Ansatz zum Drehen – und zurück
-      }
-      ang += wobble * 0.15 * k;
-    }
+    const ang = (game.heading * Math.PI) / 2;
     ctx.rotate(ang);
     ctx.translate(14, 0);
     ctx.scale(0.65, 0.65);
@@ -1087,12 +1246,7 @@ export class Renderer {
       info += known ? link.edge.name : 'unbekannte Etappe';
     }
     text(ctx, info, 16, y + 37, 8, col, 'left', null);
-    const canTurn = n.turntable || game.items.has('DREHWURM');
-    const keys = ['FEUER: Abflug'];
-    if (canTurn) keys.push('Pfeile: Richtung');
-    else if (game.items.has('WENDEHALS')) keys.push('Pfeil zurück: Wenden');
-    if (n.save) keys.push('POWER/X: Station');
-    keys.push('ESC: Pause');
+    const keys = ['M / View: zurück'];
     ctx.font = font(7, false);
     text(ctx, keys.join('   '), W - 16, y + 11, 7, '#c8c0e8', 'right', null, false);
     text(ctx, 'Pilot: ' + CHARACTERS[game.progress.character].name, W - 16, y + 24, 7, '#c8c0e8', 'right', null, false);

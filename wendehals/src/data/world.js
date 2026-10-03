@@ -8,11 +8,18 @@
 //   autoTurn  Richtung, in die man bei Ankunft automatisch gedreht wird ("Wender")
 //   item      Item, das hier liegt
 //   start     Startknoten
+//   ret       Rückholstation (an Sackgassen): bringt sofort zur Arena "to" mit Blickrichtung "heading"
+//
+// Jeder Knoten ist eine Arena (Kreuzung), die man frei durchfliegt. Ausgänge liegen an den vier
+// Seiten; pro Seite sind mehrere Ausgänge möglich. Ein Ausgang ist nur offen, wenn man in
+// seine Richtung schaut.
 //
 // Kanten-Eigenschaften:
 //   oneWay    nur von "from" nach "to" fliegbar
 //   gates     Hindernisse, Positionen als Anteil (0..1) in Richtung from->to
 //   boss      Boss am Levelende, "reward" ist dessen Belohnung ("GOAL" = Spielende)
+//   dir       Seite, an der die Kante "from" verlässt (Standard: aus den Kartenpositionen)
+//   fromPos   Lage des Ausgangs entlang der Seite in "from" (0..1, Standard 0,5); toPos analog
 
 import { E, S, W, N } from '../core/math.js';
 
@@ -33,7 +40,7 @@ export const NODES = {
   eier: { name: 'Eierbecher', x: 1, y: 2, area: 'fruehstueck', turntable: true },
   marmelade: { name: 'Marmeladenglas', x: 1, y: 1, area: 'fruehstueck', save: true, turntable: true },
   tasse: { name: 'Untertasse', x: 2, y: 1, area: 'fruehstueck' },
-  butter: { name: 'Butterdose', x: 1, y: 0, area: 'fruehstueck', item: 'WURST1', autoTurn: S },
+  butter: { name: 'Butterdose', x: 1, y: 0, area: 'fruehstueck', item: 'WURST1', autoTurn: S, ret: { to: 'marmelade', heading: S } },
   // Badewannen-Ozean
   stoepsel: { name: 'Stöpsel', x: 3, y: 1, area: 'bad', save: true, turntable: true },
   seifenschale: { name: 'Seifenschale', x: 4, y: 1, area: 'bad' },
@@ -47,14 +54,14 @@ export const NODES = {
   kellertreppe: { name: 'Kellertreppe', x: 2, y: 2, area: 'keller', save: true, turntable: true },
   einmachregal: { name: 'Einmachregal', x: 2, y: 3, area: 'keller', turntable: true },
   kartoffelkiste: { name: 'Kartoffelkiste', x: 1, y: 3, area: 'keller' },
-  gurkenfass: { name: 'Gurkenfass', x: 0, y: 3, area: 'keller', item: 'WURST3', autoTurn: E },
-  kohlenkeller: { name: 'Kohlenkeller', x: 2, y: 4, area: 'keller', item: 'TOASTER', autoTurn: N },
+  gurkenfass: { name: 'Gurkenfass', x: 0, y: 3, area: 'keller', item: 'WURST3', autoTurn: E, ret: { to: 'kartoffelkiste', heading: E } },
+  kohlenkeller: { name: 'Kohlenkeller', x: 2, y: 4, area: 'keller', item: 'TOASTER', autoTurn: N, ret: { to: 'einmachregal', heading: N } },
   // Disco-Vulkan
   discotuer: { name: 'Discotür', x: 5, y: 2, area: 'disco', save: true, turntable: true },
   tanzflaeche: { name: 'Tanzfläche', x: 5, y: 3, area: 'disco' },
   djpult: { name: 'DJ-Pult', x: 6, y: 3, area: 'disco' },
   lavalampe: { name: 'Lavalampe', x: 6, y: 2, area: 'disco', save: true, turntable: true },
-  konfetti: { name: 'Konfettikanone', x: 5, y: 4, area: 'disco', item: 'WENDEHALS', autoTurn: N },
+  konfetti: { name: 'Konfettikanone', x: 5, y: 4, area: 'disco', item: 'WENDEHALS', autoTurn: N, ret: { to: 'tanzflaeche', heading: N } },
   // Uhrwerk-Himmel
   pendel: { name: 'Pendel', x: 6, y: 1, area: 'uhrwerk', save: true, turntable: true },
   uhrturm: { name: 'Uhrturm', x: 6, y: 0, area: 'uhrwerk', goal: true },
@@ -69,14 +76,17 @@ export const EDGES = [
   { id: 'kaffeekraenzchen', from: 'marmelade', to: 'tasse', name: 'Kaffeekränzchen', theme: 'fruehstueck', length: 2200, difficulty: 2, boss: 'kaffeekanne', reward: 'DREHWURM' },
   { id: 'kruemelmauer', from: 'eier', to: 'kellertreppe', name: 'Krümelmauer', theme: 'fruehstueck', length: 2000, difficulty: 2, gates: [g('rock', 0.3), g('rock', 0.65)] },
   { id: 'abflussrohr', from: 'tasse', to: 'stoepsel', name: 'Abflussrohr', theme: 'bad', length: 2600, difficulty: 2 },
-  { id: 'schaumbad', from: 'stoepsel', to: 'seifenschale', name: 'Schaumbad', theme: 'bad', length: 2600, difficulty: 2 },
+  { id: 'schaumbad', from: 'stoepsel', to: 'seifenschale', name: 'Schaumbad', theme: 'bad', length: 2600, difficulty: 2, fromPos: 0.3 },
   { id: 'duschvorhang', from: 'seifenschale', to: 'duschkopf', name: 'Duschvorhang', theme: 'bad', length: 2400, difficulty: 3, boss: 'walross', reward: 'GUMMIHAUT' },
   { id: 'handtuchleiste', from: 'duschkopf', to: 'handtuch', name: 'Handtuchleiste', theme: 'bad', length: 2200, difficulty: 3 },
   { id: 'waescheleine', from: 'handtuch', to: 'brotkorb', name: 'Wäscheleine', theme: 'bad', length: 2200, difficulty: 3 },
   { id: 'kruemelfall', from: 'brotkorb', to: 'tasse', name: 'Krümelfall', theme: 'fruehstueck', length: 1800, difficulty: 2 },
   { id: 'entenrennen', from: 'seifenschale', to: 'entenhafen', name: 'Entenrennen', theme: 'bad', length: 2800, difficulty: 3 },
   { id: 'blubberschacht', from: 'stoepsel', to: 'blubber', name: 'Blubberschacht', theme: 'bad', length: 2000, difficulty: 3, gates: [g('dark', 0.3, 900)] },
-  { id: 'flusensieb', from: 'blubber', to: 'sockenschublade', name: 'Flusensieb', theme: 'bad', length: 2000, difficulty: 3, gates: [g('spikes', 0.35, 500)] },
+  { id: 'flusensieb', from: 'blubber', to: 'sockenschublade', name: 'Flusensieb', theme: 'bad', length: 2000, difficulty: 3, gates: [g('spikes', 0.35, 500)], toPos: 0.65 },
+  // Abkürzungen zurück zum Stöpsel (Einbahn): mehrere Ausgänge an derselben Seite
+  { id: 'ueberlauf', from: 'sockenschublade', to: 'stoepsel', dir: W, fromPos: 0.25, toPos: 0.75, name: 'Überlauf', theme: 'bad', length: 1600, difficulty: 2, oneWay: true },
+  { id: 'fallrohr', from: 'handtuch', to: 'stoepsel', name: 'Fallrohr', theme: 'bad', length: 1600, difficulty: 2, oneWay: true },
   { id: 'treppe', from: 'tasse', to: 'kellertreppe', name: 'Treppe ins Dunkle', theme: 'keller', length: 2600, difficulty: 3, gates: [g('dark', 0.2, 1500)] },
   { id: 'spinnweben', from: 'kellertreppe', to: 'einmachregal', name: 'Spinnwebengang', theme: 'keller', length: 2600, difficulty: 3, gates: [g('dark', 0.15, 1700)] },
   { id: 'kartoffeldruck', from: 'einmachregal', to: 'kartoffelkiste', name: 'Kartoffeldruck', theme: 'keller', length: 2400, difficulty: 3, boss: 'kartoffel', reward: 'BOHRER' },

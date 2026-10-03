@@ -24,16 +24,18 @@ const KEYMAP = {
   Backspace: 'back',
   KeyX: 'station',
   KeyC: 'station',
+  KeyM: 'map',
+  Tab: 'map',
   F11: 'fullscreen',
 };
 
-// Standard-Gamepad: 0=A 1=B 2=X 3=Y 8=Back/View 9=Start/Menü 12-15=Steuerkreuz
+// Standard-Gamepad: 0=A 1=B 2=X 3=Y 8=Back/View (Karte) 9=Start/Menü 12-15=Steuerkreuz
 const PADMAP = {
   0: 'fire',
   1: 'power',
   2: 'station',
   3: 'wende',
-  8: 'pause',
+  8: 'map',
   9: 'pause',
   12: 'up',
   13: 'down',
@@ -41,7 +43,7 @@ const PADMAP = {
   15: 'right',
 };
 
-const ACTIONS = ['up', 'down', 'left', 'right', 'fire', 'confirm', 'power', 'wende', 'pause', 'back', 'station', 'fullscreen'];
+const ACTIONS = ['up', 'down', 'left', 'right', 'fire', 'confirm', 'power', 'wende', 'pause', 'back', 'station', 'map', 'fullscreen'];
 const DEADZONE = 0.28;
 
 export class Input {
@@ -127,6 +129,7 @@ export class Input {
       power: pressed('power'),
       wende: pressed('wende'),
       station: pressed('station'),
+      map: pressed('map'),
       fullscreen: pressed('fullscreen'),
       up: pressed('up'),
       down: pressed('down'),

@@ -1,4 +1,5 @@
-// Zentrale Spielsteuerung: Titelbild, Weltkarte, Level, Menüs, Speichern, Abspann.
+// Zentrale Spielsteuerung: Titelbild, Arenen (Knoten), Etappen (Level), Kartenansicht, Menüs,
+// Speichern, Abspann.
 // Ohne DOM – Eingaben kommen als Objekt herein, Ausgaben (Töne, Musik) liegen in Warteschlangen.
 
 import { NODES, START_NODE, START_HEADING } from '../data/world.js';
@@ -6,8 +7,9 @@ import { ITEMS } from '../data/items.js';
 import { CHARACTERS, availableCharacters } from '../data/characters.js';
 import { THEMES } from '../data/themes.js';
 import { ENDING_LINES } from '../data/text.js';
-import { opposite } from '../core/math.js';
-import { linkAt, directionAllowed, canTurnAt, arrive } from './worldgraph.js';
+import { opposite, turnCW } from '../core/math.js';
+import { linksAt, directionAllowed, arrive, returnTarget } from './worldgraph.js';
+import { Arena } from './arena.js';
 import { Level } from './level.js';
 import { freshPowers, powerupsAfterDeath } from './powerups.js';
 import {
@@ -21,27 +23,23 @@ import {
 
 export const CONTROLS_TEXT = [
   'TASTATUR',
-  'Pfeiltasten / WASD ...... fliegen, Menü, Richtung wählen',
-  'Leertaste / J ........... Feuer, Abflug, Bestätigen',
-  'K / Umschalt ............ POWER kaufen, Stationsmenü',
+  'Pfeiltasten / WASD ...... fliegen, Menü',
+  'Leertaste / J ........... Feuer, Bestätigen',
+  'K / Umschalt ............ POWER kaufen, Drehen (Drehwurm)',
   'L / Q ................... Wenden (180°, braucht Wendehals)',
+  'X / C ................... Station benutzen',
+  'M / Tab ................. Karte',
   'Esc / P ................. Pause, Zurück',
   'F11 ..................... Vollbild',
   '',
   'CONTROLLER (Xbox / Steam Deck)',
   'Stick / Steuerkreuz ..... fliegen, Menü',
-  'A ....................... Feuer, Abflug, Bestätigen',
-  'B ....................... POWER, Zurück',
-  'X ....................... Stationsmenü',
+  'A ....................... Feuer, Bestätigen',
+  'B ....................... POWER, Drehen, Zurück',
+  'X ....................... Station benutzen',
   'Y ....................... Wenden',
+  'View / Select ........... Karte',
   'Start / Menü ............ Pause',
-];
-
-const DIR_KEYS = [
-  ['right', 0],
-  ['down', 1],
-  ['left', 2],
-  ['up', 3],
 ];
 
 export class Game {
@@ -58,17 +56,26 @@ export class Game {
     this.time = 0;
     this.screenTime = 0;
     this.level = null;
+    this.arena = null;
     this.progress = null;
     this.items = new Set();
     this.node = START_NODE;
-    this.heading = START_HEADING;
-    this.shipAngle = 0;
+    this._heading = START_HEADING;
     this.powers = freshPowers();
     this.ending = null;
     this.openTitleMenu();
   }
 
   // ------------------------------------------------------------- Zustand
+  get heading() {
+    return this._heading;
+  }
+
+  set heading(h) {
+    this._heading = h;
+    if (this.arena) this.arena.heading = h;
+  }
+
   get musicTrack() {
     if (this.screen === 'title') return 'title';
     if (this.screen === 'ending') return 'ending';
@@ -83,12 +90,11 @@ export class Game {
     this.sfxQueue.push(name);
   }
 
-  /** "Geht nicht" ohne Worte: das Schiff auf der Karte ruckelt kurz, dazu ein Ton. */
-  nudge(dir = null) {
+  /** "Geht nicht" ohne Worte: das Schiff ruckelt kurz, dazu ein Ton. */
+  nudge() {
     this.nudgeT = 0.45;
-    this.nudgeEdge = null;
-    this.nudgeDir = dir; // gewünschte Richtung: das Schiff kippt kurz dorthin und federt zurück
-    this.sfx('nope');
+    if (this.arena) this.arena.nudge();
+    else this.sfx('nope');
   }
 
   toast(text, dur = 2.6) {
@@ -168,6 +174,12 @@ export class Game {
     };
   }
 
+  /** Kartenansicht: nur zum Ansehen, keine Auswahl. */
+  openMap(onClose = null) {
+    this.sfx('pause');
+    this.overlay = { type: 'map', onClose };
+  }
+
   showControls(back) {
     this.overlay = { type: 'dialog', title: 'Steuerung', lines: CONTROLS_TEXT, onClose: back, wide: true };
   }
@@ -177,12 +189,9 @@ export class Game {
     const resume = () => (this.overlay = null);
     const back = () => this.openPause();
     const items = [{ label: 'Weiter', action: resume }];
-    if (this.screen === 'level') {
-      items.push({ label: 'Etappe abbrechen', action: () => this.abortLevel() });
-      items.push({ label: 'Zur letzten Station', action: () => this.returnToStation(false) });
-    } else {
-      items.push({ label: 'Zur letzten Station', action: () => this.returnToStation(false) });
-    }
+    if (this.screen === 'level') items.push({ label: 'Etappe abbrechen', action: () => this.abortLevel() });
+    items.push({ label: 'Karte', action: () => this.openMap(back) });
+    items.push({ label: 'Zur letzten Station', action: () => this.returnToStation(false) });
     items.push({ label: 'Optionen', action: () => this.openOptions(back) });
     items.push({ label: 'Steuerung', action: () => this.showControls(back) });
     items.push({ label: 'Zum Hauptmenü', action: () => this.toTitle() });
@@ -191,6 +200,7 @@ export class Game {
 
   openStation() {
     const node = NODES[this.node];
+    if (!node.save) return;
     const items = [];
     const others = this.progress.visited.filter((id) => NODES[id].save && id !== this.node);
     if (others.length) items.push({ label: 'Rohrpost (Schnellreise)', action: () => this.openWarp() });
@@ -253,7 +263,7 @@ export class Game {
   }
 
   updateDialog(input) {
-    if (input.confirm || input.back || input.pause) {
+    if (input.confirm || input.back || input.pause || (this.overlay.type === 'map' && input.map)) {
       const d = this.overlay;
       this.overlay = null;
       this.sfx('confirm');
@@ -273,13 +283,12 @@ export class Game {
     this.loadFromProgress();
     this.save();
     this.overlay = null;
-    this.screen = 'map';
-    this.screenTime = 0;
+    this.enterArena(this.node, this.heading, null);
     this.dialogQueue.push({
       type: 'dialog',
       title: 'Wendehals',
       // Nur Steuerung erklären – wie die Welt funktioniert, findet man selbst heraus.
-      lines: ['FEUER: losfliegen und schießen', 'Pfeile / Stick: steuern', 'ESC / Start: Pause und Steuerung'],
+      lines: ['Pfeile / Stick: fliegen', 'FEUER: schießen', 'M / View: Karte', 'ESC / Start: Pause und Steuerung'],
     });
     this.nextDialog();
   }
@@ -290,8 +299,7 @@ export class Game {
     this.progress = p;
     this.loadFromProgress();
     this.overlay = null;
-    this.screen = 'map';
-    this.screenTime = 0;
+    this.enterArena(this.node, this.heading, null);
     this.toast('Willkommen zurück an der Station ' + NODES[this.node].name + '!');
   }
 
@@ -300,9 +308,26 @@ export class Game {
     this.items = new Set(p.items);
     this.node = p.saveNode;
     this.heading = p.saveHeading;
-    this.shipAngle = this.heading;
     this.powers = freshPowers();
     this.level = null;
+    this.arena = null;
+  }
+
+  /** Betritt eine Arena. entry: { side, pos } = Ankunft durch diesen Ausgang, null = an der Station. */
+  enterArena(node, heading, entry) {
+    this.level = null;
+    this.node = node;
+    this.arena = new Arena({ node, heading, items: this.items, entry });
+    this.heading = heading;
+    this.screen = 'arena';
+    this.screenTime = 0;
+    this.savedHere = false;
+    if (!this.progress.visited.includes(node)) this.progress.visited.push(node);
+  }
+
+  /** Für Tests und Werkzeuge: direkt in eine Arena setzen (wie Rohrpost, aber ohne Speichern). */
+  placeAt(node, heading) {
+    this.enterArena(node, heading, null);
   }
 
   save() {
@@ -314,6 +339,7 @@ export class Game {
   toTitle() {
     if (this.progress) this.save();
     this.level = null;
+    this.arena = null;
     this.screen = 'title';
     this.screenTime = 0;
     this.dialogQueue = [];
@@ -321,28 +347,34 @@ export class Game {
   }
 
   warpTo(id) {
-    this.node = id;
-    this.heading = this.progress.saveHeading;
     this.progress.saveNode = id;
+    this.enterArena(id, this.progress.saveHeading, null);
     this.save();
     this.overlay = null;
     this.sfx('warp');
     this.toast('Rohrpost nach ' + NODES[id].name + ' – zisch!');
   }
 
-  launch() {
-    const link = linkAt(this.node, this.heading);
+  /**
+   * Startet eine Etappe durch einen Ausgang. Ohne Angabe: der erste befliegbare Ausgang in
+   * Blickrichtung (für Tests/Werkzeuge; im Spiel fliegt man in der Arena hinaus).
+   */
+  launch(link = null) {
     if (!link) {
-      this.nudge(this.heading);
-      return;
+      const all = linksAt(this.node, this.heading);
+      link = all.find(directionAllowed) || null;
+      if (!link) {
+        this.nudge();
+        return;
+      }
     }
     if (!directionAllowed(link)) {
-      this.nudge(this.heading);
-      this.nudgeEdge = link.edge.id; // gesperrte Kante blinkt rot
+      this.nudge();
       return;
     }
-    this.levelOrigin = { node: this.node, heading: this.heading };
+    this.levelOrigin = { node: this.node, heading: this.heading, side: this.heading, pos: link.pos };
     if (!this.progress.knownEdges.includes(link.edge.id)) this.progress.knownEdges.push(link.edge.id);
+    this.arena = null;
     this.level = new Level({
       edge: link.edge,
       forward: link.forward,
@@ -354,28 +386,22 @@ export class Game {
     });
     this.screen = 'level';
     this.screenTime = 0;
-    this.toasts = []; // Karten-Hinweise gehören nicht ins Level
+    this.toasts = []; // Arena-Meldungen gehören nicht ins Level
     this.sfx('launch');
   }
 
   abortLevel() {
     if (this.level && this.level.state === 'dead') return this.returnToStation(true);
-    this.level = null;
+    const o = this.levelOrigin;
     this.overlay = null;
-    this.node = this.levelOrigin.node;
-    this.heading = this.levelOrigin.heading;
-    this.screen = 'map';
-    this.toast('Etappe abgebrochen.');
+    // Zurück durch den Ausgang, durch den man hinausgeflogen ist – ein Stück weiter drinnen.
+    this.enterArena(o.node, o.heading, { side: o.side, pos: o.pos, depth: 70 });
   }
 
   returnToStation(died) {
     if (!died && this.level && this.level.state === 'dead') died = true;
-    this.level = null;
     this.overlay = null;
-    this.node = this.progress.saveNode;
-    this.heading = this.progress.saveHeading;
-    this.shipAngle = this.heading;
-    this.screen = 'map';
+    this.enterArena(this.progress.saveNode, this.progress.saveHeading, null);
     if (died) {
       this.progress.deaths++;
       this.powers = powerupsAfterDeath(this.powers, this.items.has('SPARSTRUMPF'));
@@ -395,7 +421,6 @@ export class Game {
       // Umgekehrt vor einer unüberwindbaren Wand: wie "Etappe abbrechen", ohne Text
       this.progress.score += lv.score;
       this.abortLevel();
-      this.toasts = [];
       this.nudge();
       return;
     }
@@ -407,18 +432,17 @@ export class Game {
     const before = new Set(this.items);
     const r = arrive(res.node, res.heading, this.items, res.rewards);
     this.items = r.items;
-    this.node = r.node;
-    this.heading = r.heading;
-    this.level = null;
     if (res.goal) {
+      this.level = null;
+      this.node = r.node;
       this.save();
       this.startEnding();
       return;
     }
-    this.screen = 'map';
-    this.screenTime = 0;
-    const node = NODES[this.node];
-    if (!this.progress.visited.includes(this.node)) this.progress.visited.push(this.node);
+    // Ankunft durch den Ausgang dieser Etappe an der Gegenseite der Arena
+    const side = opposite(res.heading);
+    const link = linksAt(res.node, side).find((l) => l.edge === lv.edge);
+    this.enterArena(r.node, r.heading, { side, pos: link ? link.pos : 0.5 });
     for (const it of this.items) {
       if (before.has(it)) continue;
       const info = ITEMS[it];
@@ -426,13 +450,26 @@ export class Game {
       // Nur Name und – falls nötig – die Taste; was das Item bewirkt, zeigt die Welt.
       this.dialogQueue.push({ type: 'dialog', title: info.name, lines: info.desc ? [info.desc] : [], item: it });
     }
-    if (node.save) {
-      this.progress.saveNode = this.node;
-      this.progress.saveHeading = this.heading;
-      this.toast('Station ' + node.name + ': gespeichert!');
-    }
     this.save();
     this.nextDialog();
+  }
+
+  /** Speicherstation berührt: Spielstand an dieser Arena. */
+  saveAtStation() {
+    this.progress.saveNode = this.node;
+    this.progress.saveHeading = this.heading;
+    this.save();
+    this.sfx('power');
+    this.toast('Gespeichert.', 1.6);
+  }
+
+  /** Rückholstation benutzt. */
+  useReturn() {
+    const r = returnTarget(this.node, this.items);
+    if (!r) return;
+    this.items = r.items;
+    this.enterArena(r.node, r.heading, null);
+    this.sfx('warp');
   }
 
   startEnding() {
@@ -469,14 +506,14 @@ export class Game {
       return;
     }
 
-    if (this.progress && (this.screen === 'map' || this.screen === 'level')) this.progress.playTime += dt;
+    if (this.progress && (this.screen === 'arena' || this.screen === 'level')) this.progress.playTime += dt;
 
     switch (this.screen) {
       case 'title':
         this.openTitleMenu();
         break;
-      case 'map':
-        this.updateMap(dt, input);
+      case 'arena':
+        this.updateArena(dt, input);
         break;
       case 'level':
         this.updateLevel(dt, input);
@@ -487,32 +524,42 @@ export class Game {
     }
   }
 
-  updateMap(dt, input) {
-    // Schiffssymbol dreht sich weich zur Blickrichtung
-    let d = this.heading - this.shipAngle;
-    while (d > 2) d -= 4;
-    while (d < -2) d += 4;
-    this.shipAngle += d * Math.min(1, dt * 12);
-
+  updateArena(dt, input) {
+    const ar = this.arena;
     if (input.pause) return this.openPause();
-    for (const [k, dir] of DIR_KEYS) {
-      if (!input[k] || dir === this.heading) continue;
-      if (canTurnAt(this.node, this.items) || (this.items.has('WENDEHALS') && dir === opposite(this.heading))) {
-        this.heading = dir;
-        this.sfx('turn');
-      } else {
-        this.nudge(dir);
-      }
-      break;
+    if (input.map) return this.openMap();
+    // Drehen: Drehwurm (POWER-Taste) 90° rechts, Wendehals 180° – überall in der Arena.
+    if (input.power) {
+      if (this.items.has('DREHWURM')) ar.turnTo(turnCW(ar.heading));
+      else ar.nudge();
     }
-    if (input.confirm || input.firePressed) return this.launch();
-    if ((input.station || input.power) && NODES[this.node].save) this.openStation();
-    else if (input.station || input.power) this.nudge();
+    if (input.wende) {
+      if (this.items.has('WENDEHALS')) ar.turnTo(opposite(ar.heading));
+      else ar.nudge();
+    }
+    ar.update(dt, { mx: input.mx, my: input.my });
+    this._heading = ar.heading;
+    for (const s of ar.sfxQueue) this.sfxQueue.push(s);
+    ar.sfxQueue.length = 0;
+    // Speicherstation: Berühren speichert (einmal pro Besuch), X öffnet das Menü
+    const atSave = ar.near('save', 0);
+    if (atSave && !this.savedHere) {
+      this.savedHere = true;
+      this.saveAtStation();
+    } else if (!ar.near('save', 30)) this.savedHere = false;
+    if (input.station) {
+      if (ar.near('save')) this.openStation();
+      else if (ar.near('ret')) this.useReturn();
+      else ar.nudge();
+      return;
+    }
+    if (ar.result && ar.result.type === 'launch') this.launch(ar.result.link);
   }
 
   updateLevel(dt, input) {
     // Während des Absturzes keine Pause: sonst ließe sich die Todesstrafe per Menü umgehen.
     if (input.pause && this.level.state !== 'dead') return this.openPause();
+    if (input.map && this.level.state !== 'dead') return this.openMap();
     const lv = this.level;
     lv.update(dt, { mx: input.mx, my: input.my, fire: input.fire, power: input.power, wende: input.wende });
     for (const s of lv.sfxQueue) this.sfxQueue.push(s);

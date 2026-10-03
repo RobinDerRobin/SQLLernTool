@@ -4,7 +4,7 @@
 
 import { NODES, START_NODE, START_HEADING } from '../data/world.js';
 import { ITEM_IDS } from '../data/items.js';
-import { traverse, turnOptions, linkAt, directionAllowed, arrive } from './worldgraph.js';
+import { traverse, turnOptions, linksAt, directionAllowed, arrive, returnTarget } from './worldgraph.js';
 import { opposite } from '../core/math.js';
 
 const BIT = Object.fromEntries(ITEM_IDS.map((id, i) => [id, 1 << i]));
@@ -30,17 +30,21 @@ export function successors(state, skill) {
   for (const h of turnOptions(state.node, state.heading, items)) {
     out.push({ node: state.node, heading: h, mask: state.mask, via: 'drehen' });
   }
-  const t = traverse(state.node, state.heading, items, skill);
-  if (t) {
-    if (t.goal) out.push({ goal: true });
+  const links = linksAt(state.node, state.heading);
+  for (const link of links) {
+    const t = traverse(state.node, state.heading, items, skill, link);
+    if (!t) continue;
+    if (t.goal) out.push({ goal: true, via: 'flug:' + t.edge.id });
     else out.push({ node: t.node, heading: t.heading, mask: maskOf(t.items), via: 'flug:' + t.edge.id });
   }
   // Wendehals mitten im Level: zurück zum Startknoten mit umgekehrter Blickrichtung.
-  const link = linkAt(state.node, state.heading);
-  if (link && directionAllowed(link) && items.has('WENDEHALS')) {
+  if (items.has('WENDEHALS') && links.some(directionAllowed)) {
     const r = arrive(state.node, opposite(state.heading), items);
     out.push({ node: r.node, heading: r.heading, mask: maskOf(r.items), via: 'wendehals' });
   }
+  // Rückholstation in der Arena
+  const ret = returnTarget(state.node, items);
+  if (ret) out.push({ node: ret.node, heading: ret.heading, mask: maskOf(ret.items), via: 'rueckhol' });
   return out;
 }
 

@@ -6,7 +6,8 @@ import { NODES } from '../src/data/world.js';
 import { ITEMS } from '../src/data/items.js';
 import { E, N, S, W } from '../src/core/math.js';
 import { successors, maskOf } from '../src/game/solver.js';
-import { press, closeDialogs, chooseMenu, planToGoal, flyLevel, turnAndLaunch } from './helpers/driver.mjs';
+import { press, closeDialogs, chooseMenu, planToGoal, plan, doStep, flyLevel, turnAndLaunch, turnTo, flyOut, useReturn } from './helpers/driver.mjs';
+import { SPOTS } from '../src/game/arena.js';
 
 function newGame(opts = {}) {
   const storage = opts.storage || new MemoryStorage();
@@ -24,7 +25,7 @@ test('Titelmenü: ohne Spielstand kein "Weiterspielen"', () => {
 
 test('Neues Spiel startet am Toastständer mit Blick nach Osten und speichert', () => {
   const { game, storage } = newGame();
-  assert.equal(game.screen, 'map');
+  assert.equal(game.screen, 'arena');
   assert.equal(game.node, 'toast');
   assert.equal(game.heading, E);
   assert.ok(storage.getItem(SAVE_KEY));
@@ -40,51 +41,116 @@ test('Neues Spiel bei vorhandenem Spielstand fragt nach', () => {
   assert.equal(g.screen, 'title');
 });
 
-test('Drehen auf der Karte nur an Drehscheiben oder mit Drehwurm', () => {
+test('Drehen in der Arena: Drehscheibe durchfliegen dreht 90° rechts', () => {
   const { game } = newGame();
-  press(game, { up: true });
-  assert.equal(game.heading, N, 'Toastständer hat eine Drehscheibe');
-  game.node = 'tasse';
-  game.heading = E;
-  press(game, { down: true });
+  assert.equal(game.heading, E);
+  turnTo(game, S);
+  assert.equal(game.heading, S, 'Toastständer hat eine Drehscheibe');
+  assert.ok(game.sfxQueue.includes('turn'));
+});
+
+test('Drehen in der Arena: ohne Drehscheibe nur mit Drehwurm (POWER-Taste)', () => {
+  const { game } = newGame();
+  game.placeAt('tasse', E);
+  press(game, { power: true });
   assert.equal(game.heading, E, 'Untertasse hat keine Drehscheibe');
-  assert.ok(game.nudgeT > 0, 'Ablehnung wird gezeigt (ohne Text)');
+  assert.ok(game.arena.nudgeT > 0, 'Ablehnung wird gezeigt (ohne Text)');
   assert.ok(game.sfxQueue.includes('nope'));
+  press(game, {});
   game.items.add('DREHWURM');
-  press(game, { down: true });
+  press(game, { power: true });
   assert.equal(game.heading, S);
 });
 
-test('Wendehals erlaubt an jedem Knoten nur die 180°-Wende', () => {
+test('Wendehals erlaubt in jeder Arena die 180°-Wende', () => {
   const { game } = newGame();
-  game.node = 'tasse';
-  game.heading = E;
+  game.placeAt('tasse', E);
   game.items.add('WENDEHALS');
-  press(game, { up: true });
-  assert.equal(game.heading, E);
-  press(game, { left: true });
+  press(game, { wende: true });
   assert.equal(game.heading, W);
 });
 
-test('Abflug ins Leere oder gegen die Einbahnstraße wird abgelehnt', () => {
+test('Arena: Ausgänge sind nur in Blickrichtung offen, Wände halten fest', () => {
   const { game } = newGame();
-  press(game, { up: true }); // Toastständer: nach Norden gibt es nichts
-  press(game, { confirm: true });
-  assert.equal(game.screen, 'map');
-  game.node = 'eier';
+  // Toastständer, Blick nach Norden: dort gibt es keinen Ausgang
+  game.heading = N;
+  for (let i = 0; i < 120; i++) press(game, { mx: 0, my: -1 });
+  assert.equal(game.screen, 'arena');
+  assert.ok(game.arena.y > 0);
+  // Blick nach Osten, aber nach Süden fliegen: Süd-Ausgang (Kellertreppe? nein, keiner) bleibt zu
+  game.placeAt('eier', E);
+  game.arena.x = 240;
+  for (let i = 0; i < 200; i++) press(game, { mx: 0, my: 1 });
+  assert.equal(game.screen, 'arena', 'Klappe nach Süden ist zu');
+  assert.ok(game.arena.nudgeT > 0 || game.arena.bumpExit, 'Klappe wackelt');
+  // Einbahnstraße gegen die Richtung: auch mit Blick dorthin zu
   game.heading = S;
-  press(game, { confirm: true });
-  assert.equal(game.screen, 'map');
-  assert.ok(game.nudgeT > 0);
+  for (let i = 0; i < 200; i++) press(game, { mx: 0, my: 1 });
+  assert.equal(game.screen, 'arena', 'Kartoffelschacht ist Einbahn');
+  // Blick nach Osten und hinaus: Etappe startet
+  game.heading = E;
+  game.arena.y = 135;
+  for (let i = 0; i < 300 && game.screen === 'arena'; i++) press(game, { mx: 1, my: 0 });
+  assert.equal(game.screen, 'level');
+  assert.equal(game.level.edge.id, 'kruemelmauer');
+});
+
+test('Arena: bei mehreren Ausgängen an einer Seite entscheidet die Position', () => {
+  const { game } = newGame();
+  game.items.add('GUMMIHAUT');
+  game.placeAt('sockenschublade', W);
+  flyOut(game, 'ueberlauf');
+  assert.equal(game.level.edge.id, 'ueberlauf');
+  game.placeAt('sockenschublade', W);
+  flyOut(game, 'flusensieb');
+  assert.equal(game.level.edge.id, 'flusensieb');
+  assert.equal(game.level.forward, false);
+});
+
+test('Rückholstation bringt aus der Sackgasse zurück', () => {
+  const { game } = newGame();
+  game.placeAt('butter', S);
+  useReturn(game);
+  assert.equal(game.node, 'marmelade');
+  assert.equal(game.screen, 'arena');
+  assert.equal(game.heading, S);
+});
+
+test('Speicherstation: Berühren speichert, X öffnet das Menü', () => {
+  const { game } = newGame();
+  game.placeAt('marmelade', W);
+  assert.equal(game.progress.saveNode, 'toast');
+  game.arena.x = SPOTS.save.x - 30;
+  game.arena.y = SPOTS.save.y;
+  for (let i = 0; i < 12; i++) press(game, { mx: 1, my: 0 });
+  assert.equal(game.progress.saveNode, 'marmelade');
+  assert.equal(game.progress.saveHeading, W);
+  press(game, { station: true });
+  assert.equal(game.overlay?.type, 'menu');
+});
+
+test('Kartenansicht: Taste öffnet und schließt, ohne Auswahl', () => {
+  const { game } = newGame();
+  press(game, { map: true });
+  assert.equal(game.overlay?.type, 'map');
+  press(game, { right: true, confirm: false });
+  assert.equal(game.node, 'toast');
+  press(game, { map: true });
+  assert.equal(game.overlay, null);
+  game.launch();
+  press(game, { map: true });
+  assert.equal(game.overlay?.type, 'map', 'auch im Level');
+  press(game, { back: true });
+  assert.equal(game.screen, 'level');
 });
 
 test('Erstes Level fliegen: Ankunft am Eierbecher', () => {
   const { game } = newGame();
-  press(game, { confirm: true });
+  turnAndLaunch(game, E);
   assert.equal(game.screen, 'level');
   flyLevel(game);
   closeDialogs(game);
-  assert.equal(game.screen, 'map');
+  assert.equal(game.screen, 'arena');
   assert.equal(game.node, 'eier');
   assert.ok(game.progress.visited.includes('eier'));
   assert.ok(game.progress.knownEdges.includes('kruemelstrasse'));
@@ -92,11 +158,11 @@ test('Erstes Level fliegen: Ankunft am Eierbecher', () => {
 
 test('Etappe abbrechen stellt den Zustand vor dem Abflug wieder her', () => {
   const { game } = newGame();
-  press(game, { confirm: true });
+  game.launch();
   for (let i = 0; i < 300; i++) press(game, { fire: true });
   press(game, { pause: true });
   chooseMenu(game, 'Etappe abbrechen');
-  assert.equal(game.screen, 'map');
+  assert.equal(game.screen, 'arena');
   assert.equal(game.node, 'toast');
   assert.equal(game.heading, E);
 });
@@ -105,12 +171,12 @@ test('Tod: zurück zur letzten Station, Items bleiben, Power-Ups weg', () => {
   const { game } = newGame({ invincible: false });
   game.items.add('WURST1');
   game.powers.speed = 2;
-  press(game, { confirm: true });
+  game.launch();
   game.level.player.hp = 1;
   game.level.player.inv = 0;
   game.level.damage();
   for (let i = 0; i < 400 && game.screen === 'level'; i++) press(game, {});
-  assert.equal(game.screen, 'map');
+  assert.equal(game.screen, 'arena');
   assert.equal(game.node, 'toast');
   assert.ok(game.items.has('WURST1'));
   assert.equal(game.powers.speed, 0);
@@ -122,17 +188,19 @@ test('Pause → Zur letzten Station funktioniert auch im Level', () => {
   const { game } = newGame();
   game.progress.saveNode = 'marmelade';
   game.progress.saveHeading = N;
-  press(game, { confirm: true });
+  game.launch();
   press(game, { pause: true });
   chooseMenu(game, 'Zur letzten Station');
   assert.equal(game.node, 'marmelade');
-  assert.equal(game.screen, 'map');
+  assert.equal(game.screen, 'arena');
 });
 
 test('Stationsmenü: Rohrpost und Pilotenwechsel', () => {
   const { game } = newGame();
   game.progress.visited.push('marmelade', 'stoepsel');
   game.items.add('OMA');
+  game.arena.x = SPOTS.save.x - 24;
+  game.arena.y = SPOTS.save.y;
   press(game, { station: true });
   assert.equal(game.overlay.type, 'menu');
   chooseMenu(game, 'Pilot wechseln');
@@ -146,7 +214,7 @@ test('Stationsmenü: Rohrpost und Pilotenwechsel', () => {
 
 test('Stationsmenü gibt es nicht an normalen Knoten', () => {
   const { game } = newGame();
-  game.node = 'eier';
+  game.placeAt('eier', E);
   press(game, { station: true });
   assert.equal(game.overlay, null);
 });
@@ -186,7 +254,7 @@ test('Speicher voll / gesperrt: Spiel läuft trotzdem weiter', () => {
   const game = new Game({ storage: broken, invincible: true });
   chooseMenu(game, 'Neues Spiel');
   closeDialogs(game);
-  assert.equal(game.screen, 'map');
+  assert.equal(game.screen, 'arena');
 });
 
 test('Optionen: Regler und Schalter werden gespeichert', () => {
@@ -213,9 +281,8 @@ test('Optionen: Regler und Schalter werden gespeichert', () => {
 
 test('Item-Dialoge erscheinen nach dem Bossieg', () => {
   const { game } = newGame();
-  game.node = 'marmelade';
-  game.heading = E;
-  press(game, { confirm: true });
+  game.placeAt('marmelade', E);
+  game.launch();
   flyLevel(game);
   assert.equal(game.node, 'tasse');
   assert.ok(game.items.has('DREHWURM'));
@@ -228,15 +295,10 @@ for (const skill of [false, true]) {
     let launches = 0;
     while (game.screen !== 'ending') {
       closeDialogs(game);
-      const plan = planToGoal(game, skill);
-      assert.ok(plan, `kein Plan von ${game.node}`);
-      // Abflugrichtung = letzter Planzustand am aktuellen Knoten
-      let i = 0;
-      while (i + 1 < plan.length && plan[i + 1].node === game.node && !plan[i].launch) i++;
-      turnAndLaunch(game, plan[i].heading);
-      assert.equal(game.screen, 'level', `Abflug fehlgeschlagen an ${game.node}`);
-      flyLevel(game);
-      launches++;
+      const steps = planToGoal(game, skill);
+      assert.ok(steps && steps.length, `kein Plan von ${game.node}`);
+      doStep(game, steps[0]);
+      if (steps[0].via.startsWith('flug')) launches++;
       assert.ok(launches < 60, 'zu viele Flüge');
     }
     assert.ok(game.progress.finished);
@@ -255,12 +317,12 @@ test('100 % sammeln ist im echten Spiel möglich', () => {
   let guard = 0;
   while (game.items.size < Object.keys(ITEMS).length && guard++ < 80) {
     closeDialogs(game);
-    const plan = planToItem(game);
-    assert.ok(plan, 'kein Weg zum nächsten Item von ' + game.node);
-    let i = 0;
-    while (i + 1 < plan.length && plan[i + 1].node === game.node) i++;
-    turnAndLaunch(game, plan[i].heading);
-    flyLevel(game);
+    const steps = planToItem(game);
+    assert.ok(steps, 'kein Weg zum nächsten Item von ' + game.node);
+    for (const st of steps) {
+      closeDialogs(game);
+      doStep(game, st);
+    }
   }
   closeDialogs(game);
   assert.equal(game.completion(), 100);
@@ -268,32 +330,9 @@ test('100 % sammeln ist im echten Spiel möglich', () => {
 });
 
 function planToItem(game) {
-  const start = { node: game.node, heading: game.heading, mask: maskOf(game.items) };
-  const key = (s) => `${s.node}|${s.heading}|${s.mask}`;
-  const prev = new Map([[key(start), null]]);
-  const queue = [start];
-  const startMask = start.mask;
+  const startMask = maskOf(game.items);
   const unvisited = (n) => !game.progress.visited.includes(n);
-  while (queue.length) {
-    const s = queue.shift();
-    for (const n of successors(s, false)) {
-      if (n.goal || n.via === 'wendehals') continue;
-      const k = key(n);
-      if (prev.has(k)) continue;
-      prev.set(k, s);
-      if (n.mask !== startMask || (n.via.startsWith('flug') && unvisited(n.node))) {
-        const path = [n];
-        let p = s;
-        while (p) {
-          path.unshift(p);
-          p = prev.get(key(p));
-        }
-        return path;
-      }
-      queue.push(n);
-    }
-  }
-  return null;
+  return plan(game, { accept: (n) => n.mask !== startMask || (n.via.startsWith('flug') && unvisited(n.node)) });
 }
 
 test('Prototyp-Schlüssel im Spielstand werden verworfen (Befund Software-Tester)', () => {
@@ -315,7 +354,7 @@ test('Pause im Todes-Timer hebelt die Todesstrafe nicht aus (Befund Software-Tes
   for (const choice of ['Etappe abbrechen', 'Zur letzten Station']) {
     const { game } = newGame({ invincible: false });
     game.powers.speed = 2;
-    press(game, { confirm: true });
+    game.launch();
     const lv = game.level;
     lv.player.hp = 1;
     lv.player.inv = 0;
@@ -333,12 +372,11 @@ test('Power-Ups bleiben über mehrere Etappen erhalten', () => {
   const { game } = newGame();
   game.powers.speed = 2;
   game.powers.laser = true;
-  press(game, { confirm: true });
+  game.launch();
   flyLevel(game);
   closeDialogs(game);
   assert.equal(game.node, 'eier');
-  press(game, { up: true });
-  press(game, { confirm: true });
+  turnAndLaunch(game, N);
   // Der Autopilot kauft unterwegs weitere Upgrades – erhalten bleibt mindestens der Startstand.
   assert.equal(game.level.powers, game.powers, 'gleiches Power-Up-Objekt im nächsten Level');
   assert.ok(game.level.powers.speed >= 2);
@@ -372,7 +410,7 @@ test('Sparstrumpf wirkt im echten Spiel beim Tod', () => {
   game.powers.order = [1, 2];
   game.powers.missile = true;
   game.powers.double = true;
-  press(game, { confirm: true });
+  game.launch();
   game.level.player.hp = 1;
   game.level.player.inv = 0;
   game.level.damage();
@@ -404,14 +442,13 @@ test('Sparstrumpf: Schild und Doppel/Laser-Wechsel verfälschen die Hälfte nich
 
 test('Rückzug vor der Wand: zurück an den Startknoten, ohne Strafe', () => {
   const { game } = newGame();
-  game.node = 'kartoffelkiste';
-  game.heading = W;
+  game.placeAt('kartoffelkiste', W);
   game.powers.speed = 2;
-  press(game, { confirm: true });
+  game.launch();
   assert.equal(game.screen, 'level');
   game.level.events = [];
   for (let i = 0; i < 60 * 90 && game.screen === 'level'; i++) press(game, {});
-  assert.equal(game.screen, 'map');
+  assert.equal(game.screen, 'arena');
   assert.equal(game.node, 'kartoffelkiste');
   assert.equal(game.heading, W);
   assert.equal(game.powers.speed, 2);

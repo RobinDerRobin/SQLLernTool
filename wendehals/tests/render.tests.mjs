@@ -6,7 +6,7 @@ import { drawEnemy, drawBullet, drawBoss } from '../src/render/sprites.js';
 import { Game } from '../src/game/game.js';
 import { Level } from '../src/game/level.js';
 import { MemoryStorage } from '../src/game/save.js';
-import { EDGES } from '../src/data/world.js';
+import { EDGES, NODES } from '../src/data/world.js';
 import { ITEM_IDS } from '../src/data/items.js';
 import { ENEMIES } from '../src/game/enemies.js';
 import { BOSSES } from '../src/game/bosses.js';
@@ -86,10 +86,19 @@ test('Karte, Titel, Menüs, Dialoge und Abspann lassen sich zeichnen', () => {
   game.items = new Set(ITEM_IDS);
   game.progress.visited = EDGES.flatMap((e) => [e.from, e.to]);
   game.progress.knownEdges = EDGES.map((e) => e.id);
-  for (let h = 0; h < 4; h++) {
-    game.heading = h;
-    r.draw(game);
+  // Jede Arena in jeder Blickrichtung, dazu die Kartenansicht
+  for (const id of Object.keys(NODES)) {
+    if (NODES[id].goal) continue;
+    for (let h = 0; h < 4; h++) {
+      game.placeAt(id, h);
+      game.update(1 / 60, { mx: 1, my: 0.5 });
+      r.draw(game, 0.5);
+    }
   }
+  game.openMap();
+  r.draw(game);
+  game.overlay = null;
+  game.placeAt('toast', 0);
   game.openStation();
   r.draw(game);
   game.openCharacters();

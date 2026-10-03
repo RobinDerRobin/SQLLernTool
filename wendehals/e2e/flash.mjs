@@ -38,8 +38,7 @@ for (const scene of SCENES) {
     }
     const s = sc.setup;
     g.items = new Set(s.items);
-    g.node = s.node;
-    g.heading = s.heading;
+    g.placeAt(s.node, s.heading);
     g.launch();
     const lv = g.level;
     lv.invincible = true;

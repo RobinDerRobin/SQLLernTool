@@ -39,7 +39,8 @@ const SCENES = [
   { name: 'boss-kartoffel', node: 'einmachregal', heading: 2, items: ['DREHWURM'], boss: true },
   { name: 'boss-diva', node: 'tanzflaeche', heading: 0, items: ['DREHWURM'], boss: true },
   { name: 'boss-wecker', node: 'pendel', heading: 3, items: ['DREHWURM', 'BOHRER', 'PILZ'], boss: true },
-  { name: 'karte', map: true },
+  { name: 'karte', map: 'karte' },
+  { name: 'arena', map: 'arena' },
 ].filter((s) => s.name.includes(filter));
 
 const exe = [process.env.CHROMIUM_PATH, '/opt/pw-browsers/chromium'].find((p) => p && existsSync(p));
@@ -76,12 +77,12 @@ async function runScene(scene, measureMs = 3000) {
     }
     window.__autoplay = !sc.map;
     if (sc.map) {
-      g.screen = 'map';
       g.progress.visited = ['toast', 'eier', 'marmelade', 'tasse', 'stoepsel', 'seifenschale', 'entenhafen', 'discotuer'];
+      g.placeAt('stoepsel', 0);
+      if (sc.map === 'karte') g.openMap();
       return;
     }
-    g.node = sc.node;
-    g.heading = sc.heading;
+    g.placeAt(sc.node, sc.heading);
     g.launch();
     const lv = g.level;
     lv.invincible = true;

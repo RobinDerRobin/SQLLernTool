@@ -7,30 +7,46 @@ import { GATES } from '../data/items.js';
 import { dirBetween, opposite, turnCW } from '../core/math.js';
 
 export function edgeDir(edge) {
+  if (edge.dir !== undefined) return edge.dir;
   const a = NODES[edge.from];
   const b = NODES[edge.to];
   return dirBetween(a.x, a.y, b.x, b.y);
 }
 
-// nodeId -> [dir] -> { edge, forward }
+/** Mindestabstand zweier Ausgänge an derselben Seite (Anteil der Seitenlänge). */
+export const MIN_EXIT_GAP = 0.25;
+
+// nodeId -> [dir] -> [{ edge, forward, pos }] (nach pos sortiert)
 const LINKS = buildLinks();
 
 function buildLinks() {
   const links = {};
-  for (const id of Object.keys(NODES)) links[id] = [null, null, null, null];
+  for (const id of Object.keys(NODES)) links[id] = [[], [], [], []];
   for (const edge of EDGES) {
     const d = edgeDir(edge);
-    if (d < 0) throw new Error(`Kante ${edge.id} liegt nicht auf einer Achse`);
-    if (links[edge.from][d]) throw new Error(`Knoten ${edge.from} hat zwei Kanten nach ${d}`);
-    if (links[edge.to][opposite(d)]) throw new Error(`Knoten ${edge.to} hat zwei Kanten nach ${opposite(d)}`);
-    links[edge.from][d] = { edge, forward: true };
-    links[edge.to][opposite(d)] = { edge, forward: false };
+    if (d < 0) throw new Error(`Kante ${edge.id} hat keine Richtung`);
+    links[edge.from][d].push({ edge, forward: true, pos: edge.fromPos ?? 0.5 });
+    links[edge.to][opposite(d)].push({ edge, forward: false, pos: edge.toPos ?? 0.5 });
+  }
+  for (const [id, sides] of Object.entries(links)) {
+    sides.forEach((list, d) => {
+      list.sort((x, y) => x.pos - y.pos);
+      for (let i = 1; i < list.length; i++) {
+        if (list[i].pos - list[i - 1].pos < MIN_EXIT_GAP - 1e-9) throw new Error(`Knoten ${id}: Ausgänge nach ${d} liegen zu dicht`);
+      }
+    });
   }
   return links;
 }
 
-export function linkAt(nodeId, dir) {
+/** Alle Ausgänge eines Knotens an einer Seite. */
+export function linksAt(nodeId, dir) {
   return LINKS[nodeId][dir];
+}
+
+/** Erster Ausgang an einer Seite (bzw. null). */
+export function linkAt(nodeId, dir) {
+  return LINKS[nodeId][dir][0] || null;
 }
 
 /** Darf man die Kante in dieser Richtung überhaupt befliegen (Einbahnstraßen)? */
@@ -81,9 +97,11 @@ export function arrive(nodeId, heading, items, rewards = []) {
   return { node: nodeId, heading: h, items: next };
 }
 
-/** Was passiert, wenn man an "nodeId" in Richtung "heading" abfliegt und das Level schafft. */
-export function traverse(nodeId, heading, items, skill = false) {
-  const link = linkAt(nodeId, heading);
+/**
+ * Was passiert, wenn man an "nodeId" in Richtung "heading" abfliegt und das Level schafft.
+ * link: welcher Ausgang (Standard: der erste an dieser Seite).
+ */
+export function traverse(nodeId, heading, items, skill = false, link = linkAt(nodeId, heading)) {
   if (!link || !directionAllowed(link)) return null;
   if (!canPassEdge(link.edge, items, skill)) return null;
   const target = link.forward ? link.edge.to : link.edge.from;
@@ -93,6 +111,13 @@ export function traverse(nodeId, heading, items, skill = false) {
   result.goal = link.forward && link.edge.reward === 'GOAL';
   result.edge = link.edge;
   return result;
+}
+
+/** Rückholstation: wohin sie bringt (oder null). */
+export function returnTarget(nodeId, items) {
+  const ret = NODES[nodeId].ret;
+  if (!ret) return null;
+  return arrive(ret.to, ret.heading, items);
 }
 
 /** Mögliche Drehungen an einem Knoten (für Löser und Karten-UI). */

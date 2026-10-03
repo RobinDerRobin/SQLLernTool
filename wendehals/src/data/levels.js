@@ -70,6 +70,8 @@ export const LEVELS = {
   entenrennen: level({ floor: [3, 4], ceil: [1, 2], density: 1.8, pieces: ['badewasser', 'shampoo', 'fliesenwand'] }),
   blubberschacht: level({ floor: [8, 14], ceil: [8, 14], density: 1.2, pieces: ['schaum', 'fliesenwand'] }),
   flusensieb: level({ floor: [3, 5], ceil: [3, 5], density: 1.0, pieces: ['fliesenwand', 'badewasser'] }),
+  ueberlauf: level({ floor: [3, 5], ceil: [3, 5], density: 1.4, pieces: ['rohr', 'badewasser'], dyn: [{ type: 'current', every: 520 }] }),
+  fallrohr: level({ floor: [8, 12], ceil: [8, 12], density: 1.2, pieces: ['schaum', 'wasserhahn'] }),
   // Omas Keller
   treppe: level({ floor: [6, 12], ceil: [6, 10], density: 1.6, pieces: ['treppe', 'kiste'] }),
   spinnweben: level({ floor: [6, 10], ceil: [8, 12], density: 1.8, pieces: ['spinnweben', 'glasstapel'] }),

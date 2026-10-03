@@ -5,7 +5,7 @@ export const ITEMS = {
   DREHWURM: {
     short: 'DW',
     name: 'Drehwurm',
-    desc: 'An Knoten: Pfeile / Stick zum Drehen.',
+    desc: 'K / B: Drehen (an Kreuzungen)',
     kind: 'ability',
     required: true,
   },

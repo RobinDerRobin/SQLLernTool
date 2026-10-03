@@ -48,13 +48,51 @@ await shot('02-intro-dialog');
 check((await state()).overlay === 'dialog', 'Intro-Dialog erscheint');
 await page.keyboard.press('Enter');
 await wait(300);
-await shot('03-karte-start');
-check((await state()).screen === 'map', 'Karte nach Neues Spiel');
+await shot('03-arena-start');
+check((await state()).screen === 'arena', 'Arena nach Neues Spiel');
 
-// Abflug und ein paar Sekunden echtes Spielen mit gehaltener Feuertaste
-await page.keyboard.press('Space');
-await wait(200);
-check((await state()).screen === 'level', 'Level startet mit Leertaste');
+// Kartenansicht per Taste
+await page.keyboard.press('KeyM');
+await wait(300);
+await shot('03b-karte');
+check((await state()).overlay === 'map', 'Karte öffnet sich mit M');
+await page.keyboard.press('KeyM');
+await wait(150);
+check((await state()).overlay === null, 'Karte schließt sich mit M');
+
+// Durch die Drehscheibe fliegen (unten links) und zurück auf Osten drehen
+const arena = () => page.evaluate(() => ({ x: window.__wendehals.game.arena?.x, y: window.__wendehals.game.arena?.y, h: window.__wendehals.game.heading }));
+async function flyArena(tx, ty, maxMs = 4000, until = null) {
+  for (let t = 0; t < maxMs; t += 50) {
+    const a = await arena();
+    if (until && (await until(a))) return true;
+    if (a.x === undefined) return false;
+    const keys = [];
+    if (a.x < tx - 4) keys.push('ArrowRight');
+    if (a.x > tx + 4) keys.push('ArrowLeft');
+    if (a.y < ty - 4) keys.push('ArrowDown');
+    if (a.y > ty + 4) keys.push('ArrowUp');
+    if (!keys.length && !until) return true;
+    for (const k of keys) await page.keyboard.down(k);
+    await wait(50);
+    for (const k of keys) await page.keyboard.up(k);
+  }
+  return false;
+}
+await flyArena(78, 166);
+await flyArena(78, 230, 2000, async (a) => a.h !== 0);
+check((await arena()).h === 1, 'Drehscheibe dreht nach Süden');
+await shot('03c-arena-gedreht');
+for (let k = 0; k < 3; k++) {
+  await flyArena(78, 166);
+  const h0 = (await arena()).h;
+  await flyArena(78, 230, 2000, async (a) => a.h !== h0);
+}
+check((await arena()).h === 0, 'nach vier Runden wieder Osten');
+// Hinaus durch den Ostausgang
+await flyArena(380, 135);
+await flyArena(600, 135, 3000, async () => (await state()).screen === 'level');
+check((await state()).screen === 'level', 'Level startet durch den Ostausgang');
 await page.keyboard.down('Space');
 await page.keyboard.down('ArrowRight');
 await wait(1500);
@@ -91,9 +129,7 @@ async function flyTo(node, heading, items, advanceSeconds, name, extra = '') {
       g.overlay = null;
       g.dialogQueue = [];
       g.items = new Set(items);
-      g.node = node;
-      g.heading = heading;
-      g.screen = 'map';
+      g.placeAt(node, heading);
       g.launch();
       const lv = g.level;
       lv.invincible = true;
@@ -145,14 +181,35 @@ await flyTo('stoepsel', 0, ['TOASTER'], 4, '28-toaster', "g.progress.character='
 // Karte mit Fortschritt und Stationsmenü
 await scenario('30-karte-fortschritt', () => {
   const g = window.__wendehals.game;
-  g.level = null;
-  g.screen = 'map';
   g.overlay = null;
   g.items = new Set(['DREHWURM', 'GUMMIHAUT', 'LAMPE', 'OMA', 'WURST1']);
   g.progress.visited = ['toast', 'eier', 'marmelade', 'tasse', 'butter', 'stoepsel', 'seifenschale', 'duschkopf', 'handtuch', 'brotkorb', 'entenhafen'];
   g.progress.knownEdges = ['kruemelstrasse', 'marmeladenaufzug', 'butterberg', 'kaffeekraenzchen', 'abflussrohr', 'schaumbad', 'duschvorhang', 'handtuchleiste', 'waescheleine', 'kruemelfall', 'entenrennen', 'kruemelmauer'];
-  g.node = 'entenhafen';
-  g.heading = 1;
+  g.placeAt('entenhafen', 1);
+  g.openMap();
+});
+check((await state()).overlay === 'map', 'Karte mit Fortschritt');
+await scenario('30b-arena-entenhafen', () => {
+  const g = window.__wendehals.game;
+  g.overlay = null;
+  g.arena.x = 372;
+  g.arena.y = 230;
+});
+await scenario('30c-arena-stoepsel', () => {
+  const g = window.__wendehals.game;
+  g.placeAt('stoepsel', 0);
+});
+await scenario('30d-arena-rueckhol', () => {
+  const g = window.__wendehals.game;
+  g.placeAt('konfetti', 3);
+  g.arena.x = 100;
+  g.arena.y = 60;
+});
+await page.evaluate(() => {
+  const g = window.__wendehals.game;
+  g.placeAt('entenhafen', 1);
+  g.arena.x = 380;
+  g.arena.y = 230;
 });
 await page.keyboard.press('KeyX');
 await wait(300);
@@ -206,7 +263,7 @@ check(idx === 1, 'Gamepad-Steuerkreuz bewegt die Menüauswahl');
 await page.evaluate(() => {
   navigator.getGamepads = () => [];
 });
-const keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Enter', 'KeyK', 'KeyL', 'KeyX', 'Escape'];
+const keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Enter', 'KeyK', 'KeyL', 'KeyX', 'KeyM', 'Escape'];
 let seed = 1;
 const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 for (let i = 0; i < 400; i++) {

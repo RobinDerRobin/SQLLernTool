@@ -39,9 +39,14 @@ console.log('  nach Enter:', await st());
 await page.keyboard.press('Enter');
 await page.waitForTimeout(300);
 console.log('  nach Enter:', await st());
-await page.keyboard.press('Space');
+// Aus der Arena nach Osten hinausfliegen: erst auf Höhe des Ausgangs, dann nach rechts
+await page.keyboard.down('ArrowUp');
+await page.waitForTimeout(500);
+await page.keyboard.up('ArrowUp');
+await page.keyboard.down('ArrowRight');
 await page.waitForTimeout(1500);
-console.log('  nach Leertaste:', await st());
+await page.keyboard.up('ArrowRight');
+console.log('  nach dem Abflug:', await st());
 check((await page.evaluate(() => window.__wendehals.game.screen)) === 'level', 'Level läuft in Electron');
 await page.screenshot({ path: path.join(root, 'e2e/screenshots/50-electron.png') });
 await page.evaluate(() => window.wendehalsNative.setFullscreen(true));
