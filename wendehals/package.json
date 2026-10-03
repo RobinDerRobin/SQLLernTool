@@ -1,0 +1,27 @@
+{
+  "name": "wendehals",
+  "productName": "Wendehals",
+  "version": "0.1.0",
+  "description": "Metroidvania-Shoot'em-Up: Welt erkunden, Richtung drehen, abgedrehte Gegner.",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "test": "node --test \"tests/*.tests.mjs\"",
+    "build": "node tools/build.mjs",
+    "e2e": "npm run build && node e2e/smoke.mjs",
+    "check": "npm test && npm run e2e",
+    "start": "npm run build && electron .",
+    "dist:win": "npm run build && electron-builder --win --x64",
+    "dist:linux": "npm run build && electron-builder --linux --x64"
+  },
+  "build": {
+    "appId": "de.robin.wendehals",
+    "productName": "Wendehals",
+    "files": ["electron/**", "dist/**", "package.json"],
+    "directories": { "output": "release" },
+    "win": { "target": ["portable", "zip"], "signAndEditExecutable": false },
+    "linux": { "target": ["AppImage", "tar.gz"], "category": "Game" }
+  },
+  "devDependencies": {}
+}
