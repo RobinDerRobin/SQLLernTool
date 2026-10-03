@@ -2,12 +2,12 @@
 
 import { SCREEN_W, SCREEN_H, wrapDelta, DIR_NAMES, DIR_VEC } from '../core/math.js';
 import { NODES, EDGES, AREAS } from '../data/world.js';
-import { ITEMS, GATES } from '../data/items.js';
+import { ITEMS } from '../data/items.js';
 import { THEMES } from '../data/themes.js';
 import { CHARACTERS } from '../data/characters.js';
 import { ENDING_LINES } from '../data/text.js';
 import { POWER_LABELS, slotAvailable } from '../game/powerups.js';
-import { linkAt, directionAllowed, requiredItems } from '../game/worldgraph.js';
+import { linkAt, directionAllowed } from '../game/worldgraph.js';
 import { BOSSES } from '../game/bosses.js';
 import {
   circle,
@@ -576,6 +576,25 @@ export class Renderer {
     }
   }
 
+  /** Fortschrittsleiste: wie weit ist es noch bis zum Ende der Etappe (bzw. bis zum Boss)? */
+  drawProgress(lv) {
+    const ctx = this.ctx;
+    const w = 160;
+    const x = W / 2 - w / 2;
+    const y = 18;
+    const k = Math.max(0, Math.min(1, lv.progress()));
+    rrect(ctx, x, y, w, 4, 2, 'rgba(20,10,40,0.55)', 'rgba(255,255,255,0.5)', 0.8);
+    rrect(ctx, x, y, Math.max(4, w * k), 4, 2, '#ffd34d');
+    // Ziel: Boss-Markierung oder Knoten-Punkt
+    if (lv.hasBoss) {
+      circle(ctx, x + w + 6, y + 2, 4, '#ff5f7a', '#ffffff', 1);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x + w + 4.5, y + 0.5, 1, 1.5);
+      ctx.fillRect(x + w + 6.5, y + 0.5, 1, 1.5);
+    } else circle(ctx, x + w + 6, y + 2, 3, '#ffffff', '#1a1020', 1);
+    if (lv.turbo) text(ctx, '»', x - 8, y + 2, 8, '#ffd34d', 'center', null);
+  }
+
   /** Rote Vignette bei einem Treffer: zeigt deutlich, dass man getroffen wurde. */
   drawHurtVignette(k) {
     const ctx = this.ctx;
@@ -646,6 +665,7 @@ export class Renderer {
     for (let i = 0; i < lv.powers.shield; i++) circle(ctx, 14 + i * 10, 21, 3.5, 'rgba(90,200,255,0.8)', '#ffffff', 0.8);
     text(ctx, String(game.progress.score + lv.score).padStart(7, '0'), W - 8, 11, 10, '#ffffff', 'right');
     text(ctx, lv.edge.name, W / 2, 10, 8, '#ffe9b0');
+    if (!lv.arena) this.drawProgress(lv);
 
     // Power-Leiste
     const bw = 62;
@@ -769,9 +789,6 @@ export class Renderer {
         ctx.fill();
         ctx.restore();
       }
-      if (known && e.gates) {
-        e.gates.forEach((g, i) => this.gateIcon(g.type, mx + (i - (e.gates.length - 1) / 2) * 11, my, game));
-      }
       if (known && e.boss && !(e.reward === 'GOAL' ? false : game.items.has(e.reward))) {
         text(ctx, '☠', mx, my - 9, 9, '#ff6a8a');
       }
@@ -825,6 +842,8 @@ export class Renderer {
     const [px, py] = this.mapPos(cur);
     ctx.save();
     ctx.translate(px, py);
+    // "Geht nicht": kurzes Ruckeln statt Erklärtext
+    if (game.nudgeT > 0) ctx.translate(Math.sin(game.nudgeT * 60) * 2.5 * (game.nudgeT / 0.3), 0);
     ctx.rotate((game.shipAngle * Math.PI) / 2);
     ctx.translate(14, 0);
     ctx.scale(0.65, 0.65);
@@ -833,14 +852,6 @@ export class Renderer {
 
     this.drawItemBar(game);
     this.drawMapPanel(game, link);
-  }
-
-  gateIcon(type, x, y, game) {
-    const ctx = this.ctx;
-    const have = game.items.has(GATES[type].item);
-    rrect(ctx, x - 5, y - 5, 10, 10, 2, have ? '#2a6a3a' : '#6a2a3a', '#ffffff', 0.8);
-    const sym = { rock: '▦', narrow: '⇔', spikes: '▲', dark: '☾' }[type];
-    text(ctx, sym, x, y + 0.5, 7, '#ffffff', 'center', null);
   }
 
   drawItemBar(game) {
@@ -880,13 +891,6 @@ export class Renderer {
     } else {
       const known = game.progress.knownEdges.includes(link.edge.id);
       info += known ? link.edge.name : 'unbekannte Etappe';
-      if (known) {
-        const missing = [...requiredItems(link.edge)].filter((it) => !game.items.has(it));
-        if (missing.length) {
-          info += ' (fehlt: ' + missing.map((m) => ITEMS[m].name).join(', ') + ')';
-          col = '#ffcf7a';
-        }
-      }
     }
     text(ctx, info, 16, y + 37, 8, col, 'left', null);
     const canTurn = n.turntable || game.items.has('DREHWURM');

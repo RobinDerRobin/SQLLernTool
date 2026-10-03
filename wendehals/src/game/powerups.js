@@ -7,7 +7,8 @@ export const MAX_OPTIONS = 2;
 export const SHIELD_HITS = 3;
 
 export function freshPowers() {
-  return { speed: 0, missile: false, double: false, laser: false, options: 0, shield: 0, cursor: -1 };
+  // order: Reihenfolge der Käufe (Slot-Nummern) – für "Omas Sparstrumpf" nach dem Tod
+  return { speed: 0, missile: false, double: false, laser: false, options: 0, shield: 0, cursor: -1, order: [] };
 }
 
 export function slotAvailable(p, i) {
@@ -60,7 +61,27 @@ export function activate(p) {
       break;
   }
   p.cursor = -1;
+  (p.order ||= []).push(i);
   return POWER_LABELS[i];
+}
+
+/** Wendet einen Kauf an, ohne die Leiste zu verändern (für den Wiederaufbau). */
+function apply(p, i) {
+  p.cursor = i;
+  activate(p);
+}
+
+/**
+ * Power-Ups nach dem Tod. Wie bei Parodius ist alles weg – mit "Omas Sparstrumpf" bleibt die
+ * erste Hälfte der gekauften Power-Ups erhalten (abgerundet). Der Schild zählt nie mit.
+ */
+export function powerupsAfterDeath(p, hasSparstrumpf) {
+  const fresh = freshPowers();
+  if (!hasSparstrumpf || !p || !Array.isArray(p.order)) return fresh;
+  const keep = p.order.filter((i) => i !== 5).slice(0, Math.floor(p.order.length / 2));
+  for (const i of keep) if (slotAvailable(fresh, i)) apply(fresh, i);
+  fresh.cursor = -1;
+  return fresh;
 }
 
 /** Sichert ab, dass ein geladener/übergebener Zustand gültig ist. */
@@ -75,5 +96,6 @@ export function sanitizePowers(p) {
     options: Math.max(0, Math.min(MAX_OPTIONS, p.options | 0)),
     shield: Math.max(0, Math.min(SHIELD_HITS, p.shield | 0)),
     cursor: Math.max(-1, Math.min(POWER_LABELS.length - 1, Number.isInteger(p.cursor) ? p.cursor : -1)),
+    order: Array.isArray(p.order) ? p.order.filter((i) => Number.isInteger(i) && i >= 0 && i < POWER_LABELS.length) : [],
   };
 }

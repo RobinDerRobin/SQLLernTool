@@ -5,11 +5,11 @@ import { NODES, START_NODE, START_HEADING } from '../data/world.js';
 import { ITEMS } from '../data/items.js';
 import { CHARACTERS, availableCharacters } from '../data/characters.js';
 import { THEMES } from '../data/themes.js';
-import { NODE_HINTS, ENDING_LINES } from '../data/text.js';
-import { DIR_NAMES, opposite } from '../core/math.js';
+import { ENDING_LINES } from '../data/text.js';
+import { opposite } from '../core/math.js';
 import { linkAt, directionAllowed, canTurnAt, arrive } from './worldgraph.js';
 import { Level } from './level.js';
-import { freshPowers } from './powerups.js';
+import { freshPowers, powerupsAfterDeath } from './powerups.js';
 import {
   newProgress,
   loadProgress,
@@ -81,6 +81,12 @@ export class Game {
 
   sfx(name) {
     this.sfxQueue.push(name);
+  }
+
+  /** "Geht nicht" ohne Worte: das Schiff auf der Karte ruckelt kurz, dazu ein Ton. */
+  nudge() {
+    this.nudgeT = 0.3;
+    this.sfx('nope');
   }
 
   toast(text, dur = 2.6) {
@@ -191,7 +197,7 @@ export class Game {
     items.push({ label: 'Weiter', action: () => (this.overlay = null) });
     this.overlay = this.menu('Station ' + node.name, items, {
       onBack: () => (this.overlay = null),
-      footer: 'Gespeichert. Du kannst dich hier frei drehen.',
+      footer: 'Gespeichert.',
     });
   }
 
@@ -270,14 +276,8 @@ export class Game {
     this.dialogQueue.push({
       type: 'dialog',
       title: 'Wendehals',
-      lines: [
-        'Dackel Düse träumt vom Fliegen.',
-        'Erkunde die Welt, finde Upgrades und dreh den Spieß um!',
-        '',
-        'Auf der Karte: Mit FEUER fliegst du in Blickrichtung los.',
-        'An Drehscheiben (weißer Ring) wählst du mit den Pfeilen die Richtung.',
-        'An Stationen (blaues Quadrat) wird gespeichert.',
-      ],
+      // Nur Steuerung erklären – wie die Welt funktioniert, findet man selbst heraus.
+      lines: ['FEUER: losfliegen und schießen', 'Pfeile / Stick: steuern', 'ESC / Start: Pause und Steuerung'],
     });
     this.nextDialog();
   }
@@ -331,13 +331,11 @@ export class Game {
   launch() {
     const link = linkAt(this.node, this.heading);
     if (!link) {
-      this.toast(NODE_HINTS.noExit);
-      this.sfx('nope');
+      this.nudge();
       return;
     }
     if (!directionAllowed(link)) {
-      this.toast(NODE_HINTS.oneWay);
-      this.sfx('nope');
+      this.nudge();
       return;
     }
     this.levelOrigin = { node: this.node, heading: this.heading };
@@ -377,11 +375,11 @@ export class Game {
     this.screen = 'map';
     if (died) {
       this.progress.deaths++;
-      this.powers = freshPowers();
+      this.powers = powerupsAfterDeath(this.powers, this.items.has('SPARSTRUMPF'));
       this.dialogQueue.push({
         type: 'dialog',
         title: 'Autsch!',
-        lines: ['Der Traum war kurz unterbrochen.', 'Zurück zur Station ' + NODES[this.node].name + '.', 'Deine Items behältst du – nur die Power-Ups sind weg.'],
+        lines: ['Zurück zur Station ' + NODES[this.node].name + '.'],
       });
     } else this.toast('Zurück zur Station ' + NODES[this.node].name + '.');
     this.save();
@@ -414,10 +412,8 @@ export class Game {
       if (before.has(it)) continue;
       const info = ITEMS[it];
       this.sfx('item');
-      this.dialogQueue.push({ type: 'dialog', title: 'Neu: ' + info.name, lines: [info.desc], item: it });
-    }
-    if (node.autoTurn !== undefined && res.heading !== node.autoTurn) {
-      this.toast('Ein Wender dreht dich nach ' + DIR_NAMES[node.autoTurn] + '!');
+      // Nur Name und – falls nötig – die Taste; was das Item bewirkt, zeigt die Welt.
+      this.dialogQueue.push({ type: 'dialog', title: info.name, lines: info.desc ? [info.desc] : [], item: it });
     }
     if (node.save) {
       this.progress.saveNode = this.node;
@@ -449,6 +445,7 @@ export class Game {
     this.screenTime += dt;
     for (const t of this.toasts) t.t += dt;
     this.toasts = this.toasts.filter((t) => t.t < t.dur);
+    this.nudgeT = Math.max(0, (this.nudgeT || 0) - dt);
     if (input.fullscreen && this.platform.setFullscreen) {
       this.settings.fullscreen = !this.settings.fullscreen;
       this.platform.setFullscreen(this.settings.fullscreen);
@@ -493,14 +490,13 @@ export class Game {
         this.heading = dir;
         this.sfx('turn');
       } else {
-        this.toast(NODE_HINTS.needTurn);
-        this.sfx('nope');
+        this.nudge();
       }
       break;
     }
     if (input.confirm || input.firePressed) return this.launch();
     if ((input.station || input.power) && NODES[this.node].save) this.openStation();
-    else if (input.station || input.power) this.toast('Stationsmenü gibt es nur an Stationen.');
+    else if (input.station || input.power) this.nudge();
   }
 
   updateLevel(dt, input) {

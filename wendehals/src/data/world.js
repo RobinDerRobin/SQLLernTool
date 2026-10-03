@@ -14,7 +14,7 @@
 //   gates     Hindernisse, Positionen als Anteil (0..1) in Richtung from->to
 //   boss      Boss am Levelende, "reward" ist dessen Belohnung ("GOAL" = Spielende)
 
-import { E, S, N } from '../core/math.js';
+import { E, S, W, N } from '../core/math.js';
 
 export const START_NODE = 'toast';
 export const START_HEADING = E;
@@ -42,6 +42,7 @@ export const NODES = {
   brotkorb: { name: 'Brotkorb', x: 2, y: 0, area: 'fruehstueck', item: 'OMA' },
   entenhafen: { name: 'Quietscheentenhafen', x: 5, y: 1, area: 'bad', save: true, turntable: true },
   blubber: { name: 'Blubberblase', x: 3, y: 2, area: 'bad', item: 'WURST2', autoTurn: N },
+  sockenschublade: { name: 'Sockenschublade', x: 4, y: 2, area: 'bad', item: 'SPARSTRUMPF', autoTurn: W },
   // Omas Keller
   kellertreppe: { name: 'Kellertreppe', x: 2, y: 2, area: 'keller', save: true, turntable: true },
   einmachregal: { name: 'Einmachregal', x: 2, y: 3, area: 'keller', turntable: true },
@@ -75,6 +76,7 @@ export const EDGES = [
   { id: 'kruemelfall', from: 'brotkorb', to: 'tasse', name: 'Krümelfall', theme: 'fruehstueck', length: 1800, difficulty: 2 },
   { id: 'entenrennen', from: 'seifenschale', to: 'entenhafen', name: 'Entenrennen', theme: 'bad', length: 2800, difficulty: 3 },
   { id: 'blubberschacht', from: 'stoepsel', to: 'blubber', name: 'Blubberschacht', theme: 'bad', length: 2000, difficulty: 3, gates: [g('dark', 0.3, 900)] },
+  { id: 'flusensieb', from: 'blubber', to: 'sockenschublade', name: 'Flusensieb', theme: 'bad', length: 2000, difficulty: 3, gates: [g('spikes', 0.35, 500)] },
   { id: 'treppe', from: 'tasse', to: 'kellertreppe', name: 'Treppe ins Dunkle', theme: 'keller', length: 2600, difficulty: 3, gates: [g('dark', 0.2, 1500)] },
   { id: 'spinnweben', from: 'kellertreppe', to: 'einmachregal', name: 'Spinnwebengang', theme: 'keller', length: 2600, difficulty: 3, gates: [g('dark', 0.15, 1700)] },
   { id: 'kartoffeldruck', from: 'einmachregal', to: 'kartoffelkiste', name: 'Kartoffeldruck', theme: 'keller', length: 2400, difficulty: 3, boss: 'kartoffel', reward: 'BOHRER' },

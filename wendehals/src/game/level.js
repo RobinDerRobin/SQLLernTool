@@ -19,8 +19,8 @@ import {
   dist2,
 } from '../core/math.js';
 import { CHARACTERS } from '../data/characters.js';
-import { maxHpFor, GATES } from '../data/items.js';
-import { HINTS, GATE_HINTS } from '../data/text.js';
+import { maxHpFor } from '../data/items.js';
+import { HINTS } from '../data/text.js';
 import { edgeDir } from './worldgraph.js';
 import { generateLevel, CROSS } from './levelgen.js';
 import { ENEMIES, FORMATION_KINDS } from './enemies.js';
@@ -114,7 +114,6 @@ export class Level {
     this.score = 0;
     this.shakeAmt = 0;
     this.turnAnim = null;
-    this.hintedGates = new Set();
     this.stats = { hits: 0, kills: 0, shots: 0, maxBullets: 0 };
     this.hasBoss = this.bossPending();
     this.say(this.edge.name, 2.2, 'title');
@@ -196,6 +195,11 @@ export class Level {
 
   get playerHalf() {
     return this.small ? { ha: 4, hc: 3, r: 2 } : { ha: 8, hc: 7, r: 3.5 };
+  }
+
+  /** Anteil der Etappe, der geschafft ist (0..1), in aktueller Flugrichtung. */
+  progress() {
+    return clamp(this.camA / Math.max(1, this.L - this.va), 0, 1);
   }
 
   /** Winkel, um den der Renderer die Welt dreht (inkl. Wende-Animation). */
@@ -330,7 +334,6 @@ export class Level {
     if (input.power) this.tryPower();
     if (input.wende) this.tryWende();
     this.spawnEvents();
-    this.gateHints();
 
     this.hazards.length = 0;
     for (const g of this.gates) if (g.blocks) for (const b of g.blocks) if (b.flash) b.flash = Math.max(0, b.flash - dt);
@@ -396,15 +399,17 @@ export class Level {
     const [da, dcv] = screenToLocalVec(this.heading, mx, my);
     const speed = BASE_SPEED * this.char.speed * (1 + 0.22 * this.powers.speed);
 
-    // Längs bewegen, dann quer – jeweils mit Wandprüfung (Gleiten an Wänden).
-    const na = p.a + da * speed * dt;
-    if (!this.wallHit(na, p.c, ha, hc)) p.a = na;
-    const nc = p.c + dcv * speed * dt;
-    if (!this.wallHit(p.a, nc, ha, hc)) p.c = nc;
-    else this.funnel(p, dt, ha, hc);
-
-    // Trichter vor engen Spalten: wenn man winzig ist und fast passt, sanft einrasten.
+    // Trichter vor engen Spalten: wer winzig ist und ungefähr trifft, wird sanft eingelenkt.
     if (this.small) this.funnel(p, dt, ha, hc);
+
+    // Längs bewegen, dann quer. Festes Terrain ist tödlich (wie bei Gradius/Parodius);
+    // die Bewegung in die Wand hinein wird trotzdem nicht ausgeführt.
+    const na = p.a + da * speed * dt;
+    if (this.wallHit(na, p.c, ha, hc)) this.instantDeath();
+    else p.a = na;
+    const nc = p.c + dcv * speed * dt;
+    if (this.wallHit(p.a, nc, ha, hc)) this.instantDeath();
+    else p.c = nc;
 
     const [back, front] = this.margins();
     p.a = clamp(p.a, this.camA + back, this.camA + this.va - front);
@@ -436,7 +441,7 @@ export class Level {
     for (const g of this.gates) {
       if (g.type !== 'narrow') continue;
       const ahead = g.a0 - (p.a + ha);
-      if (ahead > 26 || p.a - ha > g.a1) continue;
+      if (ahead > 70 || p.a - ha > g.a1) continue;
       const d = this.dc(g.gapC, p.c);
       // Trichter: wer winzig ist und ungefähr trifft, wird sanft in die Spalte gelenkt.
       if (Math.abs(d) < FUNNEL && hc <= g.gapW / 2) {
@@ -577,7 +582,6 @@ export class Level {
     this.evIdx = 0;
     this.waves.clear();
     this.hasBoss = this.bossPending();
-    this.hintedGates.clear();
     this.say('Kehrtwende!', 1.2, 'big');
     this.snapshot(); // kein Interpolieren über den Sprung hinweg
   }
@@ -600,18 +604,6 @@ export class Level {
         // Einige Formationsgegner schießen einmal gezielt ("Popcorn mit Biss").
         if (formation && this.diff >= 2 && this.rng.chance(0.08 + 0.06 * this.diff)) e.shootAt = 0.7 + this.rng.next() * 1.2;
       }
-    }
-  }
-
-  gateHints() {
-    const front = this.camA + this.va;
-    for (const g of this.gates) {
-      if (this.hintedGates.has(g) || g.a0 > front + 60 || g.a1 < this.camA) continue;
-      this.hintedGates.add(g);
-      const info = GATES[g.type];
-      const has = this.items.has(info.item);
-      this.say(GATE_HINTS[g.type][has ? 'have' : 'missing'], 4.5, has ? 'hint' : 'warn');
-      if (!has && !info.soft) this.sfx('warn');
     }
   }
 
@@ -811,14 +803,16 @@ export class Level {
               this.sfx('quietsch');
               p.squeak = 0.5;
             }
-          } else this.damage();
+          } else this.instantDeath();
         }
       }
     }
     for (const e of this.enemies) {
       if (e.dead) continue;
       if (dist2(p.a, 0, e.a, this.dc(e.c, p.c)) < (e.r + r) ** 2) {
-        this.damage();
+        // Unzerstörbares (Zahnräder) ist ein fester Gegenstand: sofort tödlich.
+        if (ENEMIES[e.kind].invulnerable) this.instantDeath();
+        else this.damage();
         if (!ENEMIES[e.kind].invulnerable) {
           e.hp -= 2;
           if (e.hp <= 0) this.kill(e, true);
@@ -845,6 +839,35 @@ export class Level {
     }
   }
 
+  /** Berührung mit festem Terrain, Stacheln oder Unzerstörbarem: sofort vorbei (kein Schild, keine Energie). */
+  instantDeath() {
+    const p = this.player;
+    if (this.state === 'dead' || this.state === 'clear') return;
+    if (this.invincible) {
+      if (p.inv <= 0) {
+        this.stats.hits++;
+        this.stats.crashes = (this.stats.crashes || 0) + 1;
+        p.inv = 0.5;
+      }
+      return;
+    }
+    p.hp = 0;
+    this.stats.hits++;
+    this.stats.crashes = (this.stats.crashes || 0) + 1;
+    this.die();
+  }
+
+  die() {
+    const p = this.player;
+    this.state = 'dead';
+    this.timer = 2.2;
+    this.burst(p.a, p.c, '#ffcc66', 30, 140, 4);
+    this.sfx('death');
+    this.shake(8);
+    this.hurtFlash = 0.45;
+    this.say('Autsch!', 2, 'big');
+  }
+
   damage() {
     const p = this.player;
     if (p.inv > 0 || this.state === 'dead') return;
@@ -866,13 +889,7 @@ export class Level {
     // Treffer spürbar machen: kurzer Stillstand (Hit-Stop) und rote Vignette im Renderer
     this.hitStop = 0.08;
     this.hurtFlash = 0.45;
-    if (p.hp <= 0) {
-      this.state = 'dead';
-      this.timer = 2.2;
-      this.burst(p.a, p.c, '#ffcc66', 30, 140, 4);
-      this.sfx('death');
-      this.say('Autsch!', 2, 'big');
-    }
+    if (p.hp <= 0) this.die();
   }
 
   updatePickups(dt) {

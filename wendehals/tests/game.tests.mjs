@@ -48,7 +48,8 @@ test('Drehen auf der Karte nur an Drehscheiben oder mit Drehwurm', () => {
   game.heading = E;
   press(game, { down: true });
   assert.equal(game.heading, E, 'Untertasse hat keine Drehscheibe');
-  assert.ok(game.toasts.length > 0);
+  assert.ok(game.nudgeT > 0, 'Ablehnung wird gezeigt (ohne Text)');
+  assert.ok(game.sfxQueue.includes('nope'));
   game.items.add('DREHWURM');
   press(game, { down: true });
   assert.equal(game.heading, S);
@@ -74,7 +75,7 @@ test('Abflug ins Leere oder gegen die Einbahnstraße wird abgelehnt', () => {
   game.heading = S;
   press(game, { confirm: true });
   assert.equal(game.screen, 'map');
-  assert.ok(game.toasts.some((t) => /Einbahn/.test(t.text)));
+  assert.ok(game.nudgeT > 0);
 });
 
 test('Erstes Level fliegen: Ankunft am Eierbecher', () => {
@@ -218,7 +219,7 @@ test('Item-Dialoge erscheinen nach dem Bossieg', () => {
   flyLevel(game);
   assert.equal(game.node, 'tasse');
   assert.ok(game.items.has('DREHWURM'));
-  assert.equal(game.overlay?.title, 'Neu: Drehwurm');
+  assert.equal(game.overlay?.title, 'Drehwurm');
 });
 
 for (const skill of [false, true]) {
@@ -326,4 +327,56 @@ test('Pause im Todes-Timer hebelt die Todesstrafe nicht aus (Befund Software-Tes
     assert.equal(game.powers.speed, 0, choice);
     assert.equal(game.node, game.progress.saveNode, choice);
   }
+});
+
+test('Power-Ups bleiben über mehrere Etappen erhalten', () => {
+  const { game } = newGame();
+  game.powers.speed = 2;
+  game.powers.laser = true;
+  press(game, { confirm: true });
+  flyLevel(game);
+  closeDialogs(game);
+  assert.equal(game.node, 'eier');
+  press(game, { up: true });
+  press(game, { confirm: true });
+  // Der Autopilot kauft unterwegs weitere Upgrades – erhalten bleibt mindestens der Startstand.
+  assert.equal(game.level.powers, game.powers, 'gleiches Power-Up-Objekt im nächsten Level');
+  assert.ok(game.level.powers.speed >= 2);
+  assert.ok(game.level.powers.laser || game.level.powers.double);
+});
+
+test('Tod: ohne Sparstrumpf ist alles weg, mit Sparstrumpf bleibt die erste Hälfte', async () => {
+  const { freshPowers, activate, powerupsAfterDeath } = await import('../src/game/powerups.js');
+  const buy = (p, i) => {
+    p.cursor = i;
+    activate(p);
+  };
+  const p = freshPowers();
+  buy(p, 0); // Tempo
+  buy(p, 3); // Laser
+  buy(p, 4); // Begleiter
+  buy(p, 0); // Tempo 2
+  buy(p, 5); // Schild
+  assert.deepEqual(powerupsAfterDeath(p, false), freshPowers());
+  const kept = powerupsAfterDeath(p, true);
+  assert.equal(kept.speed, 1, 'erstes Tempo bleibt');
+  assert.equal(kept.laser, true, 'Laser bleibt');
+  assert.equal(kept.options, 0, 'Begleiter (dritter Kauf) ist weg');
+  assert.equal(kept.shield, 0, 'Schild zählt nie');
+  assert.deepEqual(kept.order, [0, 3]);
+});
+
+test('Sparstrumpf wirkt im echten Spiel beim Tod', () => {
+  const { game } = newGame({ invincible: false });
+  game.items.add('SPARSTRUMPF');
+  game.powers.order = [1, 2];
+  game.powers.missile = true;
+  game.powers.double = true;
+  press(game, { confirm: true });
+  game.level.player.hp = 1;
+  game.level.player.inv = 0;
+  game.level.damage();
+  for (let i = 0; i < 400 && game.screen === 'level'; i++) press(game, {});
+  assert.equal(game.powers.missile, true);
+  assert.equal(game.powers.double, false);
 });

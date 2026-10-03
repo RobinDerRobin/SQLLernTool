@@ -237,3 +237,32 @@ test('Wende am Start einer rückwärts geflogenen Boss-Etappe startet keinen Bos
     assert.deepEqual(result.rewards, [], edge.id + ': keine Belohnung von hinten');
   }
 });
+
+test('Fortschritt läuft von 0 bis 1, auch rückwärts und nach einer Kehrtwende', () => {
+  for (const forward of [true, false]) {
+    const lv = new Level({ edge: EDGE_BY_ID.schaumbad, forward, items: new Set(), invincible: true });
+    assert.equal(lv.progress(), 0);
+    let last = 0;
+    runLevel(lv, 200, {
+      check: (l) => {
+        const p = l.progress();
+        assert.ok(p >= last - 1e-9 && p <= 1 + 1e-9);
+        last = p;
+      },
+    });
+    assert.ok(last > 0.999);
+  }
+});
+
+test('Show don\'t tell: Level-Meldungen verraten keine Items und keine Lösungen', async () => {
+  const { ITEMS } = await import('../src/data/items.js');
+  const names = Object.values(ITEMS).map((i) => i.name);
+  for (const edge of EDGES) {
+    const lv = new Level({ edge, forward: true, items: new Set(), invincible: true });
+    const seen = new Set();
+    runLevel(lv, edge.length / 42 + 30, { check: (l) => l.messages.forEach((m) => seen.add(m.text)) });
+    for (const t of seen) for (const n of names) assert.ok(!t.includes(n), `${edge.id}: "${t}" nennt ${n}`);
+  }
+  // Item-Texte enthalten höchstens eine Tastenbelegung
+  for (const [id, it] of Object.entries(ITEMS)) assert.ok(it.desc === '' || /[A-Z] ?\/ ?[A-Z]|Pfeile|\(X\)/.test(it.desc), id + ': ' + it.desc);
+});

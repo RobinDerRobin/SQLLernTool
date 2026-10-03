@@ -9,7 +9,7 @@ export const CROSS = 540; // Periode der Querachse (die Welt "wiederholt" sich q
 export const ROCK_THICK = 26;
 export const NARROW_THICK = 34;
 export const NARROW_GAP = 11;
-export const SPIKE_GAP = 70;
+export const SPIKE_GAP = 76; // Stacheln sind tödlich: Lücke großzügig, Bewegung gemächlich
 export const SPIKE_SPACING = 120;
 export const START_CLEAR = 380;
 
@@ -30,8 +30,8 @@ export function buildGates(edge, rng) {
       const cols = [];
       let base = rng.range(0, CROSS);
       for (let a = a0 + 30; a < a0 + g.len - 10; a += SPIKE_SPACING) {
-        cols.push({ a, base, phase: rng.range(0, Math.PI * 2), amp: rng.range(30, 70), speed: rng.range(0.5, 0.9) });
-        base += rng.range(-90, 90);
+        cols.push({ a, base, phase: rng.range(0, Math.PI * 2), amp: rng.range(20, 50), speed: rng.range(0.4, 0.75) });
+        base += rng.range(-80, 80);
       }
       out.push({ type: 'spikes', a0, a1: a0 + g.len, cols, gap: SPIKE_GAP });
     } else if (g.type === 'dark') {
