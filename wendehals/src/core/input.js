@@ -57,20 +57,22 @@ export class Input {
       if (a) {
         e.preventDefault();
         if (!e.repeat) this.tapped.add(a);
-        this.keys.add(a);
+        this.keys.add(e.code);
         this.usingPad = false;
       }
     });
     target.addEventListener('keyup', (e) => {
       const a = KEYMAP[e.code];
-      if (a) this.keys.delete(a);
+      if (a) this.keys.delete(e.code);
     });
     target.addEventListener('blur', () => this.keys.clear());
   }
 
   poll() {
     const held = {};
-    for (const a of ACTIONS) held[a] = this.keys.has(a) || this.tapped.has(a);
+    // Tasten werden als Codes gemerkt: Pfeil hoch halten und W loslassen beendet "hoch" nicht.
+    for (const a of ACTIONS) held[a] = this.tapped.has(a);
+    for (const code of this.keys) held[KEYMAP[code]] = true;
     // Jedes neue keydown (ohne Wiederholung) zählt als frischer Druck.
     for (const a of this.tapped) this.prev[a] = false;
     this.tapped.clear();
@@ -93,12 +95,16 @@ export class Input {
         mx = ax;
         my = ay;
         this.usingPad = true;
-        // Stick auch für Menüs: als Richtungstaste werten (mit Hysterese)
-        held.left = held.left || ax < -0.6;
-        held.right = held.right || ax > 0.6;
-        held.up = held.up || ay < -0.6;
-        held.down = held.down || ay > 0.6;
-      } else if (held.left || held.right || held.up || held.down) {
+      }
+      // Stick auch für Menüs: als Richtungstaste werten, mit Hysterese (an ab 0,6, aus unter 0,4),
+      // damit ein leicht driftender Stick (Steam Deck) keine Flut von Menüschritten erzeugt.
+      const l = this.stickLatch;
+      l.left = ax < -0.6 || (l.left && ax < -0.4);
+      l.right = ax > 0.6 || (l.right && ax > 0.4);
+      l.up = ay < -0.6 || (l.up && ay < -0.4);
+      l.down = ay > 0.6 || (l.down && ay > 0.4);
+      for (const d of ['left', 'right', 'up', 'down']) if (l[d]) held[d] = true;
+      if (Math.hypot(ax, ay) <= DEADZONE && (held.left || held.right || held.up || held.down)) {
         mx = (held.right ? 1 : 0) - (held.left ? 1 : 0);
         my = (held.down ? 1 : 0) - (held.up ? 1 : 0);
       }

@@ -125,6 +125,15 @@ export class Game {
       { label: 'Musik', kind: 'slider', get: () => s.music, set: (v) => (s.music = v) },
       { label: 'Effekte', kind: 'slider', get: () => s.sfx, set: (v) => (s.sfx = v) },
       { label: 'Bildschirmwackeln', kind: 'toggle', get: () => s.shake, set: (v) => (s.shake = v) },
+      {
+        label: 'Reduzierte Effekte',
+        kind: 'toggle',
+        get: () => s.reducedEffects,
+        set: (v) => {
+          s.reducedEffects = v;
+          if (v) s.shake = false;
+        },
+      },
     ];
     if (this.platform.setFullscreen) {
       items.push({
@@ -344,10 +353,12 @@ export class Game {
     });
     this.screen = 'level';
     this.screenTime = 0;
+    this.toasts = []; // Karten-Hinweise gehören nicht ins Level
     this.sfx('launch');
   }
 
   abortLevel() {
+    if (this.level && this.level.state === 'dead') return this.returnToStation(true);
     this.level = null;
     this.overlay = null;
     this.node = this.levelOrigin.node;
@@ -357,6 +368,7 @@ export class Game {
   }
 
   returnToStation(died) {
+    if (!died && this.level && this.level.state === 'dead') died = true;
     this.level = null;
     this.overlay = null;
     this.node = this.progress.saveNode;
@@ -492,7 +504,8 @@ export class Game {
   }
 
   updateLevel(dt, input) {
-    if (input.pause) return this.openPause();
+    // Während des Absturzes keine Pause: sonst ließe sich die Todesstrafe per Menü umgehen.
+    if (input.pause && this.level.state !== 'dead') return this.openPause();
     const lv = this.level;
     lv.update(dt, { mx: input.mx, my: input.my, fire: input.fire, power: input.power, wende: input.wende });
     for (const s of lv.sfxQueue) this.sfxQueue.push(s);

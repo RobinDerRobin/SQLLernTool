@@ -40,7 +40,7 @@ export const BOSSES = {
   kaffeekanne: {
     name: 'Graf Kaffeekanne',
     title: 'Der Graf ist übergekocht!',
-    hp: 70,
+    hp: 55,
     r: 30,
     update(b, lv, dt) {
       b.a = b.homeA + 10 * Math.sin(b.t * 1.3);
@@ -79,7 +79,7 @@ export const BOSSES = {
   walross: {
     name: 'Admiral Walross',
     title: 'Ahoi, du Landratte!',
-    hp: 80,
+    hp: 62,
     r: 34,
     update(b, lv, dt) {
       b.a = b.homeA;
@@ -98,7 +98,7 @@ export const BOSSES = {
     },
     /** Nur der Kopf ist verwundbar, die Wanne schluckt Schüsse. */
     hitTest(b, s) {
-      if (dist2(b.a - 12, b.c - 22, s.a, s.c) < (13 + s.r) ** 2) return 'hit';
+      if (dist2(b.a - 12, b.c - 22, s.a, s.c) < (19 + s.r) ** 2) return 'hit';
       if (dist2(b.a, b.c, s.a, s.c) < (b.r + s.r) ** 2) return 'block';
       return null;
     },
@@ -107,7 +107,7 @@ export const BOSSES = {
   kartoffel: {
     name: 'Kaiser Kartoffel',
     title: 'Ich bin hier der Knollenkaiser!',
-    hp: 110,
+    hp: 85,
     r: 30,
     update(b, lv, dt) {
       b.a = b.homeA + 18 * Math.sin(b.t * 0.9);
@@ -158,7 +158,7 @@ export const BOSSES = {
   diva: {
     name: 'Diskokugel-Diva',
     title: 'Darling, das ist MEINE Tanzfläche!',
-    hp: 120,
+    hp: 92,
     r: 28,
     update(b, lv, dt) {
       b.a = b.homeA - 20 + 22 * Math.sin(b.t * 1.4);
@@ -188,7 +188,7 @@ export const BOSSES = {
   wecker: {
     name: 'Der Große Wecker',
     title: 'Es ist höchste Zeit!',
-    hp: 160,
+    hp: 125,
     r: 36,
     update(b, lv, dt) {
       b.a = b.homeA - 10;

@@ -141,3 +141,42 @@ test('jeder ausgelöste Soundeffekt hat einen Klang', () => {
   assert.ok(names.size > 15);
   for (const n of names) assert.ok(audioSrc.includes(`case '${n}'`), `Sound "${n}" fehlt`);
 });
+
+test('Stachelreihen: keine Zacke ragt in die Lücke (Regression Renderfehler)', async () => {
+  const { drawSpikeColumn } = await import('../src/render/renderer.js');
+  for (const vc of [270, 480]) {
+    for (let gy = -60; gy <= vc + 60; gy += 7) {
+      const half = 35;
+      const ys = [];
+      const rec = {
+        fillRect: (x, y, w, h) => ys.push(y, y + h),
+        moveTo: (x, y) => ys.push(y),
+        lineTo: (x, y) => ys.push(y),
+        beginPath() {},
+        fill() {},
+        stroke() {},
+        setLineDash() {},
+        fillStyle: '',
+        strokeStyle: '',
+      };
+      // Markierungslinie in der Lücke ignorieren: nur Zacken und Balken prüfen
+      rec.stroke = () => ys.splice(ys.length - 2, 2);
+      drawSpikeColumn(rec, 100, gy, half, 540, vc);
+      for (const y of ys) {
+        for (const g of [gy - 540, gy, gy + 540]) {
+          assert.ok(!(y > g - half + 0.01 && y < g + half - 0.01), `Zacke bei ${y.toFixed(1)} liegt in der Lücke um ${g}`);
+        }
+      }
+    }
+  }
+});
+
+test('Blitz-Zählung erkennt Stroboskop und lässt sanftes Pulsieren durch', async () => {
+  const { countFlashes } = await import('../e2e/flashcount.mjs');
+  const strobe = Array.from({ length: 60 }, (_, i) => (Math.floor(i / 5) % 2 ? 0.6 : 0.05)); // 6 Hz
+  assert.ok(countFlashes(strobe) >= 5);
+  const gentle = Array.from({ length: 60 }, (_, i) => 0.3 + 0.03 * Math.sin(i / 3));
+  assert.equal(countFlashes(gentle), 0);
+  const twoHz = Array.from({ length: 60 }, (_, i) => 0.3 + 0.2 * Math.sin((i / 60) * Math.PI * 4));
+  assert.ok(countFlashes(twoHz) <= 2);
+});

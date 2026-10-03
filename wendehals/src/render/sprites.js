@@ -3,6 +3,7 @@
 // Weil der Renderer die ganze Welt dreht, drehen sich alle Figuren automatisch mit.
 
 const TAU = Math.PI * 2;
+const DISCO5 = ['#ff4fb0', '#4fd0ff', '#ffe14d', '#ffffff', '#b04fff'];
 
 export function circle(ctx, x, y, r, fill, stroke, lw = 1) {
   ctx.beginPath();
@@ -197,6 +198,9 @@ export function drawShot(ctx, s, charId) {
     rrect(ctx, -3.5, -3.5, 7, 7, 2, '#e5b46a', '#9b6a2a', 0.7);
   } else {
     ctx.rotate(s.t * 18);
+    // Knochen mit dunklem Rand, damit er auch auf hellem Hintergrund sichtbar bleibt
+    rrect(ctx, -4.8, -2, 9.6, 4, 1.5, '#5a3a20');
+    for (const x of [-4, 4]) for (const y of [-1.5, 1.5]) circle(ctx, x, y, 2.2, '#5a3a20');
     rrect(ctx, -4, -1.2, 8, 2.4, 1, '#fbf6e8');
     for (const x of [-4, 4]) for (const y of [-1.5, 1.5]) circle(ctx, x, y, 1.4, '#fbf6e8');
   }
@@ -255,7 +259,6 @@ export function drawBullet(ctx, b, t) {
 // --------------------------------------------------------------- Gegner
 export function drawEnemy(ctx, e, t) {
   ctx.save();
-  if (e.flash > 0) ctx.filter = 'brightness(2.5)';
   switch (e.kind) {
     case 'toast':
       ctx.rotate(Math.sin(t * 6 + e.idx) * 0.2);
@@ -377,13 +380,15 @@ export function drawEnemy(ctx, e, t) {
       break;
     case 'discokugel':
       circle(ctx, 0, 0, 12, '#c0c8d8', '#555', 0.8);
-      for (let i = 0; i < 12; i++) {
-        const a = i * 0.52 + t;
-        const x = Math.cos(a) * 7;
-        const y = Math.sin(a * 1.3) * 7;
-        ctx.fillStyle = ['#ff4fb0', '#4fd0ff', '#ffe14d', '#ffffff'][i % 4];
-        ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
-      }
+      DISCO5.slice(0, 4).forEach((col, k) => {
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        for (let i = k; i < 12; i += 4) {
+          const a = i * 0.52 + t;
+          ctx.rect(Math.cos(a) * 7 - 1.5, Math.sin(a * 1.3) * 7 - 1.5, 3, 3);
+        }
+        ctx.fill();
+      });
       rrect(ctx, -8, -4, 16, 4, 2, '#111'); // Sonnenbrille
       break;
     case 'wurst':
@@ -497,7 +502,6 @@ export function drawCapsule(ctx, t) {
 // ---------------------------------------------------------------- Bosse
 export function drawBoss(ctx, b, t) {
   ctx.save();
-  if (b.flash > 0) ctx.filter = 'brightness(2.2)';
   const angry = !!b.angry;
   switch (b.kind) {
     case 'kaffeekanne': {
@@ -629,14 +633,17 @@ export function drawBoss(ctx, b, t) {
     }
     case 'diva': {
       circle(ctx, 0, 0, 28, '#c0c8d8', '#555', 1.5);
-      for (let i = 0; i < 40; i++) {
-        const a = i * 0.7 + t * 0.8;
-        const rr = 6 + (i % 5) * 4.5;
-        const x = Math.cos(a) * rr;
-        const y = Math.sin(a) * rr;
-        ctx.fillStyle = ['#ff4fb0', '#4fd0ff', '#ffe14d', '#ffffff', '#b04fff'][i % 5];
-        ctx.fillRect(x - 2, y - 2, 4, 4);
-      }
+      // Spiegelplättchen: pro Farbe ein Pfad statt 40 Einzelrechtecke mit Farbwechsel
+      DISCO5.forEach((col, k) => {
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        for (let i = k; i < 40; i += 5) {
+          const a = i * 0.7 + t * 0.8;
+          const rr = 6 + (i % 5) * 4.5;
+          ctx.rect(Math.cos(a) * rr - 2, Math.sin(a) * rr - 2, 4, 4);
+        }
+        ctx.fill();
+      });
       // Diva-Gesicht: Sonnenbrille, Lippenstift, Perücke
       ctx.fillStyle = '#ff4fb0';
       ctx.beginPath();

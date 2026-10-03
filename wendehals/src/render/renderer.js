@@ -24,6 +24,7 @@ import {
   drawGear,
   drawDackel,
 } from './sprites.js';
+import { cached, fillTiled, fillTiledScreen, drawWithFlash } from './canvas.js';
 
 const FONT = "'Trebuchet MS', 'Segoe UI', 'DejaVu Sans', Verdana, sans-serif";
 const W = SCREEN_W;
@@ -68,13 +69,155 @@ function panel(ctx, x, y, w, h, alpha = 0.88) {
   rrect(ctx, x, y, w, h, 8, `rgba(28,18,44,${alpha})`, '#ffd34d', 1.5);
 }
 
+/**
+ * Eine Stachelreihe quer zur Flugrichtung mit einer Lücke bei gy (periodisch mit H).
+ * Die Zacken sind an den Lückenkanten verankert und füllen jedes Stück exakt aus –
+ * so ragt nichts in die Lücke, und Optik und Kollision stimmen überein.
+ */
+export function drawSpikeColumn(ctx, x, gy, half, H, vc) {
+  const lo = -20;
+  const hi = vc + 20;
+  for (let k = -1; k <= 0; k++) {
+    const start = gy + k * H + half; // Ende einer Lücke
+    const end = gy + (k + 1) * H - half; // Anfang der nächsten Lücke
+    const s0 = Math.max(start, lo);
+    const s1 = Math.min(end, hi);
+    if (s1 <= s0) continue;
+    const n = Math.max(1, Math.round((end - start) / 8));
+    const step = (end - start) / n;
+    ctx.fillStyle = '#5a4a6a';
+    ctx.fillRect(x - 2, s0, 4, s1 - s0);
+    ctx.fillStyle = '#dfe6f0';
+    ctx.beginPath();
+    const first = Math.max(0, Math.floor((s0 - start) / step));
+    for (let i = first; i < n; i++) {
+      const y = start + i * step;
+      if (y > s1) break;
+      ctx.moveTo(x - 2, y);
+      ctx.lineTo(x - 8, y + step / 2);
+      ctx.lineTo(x - 2, y + step);
+      ctx.moveTo(x + 2, y);
+      ctx.lineTo(x + 8, y + step / 2);
+      ctx.lineTo(x + 2, y + step);
+    }
+    ctx.fill();
+  }
+  // Lücke dezent markieren
+  ctx.strokeStyle = 'rgba(120,255,140,0.6)';
+  ctx.setLineDash([2, 3]);
+  ctx.beginPath();
+  ctx.moveTo(x, gy - half + 2);
+  ctx.lineTo(x, gy + half - 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+/**
+ * Kugeln als vorgerenderte Bilder: viele gleiche, kleine Objekte – drawImage ist deutlich
+ * günstiger als Kreise mit Transparenz. Drehung (Zucker, Pommes) per Transformation.
+ */
+const ROTATING_BULLETS = { zucker: 'spin', pommes: 'velocity' };
+function drawBulletCached(ctx, b, t) {
+  const r = b.r || 3;
+  const size = Math.ceil(r * 2 + 12);
+  const img = cached('bullet:' + b.kind + ':' + r, size, size, 3, (c) => {
+    c.translate(size / 2, size / 2);
+    // Dunkler Hof: Gegnerkugeln heben sich auf jedem Hintergrund ab (auch auf hellem Karo)
+    c.fillStyle = 'rgba(30,10,40,0.55)';
+    c.beginPath();
+    c.arc(0, 0, r + 3.5, 0, Math.PI * 2);
+    c.fill();
+    drawBullet(c, { kind: b.kind, r, va: 1, vc: 0 }, 0);
+  });
+  if (!img) return drawBullet(ctx, b, t);
+  const rot = ROTATING_BULLETS[b.kind];
+  // Runde Kugeln aufrecht (achsenparallel) zeichnen: gedrehte Bilder sind teuer zu rastern.
+  if (!rot && typeof ctx.getTransform === 'function') {
+    const m = ctx.getTransform();
+    const sc = Math.hypot(m.a, m.b);
+    ctx.setTransform(sc, 0, 0, sc, m.e, m.f);
+  } else if (rot === 'spin') ctx.rotate(t * 5);
+  else if (rot === 'velocity') ctx.rotate(Math.atan2(b.vc, b.va));
+  ctx.drawImage(img.canvas, -size / 2, -size / 2, size, size);
+}
+
+/** Vorgerenderte, kachelbare Grundmuster der Gebiete. */
+function backgroundTile(pattern) {
+  switch (pattern) {
+    case 'tischdecke': {
+      const e = cached('bg:tischdecke', 64, 64, 2, (c) => {
+        c.fillStyle = 'rgba(208,69,58,0.22)';
+        c.fillRect(0, 0, 32, 32);
+        c.fillRect(32, 32, 32, 32);
+      });
+      if (e) e.parallax = 0.5;
+      return e;
+    }
+    case 'fliesen': {
+      const e = cached('bg:fliesen', 28, 28, 2, (c) => {
+        c.strokeStyle = 'rgba(255,255,255,0.45)';
+        c.lineWidth = 1.5;
+        c.beginPath();
+        c.moveTo(0.75, 0);
+        c.lineTo(0.75, 28);
+        c.moveTo(0, 0.75);
+        c.lineTo(28, 0.75);
+        c.stroke();
+      });
+      if (e) e.parallax = 0.5;
+      return e;
+    }
+    case 'ziegel': {
+      const e = cached('bg:ziegel', 34, 28, 2, (c) => {
+        c.strokeStyle = 'rgba(0,0,0,0.35)';
+        c.lineWidth = 1;
+        c.fillStyle = 'rgba(120,80,90,0.25)';
+        for (const [x, y] of [[0, 0], [-17, 14], [17, 14]]) {
+          c.fillRect(x + 1, y + 1, 32, 12);
+          c.strokeRect(x + 1, y + 1, 32, 12);
+        }
+      });
+      if (e) e.parallax = 0.5;
+      return e;
+    }
+    case 'tanzboden': {
+      const e = cached('bg:tanzboden', 40, 40, 2, (c) => {
+        c.fillStyle = 'rgba(255,255,255,0.04)';
+        c.fillRect(2, 2, 36, 36);
+      });
+      if (e) e.parallax = 0.6;
+      return e;
+    }
+    default:
+      return null;
+  }
+}
+
+/** Dunkelmaske: einmal gerendert, danach nur noch verschoben (statt Verlauf in jedem Frame). */
+function darknessMask(radius) {
+  const r = Math.round(radius / 10) * 10;
+  const w = W * 2 + r * 2;
+  const h = H * 2 + r * 2;
+  return cached('dark' + r, w, h, 0.5, (c) => {
+    const g = c.createRadialGradient(w / 2, h / 2, r * 0.45, w / 2, h / 2, r);
+    g.addColorStop(0, 'rgba(5,3,10,0)');
+    g.addColorStop(1, 'rgba(5,3,10,0.96)');
+    c.fillStyle = g;
+    c.fillRect(0, 0, w, h);
+  });
+}
+
 export class Renderer {
   constructor(ctx) {
     this.ctx = ctx;
   }
 
-  draw(game) {
+  draw(game, alpha = 1) {
     const ctx = this.ctx;
+    this.alpha = alpha;
+    this.devW = ctx.canvas ? ctx.canvas.width : 2000;
+    this.devH = ctx.canvas ? ctx.canvas.height : 2000;
+    this.reducedEffects = !!game.settings.reducedEffects;
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, 0, W, H);
@@ -118,32 +261,44 @@ export class Renderer {
     ctx.rotate(ang);
     ctx.translate(-lv.va / 2, -lv.vc / 2);
     this.lv = lv;
+    this.setCamera(lv);
     // Etwas größer zeichnen, damit bei der Drehanimation keine Ränder sichtbar werden
     const pad = lv.turnAnim ? 140 : 0;
     this.drawBackground(theme, lv, t, pad);
     this.drawGates(lv, t);
     for (const pk of lv.pickups) this.at(pk.a, pk.c, () => drawCapsule(ctx, pk.t));
-    for (const e of lv.enemies) this.at(e.a, e.c, () => drawEnemy(ctx, e, t));
+    for (const e of lv.enemies) {
+      this.atObj(e, () => {
+        if (e.flash > 0) drawWithFlash(ctx, e.r + 6, 0.8, (c) => drawEnemy(c, e, t));
+        else drawEnemy(ctx, e, t);
+      });
+    }
     if (lv.boss) {
       const kind = lv.boss.kind;
       for (const h of lv.hazards) this.at(h.a, h.c, () => drawHazard(ctx, h, t, kind));
-      this.at(lv.boss.a, lv.boss.c, () => drawBoss(ctx, lv.boss, t));
+      const b = lv.boss;
+      this.atObj(b, () => {
+        if (b.flash > 0) drawWithFlash(ctx, b.r + 24, 0.6, (c) => drawBoss(c, b, t));
+        else drawBoss(ctx, b, t);
+      });
     }
-    for (const s of lv.shots) this.at(s.a, s.c, () => drawShot(ctx, s, lv.charId));
-    for (const b of lv.bullets) this.at(b.a, b.c, () => drawBullet(ctx, b, t));
+    for (const s of lv.shots) this.atObj(s, () => drawShot(ctx, s, lv.charId));
+    for (const b of lv.bullets) this.atObj(b, () => drawBulletCached(ctx, b, t));
     const p = lv.player;
     if (lv.state !== 'dead') {
       for (const [oa, oc] of lv.optionPositions()) this.at(oa, oc, () => drawOption(ctx, lv.charId, t));
-      this.at(p.a, p.c, () => {
+      this.atObj(p, () => {
         if (lv.powers.shield > 0) {
           circle(ctx, 0, 0, lv.small ? 9 : 16, `rgba(90,200,255,${0.15 + 0.08 * lv.powers.shield})`, 'rgba(160,230,255,0.8)', 1);
         }
+        const spin = lv.playerSpin();
+        if (spin) ctx.rotate(spin);
         drawPlayer(ctx, lv.charId, t, lv.small, p.inv);
       });
     }
     for (const pt of lv.particles) {
       const k = 1 - pt.t / pt.life;
-      this.at(pt.a, pt.c, () => {
+      this.atObj(pt, () => {
         ctx.globalAlpha = Math.max(0, k);
         ctx.fillStyle = pt.color;
         ctx.fillRect(-pt.size / 2, -pt.size / 2, pt.size, pt.size);
@@ -154,6 +309,7 @@ export class Renderer {
     ctx.restore();
 
     this.drawDarkness(game, lv);
+    if (lv.hurtFlash > 0) this.drawHurtVignette(lv.hurtFlash / 0.45);
     for (const pp of lv.popups) {
       const [sx, sy] = this.toScreen(lv, pp.a, pp.c);
       text(ctx, pp.text, sx, sy - pp.t * 20, 9, '#fff3a0');
@@ -161,8 +317,27 @@ export class Renderer {
     this.drawHud(game, lv);
   }
 
+  /** Kamera zwischen zwei Simulationsschritten interpolieren. */
+  setCamera(lv) {
+    const k = this.alpha;
+    this.camA = lv.turnAnim ? lv.displayCamA() : lv.pCamA === undefined ? lv.camA : lv.pCamA + (lv.camA - lv.pCamA) * k;
+    this.camC = lv.pCamC === undefined ? lv.camC : lv.pCamC + wrapDelta(lv.camC - lv.pCamC, lv.H) * k;
+  }
+
   viewPos(lv, a, c) {
-    return [a - lv.camA, wrapDelta(c - lv.camC - lv.vc / 2, lv.H) + lv.vc / 2];
+    return [a - this.camA, wrapDelta(c - this.camC - lv.vc / 2, lv.H) + lv.vc / 2];
+  }
+
+  /** Interpolierte Position eines Objekts mit a/c (und optional pa/pc vom letzten Schritt). */
+  ipos(o) {
+    if (o.pa === undefined) return [o.a, o.c];
+    const k = this.alpha;
+    return [o.pa + (o.a - o.pa) * k, o.pc + wrapDelta(o.c - o.pc, this.lv.H) * k];
+  }
+
+  atObj(o, fn) {
+    const [a, c] = this.ipos(o);
+    this.at(a, c, fn);
   }
 
   at(a, c, fn) {
@@ -194,118 +369,105 @@ export class Renderer {
     ctx.fillStyle = theme.bg[0];
     ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
     const mod = (v, m) => ((v % m) + m) % m;
+    // Grundmuster als vorgerenderte Kachel (eine Füllung statt hunderter Einzelrechtecke)
+    const tile = backgroundTile(theme.pattern);
+    if (tile) {
+      const ox = this.camA * tile.parallax;
+      const oy = this.camC * tile.parallax;
+      const quarter = lv.turnAnim ? -1 : lv.heading;
+      // Achsenparallel füllen, wenn die Welt genau um 0/90/180/270° gedreht ist
+      const ok =
+        quarter >= 0 &&
+        fillTiledScreen(ctx, tile, quarter, -(((ox % tile.w) + tile.w) % tile.w), -(((oy % tile.h) + tile.h) % tile.h), this.devW, this.devH);
+      if (!ok) fillTiled(ctx, tile, ox, oy, x0, y0, x1, y1);
+    }
     switch (theme.pattern) {
       case 'tischdecke': {
-        const s = 32;
-        const ox = mod(lv.camA * 0.5, s * 2);
-        const oy = mod(lv.camC * 0.5, s * 2);
-        ctx.fillStyle = 'rgba(208,69,58,0.22)';
-        for (let x = x0 - ox - s * 2; x < x1; x += s) {
-          for (let y = y0 - oy - s * 2; y < y1; y += s) {
-            const ix = Math.round((x + ox) / s);
-            const iy = Math.round((y + oy) / s);
-            if ((ix + iy) % 2 === 0) ctx.fillRect(x, y, s, s);
-          }
-        }
         // Krümel im Vordergrund
         ctx.fillStyle = 'rgba(160,100,40,0.5)';
         for (let i = 0; i < 40; i++) {
-          const x = mod(i * 97 - lv.camA, va + 200) - 100;
-          const y = mod(i * 61 - lv.camC, vc + 100) - 50;
+          const x = mod(i * 97 - this.camA, va + 200) - 100;
+          const y = mod(i * 61 - this.camC, vc + 100) - 50;
           ctx.fillRect(x, y, 2 + (i % 3), 2);
         }
         break;
       }
       case 'fliesen': {
-        const s = 28;
-        const ox = mod(lv.camA * 0.5, s);
-        const oy = mod(lv.camC * 0.5, s);
-        ctx.strokeStyle = 'rgba(255,255,255,0.45)';
-        ctx.lineWidth = 1.5;
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+        ctx.lineWidth = 0.8;
         ctx.beginPath();
-        for (let x = x0 - ox; x < x1; x += s) {
-          ctx.moveTo(x, y0);
-          ctx.lineTo(x, y1);
-        }
-        for (let y = y0 - oy; y < y1; y += s) {
-          ctx.moveTo(x0, y);
-          ctx.lineTo(x1, y);
-        }
-        ctx.stroke();
         for (let i = 0; i < 18; i++) {
-          const x = mod(i * 131 - lv.camA * 0.8, va + 100) - 50;
-          const y = mod(i * 47 - lv.camC * 0.8 - t * (10 + (i % 4) * 6), vc + 60) - 30;
-          circle(ctx, x, y, 2 + (i % 4), 'rgba(255,255,255,0.18)', 'rgba(255,255,255,0.6)', 0.8);
+          const x = mod(i * 131 - this.camA * 0.8, va + 100) - 50;
+          const y = mod(i * 47 - this.camC * 0.8 - t * (10 + (i % 4) * 6), vc + 60) - 30;
+          const r = 2 + (i % 4);
+          ctx.moveTo(x + r, y);
+          ctx.arc(x, y, r, 0, Math.PI * 2);
         }
+        ctx.fill();
+        ctx.stroke();
         break;
       }
       case 'ziegel': {
-        const bw = 34;
-        const bh = 14;
-        const ox = mod(lv.camA * 0.5, bw);
-        const oy = mod(lv.camC * 0.5, bh * 2);
-        ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-        ctx.lineWidth = 1;
-        ctx.fillStyle = 'rgba(120,80,90,0.25)';
-        for (let y = y0 - oy - bh * 2; y < y1; y += bh) {
-          const row = Math.round((y + oy) / bh);
-          const shift = row % 2 ? bw / 2 : 0;
-          for (let x = x0 - ox - bw * 2 + shift; x < x1; x += bw) {
-            ctx.fillRect(x + 1, y + 1, bw - 2, bh - 2);
-            ctx.strokeRect(x + 1, y + 1, bw - 2, bh - 2);
-          }
-        }
         ctx.strokeStyle = 'rgba(220,220,230,0.25)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
         for (let i = 0; i < 6; i++) {
-          const x = mod(i * 173 - lv.camA * 0.9, va + 120) - 60;
-          const y = mod(i * 89 - lv.camC * 0.9, vc + 80) - 40;
+          const x = mod(i * 173 - this.camA * 0.9, va + 120) - 60;
+          const y = mod(i * 89 - this.camC * 0.9, vc + 80) - 40;
           for (let k = 0; k < 6; k++) {
-            ctx.beginPath();
             ctx.moveTo(x, y);
             ctx.lineTo(x + Math.cos(k) * 22, y + Math.sin(k) * 22);
-            ctx.stroke();
           }
-          ctx.beginPath();
+          ctx.moveTo(x + 10, y);
           ctx.arc(x, y, 10, 0, Math.PI * 2);
-          ctx.stroke();
         }
+        ctx.stroke();
         break;
       }
       case 'tanzboden': {
+        // Dezent: wenige Felder, sanftes Ein- und Ausblenden, höchstens 2 Wechsel pro Sekunde.
+        if (this.reducedEffects) break;
         const s = 40;
-        const ox = mod(lv.camA * 0.6, s);
-        const oy = mod(lv.camC * 0.6, s);
+        const ox = this.camA * 0.6;
+        const oy = this.camC * 0.6;
         const cols = ['#ff4fb0', '#4fd0ff', '#ffe14d', '#b04fff'];
-        for (let x = x0 - ox - s; x < x1; x += s) {
-          for (let y = y0 - oy - s; y < y1; y += s) {
-            const ix = Math.round((x + ox + lv.camA * 0.6) / s);
-            const iy = Math.round((y + oy + lv.camC * 0.6) / s);
-            const on = (ix * 7 + iy * 13 + Math.floor(t * 4)) % 5 === 0;
-            ctx.fillStyle = on ? cols[(ix + iy) & 3] : 'rgba(255,255,255,0.04)';
-            ctx.globalAlpha = on ? 0.35 : 1;
-            ctx.fillRect(x + 2, y + 2, s - 4, s - 4);
+        const beat = Math.floor(t * 2);
+        const fade = 0.5 - 0.5 * Math.cos((t * 2 - beat) * Math.PI * 2);
+        for (let x = -mod(ox, s) - s; x < x1; x += s) {
+          for (let y = -mod(oy, s) - s; y < y1; y += s) {
+            const ix = Math.round((x + ox) / s);
+            const iy = Math.round((y + oy) / s);
+            if ((((ix * 7 + iy * 13 + beat) % 9) + 9) % 9 !== 0) continue;
+            ctx.globalAlpha = 0.14 * fade;
+            ctx.fillStyle = cols[(ix + iy) & 3];
+            ctx.fillRect(x + 3, y + 3, s - 6, s - 6);
           }
         }
         ctx.globalAlpha = 1;
         break;
       }
       case 'zahnraeder': {
+        ctx.fillStyle = 'rgba(255,255,220,0.6)';
         for (let i = 0; i < 50; i++) {
-          const x = mod(i * 113 - lv.camA * 0.2, va + 40) - 20;
-          const y = mod(i * 71 - lv.camC * 0.2, vc + 40) - 20;
-          const tw = 0.5 + 0.5 * Math.sin(t * 3 + i);
-          ctx.fillStyle = `rgba(255,255,220,${0.3 + 0.5 * tw})`;
-          ctx.fillRect(x, y, 1.5, 1.5);
+          const x = mod(i * 113 - this.camA * 0.2, va + 40) - 20;
+          const y = mod(i * 71 - this.camC * 0.2, vc + 40) - 20;
+          ctx.fillRect(x, y, i % 3 ? 1.5 : 2, i % 3 ? 1.5 : 2);
         }
         for (let i = 0; i < 5; i++) {
-          const x = mod(i * 211 - lv.camA * 0.45, va + 240) - 120;
-          const y = mod(i * 157 - lv.camC * 0.45, vc + 200) - 100;
-          ctx.globalAlpha = 0.25;
+          const x = mod(i * 211 - this.camA * 0.45, va + 240) - 120;
+          const y = mod(i * 157 - this.camC * 0.45, vc + 200) - 100;
+          const r = 40 + (i % 3) * 15;
+          const gear = cached('bggear' + r, r * 2 + 4, r * 2 + 4, 2, (c) => {
+            c.translate(r + 2, r + 2);
+            c.globalAlpha = 0.25;
+            drawGear(c, r, 12, 0, '#c9a85a', '#7a6a3a');
+          });
           ctx.save();
           ctx.translate(x, y);
-          drawGear(ctx, 40 + (i % 3) * 15, 12, t * (i % 2 ? 0.3 : -0.3), '#c9a85a', '#7a6a3a');
+          ctx.rotate(t * (i % 2 ? 0.3 : -0.3));
+          if (gear) ctx.drawImage(gear.canvas, -r - 2, -r - 2, r * 2 + 4, r * 2 + 4);
           ctx.restore();
-          ctx.globalAlpha = 1;
         }
         break;
       }
@@ -315,8 +477,8 @@ export class Renderer {
   drawGates(lv, t) {
     const ctx = this.ctx;
     for (const g of lv.gates) {
-      const x0 = g.a0 - lv.camA;
-      const x1 = g.a1 - lv.camA;
+      const x0 = g.a0 - this.camA;
+      const x1 = g.a1 - this.camA;
       if (x1 < -60 || x0 > lv.va + 60) continue;
       if (g.type === 'rock') {
         for (const b of g.blocks) {
@@ -326,8 +488,7 @@ export class Renderer {
           const h = b.c1 - b.c0;
           if (y < -h || y > lv.vc + h) continue;
           ctx.save();
-          if (b.flash > 0) ctx.filter = 'brightness(1.8)';
-          rrect(ctx, x0, y - h / 2 + 0.5, x1 - x0, h - 1, 4, '#8a6a4a', '#4a3420', 1.2);
+          rrect(ctx, x0, y - h / 2 + 0.5, x1 - x0, h - 1, 4, b.flash > 0 ? '#d8b896' : '#8a6a4a', '#4a3420', 1.2);
           ctx.fillStyle = 'rgba(255,255,255,0.12)';
           ctx.fillRect(x0 + 3, y - h / 2 + 3, x1 - x0 - 6, 3);
           ctx.strokeStyle = '#3a2410';
@@ -366,47 +527,25 @@ export class Renderer {
             circle(ctx, x1 - 5, y, 1.3, '#c0c8d0');
           }
         }
-        // Warnstreifen an der Lücke
+        // Warnstreifen an der Lücke und ein sichtbarer Einlauf (Trichter) davor
         const glow = 0.5 + 0.5 * Math.sin(t * 6);
         ctx.fillStyle = `rgba(255,220,60,${0.6 + 0.4 * glow})`;
         ctx.fillRect(x0, gy - half - 3, x1 - x0, 3);
         ctx.fillRect(x0, gy + half, x1 - x0, 3);
+        ctx.strokeStyle = 'rgba(255,220,60,0.55)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x0 - 26, gy - 30);
+        ctx.lineTo(x0, gy - half);
+        ctx.moveTo(x0 - 26, gy + 30);
+        ctx.lineTo(x0, gy + half);
+        ctx.stroke();
       } else if (g.type === 'spikes') {
         for (const col of g.cols) {
-          const x = col.a - lv.camA;
+          const x = col.a - this.camA;
           if (x < -20 || x > lv.va + 20) continue;
-          const gap = lv.spikeGapAt(col);
-          const [, gy] = this.viewPos(lv, col.a, gap);
-          const half = g.gap / 2;
-          ctx.fillStyle = 'rgba(80,60,90,0.7)';
-          for (const [ya, yb] of [
-            [gy - lv.H + half, gy - half],
-            [gy + half, gy + lv.H - half],
-          ]) {
-            const top = Math.max(ya, -20);
-            const bot = Math.min(yb, lv.vc + 20);
-            if (bot <= top) continue;
-            ctx.fillStyle = '#5a4a6a';
-            ctx.fillRect(x - 2, top, 4, bot - top);
-            ctx.fillStyle = '#dfe6f0';
-            for (let y = top; y < bot; y += 8) {
-              ctx.beginPath();
-              ctx.moveTo(x - 2, y);
-              ctx.lineTo(x - 8, y + 4);
-              ctx.lineTo(x - 2, y + 8);
-              ctx.moveTo(x + 2, y);
-              ctx.lineTo(x + 8, y + 4);
-              ctx.lineTo(x + 2, y + 8);
-              ctx.fill();
-            }
-          }
-          ctx.strokeStyle = 'rgba(120,255,140,0.6)';
-          ctx.setLineDash([2, 3]);
-          ctx.beginPath();
-          ctx.moveTo(x, gy - half + 2);
-          ctx.lineTo(x, gy + half - 2);
-          ctx.stroke();
-          ctx.setLineDash([]);
+          const [, gy] = this.viewPos(lv, col.a, lv.spikeGapAt(col));
+          drawSpikeColumn(ctx, x, gy, g.gap / 2, lv.H, lv.vc);
         }
       }
     }
@@ -416,12 +555,14 @@ export class Renderer {
   drawNarrowArrows(lv, t) {
     const ctx = this.ctx;
     for (const g of lv.gates) {
-      if (g.type !== 'narrow' || g.a1 < lv.player.a || g.a0 - lv.camA > lv.va + 40) continue;
+      if (g.type !== 'narrow' || g.a1 < lv.player.a || g.a0 - this.camA > lv.va + 40) continue;
       const [, gy] = this.viewPos(lv, g.a0, g.gapC);
-      if (gy > 8 && gy < lv.vc - 8) continue;
-      const up = gy <= 8;
-      const x = Math.min(lv.va - 20, g.a0 - lv.camA - 14);
-      const y = up ? 14 + Math.sin(t * 8) * 3 : lv.vc - 14 - Math.sin(t * 8) * 3;
+      // Pfeil bleibt innerhalb der sicheren Zone (nicht unter Anzeigen am Bildrand)
+      const m = 34;
+      if (gy > m && gy < lv.vc - m) continue;
+      const up = gy <= m;
+      const x = Math.min(lv.va - 40, g.a0 - this.camA - 14);
+      const y = up ? m + Math.sin(t * 8) * 3 : lv.vc - m - Math.sin(t * 8) * 3;
       ctx.fillStyle = '#ffe14d';
       ctx.strokeStyle = '#1a1020';
       ctx.lineWidth = 1.5;
@@ -435,6 +576,22 @@ export class Renderer {
     }
   }
 
+  /** Rote Vignette bei einem Treffer: zeigt deutlich, dass man getroffen wurde. */
+  drawHurtVignette(k) {
+    const ctx = this.ctx;
+    const img = cached('hurt', W, H, 0.5, (c) => {
+      const g = c.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.62);
+      g.addColorStop(0, 'rgba(255,40,60,0)');
+      g.addColorStop(1, 'rgba(255,40,60,0.75)');
+      c.fillStyle = g;
+      c.fillRect(0, 0, W, H);
+    });
+    if (!img) return;
+    ctx.globalAlpha = Math.min(1, k);
+    ctx.drawImage(img.canvas, 0, 0, W, H);
+    ctx.globalAlpha = 1;
+  }
+
   drawDarkness(game, lv) {
     const p = lv.player;
     let k = 0;
@@ -445,14 +602,24 @@ export class Renderer {
     }
     if (k <= 0) return;
     const ctx = this.ctx;
-    const [sx, sy] = this.toScreen(lv, p.a, p.c);
+    const [ia, ic] = this.ipos(p);
+    const [sx, sy] = this.toScreen(lv, ia, ic);
     const lamp = lv.items.has('LAMPE');
-    const r = lamp ? 190 + Math.sin(lv.time * 9) * 4 : 46 + Math.sin(lv.time * 3) * 3;
-    const grad = ctx.createRadialGradient(sx, sy, r * 0.45, sx, sy, r);
-    grad.addColorStop(0, 'rgba(5,3,10,0)');
-    grad.addColorStop(1, `rgba(5,3,10,${0.96 * k})`);
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, W, H);
+    const flicker = this.reducedEffects ? 0 : lamp ? Math.sin(lv.time * 9) * 4 : Math.sin(lv.time * 3) * 3;
+    const r = (lamp ? 190 : 46) + flicker;
+    const mask = darknessMask(lamp ? 190 : 46);
+    if (mask) {
+      const s2 = r / Math.round((lamp ? 190 : 46) / 10) / 10;
+      ctx.globalAlpha = k;
+      ctx.drawImage(mask.canvas, sx - (mask.w / 2) * s2, sy - (mask.h / 2) * s2, mask.w * s2, mask.h * s2);
+      ctx.globalAlpha = 1;
+    } else {
+      const grad = ctx.createRadialGradient(sx, sy, r * 0.45, sx, sy, r);
+      grad.addColorStop(0, 'rgba(5,3,10,0)');
+      grad.addColorStop(1, `rgba(5,3,10,${0.96 * k})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+    }
     // Leuchtende Augen der Gegner im Dunkeln
     if (!lamp) {
       for (const e of lv.enemies) {
@@ -488,7 +655,7 @@ export class Renderer {
       const x = x0 + i * bw;
       const sel = lv.powers.cursor === i;
       const avail = slotAvailable(lv.powers, i);
-      rrect(ctx, x + 1, y0, bw - 2, 13, 3, sel ? '#ffd34d' : 'rgba(20,10,40,0.7)', sel ? '#ffffff' : '#7a6aa0', 1);
+      rrect(ctx, x + 1, y0, bw - 2, 13, 3, sel ? 'rgba(255,211,77,0.85)' : 'rgba(20,10,40,0.45)', sel ? '#ffffff' : 'rgba(122,106,160,0.7)', 1);
       let label = POWER_LABELS[i];
       if (i === 0 && lv.powers.speed) label += ' ' + lv.powers.speed;
       if (i === 4 && lv.powers.options) label += ' ' + lv.powers.options;
@@ -781,10 +948,21 @@ export class Renderer {
     const t = game.time;
     const line = Math.min(e.line, ENDING_LINES.length - 1);
     if (e.line <= 1) {
-      ctx.fillStyle = e.line === 0 && Math.floor(t * 12) % 2 ? '#fff6c8' : '#2a1838';
+      // Kein Vollbild-Blitzen mehr: ruhiger Hintergrund, das Klingeln zeigen Wackeln und Schallringe.
+      ctx.fillStyle = '#2a1838';
       ctx.fillRect(0, 0, W, H);
+      if (e.line === 0 && !this.reducedEffects) {
+        ctx.strokeStyle = 'rgba(255,230,150,0.5)';
+        ctx.lineWidth = 3;
+        for (let i = 0; i < 3; i++) {
+          const rr = 60 + ((t * 80 + i * 40) % 120);
+          ctx.beginPath();
+          ctx.arc(W / 2, 140, rr, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
       ctx.save();
-      ctx.translate(W / 2 + Math.sin(t * 60) * 4, 140);
+      ctx.translate(W / 2 + (this.reducedEffects ? 0 : Math.sin(t * 40) * 3), 140);
       ctx.scale(1.6, 1.6);
       drawBoss(ctx, { kind: 'wecker', phase: 3, angry: true, flash: 0 }, t);
       ctx.restore();

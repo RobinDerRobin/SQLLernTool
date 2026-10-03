@@ -4,7 +4,7 @@ import { EDGES, EDGE_BY_ID } from '../src/data/world.js';
 import { ITEM_IDS, GATES } from '../src/data/items.js';
 import { Level } from '../src/game/level.js';
 import { edgeDir } from '../src/game/worldgraph.js';
-import { opposite } from '../src/core/math.js';
+import { opposite, headingAngle } from '../src/core/math.js';
 import { freshPowers } from '../src/game/powerups.js';
 import { runLevel, botInput } from './helpers/bot.mjs';
 
@@ -136,9 +136,11 @@ test('Wendehals: Bildschirmposition bleibt bei der Kehrtwende erhalten', () => {
   const relC = lv.dc(lv.player.c, lv.camC);
   lv.update(1 / 60, { wende: true });
   while (lv.turnAnim) lv.update(1 / 60, {});
-  // Nach 180° liegt der Spieler gespiegelt im Sichtfeld.
-  assert.ok(Math.abs(lv.player.a - lv.camA - (lv.va - relA)) < 1);
+  // Nach der Wende bleibt der Abstand zur Hinterkante gleich (Kamera gleitet hinterher),
+  // quer bleibt die Figur an derselben Bildschirmstelle (Querachse gespiegelt).
+  assert.ok(Math.abs(lv.player.a - lv.camA - relA) < 1);
   assert.ok(Math.abs(lv.dc(lv.player.c, lv.camC) - (lv.vc - relC)) < 1.5);
+  assert.equal(lv.viewAngle(), headingAngle(lv.heading), 'die Welt dreht sich nicht mit');
   // Wände wurden mitgespiegelt und bleiben zerstört/intakt
   for (const g of lv.gates) assert.ok(g.a0 < g.a1);
 });
@@ -222,4 +224,16 @@ test('Großer Wecker: Uhrzeiger lassen hinten immer einen sicheren Streifen frei
     },
   });
   assert.ok(minA > lv.margins()[0] + 12, 'Zeiger reicht bis ' + minA.toFixed(1));
+});
+
+test('Wende am Start einer rückwärts geflogenen Boss-Etappe startet keinen Boss (Befund Software-Tester)', () => {
+  for (const edge of EDGES.filter((e) => e.boss && !e.oneWay)) {
+    const lv = new Level({ edge, forward: false, items: new Set(['WENDEHALS']), invincible: true });
+    lv.update(1 / 60, { wende: true });
+    while (lv.turnAnim) lv.update(1 / 60, {});
+    const { result } = runLevel(lv, edge.length / 42 + 20);
+    assert.notEqual(lv.state, 'boss', edge.id);
+    assert.ok(result, edge.id);
+    assert.deepEqual(result.rewards, [], edge.id + ': keine Belohnung von hinten');
+  }
 });

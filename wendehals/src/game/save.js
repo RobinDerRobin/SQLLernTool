@@ -26,20 +26,22 @@ export function newProgress() {
 }
 
 const isDir = (d) => Number.isInteger(d) && d >= 0 && d <= 3;
+// Nur eigene Schlüssel zählen ("constructor", "__proto__" usw. sind keine Items/Knoten).
+const has = (obj, k) => typeof k === 'string' && Object.hasOwn(obj, k);
 
 /** Macht aus beliebigen Daten einen gültigen Spielstand (oder null, wenn nichts zu retten ist). */
 export function sanitizeProgress(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const p = newProgress();
-  if (typeof raw.saveNode === 'string' && NODES[raw.saveNode]?.save) p.saveNode = raw.saveNode;
+  if (has(NODES, raw.saveNode) && NODES[raw.saveNode].save) p.saveNode = raw.saveNode;
   if (isDir(raw.saveHeading)) p.saveHeading = raw.saveHeading;
-  if (Array.isArray(raw.items)) p.items = [...new Set(raw.items.filter((i) => typeof i === 'string' && ITEMS[i]))];
+  if (Array.isArray(raw.items)) p.items = [...new Set(raw.items.filter((i) => has(ITEMS, i)))];
   if (Array.isArray(raw.visited)) {
-    p.visited = [...new Set([START_NODE, ...raw.visited.filter((n) => typeof n === 'string' && NODES[n])])];
+    p.visited = [...new Set([START_NODE, ...raw.visited.filter((n) => has(NODES, n))])];
   }
   if (!p.visited.includes(p.saveNode)) p.visited.push(p.saveNode);
-  if (Array.isArray(raw.knownEdges)) p.knownEdges = [...new Set(raw.knownEdges.filter((e) => typeof e === 'string' && EDGE_BY_ID[e]))];
-  if (typeof raw.character === 'string' && CHARACTERS[raw.character]) {
+  if (Array.isArray(raw.knownEdges)) p.knownEdges = [...new Set(raw.knownEdges.filter((e) => has(EDGE_BY_ID, e)))];
+  if (has(CHARACTERS, raw.character)) {
     const unlock = CHARACTERS[raw.character].unlock;
     if (!unlock || p.items.includes(unlock)) p.character = raw.character;
   }
@@ -77,7 +79,7 @@ export function clearProgress(storage) {
   }
 }
 
-export const DEFAULT_SETTINGS = { music: 0.6, sfx: 0.8, shake: true, fullscreen: false };
+export const DEFAULT_SETTINGS = { music: 0.6, sfx: 0.8, shake: true, fullscreen: false, reducedEffects: false };
 
 export function loadSettings(storage) {
   const s = { ...DEFAULT_SETTINGS };
@@ -87,6 +89,7 @@ export function loadSettings(storage) {
     if (Number.isFinite(raw.sfx)) s.sfx = Math.max(0, Math.min(1, raw.sfx));
     if (typeof raw.shake === 'boolean') s.shake = raw.shake;
     if (typeof raw.fullscreen === 'boolean') s.fullscreen = raw.fullscreen;
+    if (typeof raw.reducedEffects === 'boolean') s.reducedEffects = raw.reducedEffects;
   } catch {
     /* Standardwerte */
   }

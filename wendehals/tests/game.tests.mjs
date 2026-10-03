@@ -198,12 +198,15 @@ test('Optionen: Regler und Schalter werden gespeichert', () => {
   press(g, { down: true });
   press(g, { confirm: true }); // Wackeln aus
   press(g, { down: true });
+  press(g, { confirm: true }); // Reduzierte Effekte an
+  press(g, { down: true });
   press(g, { confirm: true }); // Vollbild an
   assert.equal(fs, true);
   press(g, { back: true });
   const s = JSON.parse(storage.getItem('wendehals.settings.v1'));
   assert.equal(s.music, 0.5);
   assert.equal(s.shake, false);
+  assert.equal(s.reducedEffects, true);
   assert.equal(g.screen, 'title');
 });
 
@@ -291,3 +294,36 @@ function planToItem(game) {
   }
   return null;
 }
+
+test('Prototyp-Schlüssel im Spielstand werden verworfen (Befund Software-Tester)', () => {
+  const p = sanitizeProgress({
+    saveNode: 'constructor',
+    items: ['toString', 'constructor', '__proto__', 'DREHWURM'],
+    visited: ['constructor', 'hasOwnProperty'],
+    knownEdges: ['constructor'],
+    character: 'constructor',
+  });
+  assert.deepEqual(p.items, ['DREHWURM']);
+  assert.deepEqual(p.visited, ['toast']);
+  assert.deepEqual(p.knownEdges, []);
+  assert.equal(p.character, 'dackel');
+  assert.equal(p.saveNode, 'toast');
+});
+
+test('Pause im Todes-Timer hebelt die Todesstrafe nicht aus (Befund Software-Tester)', () => {
+  for (const choice of ['Etappe abbrechen', 'Zur letzten Station']) {
+    const { game } = newGame({ invincible: false });
+    game.powers.speed = 2;
+    press(game, { confirm: true });
+    const lv = game.level;
+    lv.player.hp = 1;
+    lv.player.inv = 0;
+    lv.damage();
+    press(game, { pause: true });
+    if (game.overlay && game.overlay.type === 'menu') chooseMenu(game, choice);
+    for (let i = 0; i < 400 && game.screen === 'level'; i++) press(game, {});
+    assert.equal(game.progress.deaths, 1, choice);
+    assert.equal(game.powers.speed, 0, choice);
+    assert.equal(game.node, game.progress.saveNode, choice);
+  }
+});

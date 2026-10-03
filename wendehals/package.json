@@ -15,7 +15,9 @@
     "dist:win": "npm run build && electron-builder --win --x64 --publish never",
     "dist:linux": "npm run build && electron-builder --linux --x64 --publish never",
     "e2e:desktop": "node e2e/electron.mjs",
-    "icon": "node tools/make-icon.mjs"
+    "icon": "node tools/make-icon.mjs",
+    "e2e:perf": "npm run build && node e2e/perf.mjs",
+    "e2e:flash": "npm run build && node e2e/flash.mjs"
   },
   "build": {
     "appId": "de.robin.wendehals",

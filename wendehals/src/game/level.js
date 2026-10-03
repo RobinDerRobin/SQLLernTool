@@ -28,8 +28,20 @@ import { BOSSES, defaultHitTest } from './bosses.js';
 import { addCapsule, activate, freshPowers } from './powerups.js';
 
 export const SCROLL_SPEED = 42;
+
+/** Entfernt Elemente in place (ohne neues Array pro Frame). Reihenfolge bleibt erhalten. */
+export function compact(arr, keep) {
+  let j = 0;
+  for (let i = 0; i < arr.length; i++) if (keep(arr[i])) arr[j++] = arr[i];
+  arr.length = j;
+  return arr;
+}
+
+// Wiederverwendete Partikel-Objekte (vermeidet Garbage-Collection-Ruckler)
+const PARTICLE_POOL = [];
 export const BASE_SPEED = 105;
-const WALL_HOLD = 0.72; // Wand steht beim Anhalten bei 72 % des Sichtfelds
+const WALL_HOLD = 0.72;
+export const FUNNEL = 30; // Einzugsbereich vor engen Spalten (quer, in Einheiten) // Wand steht beim Anhalten bei 72 % des Sichtfelds
 const MAX_ENEMY_BULLETS = 220;
 
 export class Level {
@@ -46,6 +58,7 @@ export class Level {
   constructor(o) {
     this.edge = o.edge;
     this.forward = o.forward;
+    this.startForward = o.forward;
     this.items = o.items;
     this.charId = o.character || 'dackel';
     this.char = CHARACTERS[this.charId];
@@ -108,7 +121,9 @@ export class Level {
   }
 
   bossPending() {
-    if (!this.forward || !this.edge.boss) return false;
+    // Der Boss wartet am "to"-Ende und nur für Spieler, die die Etappe vorwärts begonnen haben.
+    // (Rückwärts starten und sofort wenden darf keinen Boss "von hinten" auslösen.)
+    if (!this.forward || !this.startForward || !this.edge.boss) return false;
     return this.edge.reward === 'GOAL' || !this.items.has(this.edge.reward);
   }
 
@@ -166,16 +181,16 @@ export class Level {
     for (let i = 0; i < n; i++) {
       const ang = this.rng.next() * Math.PI * 2;
       const sp = speed * (0.4 + this.rng.next() * 0.8);
-      this.particles.push({
-        a,
-        c,
-        va: Math.cos(ang) * sp,
-        vc: Math.sin(ang) * sp,
-        t: 0,
-        life: 0.4 + this.rng.next() * 0.5,
-        color,
-        size,
-      });
+      const pt = PARTICLE_POOL.pop() || {};
+      pt.a = pt.pa = a;
+      pt.c = pt.pc = c;
+      pt.va = Math.cos(ang) * sp;
+      pt.vc = Math.sin(ang) * sp;
+      pt.t = 0;
+      pt.life = 0.4 + this.rng.next() * 0.5;
+      pt.color = color;
+      pt.size = size;
+      this.particles.push(pt);
     }
   }
 
@@ -185,10 +200,25 @@ export class Level {
 
   /** Winkel, um den der Renderer die Welt dreht (inkl. Wende-Animation). */
   viewAngle() {
-    const base = headingAngle(this.heading);
-    if (!this.turnAnim) return base;
+    // Die Welt bleibt bei der 180°-Kehrtwende stehen (Himmelsrichtungen bleiben, wo sie sind);
+    // nur die Figur dreht sich um – siehe playerSpin().
+    return headingAngle(this.heading);
+  }
+
+  /** Zusätzliche Drehung der Spielfigur während der Kehrtwende (stetig über den Wechsel hinweg). */
+  playerSpin() {
+    if (!this.turnAnim) return 0;
     const p = this.turnAnim.t / this.turnAnim.dur;
-    return this.turnAnim.swapped ? base - Math.PI * (1 - p) : base + Math.PI * p;
+    return this.turnAnim.swapped ? -Math.PI * (1 - p) : Math.PI * p;
+  }
+
+  /** Kameraposition für die Anzeige: gleitet nach der Kehrtwende sanft an ihre neue Stelle. */
+  displayCamA() {
+    const pan = this.turnAnim && this.turnAnim.pan;
+    if (!pan) return this.camA;
+    const k = Math.min(1, Math.max(0, (this.turnAnim.t / this.turnAnim.dur - 0.5) * 2));
+    const e = k * k * (3 - 2 * k);
+    return pan.from + (pan.to - pan.from) * e;
   }
 
   inDark(a) {
@@ -219,13 +249,42 @@ export class Level {
   }
 
   // --------------------------------------------------------------- Update
+  /**
+   * Merkt sich die Positionen vor dem Simulationsschritt. Der Renderer interpoliert damit
+   * zwischen zwei Schritten (flüssig auf Bildschirmen mit 90/120/144 Hz).
+   */
+  snapshot() {
+    this.pCamA = this.camA;
+    this.pCamC = this.camC;
+    const p = this.player;
+    p.pa = p.a;
+    p.pc = p.c;
+    for (const list of [this.enemies, this.bullets, this.shots, this.particles]) {
+      for (const o of list) {
+        o.pa = o.a;
+        o.pc = o.c;
+      }
+    }
+    if (this.boss) {
+      this.boss.pa = this.boss.a;
+      this.boss.pc = this.boss.c;
+    }
+  }
+
   update(dt, input = {}) {
     if (this.result) return;
+    this.snapshot();
     this.sfxQueue.length = 0;
     this.time += dt;
     for (const m of this.messages) m.t += dt;
-    this.messages = this.messages.filter((m) => m.t < m.dur);
+    compact(this.messages, (m) => m.t < m.dur);
     this.shakeAmt = Math.max(0, this.shakeAmt - 30 * dt);
+
+    this.hurtFlash = Math.max(0, (this.hurtFlash || 0) - dt);
+    if (this.hitStop > 0) {
+      this.hitStop -= dt;
+      return;
+    }
 
     if (this.turnAnim) {
       this.turnAnim.t += dt;
@@ -345,7 +404,7 @@ export class Level {
     else this.funnel(p, dt, ha, hc);
 
     // Trichter vor engen Spalten: wenn man winzig ist und fast passt, sanft einrasten.
-    if (this.small && da > 0.2) this.funnel(p, dt, ha, hc);
+    if (this.small) this.funnel(p, dt, ha, hc);
 
     const [back, front] = this.margins();
     p.a = clamp(p.a, this.camA + back, this.camA + this.va - front);
@@ -377,10 +436,11 @@ export class Level {
     for (const g of this.gates) {
       if (g.type !== 'narrow') continue;
       const ahead = g.a0 - (p.a + ha);
-      if (ahead > 14 || p.a - ha > g.a1) continue;
+      if (ahead > 26 || p.a - ha > g.a1) continue;
       const d = this.dc(g.gapC, p.c);
-      if (Math.abs(d) < 12 && hc <= g.gapW / 2) {
-        const step = Math.sign(d) * Math.min(Math.abs(d), 60 * dt);
+      // Trichter: wer winzig ist und ungefähr trifft, wird sanft in die Spalte gelenkt.
+      if (Math.abs(d) < FUNNEL && hc <= g.gapW / 2) {
+        const step = Math.sign(d) * Math.min(Math.abs(d), 90 * dt);
         if (!this.wallHit(p.a, p.c + step, ha, hc)) p.c = wrap(p.c + step, this.H);
       }
     }
@@ -406,7 +466,8 @@ export class Level {
     if (p.fireCool <= 0) {
       const lasers = this.powers.laser;
       const limit = 5 * emitters.length;
-      const mine = this.shots.filter((s) => s.kind !== 'missile').length;
+      let mine = 0;
+      for (const s of this.shots) if (s.kind !== 'missile') mine++;
       if (mine < limit) {
         p.fireCool = lasers ? 0.2 : 0.12;
         const sp = this.char.shotSpeed;
@@ -470,10 +531,14 @@ export class Level {
     this.forward = !this.forward;
     this.heading = opposite(this.heading);
     const p = this.player;
+    const rel = p.a - this.camA; // Abstand zur Hinterkante – bleibt nach der Wende gleich
     p.a = ma(p.a);
     p.c = mc(p.c);
     p.history = p.history.map(([a, c]) => [ma(a), mc(c)]);
-    this.camA = L - this.camA - this.va;
+    const mirroredCam = L - this.camA - this.va;
+    this.camA = clamp(p.a - rel, 0, L - this.va);
+    // Die Figur stünde sonst plötzlich an der Vorderkante; die Kamera gleitet hinterher.
+    this.turnAnim.pan = { from: mirroredCam, to: this.camA };
     this.camC = wrap(H - this.camC - this.vc, H);
     for (const g of this.gates) {
       const a0 = ma(g.a1);
@@ -514,6 +579,7 @@ export class Level {
     this.hasBoss = this.bossPending();
     this.hintedGates.clear();
     this.say('Kehrtwende!', 1.2, 'big');
+    this.snapshot(); // kein Interpolieren über den Sprung hinweg
   }
 
   spawnEvents() {
@@ -797,6 +863,9 @@ export class Level {
     p.hp--;
     this.stats.hits++;
     this.sfx('hurt');
+    // Treffer spürbar machen: kurzer Stillstand (Hit-Stop) und rote Vignette im Renderer
+    this.hitStop = 0.08;
+    this.hurtFlash = 0.45;
     if (p.hp <= 0) {
       this.state = 'dead';
       this.timer = 2.2;
@@ -820,35 +889,38 @@ export class Level {
   }
 
   updateParticles(dt) {
-    for (const pt of this.particles) {
+    const ps = this.particles;
+    let j = 0;
+    for (let i = 0; i < ps.length; i++) {
+      const pt = ps[i];
       pt.t += dt;
+      if (pt.t >= pt.life) {
+        PARTICLE_POOL.push(pt);
+        continue;
+      }
       pt.a += pt.va * dt;
       pt.c += pt.vc * dt;
       pt.va *= 1 - 2 * dt;
       pt.vc *= 1 - 2 * dt;
+      ps[j++] = pt;
     }
-    this.particles = this.particles.filter((pt) => pt.t < pt.life);
+    ps.length = j;
     for (const pp of this.popups) pp.t += dt;
-    this.popups = this.popups.filter((pp) => pp.t < 1.2);
+    compact(this.popups, (pp) => pp.t < 1.2);
   }
 
   cleanup() {
+    const camA = this.camA;
+    const front = camA + this.va;
     const camMid = this.camC + this.vc / 2;
-    this.enemies = this.enemies.filter((e) => {
-      if (e.dead || e.gone) return false;
-      if (e.a < this.camA - 50 || e.a > this.camA + this.va + 420 || e.t > 40) return false;
-      return true;
-    });
-    this.shots = this.shots.filter((s) => !s.dead);
-    this.bullets = this.bullets.filter(
-      (b) =>
-        !b.dead &&
-        b.t < 12 &&
-        b.a > this.camA - 30 &&
-        b.a < this.camA + this.va + 60 &&
-        Math.abs(this.dc(b.c, camMid)) < this.vc / 2 + 40,
+    const halfC = this.vc / 2 + 40;
+    compact(this.enemies, (e) => !e.dead && !e.gone && e.a >= camA - 50 && e.a <= front + 420 && e.t <= 40);
+    compact(this.shots, (s) => !s.dead);
+    compact(
+      this.bullets,
+      (b) => !b.dead && b.t < 12 && b.a > camA - 30 && b.a < front + 60 && Math.abs(this.dc(b.c, camMid)) < halfC,
     );
-    this.pickups = this.pickups.filter((pk) => !pk.dead && pk.a > this.camA - 20);
+    compact(this.pickups, (pk) => !pk.dead && pk.a > camA - 20);
   }
 
   finish() {

@@ -114,6 +114,10 @@ await flyTo('eier', 3, [], 6, '07-nach-norden');
 await flyTo('marmelade', 1, [], 6, '08-nach-sueden');
 await flyTo('tasse', 2, ['DREHWURM'], 6, '09-nach-westen');
 await flyTo('marmelade', 3, [], 18, '10-stacheln');
+// Stachelfelder in weiteren Flugrichtungen (Regression des Renderfehlers)
+await flyTo('butter', 1, [], 22, '10b-stacheln-sued');
+await flyTo('entenhafen', 1, ['DREHWURM'], 24, '10c-stacheln-sued-disco');
+await flyTo('djpult', 3, ['DREHWURM'], 30, '10d-stacheln-nord-lava');
 await flyTo('tasse', 1, ['DREHWURM'], 16, '11-dunkel-ohne-lampe');
 await flyTo('tasse', 1, ['DREHWURM', 'LAMPE'], 16, '12-dunkel-mit-lampe');
 await flyTo('kartoffelkiste', 2, ['BOHRER'], 18, '13-felswand');
