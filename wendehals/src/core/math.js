@@ -58,7 +58,16 @@ export const SCREEN_H = 270;
  * fliegt man nach Norden/Süden, ist sie die Bildschirmhöhe.
  */
 export function viewDims(heading) {
-  return heading % 2 === 0 ? { va: SCREEN_W, vc: SCREEN_H } : { va: SCREEN_H, vc: SCREEN_W };
+  // Die sichtbare Strecke in Flugrichtung ist immer 480 Einheiten – auch in vertikalen Leveln.
+  // Dort wird rausgezoomt (zoom < 1), damit man gleich viel Reaktionszeit hat.
+  if (heading % 2 === 0) return { va: SCREEN_W, vc: SCREEN_H, zoom: 1 };
+  const zoom = SCREEN_H / SCREEN_W;
+  return { va: SCREEN_W, vc: SCREEN_W / zoom, zoom };
+}
+
+/** Periode der Querachse: horizontal 544 (34 Kacheln), vertikal 960 (60 Kacheln, > Sichtbreite 853). */
+export function crossPeriod(heading) {
+  return heading % 2 === 0 ? 544 : 960;
 }
 
 /** Drehwinkel der Welt auf dem Bildschirm für eine Flugrichtung. */

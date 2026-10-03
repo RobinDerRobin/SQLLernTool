@@ -5,7 +5,6 @@ import { Rng } from '../core/rng.js';
 import { THEMES } from '../data/themes.js';
 import { FORMATION_KINDS } from './enemies.js';
 
-export const CROSS = 540; // Periode der Querachse (die Welt "wiederholt" sich quer zur Flugrichtung)
 export const ROCK_THICK = 26;
 export const NARROW_THICK = 34;
 export const NARROW_GAP = 11;
@@ -14,21 +13,21 @@ export const SPIKE_SPACING = 120;
 export const START_CLEAR = 380;
 
 /** Hindernisse als Weltobjekte mit absoluten Positionen (vorwärts). */
-export function buildGates(edge, rng) {
+export function buildGates(edge, rng, H) {
   const out = [];
   for (const g of edge.gates || []) {
     const a0 = Math.round(g.at * edge.length);
     if (g.type === 'rock') {
-      const n = 20;
-      const h = CROSS / n;
+      const n = Math.round(H / 27);
+      const h = H / n;
       const blocks = [];
       for (let i = 0; i < n; i++) blocks.push({ c0: i * h, c1: (i + 1) * h, hp: 3 });
       out.push({ type: 'rock', a0, a1: a0 + ROCK_THICK, blocks });
     } else if (g.type === 'narrow') {
-      out.push({ type: 'narrow', a0, a1: a0 + NARROW_THICK, gapC: Math.round(rng.range(0, CROSS)), gapW: NARROW_GAP });
+      out.push({ type: 'narrow', a0, a1: a0 + NARROW_THICK, gapC: Math.round(rng.range(0, H)), gapW: NARROW_GAP });
     } else if (g.type === 'spikes') {
       const cols = [];
-      let base = rng.range(0, CROSS);
+      let base = rng.range(0, H);
       for (let a = a0 + 30; a < a0 + g.len - 10; a += SPIKE_SPACING) {
         cols.push({ a, base, phase: rng.range(0, Math.PI * 2), amp: rng.range(20, 50), speed: rng.range(0.4, 0.75) });
         base += rng.range(-80, 80);
@@ -104,8 +103,8 @@ export function mirrorGate(g, length) {
  * Komplettes Level für eine Flugrichtung. Rückwärts werden die Hindernisse gespiegelt und
  * die Gegnerwellen passend dazu neu verteilt (deterministisch).
  */
-export function generateLevel(edge, forward = true) {
-  const base = buildGates(edge, new Rng('gates:' + edge.id));
+export function generateLevel(edge, forward = true, H = 544) {
+  const base = buildGates(edge, new Rng('gates:' + edge.id), H);
   const gates = forward ? base : mirrorGates(base, edge.length);
   const events = buildEvents(edge, new Rng('level:' + edge.id + (forward ? '' : ':rev')), gates, forward);
   return { gates, events };

@@ -259,6 +259,7 @@ export class Renderer {
     const ang = lv.viewAngle();
     ctx.translate(W / 2, H / 2);
     ctx.rotate(ang);
+    ctx.scale(lv.zoom || 1, lv.zoom || 1);
     ctx.translate(-lv.va / 2, -lv.vc / 2);
     this.lv = lv;
     this.setCamera(lv);
@@ -353,8 +354,9 @@ export class Renderer {
   toScreen(lv, a, c) {
     const [x, y] = this.viewPos(lv, a, c);
     const ang = lv.viewAngle();
-    const dx = x - lv.va / 2;
-    const dy = y - lv.vc / 2;
+    const z = lv.zoom || 1;
+    const dx = (x - lv.va / 2) * z;
+    const dy = (y - lv.vc / 2) * z;
     return [W / 2 + Math.cos(ang) * dx - Math.sin(ang) * dy, H / 2 + Math.sin(ang) * dx + Math.cos(ang) * dy];
   }
 

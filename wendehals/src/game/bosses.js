@@ -200,8 +200,8 @@ export const BOSSES = {
       b.hour = (b.hour ?? Math.PI) + dt * 0.35 * sp;
       b.minute = (b.minute ?? Math.PI * 0.5) + dt * 0.9 * sp;
       // Zeiger nie so lang, dass sie den hinteren Bildrand erreichen: dort ist immer ein sicherer Streifen.
-      const lh = Math.min(lv.va * 0.32, 150);
-      const lm = Math.min(lv.va * 0.45, 200);
+      const lh = Math.min(lv.va * 0.26, 130);
+      const lm = Math.min(lv.va * 0.34, 165);
       const warmup = b.t < 2;
       lv.hazard(b.a, b.c, b.hour, lh, 6, warmup);
       lv.hazard(b.a, b.c, b.minute, lm, 3, warmup);

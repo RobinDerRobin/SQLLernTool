@@ -207,9 +207,11 @@ test('Fairness: ein ausweichender Autopilot überlebt jedes Level (ohne Unverwun
   const { dodgeInput } = await import('./helpers/bot.mjs');
   const deaths = [];
   for (const edge of EDGES) {
-    const lv = new Level({ edge, forward: true, items: new Set(['BOHRER', 'PILZ']), seed: 2 });
-    runLevel(lv, edge.length / 42 + 150, { input: dodgeInput });
-    if (!lv.result || lv.result.type !== 'arrive') deaths.push(edge.id);
+    for (const seed of [1, 2, 3]) {
+      const lv = new Level({ edge, forward: true, items: new Set(['BOHRER', 'PILZ']), seed });
+      runLevel(lv, edge.length / 42 + 150, { input: dodgeInput });
+      if (!lv.result || lv.result.type !== 'arrive') deaths.push(edge.id + '#' + seed);
+    }
   }
   assert.deepEqual(deaths, []);
 });

@@ -1,7 +1,7 @@
 // Laufzeit eines Levels (Sidescroller-Teil). Komplett ohne DOM, damit es in Tests
 // beschleunigt simuliert werden kann. Der Renderer liest nur den Zustand aus.
 //
-// Koordinaten: a = Flugrichtung (vorwärts = +a), c = Querachse (periodisch mit CROSS).
+// Koordinaten: a = Flugrichtung (vorwärts = +a), c = Querachse (periodisch mit H).
 // camA ist die Hinterkante des Sichtfelds, camC die "obere" Kante quer.
 
 import { Rng } from '../core/rng.js';
@@ -13,6 +13,7 @@ import {
   clamp,
   opposite,
   viewDims,
+  crossPeriod,
   headingAngle,
   screenToLocalVec,
   segPointDist2,
@@ -22,7 +23,7 @@ import { CHARACTERS } from '../data/characters.js';
 import { maxHpFor } from '../data/items.js';
 import { HINTS } from '../data/text.js';
 import { edgeDir } from './worldgraph.js';
-import { generateLevel, CROSS } from './levelgen.js';
+import { generateLevel } from './levelgen.js';
 import { ENEMIES, FORMATION_KINDS } from './enemies.js';
 import { BOSSES, defaultHitTest } from './bosses.js';
 import { addCapsule, activate, freshPowers } from './powerups.js';
@@ -66,14 +67,15 @@ export class Level {
     this.invincible = !!o.invincible;
     this.rng = new Rng(o.seed ?? 12345);
     this.L = this.edge.length;
-    this.H = CROSS;
     this.diff = this.edge.difficulty || 1;
     this.heading = this.forward ? edgeDir(this.edge) : opposite(edgeDir(this.edge));
+    this.H = crossPeriod(this.heading);
     const dims = viewDims(this.heading);
+    this.zoom = dims.zoom;
     this.va = dims.va;
     this.vc = dims.vc;
 
-    const gen = generateLevel(this.edge, this.forward);
+    const gen = generateLevel(this.edge, this.forward, this.H);
     this.gates = gen.gates;
     this.events = gen.events;
     this.evIdx = 0;
@@ -81,7 +83,7 @@ export class Level {
     this.small = this.items.has('PILZ');
     this.player = {
       a: 70,
-      c: CROSS / 2,
+      c: this.H / 2,
       hp: maxHpFor(this.items),
       maxHp: maxHpFor(this.items),
       inv: 1.2,
@@ -92,7 +94,7 @@ export class Level {
       history: [],
     };
     this.camA = 0;
-    this.camC = CROSS / 2 - this.vc / 2;
+    this.camC = this.H / 2 - this.vc / 2;
     this.time = 0;
     this.state = 'play'; // play | boss | bossdown | clear | dead
     this.timer = 0;
@@ -427,11 +429,13 @@ export class Level {
 
   /** Abstand zu Hinter- und Vorderkante, damit die Figur nicht unter der Anzeige verschwindet. */
   margins() {
+    // Werte in Bildschirmpixeln (480x270), umgerechnet in lokale Einheiten (Zoom!)
+    const z = this.zoom || 1;
     switch (this.heading) {
       case N:
-        return [30, 22];
+        return [30 / z, 22 / z];
       case S:
-        return [26, 30];
+        return [26 / z, 30 / z];
       default:
         return [18, 12];
     }
@@ -578,7 +582,7 @@ export class Level {
     }
     this.popups = [];
     const front = this.camA + this.va + 40;
-    this.events = generateLevel(this.edge, this.forward).events.filter((ev) => ev.type === 'wave' && ev.at > front);
+    this.events = generateLevel(this.edge, this.forward, this.H).events.filter((ev) => ev.type === 'wave' && ev.at > front);
     this.evIdx = 0;
     this.waves.clear();
     this.hasBoss = this.bossPending();
@@ -616,7 +620,7 @@ export class Level {
       kind: this.edge.boss,
       a: this.L + 80,
       c: this.arenaC,
-      homeA: this.L - 80,
+      homeA: this.L - 80 / this.zoom, // im Zoom gleich weit vom Rand (nicht unter der Anzeige)
       hp: def.hp,
       maxHp: def.hp,
       r: def.r,

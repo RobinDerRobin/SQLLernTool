@@ -12,7 +12,7 @@ export function botInput(lv, opts = {}) {
   const solid = lv.gates
     .filter((g) => (g.type === 'rock' || g.type === 'narrow') && g.a1 + 4 > p.a && g.a0 - p.a < 320)
     .sort((x, y) => x.a0 - y.a0)[0];
-  const spikes = lv.gates.find((g) => g.type === 'spikes' && p.a > g.a0 - 120 && p.a < g.a1 + 10);
+  const spikes = lv.gates.find((g) => g.type === 'spikes' && p.a > g.a0 - lv.va * 0.8 && p.a < g.a1 + 10);
 
   if (solid && solid.type === 'narrow') {
     targetC = solid.gapC;
@@ -70,6 +70,18 @@ export function safeInput(lv, inp) {
   const look = 0.18 * 110 * (1 + 0.22 * lv.powers.speed) * (lv.char ? lv.char.speed : 1);
   if (da !== 0 && lv.wallHit(p.a + da * look + Math.sign(da) * 2, p.c, ha + 1, hc + 1)) da = 0;
   if (dc !== 0 && (lv.wallHit(p.a, p.c + dc * look, ha + 1, hc + 1) || lv.wallHit(p.a + da * look, p.c + dc * look, ha + 1, hc + 1))) dc = 0;
+  // Stachelreihen: nicht hineinfliegen, solange man nicht in der Lücke ist, und darin nicht quer abdriften
+  for (const g of lv.gates) {
+    if (g.type !== 'spikes' || lv.items.has('GUMMIHAUT')) continue;
+    for (const col of g.cols) {
+      const d = col.a - p.a;
+      if (d < -(ha + 8) || d > ha + 14) continue;
+      const off = lv.dc(p.c, lv.spikeGapAt(col));
+      const safe = g.gap / 2 - hc - 6;
+      if (Math.abs(off) > safe && da > 0 && d > 0) da = 0;
+      if (Math.abs(off + dc * 4) > safe && Math.sign(dc) === Math.sign(off)) dc = 0;
+    }
+  }
   const [mx, my] = localToScreenVec(lv.heading, da, dc);
   return { ...inp, mx, my };
 }
@@ -98,10 +110,17 @@ export function dodgeInput(lv) {
   let fc = 0;
   const threats = [
     ...lv.bullets.map((b) => ({ a: b.a, c: b.c, va: b.va, vc: b.vc, r: b.r })),
-    ...lv.enemies.map((e) => ({ a: e.a, c: e.c, va: -60, vc: 0, r: e.r })),
+    // echte Geschwindigkeit aus dem letzten Schritt (z. B. zustoßende Gebisse)
+    ...lv.enemies.map((e) => ({
+      a: e.a,
+      c: e.c,
+      va: e.pa === undefined ? -60 : (e.a - e.pa) * 60,
+      vc: e.pc === undefined ? 0 : lv.dc(e.c, e.pc) * 60,
+      r: e.r,
+    })),
   ];
   for (const t of threats) {
-    for (const T of [0.1, 0.25, 0.4]) {
+    for (const T of [0.1, 0.25, 0.4, 0.6]) {
       const da = t.a + t.va * T - p.a;
       const dc = lv.dc(t.c + t.vc * T, p.c);
       const d = Math.hypot(da, dc);

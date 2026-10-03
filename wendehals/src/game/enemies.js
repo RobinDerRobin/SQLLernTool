@@ -322,14 +322,20 @@ export const ENEMIES = {
   // --- Boss-Helfer ---
   torpedo: {
     name: 'Torpedo-Ente',
-    hp: 2,
+    hp: 1,
     r: 7,
     score: 100,
     init(e) {
       e.ang = Math.PI;
     },
     update(e, lv, dt) {
-      ENEMIES.bohne.update(e, lv, dt);
+      // Nur kurz zielsuchend, danach geradeaus – ausweichbar statt klebrig
+      if (e.t < 2.2) ENEMIES.bohne.update(e, lv, dt);
+      else {
+        e.a += Math.cos(e.ang) * 80 * dt;
+        e.c += Math.sin(e.ang) * 80 * dt;
+        if (e.t > 8) e.gone = true;
+      }
     },
   },
   knolle: {
