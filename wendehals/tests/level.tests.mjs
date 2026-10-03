@@ -19,7 +19,7 @@ function checkInvariants(lv) {
   const p = lv.player;
   assert.ok(Number.isFinite(p.a) && Number.isFinite(p.c), 'Spielerposition ungültig');
   assert.ok(p.c >= 0 && p.c < lv.H, 'Querposition nicht normalisiert');
-  assert.ok(p.a >= lv.camA + 9.9 || lv.state === 'clear', 'Spieler hinter der Kamera');
+  assert.ok(p.a >= lv.camA + lv.margins()[0] - 0.01 || lv.state === 'clear', 'Spieler hinter der Kamera');
   assert.ok(Number.isFinite(lv.camA) && Number.isFinite(lv.camC));
   for (const e of lv.enemies) assert.ok(Number.isFinite(e.a) && Number.isFinite(e.c), 'Gegner ' + e.kind + ' NaN');
   for (const b of lv.bullets) assert.ok(Number.isFinite(b.a) && Number.isFinite(b.c));
@@ -199,4 +199,27 @@ test('Bonbons: ganze Formation abschießen lässt ein Bonbon fallen', () => {
   const lv = new Level({ edge: EDGE_BY_ID.kruemelstrasse, forward: true, items: new Set(), invincible: true });
   runLevel(lv, 30, { input: (l) => botInput(l, { buyPowers: false }) });
   assert.ok(lv.powers.cursor >= 0 || lv.pickups.length > 0, 'kein Bonbon bekommen');
+});
+
+test('Fairness: ein ausweichender Autopilot überlebt jedes Level (ohne Unverwundbarkeit)', async () => {
+  const { dodgeInput } = await import('./helpers/bot.mjs');
+  const deaths = [];
+  for (const edge of EDGES) {
+    const lv = new Level({ edge, forward: true, items: new Set(['BOHRER', 'PILZ']), seed: 2 });
+    runLevel(lv, edge.length / 42 + 150, { input: dodgeInput });
+    if (!lv.result || lv.result.type !== 'arrive') deaths.push(edge.id);
+  }
+  assert.deepEqual(deaths, []);
+});
+
+test('Großer Wecker: Uhrzeiger lassen hinten immer einen sicheren Streifen frei', () => {
+  const lv = new Level({ edge: EDGE_BY_ID.uhrwerk, forward: true, items: withAll(), invincible: true });
+  lv.events = [];
+  let minA = Infinity;
+  runLevel(lv, 160, {
+    check: (l) => {
+      for (const h of l.hazards) minA = Math.min(minA, h.a + Math.cos(h.ang) * h.len - l.camA);
+    },
+  });
+  assert.ok(minA > lv.margins()[0] + 12, 'Zeiger reicht bis ' + minA.toFixed(1));
 });

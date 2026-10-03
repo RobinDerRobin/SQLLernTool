@@ -113,7 +113,7 @@ export const BOSSES = {
       b.a = b.homeA + 18 * Math.sin(b.t * 0.9);
       b.vcc = b.vcc ?? 70;
       b.c += b.vcc * dt;
-      const lim = lv.vc * 0.36;
+      const lim = lv.vc * 0.26;
       const off = lv.dc(b.c, lv.arenaC);
       if (off > lim) b.vcc = -Math.abs(b.vcc);
       if (off < -lim) b.vcc = Math.abs(b.vcc);
@@ -199,15 +199,17 @@ export const BOSSES = {
       const sp = b.phase === 3 ? 1.6 : b.phase === 2 ? 1.25 : 1;
       b.hour = (b.hour ?? Math.PI) + dt * 0.35 * sp;
       b.minute = (b.minute ?? Math.PI * 0.5) + dt * 0.9 * sp;
-      const lh = Math.min(lv.va * 0.42, 150);
-      const lm = Math.min(lv.va * 0.58, 200);
+      // Zeiger nie so lang, dass sie den hinteren Bildrand erreichen: dort ist immer ein sicherer Streifen.
+      const lh = Math.min(lv.va * 0.32, 150);
+      const lm = Math.min(lv.va * 0.45, 200);
       const warmup = b.t < 2;
       lv.hazard(b.a, b.c, b.hour, lh, 6, warmup);
       lv.hazard(b.a, b.c, b.minute, lm, 3, warmup);
       schedule(b, dt, b.phase === 3 ? 1.3 : 1.9, [
         () => {
+          // aus beiden Glocken (oben links/rechts der Uhr)
           fan(lv, b.a - 20, b.c - 34, aim(b, lv, -20, -34), 2, 0.2, lv.bulletSpeed(105), 'glocke');
-          fan(lv, b.a - 20, b.c + 34, aim(b, lv, -20, 34), 2, 0.2, lv.bulletSpeed(105), 'glocke');
+          fan(lv, b.a + 20, b.c - 34, aim(b, lv, 20, -34), 2, 0.2, lv.bulletSpeed(105), 'glocke');
         },
         () => {
           if (b.phase >= 2) {

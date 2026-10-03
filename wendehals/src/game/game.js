@@ -266,8 +266,8 @@ export class Game {
         'Erkunde die Welt, finde Upgrades und dreh den Spieß um!',
         '',
         'Auf der Karte: Mit FEUER fliegst du in Blickrichtung los.',
-        'An Drehscheiben (◎) kannst du mit den Pfeilen die Richtung wählen.',
-        'An Stationen (💾) wird gespeichert.',
+        'An Drehscheiben (weißer Ring) wählst du mit den Pfeilen die Richtung.',
+        'An Stationen (blaues Quadrat) wird gespeichert.',
       ],
     });
     this.nextDialog();
@@ -474,7 +474,7 @@ export class Game {
     while (d < -2) d += 4;
     this.shipAngle += d * Math.min(1, dt * 12);
 
-    if (input.pause || input.back) return this.openPause();
+    if (input.pause) return this.openPause();
     for (const [k, dir] of DIR_KEYS) {
       if (!input[k] || dir === this.heading) continue;
       if (canTurnAt(this.node, this.items) || (this.items.has('WENDEHALS') && dir === opposite(this.heading))) {

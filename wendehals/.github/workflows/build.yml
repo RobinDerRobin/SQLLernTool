@@ -1,0 +1,58 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npm test
+      - run: npx playwright@1.56.1 install --with-deps chromium
+      - run: npm run build
+      - run: node e2e/smoke.mjs
+        env:
+          CHROMIUM_PATH: ''
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wendehals-browser
+          path: dist/index.html
+
+  package:
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist:win
+            artifact: wendehals-windows
+          - os: ubuntu-latest
+            script: dist:linux
+            artifact: wendehals-linux-steamdeck
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run ${{ matrix.script }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            release/*.exe
+            release/*.zip
+            release/*.AppImage
+            release/*.tar.gz

@@ -6,6 +6,8 @@
 
 import { Rng } from '../core/rng.js';
 import {
+  N,
+  S,
   wrap,
   wrapDelta,
   clamp,
@@ -272,8 +274,10 @@ export class Level {
     this.gateHints();
 
     this.hazards.length = 0;
+    for (const g of this.gates) if (g.blocks) for (const b of g.blocks) if (b.flash) b.flash = Math.max(0, b.flash - dt);
     for (const e of this.enemies) {
       e.t += dt;
+      if (e.flash) e.flash = Math.max(0, e.flash - dt);
       ENEMIES[e.kind].update(e, this, dt);
       e.c = wrap(e.c, this.H);
       if (e.shootAt && e.t >= e.shootAt) {
@@ -343,7 +347,8 @@ export class Level {
     // Trichter vor engen Spalten: wenn man winzig ist und fast passt, sanft einrasten.
     if (this.small && da > 0.2) this.funnel(p, dt, ha, hc);
 
-    p.a = clamp(p.a, this.camA + 10, this.camA + this.va - 10);
+    const [back, front] = this.margins();
+    p.a = clamp(p.a, this.camA + back, this.camA + this.va - front);
     if (this.arena) {
       const rel = clamp(this.dc(p.c, this.camC + this.vc / 2), -this.vc / 2 + 10, this.vc / 2 - 10);
       p.c = this.camC + this.vc / 2 + rel;
@@ -354,6 +359,18 @@ export class Level {
     if (p.history.length > 40) p.history.length = 40;
 
     if (canFire) this.fireWeapons(dt, input);
+  }
+
+  /** Abstand zu Hinter- und Vorderkante, damit die Figur nicht unter der Anzeige verschwindet. */
+  margins() {
+    switch (this.heading) {
+      case N:
+        return [30, 22];
+      case S:
+        return [26, 30];
+      default:
+        return [18, 12];
+    }
   }
 
   funnel(p, dt, ha, hc) {

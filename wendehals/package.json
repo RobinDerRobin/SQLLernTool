@@ -12,16 +12,42 @@
     "e2e": "npm run build && node e2e/smoke.mjs",
     "check": "npm test && npm run e2e",
     "start": "npm run build && electron .",
-    "dist:win": "npm run build && electron-builder --win --x64",
-    "dist:linux": "npm run build && electron-builder --linux --x64"
+    "dist:win": "npm run build && electron-builder --win --x64 --publish never",
+    "dist:linux": "npm run build && electron-builder --linux --x64 --publish never",
+    "e2e:desktop": "node e2e/electron.mjs",
+    "icon": "node tools/make-icon.mjs"
   },
   "build": {
     "appId": "de.robin.wendehals",
     "productName": "Wendehals",
-    "files": ["electron/**", "dist/**", "package.json"],
-    "directories": { "output": "release" },
-    "win": { "target": ["portable", "zip"], "signAndEditExecutable": false },
-    "linux": { "target": ["AppImage", "tar.gz"], "category": "Game" }
+    "files": [
+      "electron/**",
+      "dist/**",
+      "build/icon.png",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        "portable",
+        "zip"
+      ],
+      "signAndEditExecutable": false
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "tar.gz"
+      ],
+      "category": "Game"
+    }
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "playwright-core": "^1.56.1"
+  }
 }
