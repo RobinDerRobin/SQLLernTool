@@ -157,7 +157,7 @@ export function boot() {
   requestAnimationFrame(frame);
 
   // Für automatische Tests
-  window.__wendehals = { game, input, audio, perf };
+  window.__wendehals = { game, input, audio, perf, renderer };
   return game;
 }
 

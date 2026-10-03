@@ -371,7 +371,8 @@ export const ENEMIES = {
  * Teilen: Gegner mit "split" zerfallen beim Abschuss in kleinere – aber erst nach SPLIT_DELAY
  * (sichtbares Wackeln), und die Teile teilen sich nie weiter (keine Kettenreaktion).
  */
-export const SPLIT_DELAY = 0.35;
+export const SPLIT_WOBBLE = 0.2; // Elternteil wackelt, bevor er platzt
+export const SPLIT_DELAY = 0.3; // Teile wachsen, bevor sie loslegen
 export const MAX_SPLIT_GENERATION = 1;
 
 /** Gegner, die in Formationen auftreten (mehrere hintereinander). */

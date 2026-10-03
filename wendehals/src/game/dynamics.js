@@ -26,7 +26,7 @@ export function dynState(o, t) {
       return { kind: 'rect', a: o.a, c, ha: o.w / 2, hc: len / 2, base: o.c, dir, len };
     }
     case 'gear':
-      return { kind: 'circle', a: o.a, c: o.c + s * o.amp * Math.sin(t * o.speed + o.phase), r: o.r, rot: s * t * 1.5 };
+      return { kind: 'circle', a: o.a, c: o.c + s * o.amp * Math.sin(t * o.speed + o.phase), r: o.r, rot: (o.spin || 1) * t * 1.5 };
     case 'pendulum': {
       const th = o.maxAng * Math.sin(t * o.speed + o.phase);
       const a = o.a + Math.sin(th) * o.len * (o.flipA ? -1 : 1);
@@ -102,7 +102,7 @@ export function mirrorDyn(o, L, H, alsoC) {
   if (alsoC) {
     m.c = H - o.c;
     m.sign = -(o.sign || 1);
-  }
+  } else m.spin = -(o.spin || 1); // Spiegelbild dreht andersherum (180°-Drehung nicht)
   return m;
 }
 

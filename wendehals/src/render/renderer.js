@@ -311,7 +311,7 @@ export class Renderer {
         }
         const spin = lv.playerSpin();
         if (spin) ctx.rotate(spin);
-        if (lv.state === 'retreat') {
+        if (lv.state === 'retreat' || lv.stuckT > 3) {
           ctx.rotate(Math.sin(t * 22) * 0.25); // Kopfschütteln
           circle(ctx, 0, -22, 8, '#ffffff', '#1a1020', 1.2);
           text(ctx, '?', 0, -21.5, 10, '#1a1020', 'center', null);
@@ -547,6 +547,22 @@ export class Renderer {
     // Zerbrechliches als einzelne Klötzchen mit Fuge
     fillGroup(groups[T.BREAK], pal.brkEdge, 0);
     fillGroup(groups[T.BREAK], pal.brk, 1.5);
+    // Risse: zerbrechlich heißt "zerschießbar, aber fest" – nicht mit Hintergrund verwechseln
+    if (groups[T.BREAK].length) {
+      const list = groups[T.BREAK];
+      ctx.strokeStyle = pal.brkEdge;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      for (let i = 0; i < list.length; i += 2) {
+        const px = x(list[i]);
+        const py = y(list[i + 1]);
+        ctx.moveTo(px + S * 0.2, py + S * 0.25);
+        ctx.lineTo(px + S * 0.5, py + S * 0.45);
+        ctx.lineTo(px + S * 0.4, py + S * 0.7);
+        ctx.lineTo(px + S * 0.75, py + S * 0.85);
+      }
+      ctx.stroke();
+    }
     // Kanten zum freien Raum: helle Oberkante (Richtung -c) und dunkle Kontur
     const solidLike = (k) => k >= T.SOLID && k <= T.METAL;
     ctx.fillStyle = pal.edge;
@@ -806,8 +822,9 @@ export class Renderer {
     if (k <= 0) return;
     const ctx = this.ctx;
     const [ia, ic] = this.ipos(p);
-    const [sx, sy] = this.toScreen(lv, ia, ic);
     const lamp = lv.items.has('LAMPE');
+    // Die Lampe leuchtet nach vorn (dorthin, wo die Gefahr herkommt), nicht um den Dackel herum
+    const [sx, sy] = this.toScreen(lv, ia + (lamp ? 110 : 30), ic);
     const flicker = this.reducedEffects ? 0 : lamp ? Math.sin(lv.time * 9) * 4 : Math.sin(lv.time * 3) * 3;
     const r = (lamp ? 190 : 46) + flicker;
     const mask = darknessMask(lamp ? 190 : 46);
@@ -822,6 +839,26 @@ export class Renderer {
       grad.addColorStop(1, `rgba(5,3,10,${0.96 * k})`);
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, W, H);
+    }
+    // Bewegliche tödliche Teile bleiben als glühender Umriss sichtbar (fair auch ohne Lampe)
+    if (!lamp) {
+      ctx.strokeStyle = `rgba(255,140,90,${0.75 * k})`;
+      ctx.lineWidth = 1.5;
+      const z = lv.zoom || 1;
+      for (const st of lv.dynStates) {
+        if (!st || st.kind === 'zone') continue;
+        const [dx, dy] = this.toScreen(lv, st.a, st.c);
+        if (dx < -60 || dx > W + 60 || dy < -60 || dy > H + 60) continue;
+        ctx.beginPath();
+        if (st.kind === 'circle') ctx.arc(dx, dy, st.r * z, 0, Math.PI * 2);
+        else {
+          const vert = lv.heading % 2 === 1;
+          const hw = (vert ? st.hc : st.ha) * z;
+          const hh = (vert ? st.ha : st.hc) * z;
+          ctx.rect(dx - hw, dy - hh, hw * 2, hh * 2);
+        }
+        ctx.stroke();
+      }
     }
     // Leuchtende Augen der Gegner im Dunkeln
     if (!lamp) {
@@ -848,8 +885,15 @@ export class Renderer {
     }
     for (let i = 0; i < lv.powers.shield; i++) circle(ctx, 14 + i * 10, 21, 3.5, 'rgba(90,200,255,0.8)', '#ffffff', 0.8);
     text(ctx, String(game.progress.score + lv.score).padStart(7, '0'), W - 8, 11, 10, '#ffffff', 'right');
-    text(ctx, lv.edge.name, W / 2, 10, 8, '#ffe9b0');
+    // Anzeigen weichen dem Spieler: in seiner Nähe werden sie durchsichtig (Terrain bleibt sichtbar)
+    const [, py] = this.toScreen(lv, p.a, p.c);
+    const topA = py < 60 ? 0.3 : 1;
+    const botA = py > H - 60 ? 0.3 : 1;
+    ctx.globalAlpha = topA * Math.max(0, Math.min(1, 5 - lv.time)); // Etappenname nur am Anfang
+    if (ctx.globalAlpha > 0) text(ctx, lv.edge.name, W / 2, 10, 8, '#ffe9b0');
+    ctx.globalAlpha = topA;
     if (!lv.arena) this.drawProgress(lv);
+    ctx.globalAlpha = botA;
 
     // Power-Leiste
     const bw = 62;
@@ -865,6 +909,7 @@ export class Renderer {
       if (i === 4 && lv.powers.options) label += ' ' + lv.powers.options;
       text(ctx, label, x + bw / 2, y0 + 7, 7, sel ? '#2a1040' : avail ? '#ffffff' : '#7a6aa0', 'center', null);
     }
+    ctx.globalAlpha = 1;
 
     if (lv.boss && lv.state === 'boss') {
       const b = lv.boss;

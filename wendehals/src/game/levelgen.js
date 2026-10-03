@@ -209,6 +209,13 @@ function fitGatesToTerrain(gates, map) {
  * Komplettes Level für eine Flugrichtung. Rückwärts wird alles (Terrain, Hindernisse,
  * bewegliche Teile) gespiegelt; die Gegnerwellen werden passend neu verteilt.
  */
+/** Nur die Ereignisse (Wellen, Hinweise) einer Richtung – ohne Terrain, für die Kehrtwende. */
+export function generateEvents(edge, forward = true, H = 544, L = edge.length) {
+  const gatesFwd = buildGates(edge, new Rng('gates:' + edge.id), H, L);
+  const gates = forward ? gatesFwd : mirrorGates(gatesFwd, L);
+  return buildEvents(edge, new Rng('level:' + edge.id + (forward ? '' : ':rev')), gates, forward, L);
+}
+
 export function generateLevel(edge, forward = true, H = 544, L = edge.length) {
   const gatesFwd = buildGates(edge, new Rng('gates:' + edge.id), H, L);
   const terrain = buildTerrain(edge, H, L, gatesFwd, new Rng('terrain:' + edge.id));

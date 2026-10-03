@@ -13,7 +13,7 @@ export const THEMES = {
   bad: {
     name: 'Badewannen-Ozean',
     bg: ['#bfe8f4', '#8fd0e8'],
-    terrain: { solid: '#f2f6f8', edge: '#6a8aa0', light: '#ffffff', brk: '#d8f4ff', brkEdge: '#7ab0c8', metal: '#a0b4c4', slow: 'rgba(60,150,230,0.45)' },
+    terrain: { solid: '#4f9cbf', edge: '#1f4a66', light: '#9fd8ee', brk: '#ffe07a', brkEdge: '#a07a10', metal: '#a0b4c4', slow: 'rgba(60,150,230,0.45)' },
     pattern: 'fliesen',
     accent: '#ffe14d',
     pool: ['ente', 'seife', 'nilpferd', 'socke'],

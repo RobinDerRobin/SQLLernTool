@@ -23,11 +23,11 @@ import { CHARACTERS } from '../data/characters.js';
 import { maxHpFor } from '../data/items.js';
 import { HINTS } from '../data/text.js';
 import { edgeDir } from './worldgraph.js';
-import { generateLevel } from './levelgen.js';
+import { generateLevel, generateEvents } from './levelgen.js';
 import { LEVELS } from '../data/levels.js';
 import { TILE, isSolid } from './terrain.js';
 import { dynState, dynHitsBox, mirrorDyn, corridorAt } from './dynamics.js';
-import { ENEMIES, FORMATION_KINDS, SPLIT_DELAY, MAX_SPLIT_GENERATION } from './enemies.js';
+import { ENEMIES, FORMATION_KINDS, SPLIT_DELAY, SPLIT_WOBBLE, MAX_SPLIT_GENERATION } from './enemies.js';
 import { BOSSES, defaultHitTest } from './bosses.js';
 import { addCapsule, activate, freshPowers } from './powerups.js';
 
@@ -395,13 +395,20 @@ export class Level {
     this.hazards.length = 0;
     for (const g of this.gates) if (g.blocks) for (const b of g.blocks) if (b.flash) b.flash = Math.max(0, b.flash - dt);
     for (const e of this.enemies) {
+      if (e.splitting > 0) {
+        // getroffen: wackelt und bläht sich kurz auf, dann platzt er in seine Teile
+        e.splitting -= dt;
+        if (e.splitting <= 0) this.finishSplit(e);
+        continue;
+      }
       if (e.dormant > 0) {
-        e.dormant -= dt; // frisch geteilt: wackelt kurz an Ort und Stelle, harmlos und unverwundbar
+        e.dormant -= dt; // frisch geteilt: wächst kurz an Ort und Stelle, harmlos und unverwundbar
         continue;
       }
       e.t += dt;
       if (e.flash) e.flash = Math.max(0, e.flash - dt);
       ENEMIES[e.kind].update(e, this, dt);
+      this.keepOutOfWalls(e);
       e.c = this.nc(e.c);
       if (e.shootAt && e.t >= e.shootAt) {
         e.shootAt = 0;
@@ -434,7 +441,7 @@ export class Level {
     );
     const held = g && this.camA >= g.a0 - this.va * WALL_HOLD - 1;
     this.stuckT = held ? (this.stuckT || 0) + dt : 0;
-    if (this.stuckT > 6) {
+    if (this.stuckT > 6 - 1e-9) {
       this.state = 'retreat';
       this.timer = 1.6;
       this.sfx('nope');
@@ -686,7 +693,8 @@ export class Level {
     }
     this.popups = [];
     const front = this.camA + this.va + 40;
-    this.events = generateLevel(this.edge, this.forward, this.H).events.filter((ev) => ev.type === 'wave' && ev.at > front);
+    // Nur die Wellen neu berechnen – Terrain und Dynamik sind schon gespiegelt (billig, kein Ruckler)
+    this.events = generateEvents(this.edge, this.forward, this.H, this.L).filter((ev) => ev.type === 'wave' && ev.at > front);
     this.evIdx = 0;
     this.waves.clear();
     this.hasBoss = this.bossPending();
@@ -853,7 +861,7 @@ export class Level {
       }
       if (s.dead) continue;
       for (const e of this.enemies) {
-        if (e.dead || e.dormant > 0) continue;
+        if (e.dead || e.dormant > 0 || e.splitting > 0) continue;
         if (s.hit && s.hit.has(e)) continue;
         const rr = e.r + s.r + (s.kind === 'laser' ? 6 : 0);
         if (Math.abs(s.a - e.a) > rr + (s.len || 0) || Math.abs(this.dc(s.c, e.c)) > rr) continue;
@@ -894,11 +902,17 @@ export class Level {
   }
 
   kill(e, byPlayer) {
-    if (e.dead) return;
-    e.dead = true;
+    if (e.dead || e.splitting > 0) return;
     const def = ENEMIES[e.kind];
-    this.burst(e.a, e.c, '#ffffff', 8, 90, 3);
-    this.sfx('pop');
+    const splits = this.canSplit(e, def, byPlayer);
+    if (!splits) {
+      e.dead = true;
+      this.burst(e.a, e.c, '#ffffff', 8, 90, 3);
+      this.sfx('pop');
+    } else {
+      e.splitting = SPLIT_WOBBLE;
+      this.sfx('hit');
+    }
     if (byPlayer) {
       this.score += def.score;
       this.stats.kills++;
@@ -909,17 +923,34 @@ export class Level {
       }
     }
     if (def.onDeath) def.onDeath(e, this);
-    this.trySplit(e, def, byPlayer);
   }
 
-  /** Verzögertes Teilen: Die Teile erscheinen "schlafend" und werden erst nach kurzer Zeit aktiv. */
-  trySplit(e, def, byPlayer) {
+  canSplit(e, def, byPlayer) {
     const sp = def.split;
-    if (!sp || (e.gen || 0) >= MAX_SPLIT_GENERATION) return;
-    if (!byPlayer && !sp.always) return;
+    return !!sp && (e.gen || 0) < MAX_SPLIT_GENERATION && (byPlayer || sp.always);
+  }
+
+  /**
+   * Verzögertes Teilen: erst wackelt der Gegner (SPLIT_WOBBLE), dann platzt er; die Teile
+   * erscheinen "schlafend" (SPLIT_DELAY) und teilen sich selbst nie weiter.
+   */
+  finishSplit(e) {
+    const sp = ENEMIES[e.kind].split;
+    e.dead = true;
+    e.splitting = 0;
+    this.burst(e.a, e.c, '#ffffff', 8, 90, 3);
+    this.sfx('pop');
+    const c = this.freeC(e.a, e.c); // nie in einer Wand entstehen
     for (const vc of sp.spread) {
-      this.spawn(sp.into, e.a, e.c, { vc, gen: (e.gen || 0) + 1, dormant: SPLIT_DELAY, c0: e.c });
+      this.spawn(sp.into, e.a, c, { vc, gen: (e.gen || 0) + 1, dormant: SPLIT_DELAY, c0: c });
     }
+  }
+
+  /** Gegner fliegen nicht durch festes Terrain: an der Wand entlang statt hinein. */
+  keepOutOfWalls(e) {
+    if (!isSolid(this.map.at(e.a, e.c))) return;
+    const c = this.freeC(e.a, e.c);
+    if (c !== e.c) e.c = c;
   }
 
   dropCapsule(a, c) {
@@ -947,7 +978,7 @@ export class Level {
       }
     }
     for (const e of this.enemies) {
-      if (e.dead || e.dormant > 0) continue;
+      if (e.dead || e.dormant > 0 || e.splitting > 0) continue;
       if (dist2(p.a, 0, e.a, this.dc(e.c, p.c)) < (e.r + r) ** 2) {
         // Unzerstörbares (Zahnräder) ist ein fester Gegenstand: sofort tödlich.
         if (ENEMIES[e.kind].invulnerable) this.instantDeath();

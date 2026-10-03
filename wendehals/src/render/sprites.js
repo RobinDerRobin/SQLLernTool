@@ -2,6 +2,8 @@
 // +x = Flugrichtung des Spielers, +y = Querachse. Gegner schauen nach -x.
 // Weil der Renderer die ganze Welt dreht, drehen sich alle Figuren automatisch mit.
 
+import { SPLIT_DELAY, SPLIT_WOBBLE } from '../game/enemies.js';
+
 const TAU = Math.PI * 2;
 const DISCO5 = ['#ff4fb0', '#4fd0ff', '#ffe14d', '#ffffff', '#b04fff'];
 
@@ -259,9 +261,14 @@ export function drawBullet(ctx, b, t) {
 // --------------------------------------------------------------- Gegner
 export function drawEnemy(ctx, e, t) {
   ctx.save();
-  if (e.dormant > 0) {
+  if (e.splitting > 0) {
+    // getroffen, gleich platzt er: wackeln und aufblähen
+    const k = 1 - e.splitting / SPLIT_WOBBLE;
+    ctx.rotate(Math.sin(t * 50) * 0.35);
+    ctx.scale(1 + 0.35 * k, 1 + 0.35 * k);
+  } else if (e.dormant > 0) {
     // frisch geteilt: klein, wackelnd, halb durchsichtig – wächst in die volle Größe
-    const k = 1 - e.dormant / 0.35;
+    const k = 1 - e.dormant / SPLIT_DELAY;
     ctx.globalAlpha = 0.5 + 0.5 * k;
     ctx.scale(0.4 + 0.6 * k, 0.4 + 0.6 * k);
     ctx.rotate(Math.sin(t * 40) * 0.3);
@@ -320,13 +327,17 @@ export function drawEnemy(ctx, e, t) {
       break;
     case 'seife':
     case 'miniseife': {
+      // Rosa Seifenstück mit Gesicht – klar anders als die Deko-Blasen im Bad
       const r = e.kind === 'seife' ? 12 : 6;
-      circle(ctx, 0, 0, r, 'rgba(180,230,255,0.25)', 'rgba(255,255,255,0.9)', 1.2);
-      ctx.strokeStyle = 'rgba(255,120,220,0.5)';
+      rrect(ctx, -r, -r * 0.7, r * 2, r * 1.4, r * 0.45, '#ff8ac8', '#8a1f5a', 1.4);
+      circle(ctx, -r * 0.45, -r * 0.3, r * 0.2, '#ffffff');
+      circle(ctx, -r * 0.3, -r * 0.05, r * 0.12, '#1a1020');
+      circle(ctx, r * 0.3, -r * 0.05, r * 0.12, '#1a1020');
+      ctx.strokeStyle = '#1a1020';
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(0, 0, r - 2, t * 2, t * 2 + 1.5);
+      ctx.arc(0, r * 0.15, r * 0.25, 0.2, Math.PI - 0.2);
       ctx.stroke();
-      circle(ctx, -r * 0.35, -r * 0.35, r * 0.18, '#ffffff');
       break;
     }
     case 'nilpferd':
@@ -456,10 +467,13 @@ export function drawEnemy(ctx, e, t) {
       break;
     case 'brezelhaelfte':
       ctx.rotate(t * 4);
-      ctx.strokeStyle = '#a0561f';
-      ctx.lineWidth = 2.5;
       ctx.beginPath();
       ctx.arc(0, 0, 4, 0.3, Math.PI * 1.4);
+      ctx.strokeStyle = '#fff3d0'; // helle Kontur: lesbar vor braunem Terrain
+      ctx.lineWidth = 4.5;
+      ctx.stroke();
+      ctx.strokeStyle = '#a0561f';
+      ctx.lineWidth = 2.5;
       ctx.stroke();
       circle(ctx, 1, -2, 0.6, '#ffffff');
       break;
