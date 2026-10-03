@@ -44,7 +44,7 @@ export const NODES = {
   // Badewannen-Ozean
   stoepsel: { name: 'Stöpsel', x: 3, y: 1, area: 'bad', save: true, turntable: true },
   seifenschale: { name: 'Seifenschale', x: 4, y: 1, area: 'bad' },
-  duschkopf: { name: 'Duschkopf', x: 4, y: 0, area: 'bad' },
+  duschkopf: { name: 'Duschkopf', x: 4, y: 0, area: 'bad', item: 'ESPRESSO' },
   handtuch: { name: 'Handtuchhaken', x: 3, y: 0, area: 'bad', item: 'LAMPE' },
   brotkorb: { name: 'Brotkorb', x: 2, y: 0, area: 'fruehstueck', item: 'OMA' },
   entenhafen: { name: 'Quietscheentenhafen', x: 5, y: 1, area: 'bad', save: true, turntable: true },
@@ -83,7 +83,7 @@ export const EDGES = [
   { id: 'kruemelfall', from: 'brotkorb', to: 'tasse', name: 'Krümelfall', theme: 'fruehstueck', length: 1800, difficulty: 2 },
   { id: 'entenrennen', from: 'seifenschale', to: 'entenhafen', name: 'Entenrennen', theme: 'bad', length: 2800, difficulty: 3 },
   { id: 'blubberschacht', from: 'stoepsel', to: 'blubber', name: 'Blubberschacht', theme: 'bad', length: 2000, difficulty: 3, gates: [g('dark', 0.3, 900)] },
-  { id: 'flusensieb', from: 'blubber', to: 'sockenschublade', name: 'Flusensieb', theme: 'bad', length: 2000, difficulty: 3, gates: [g('spikes', 0.35, 500)], toPos: 0.65 },
+  { id: 'flusensieb', from: 'blubber', to: 'sockenschublade', name: 'Flusensieb', theme: 'bad', length: 2600, difficulty: 3, gates: [g('spikes', 0.15, 450), g('clock', 0.5)], toPos: 0.65 },
   // Abkürzungen zurück zum Stöpsel (Einbahn): mehrere Ausgänge an derselben Seite
   { id: 'ueberlauf', from: 'sockenschublade', to: 'stoepsel', dir: W, fromPos: 0.25, toPos: 0.75, name: 'Überlauf', theme: 'bad', length: 1600, difficulty: 2, oneWay: true },
   { id: 'fallrohr', from: 'handtuch', to: 'stoepsel', name: 'Fallrohr', theme: 'bad', length: 1600, difficulty: 2, oneWay: true },

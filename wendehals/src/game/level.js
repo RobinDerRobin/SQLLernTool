@@ -23,7 +23,7 @@ import { CHARACTERS } from '../data/characters.js';
 import { maxHpFor } from '../data/items.js';
 import { HINTS } from '../data/text.js';
 import { edgeDir } from './worldgraph.js';
-import { generateLevel, generateEvents } from './levelgen.js';
+import { generateLevel, generateEvents, CLOCK_RUN, CLOCK_TIME } from './levelgen.js';
 import { LEVELS } from '../data/levels.js';
 import { TILE, isSolid } from './terrain.js';
 import { dynState, dynHitsBox, mirrorDyn, corridorAt } from './dynamics.js';
@@ -287,8 +287,9 @@ export class Level {
   staticWallHit(a, c, ha, hc) {
     if (this.map.touch(a, c, ha, hc) & 1) return this.map;
     for (const g of this.gates) {
-      if (g.type !== 'rock' && g.type !== 'narrow') continue;
+      if (g.type !== 'rock' && g.type !== 'narrow' && !(g.type === 'clock' && g.closed)) continue;
       if (a + ha <= g.a0 || a - ha >= g.a1) continue;
+      if (g.type === 'clock') return g;
       if (g.type === 'rock') {
         for (const b of g.blocks) {
           if (b.hp <= 0) continue;
@@ -330,6 +331,8 @@ export class Level {
     this.snapshot();
     this.sfxQueue.length = 0;
     this.time += dt;
+    // Doppelter Espresso: Taste halten = doppelt so schnell scrollen (und fliegen)
+    this.turbo = this.items.has('ESPRESSO') && !!input.espresso && this.state === 'play';
     for (const m of this.messages) m.t += dt;
     compact(this.messages, (m) => m.t < m.dur);
     this.shakeAmt = Math.max(0, this.shakeAmt - 30 * dt);
@@ -435,7 +438,7 @@ export class Level {
     const p = this.player;
     const g = this.gates.find(
       (x) =>
-        ((x.type === 'rock' && !this.items.has('BOHRER')) || (x.type === 'narrow' && !this.small)) &&
+        ((x.type === 'rock' && !this.items.has('BOHRER')) || (x.type === 'narrow' && !this.small) || (x.type === 'clock' && x.closed)) &&
         x.a0 > p.a &&
         x.a0 - this.camA < this.va,
     );
@@ -451,9 +454,10 @@ export class Level {
   updateCamera(dt) {
     if (this.arena) return;
     const maxA = this.L - this.va;
-    let target = this.camA + SCROLL_SPEED * dt;
+    let target = this.camA + SCROLL_SPEED * (this.turbo ? 2 : 1) * dt;
+    this.updateClocks(dt);
     for (const g of this.gates) {
-      if (g.type !== 'rock' && g.type !== 'narrow') continue;
+      if (g.type !== 'rock' && g.type !== 'narrow' && !(g.type === 'clock' && g.closed)) continue;
       if (g.a1 <= this.camA) continue;
       if (this.player.a < g.a1 + 4) target = Math.min(target, Math.max(this.camA, g.a0 - this.va * WALL_HOLD));
     }
@@ -471,6 +475,36 @@ export class Level {
         this.timer = 1.6;
         this.sfx('clear');
         this.say('Etappe geschafft!', 1.6, 'big');
+      }
+    }
+  }
+
+  /**
+   * Zeitschranken: Sobald ihre Anlaufstrecke ins Bild kommt, läuft die Uhr. Ist sie abgelaufen,
+   * fällt die Schranke zu – es sei denn, man steckt gerade darin (dann sobald man draußen ist).
+   */
+  updateClocks(dt) {
+    const p = this.player;
+    const { ha } = this.playerHalf;
+    for (const g of this.gates) {
+      if (g.type !== 'clock') continue;
+      g.shut = Math.max(0, Math.min(1, (g.shut || 0) + (g.closed ? dt * 6 : -dt * 6)));
+      if (g.closed) continue;
+      if (g.timer < 0) {
+        if (this.camA + this.va >= g.a0 - CLOCK_RUN) {
+          g.timer = CLOCK_TIME;
+          this.sfx('tick');
+        }
+        continue;
+      }
+      const before = Math.ceil(g.timer);
+      g.timer -= dt;
+      if (Math.ceil(g.timer) !== before && g.timer > 0) this.sfx('tick');
+      if (g.timer <= 0 && (p.a + ha <= g.a0 || p.a - ha >= g.a1)) {
+        g.closed = true;
+        g.timer = 0;
+        this.shake(3);
+        this.sfx('boom');
       }
     }
   }
@@ -493,7 +527,7 @@ export class Level {
       my /= len;
     }
     const [da, dcv] = screenToLocalVec(this.heading, mx, my);
-    const speed = BASE_SPEED * this.char.speed * (1 + 0.22 * this.powers.speed) * (p.slow ? 0.55 : 1);
+    const speed = BASE_SPEED * this.char.speed * (1 + 0.22 * this.powers.speed) * (p.slow ? 0.55 : 1) * (this.turbo ? 1.35 : 1);
 
     // Trichter vor engen Spalten: wer winzig ist und ungefähr trifft, wird sanft eingelenkt.
     if (this.small) this.funnel(p, dt, ha, hc);
@@ -852,6 +886,10 @@ export class Level {
               break;
             }
           }
+        } else if (g.type === 'clock' && g.closed && s.a + s.r > g.a0 && s.a - s.r < g.a1) {
+          s.dead = true;
+          this.burst(g.a0, s.c, '#cccccc', 3, 50, 2);
+          this.sfx('pling');
         } else if (g.type === 'narrow' && s.a + s.r > g.a0 && s.a - s.r < g.a1) {
           if (Math.abs(this.dc(s.c, g.gapC)) + s.r > g.gapW / 2) {
             s.dead = true;

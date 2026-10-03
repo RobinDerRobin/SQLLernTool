@@ -25,6 +25,7 @@ const KEYMAP = {
   KeyX: 'station',
   KeyC: 'station',
   KeyM: 'map',
+  KeyE: 'espresso',
   Tab: 'map',
   F11: 'fullscreen',
 };
@@ -35,6 +36,7 @@ const PADMAP = {
   1: 'power',
   2: 'station',
   3: 'wende',
+  5: 'espresso',
   8: 'map',
   9: 'pause',
   12: 'up',
@@ -43,7 +45,7 @@ const PADMAP = {
   15: 'right',
 };
 
-const ACTIONS = ['up', 'down', 'left', 'right', 'fire', 'confirm', 'power', 'wende', 'pause', 'back', 'station', 'map', 'fullscreen'];
+const ACTIONS = ['up', 'down', 'left', 'right', 'fire', 'confirm', 'power', 'wende', 'pause', 'back', 'station', 'map', 'espresso', 'fullscreen'];
 const DEADZONE = 0.28;
 
 export class Input {
@@ -122,6 +124,7 @@ export class Input {
       mx,
       my,
       fire: held.fire,
+      espresso: !!held.espresso,
       firePressed: pressed('fire'),
       confirm: pressed('confirm') || pressed('fire'),
       back: pressed('back') || pressed('power'),

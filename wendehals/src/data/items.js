@@ -58,6 +58,13 @@ export const ITEMS = {
     kind: 'character',
     required: false,
   },
+  ESPRESSO: {
+    short: 'EX',
+    name: 'Doppelter Espresso',
+    desc: 'E / RB halten: Turbo',
+    kind: 'ability',
+    required: false,
+  },
   SPARSTRUMPF: {
     short: 'SS',
     name: 'Omas Sparstrumpf',
@@ -78,6 +85,7 @@ export const GATES = {
   narrow: { item: 'PILZ', soft: false, name: 'Enge Spalte' },
   spikes: { item: 'GUMMIHAUT', soft: true, name: 'Stachelfeld' },
   dark: { item: 'LAMPE', soft: true, name: 'Dunkelzone' },
+  clock: { item: 'ESPRESSO', soft: false, name: 'Zeitschranke' },
 };
 
 export const BASE_HP = 3;

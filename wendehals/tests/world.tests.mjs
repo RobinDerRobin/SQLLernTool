@@ -154,7 +154,7 @@ test('Arenen: mehrere Ausgänge pro Seite, mehr als vier insgesamt', () => {
 
 test('Löser kennt alle Ausgänge einer Seite', async () => {
   const { successors, maskOf } = await import('../src/game/solver.js');
-  const items = new Set(['GUMMIHAUT']);
+  const items = new Set(['GUMMIHAUT', 'ESPRESSO']);
   const succ = successors({ node: 'sockenschublade', heading: W, mask: maskOf(items) }, false);
   const via = succ.map((s) => s.via).sort();
   assert.deepEqual(via, ['flug:flusensieb', 'flug:ueberlauf']);

@@ -27,6 +27,7 @@ export const CONTROLS_TEXT = [
   'Leertaste / J ........... Feuer, Bestätigen',
   'K / Umschalt ............ POWER kaufen, Drehen (Drehwurm)',
   'L / Q ................... Wenden (180°, braucht Wendehals)',
+  'E (halten) .............. Turbo (braucht Espresso)',
   'X / C ................... Station benutzen',
   'M / Tab ................. Karte',
   'Esc / P ................. Pause, Zurück',
@@ -38,6 +39,7 @@ export const CONTROLS_TEXT = [
   'B ....................... POWER, Drehen, Zurück',
   'X ....................... Station benutzen',
   'Y ....................... Wenden',
+  'RB (halten) ............. Turbo',
   'View / Select ........... Karte',
   'Start / Menü ............ Pause',
 ];
@@ -561,7 +563,7 @@ export class Game {
     if (input.pause && this.level.state !== 'dead') return this.openPause();
     if (input.map && this.level.state !== 'dead') return this.openMap();
     const lv = this.level;
-    lv.update(dt, { mx: input.mx, my: input.my, fire: input.fire, power: input.power, wende: input.wende });
+    lv.update(dt, { mx: input.mx, my: input.my, fire: input.fire, power: input.power, wende: input.wende, espresso: input.espresso });
     for (const s of lv.sfxQueue) this.sfxQueue.push(s);
     if (lv.result) this.handleLevelResult(lv.result);
   }

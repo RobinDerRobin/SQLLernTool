@@ -27,6 +27,7 @@ import {
 } from './sprites.js';
 import { cached, fillTiled, fillTiledScreen, drawWithFlash } from './canvas.js';
 import { TILE, T } from '../game/terrain.js';
+import { CLOCK_RUN, CLOCK_TIME } from '../game/levelgen.js';
 
 const FONT = "'Trebuchet MS', 'Segoe UI', 'DejaVu Sans', Verdana, sans-serif";
 const W = SCREEN_W;
@@ -329,6 +330,19 @@ export class Renderer {
       });
     }
     this.drawNarrowArrows(lv, t);
+    if (lv.turbo && !this.reducedEffects) {
+      // Fahrtwind: helle Striche, die nach hinten wegziehen
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i < 9; i++) {
+        const y = ((i * 97) % lv.vc) + 6;
+        const x = lv.va - ((t * 900 + i * 173) % (lv.va + 80));
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + 40, y);
+      }
+      ctx.stroke();
+    }
     ctx.restore();
 
     this.drawDarkness(game, lv);
@@ -679,7 +693,8 @@ export class Renderer {
     for (const g of lv.gates) {
       const x0 = g.a0 - this.camA;
       const x1 = g.a1 - this.camA;
-      if (x1 < -60 || x0 > lv.va + 60) continue;
+      const lead = g.type === 'clock' ? CLOCK_RUN : 0; // Startlinie liegt vor der Schranke
+      if (x1 < -60 || x0 - lead > lv.va + 60) continue;
       if (g.type === 'rock') {
         for (const b of g.blocks) {
           if (b.hp <= 0) continue;
@@ -707,6 +722,8 @@ export class Renderer {
           }
           ctx.restore();
         }
+      } else if (g.type === 'clock') {
+        this.drawClockGate(lv, g, x0, x1, t);
       } else if (g.type === 'narrow') {
         const [, gy] = this.viewPos(lv, g.a0, g.gapC);
         const half = g.gapW / 2;
@@ -752,6 +769,73 @@ export class Renderer {
   }
 
   /** Pfeile zeigen auf eine enge Spalte, die gerade nicht im Bild ist. */
+  /**
+   * Zeitschranke: Startlinie mit Stoppuhren, dahinter ein Messinggitter, das zuschnappt, wenn
+   * die Uhr abgelaufen ist. Die große Uhr zeigt die Restzeit – ohne Text.
+   */
+  drawClockGate(lv, g, x0, x1, t) {
+    const ctx = this.ctx;
+    const vc = lv.vc;
+    const run = CLOCK_RUN;
+    // Startlinie (in Flugrichtung vor der Schranke)
+    const xs = x0 - run;
+    if (xs > -20 && xs < lv.va + 20 && !g.closed) {
+      ctx.strokeStyle = 'rgba(255,225,77,0.8)';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8, 8]);
+      ctx.beginPath();
+      ctx.moveTo(xs, -10);
+      ctx.lineTo(xs, vc + 10);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      for (let y = 40; y < vc; y += 110) this.stopwatch(xs, y, 7, 1, false);
+    }
+    // Rahmen
+    ctx.fillStyle = '#c9a24a';
+    ctx.fillRect(x0, -20, 3, vc + 40);
+    ctx.fillRect(x1 - 3, -20, 3, vc + 40);
+    // Gitter schließt von beiden Seiten zur Mitte
+    const k = g.shut || 0;
+    if (k > 0) {
+      const half = (vc + 40) / 2;
+      const len = half * k;
+      ctx.fillStyle = 'rgba(90,60,20,0.85)';
+      ctx.fillRect(x0, -20, x1 - x0, len);
+      ctx.fillRect(x0, vc + 20 - len, x1 - x0, len);
+      ctx.strokeStyle = '#e8c870';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let y = -20; y < -20 + len; y += 10) {
+        ctx.moveTo(x0, y);
+        ctx.lineTo(x1, y);
+      }
+      for (let y = vc + 20 - len; y < vc + 20; y += 10) {
+        ctx.moveTo(x0, y);
+        ctx.lineTo(x1, y);
+      }
+      ctx.stroke();
+    }
+    // Restzeit als Stoppuhr an der Schranke
+    if (!g.closed) {
+      const left = g.timer < 0 ? 1 : Math.max(0, g.timer / CLOCK_TIME);
+      const urgent = g.timer >= 0 && g.timer < 1.2;
+      const wob = urgent && !this.reducedEffects ? Math.sin(t * 30) * 2 : 0;
+      this.stopwatch((x0 + x1) / 2 + wob, vc / 2, 14, left, urgent);
+    }
+  }
+
+  stopwatch(x, y, r, left, urgent) {
+    const ctx = this.ctx;
+    circle(ctx, x, y, r, '#fffdf0', urgent ? '#ff4f4f' : '#5a4420', 2);
+    ctx.fillStyle = urgent ? 'rgba(255,79,79,0.45)' : 'rgba(255,211,77,0.6)';
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.arc(x, y, r - 2, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * left);
+    ctx.fill();
+    ctx.fillStyle = '#5a4420';
+    ctx.fillRect(x - 2, y - r - 4, 4, 4);
+  }
+
   drawNarrowArrows(lv, t) {
     const ctx = this.ctx;
     for (const g of lv.gates) {

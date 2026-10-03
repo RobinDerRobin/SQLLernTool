@@ -163,6 +163,9 @@ await flyTo('stoepsel', 0, ALL, 14, '15-bad');
 await flyTo('discotuer', 1, ALL, 14, '16-disco');
 await flyTo('lavalampe', 3, ALL, 14, '17-uhrwerk');
 await flyTo('kellertreppe', 1, ALL, 14, '18-keller');
+// Zeitschranke: Uhr läuft (mit Espresso), bzw. schon zu (ohne)
+await flyTo('blubber', 0, [...ALL, 'ESPRESSO'], 12, '19-zeitschranke-uhr', 'for (let i = 0; i < 150; i++) lv.update(1/60, { espresso: true, mx: 1, my: 0, fire: true });');
+await flyTo('blubber', 0, ALL, 26, '19b-zeitschranke-zu');
 // Bosse: Kamera ans Levelende setzen
 const toBoss = 'lv.camA = lv.L - lv.va - 1; lv.player.a = lv.camA + 60; for (let i = 0; i < 60 * 6; i++) lv.update(1/60, { fire: true, my: Math.sin(i/30) });';
 await flyTo('marmelade', 0, [], 1, '20-boss-kaffeekanne', toBoss);

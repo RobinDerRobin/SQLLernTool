@@ -220,7 +220,9 @@ test('Fairness: ein ausweichender Autopilot überlebt jedes Level (ohne Unverwun
   const deaths = [];
   for (const edge of EDGES) {
     for (const seed of [1, 2, 3]) {
-      const lv = new Level({ edge, forward: true, items: new Set(['BOHRER', 'PILZ']), seed });
+      // Nur die Items für harte Hindernisse – weiche (Stacheln, Dunkel) muss man können
+      const hard = Object.values(GATES).filter((g) => !g.soft).map((g) => g.item);
+      const lv = new Level({ edge, forward: true, items: new Set(hard), seed });
       runLevel(lv, edge.length / 42 + 150, { input: dodgeInput });
       if (!lv.result || lv.result.type !== 'arrive') deaths.push(edge.id + '#' + seed);
     }
@@ -384,4 +386,53 @@ test('Zahnräder: Drehsinn bleibt bei der Kehrtwende, kehrt sich im Spiegelbild 
   assert.ok(rot(g) > 0);
   assert.ok(rot(mirrorDyn(g, 1000, 288, true)) > 0, '180°-Drehung');
   assert.ok(rot(mirrorDyn(g, 1000, 288, false)) < 0, 'Spiegelung');
+});
+
+test('Zeitschranke: ohne Espresso fällt sie vor der Nase zu, mit Espresso (gehalten) kommt man durch', () => {
+  const edge = EDGE_BY_ID.flusensieb;
+  for (const forward of [true, false]) {
+    for (const withEspresso of [false, true]) {
+      const items = withAll(withEspresso ? [] : ['ESPRESSO']);
+      const lv = new Level({ edge, forward, items, invincible: true, seed: 4 });
+      const { result } = runLevel(lv, edge.length / 42 + 40);
+      const g = lv.gates.find((x) => x.type === 'clock');
+      if (withEspresso) assert.equal(result?.type, 'arrive', `${forward}: mit Espresso nicht durch`);
+      else {
+        assert.ok(g.closed, 'Schranke ist zu');
+        assert.ok(!result || result.type === 'retreat', `${forward}: ohne Espresso trotzdem durch`);
+      }
+    }
+  }
+});
+
+test('Espresso: Taste halten verdoppelt das Scrolltempo, ohne Item passiert nichts', () => {
+  const edge = EDGES.find((e) => !e.boss && !(e.gates || []).length);
+  const run = (items, espresso) => {
+    const lv = new Level({ edge, forward: true, items, invincible: true, seed: 1 });
+    clearTerrain(lv);
+    lv.events = [];
+    for (let i = 0; i < 120; i++) lv.update(1 / 60, { espresso });
+    return lv.camA;
+  };
+  const normal = run(new Set(), false);
+  assert.ok(Math.abs(run(new Set(), true) - normal) < 1e-6, 'ohne Item kein Turbo');
+  const fast = run(new Set(['ESPRESSO']), true);
+  assert.ok(Math.abs(fast - 2 * normal) < 1, `Turbo: ${fast} vs ${normal}`);
+});
+
+test('Zeitschranke: Uhr startet erst im Level, mit Espresso bleibt Luft für Menschen (≥ 1,2 s)', async () => {
+  const { CLOCK_RUN } = await import('../src/game/levelgen.js');
+  for (const edge of EDGES.filter((e) => (e.gates || []).some((g) => g.type === 'clock'))) {
+    for (const forward of [true, false]) {
+      const lv = new Level({ edge, forward, items: withAll(), invincible: true, seed: 4 });
+      const g = lv.gates.find((x) => x.type === 'clock');
+      assert.ok(g.a0 - CLOCK_RUN - lv.va > 400, `${edge.id}: Uhr liefe schon am Start`);
+      let rest = null;
+      for (let i = 0; i < 60 * 120 && !lv.result; i++) {
+        lv.update(1 / 60, botInput(lv));
+        if (rest === null && lv.player.a - lv.playerHalf.ha > g.a1) rest = g.timer;
+      }
+      assert.ok(rest !== null && rest >= 1.2, `${edge.id} ${forward}: Restzeit ${rest}`);
+    }
+  }
 });

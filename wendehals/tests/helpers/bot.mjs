@@ -22,8 +22,11 @@ export function botInput(lv, opts = {}) {
   let fire = true;
 
   const solid = lv.gates
-    .filter((g) => (g.type === 'rock' || g.type === 'narrow') && g.a1 + 4 > p.a && g.a0 - p.a < 320)
+    .filter((g) => (g.type === 'rock' || g.type === 'narrow' || (g.type === 'clock' && g.closed)) && g.a1 + 4 > p.a && g.a0 - p.a < 320)
     .sort((x, y) => x.a0 - y.a0)[0];
+  // Zeitschranke voraus: Espresso halten und ganz vorn fliegen
+  const clock = lv.gates.find((g) => g.type === 'clock' && !g.closed && g.a1 + 30 > p.a && g.a0 - p.a < 700);
+  const espresso = !!clock && lv.items.has('ESPRESSO');
   const spikes = lv.gates.find((g) => g.type === 'spikes' && p.a > g.a0 - lv.va * 0.8 && p.a < g.a1 + 10);
 
   if (solid && solid.type === 'narrow') {
@@ -42,6 +45,8 @@ export function botInput(lv, opts = {}) {
     } else {
       targetA = solid.a0 - 40;
     }
+  } else if (solid && solid.type === 'clock') {
+    targetA = solid.a0 - 40;
   } else if (spikes && !opts.ignoreSpikes) {
     // Eine Reihe gilt erst als passiert, wenn die Figur sie ganz hinter sich hat
     const col = spikes.cols.find((c) => c.a > p.a - (lv.playerHalf.ha + 8));
@@ -72,10 +77,11 @@ export function botInput(lv, opts = {}) {
     if (best) targetC = best.e.c;
   }
 
+  if (espresso && !solid) targetA = Math.max(targetA, lv.camA + lv.va);
   let da = clamp((targetA - p.a) / 20, -1, 1);
   let dc = targetC === null ? 0 : clamp(lv.dc(targetC, p.c) / 8, -1, 1);
   const [mx, my] = localToScreenVec(lv.heading, da, dc);
-  return safeInput(lv, { mx, my, fire, power: lv.powers.cursor >= 0 && opts.buyPowers !== false });
+  return safeInput(lv, { mx, my, fire, espresso, power: lv.powers.cursor >= 0 && opts.buyPowers !== false });
 }
 
 /** Liegt Terrain in der eigenen Flugbahn (±3 Kacheln quer) in den nächsten Spalten? */

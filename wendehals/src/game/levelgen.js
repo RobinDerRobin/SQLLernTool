@@ -14,6 +14,9 @@ export const NARROW_GAP = 11;
 export const SPIKE_GAP = 76; // Stacheln sind tödlich: Lücke großzügig, Bewegung gemächlich
 export const SPIKE_SPACING = 120;
 export const START_CLEAR = 380;
+export const CLOCK_THICK = 24;
+export const CLOCK_RUN = 220; // Anlauf: ab dieser Strecke vor der Schranke läuft die Uhr
+export const CLOCK_TIME = 5.0; // so lange bleibt sie offen (mit Espresso knapp schaffbar, ohne nicht)
 
 /** Hindernisse als Weltobjekte mit absoluten Positionen (vorwärts). */
 export function buildGates(edge, rng, H, L = edge.length) {
@@ -38,13 +41,15 @@ export function buildGates(edge, rng, H, L = edge.length) {
       out.push({ type: 'spikes', a0, a1: a0 + g.len, cols, gap: SPIKE_GAP });
     } else if (g.type === 'dark') {
       out.push({ type: 'dark', a0, a1: a0 + g.len });
+    } else if (g.type === 'clock') {
+      out.push({ type: 'clock', a0, a1: a0 + CLOCK_THICK, timer: -1, closed: false, shut: 0 });
     }
   }
   return out;
 }
 
 function solidZones(gates) {
-  return gates.filter((g) => g.type === 'rock' || g.type === 'narrow').map((g) => [g.a0 - 260, g.a1 + 60]);
+  return gates.filter((g) => g.type === 'rock' || g.type === 'narrow' || g.type === 'clock').map((g) => [g.a0 - 260, g.a1 + 60]);
 }
 
 /**
@@ -108,7 +113,10 @@ export const BOSS_CLEAR = 620; // Arena am Ende bleibt frei von Set-Pieces
 function keepClear(gates, L, edge) {
   const z = [[0, START_CLEAR + 80]];
   // Dunkelzonen dürfen Terrain haben (gruselig!), feste Hindernisse und Stacheln brauchen Platz
-  for (const g of gates) if (g.type !== 'dark') z.push([g.a0 - 64, g.a1 + 64]);
+  for (const g of gates) {
+    if (g.type === 'clock') z.push([g.a0 - CLOCK_RUN - 64, g.a1 + CLOCK_RUN + 64]); // freie Anlaufstrecke (beide Richtungen)
+    else if (g.type !== 'dark') z.push([g.a0 - 64, g.a1 + 64]);
+  }
   z.push([L - (edge.boss ? BOSS_CLEAR : 220), L]);
   return z;
 }
