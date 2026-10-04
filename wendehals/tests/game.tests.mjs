@@ -454,3 +454,44 @@ test('Rückzug vor der Wand: zurück an den Startknoten, ohne Strafe', () => {
   assert.equal(game.powers.speed, 2);
   assert.equal(game.progress.deaths, 0);
 });
+
+test('Nach dem Rückzug fliegt gehaltenes "vorwärts" nicht gleich wieder hinein (Befund Spieletester)', () => {
+  const { game } = newGame();
+  game.placeAt('kartoffelkiste', W);
+  game.launch();
+  game.level.events = [];
+  for (let i = 0; i < 60 * 90 && game.screen === 'level'; i++) press(game, { mx: -1, my: 0 });
+  assert.equal(game.screen, 'arena');
+  for (let i = 0; i < 120; i++) press(game, { mx: -1, my: 0 }); // weiter nach Westen halten
+  assert.equal(game.screen, 'arena', 'Ausgang bleibt zu, solange man hält');
+  for (let i = 0; i < 20; i++) press(game, {}); // loslassen
+  for (let i = 0; i < 120 && game.screen === 'arena'; i++) press(game, { mx: -1, my: 0 });
+  assert.equal(game.screen, 'level', 'nach dem Loslassen geht es wieder');
+});
+
+test('Karte merkt sich versperrte Etappen, bis man durchkommt', () => {
+  const { game } = newGame();
+  game.placeAt('kartoffelkiste', W);
+  game.launch();
+  game.level.events = [];
+  for (let i = 0; i < 60 * 90 && game.screen === 'level'; i++) press(game, {});
+  assert.deepEqual(game.progress.blockedEdges, ['gurkengasse']);
+  assert.deepEqual(sanitizeProgress(JSON.parse(JSON.stringify(game.progress))).blockedEdges, ['gurkengasse']);
+  game.items.add('BOHRER');
+  game.placeAt('kartoffelkiste', W);
+  game.launch();
+  flyLevel(game);
+  assert.deepEqual(game.progress.blockedEdges, []);
+});
+
+test('Drehscheibe: rechts herum durchflogen dreht rechts, links herum links (Befund Spieletester)', () => {
+  for (const [fromSide, expect] of [[-1, S], [1, N]]) {
+    const { game } = newGame();
+    const s = SPOTS.turntable;
+    game.arena.x = s.x + fromSide * 50;
+    game.arena.y = s.y - 8;
+    game.arena.ringArmed = true;
+    for (let i = 0; i < 40 && game.heading === E; i++) press(game, { mx: -fromSide, my: 0 });
+    assert.equal(game.heading, expect, fromSide < 0 ? 'von links: rechts herum' : 'von rechts: links herum');
+  }
+});

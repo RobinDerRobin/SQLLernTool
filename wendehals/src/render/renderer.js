@@ -2,12 +2,12 @@
 
 import { SCREEN_W, SCREEN_H, wrapDelta, DIR_NAMES, DIR_VEC } from '../core/math.js';
 import { NODES, EDGES, AREAS } from '../data/world.js';
-import { ITEMS } from '../data/items.js';
+import { ITEMS, GATES } from '../data/items.js';
 import { THEMES } from '../data/themes.js';
 import { CHARACTERS } from '../data/characters.js';
 import { ENDING_LINES } from '../data/text.js';
 import { POWER_LABELS, slotAvailable } from '../game/powerups.js';
-import { linkAt, directionAllowed } from '../game/worldgraph.js';
+import { linkAt, linksAt, directionAllowed } from '../game/worldgraph.js';
 import { ARENA_W, ARENA_H, WALL, EXIT_HALF, SPOTS } from '../game/arena.js';
 import { BOSSES } from '../game/bosses.js';
 import {
@@ -1139,6 +1139,21 @@ export class Renderer {
         ctx.fill();
       }
       ctx.restore();
+      // innen gegenläufig: wer links herum hineinfliegt, dreht nach links
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(-t * 1.5);
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      const ri = s.r - 9;
+      for (let k = 0; k < 3; k++) {
+        ctx.rotate((Math.PI * 2) / 3);
+        ctx.beginPath();
+        ctx.moveTo(ri - 3, 4);
+        ctx.lineTo(ri + 3, 4);
+        ctx.lineTo(ri, -1);
+        ctx.fill();
+      }
+      ctx.restore();
     }
     // Speicherstation: Briefkasten mit Diskette
     if (node.save) {
@@ -1183,6 +1198,11 @@ export class Renderer {
     }
     ctx.save();
     ctx.translate(x, y);
+    if (ar.confusedT > 0) {
+      circle(ctx, 0, -20, 8, '#ffffff', '#1a1020', 1.2);
+      text(ctx, '?', 0, -19.5, 10, '#1a1020', 'center', null);
+      ctx.rotate(Math.sin(t * 22) * 0.25); // Kopfschütteln
+    }
     ctx.rotate((ar.shipAngle * Math.PI) / 2);
     drawPlayer(ctx, game.progress.character, t, false, 0);
     ctx.restore();
@@ -1236,31 +1256,37 @@ export class Renderer {
       const va = this.nodeVisible(game, e.from);
       const vb = this.nodeVisible(game, e.to);
       if (va !== 'visited' && vb !== 'visited') continue;
-      const [x1, y1] = this.mapPos(NODES[e.from]);
-      const [x2, y2] = this.mapPos(NODES[e.to]);
       const known = game.progress.knownEdges.includes(e.id);
-      const active = link && link.edge === e;
-      ctx.lineCap = 'round';
-      if (active) {
-        ctx.strokeStyle = `rgba(255,225,77,${0.5 + 0.5 * Math.sin(t * 6)})`;
-        ctx.lineWidth = 7;
+      const active = linksAt(game.node, game.heading).some((l) => l.edge === e);
+      const pts = this.edgePoints(e);
+      const path = () => {
         ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      };
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      if (active) {
+        // Blickrichtung: weiß pulsierend (nicht mit gelben Bad-Kanten verwechselbar)
+        ctx.strokeStyle = `rgba(255,255,255,${0.35 + 0.35 * Math.sin(t * 6)})`;
+        ctx.lineWidth = 8;
+        path();
         ctx.stroke();
       }
       ctx.strokeStyle = known ? THEMES[e.theme].accent : 'rgba(200,200,220,0.45)';
       ctx.lineWidth = known ? 3.5 : 2;
       if (!known) ctx.setLineDash([4, 4]);
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
+      path();
       ctx.stroke();
       ctx.setLineDash([]);
-      const mx = (x1 + x2) / 2;
-      const my = (y1 + y2) / 2;
+      const mid = pts[Math.floor((pts.length - 1) / 2)];
+      const nxt = pts[Math.floor((pts.length - 1) / 2) + 1];
+      const mx = (mid[0] + nxt[0]) / 2;
+      const my = (mid[1] + nxt[1]) / 2;
+      // Versperrt (schon versucht, Hindernis noch nicht überwindbar): Symbol des Hindernisses
+      if (game.progress.blockedEdges.includes(e.id)) this.blockedIcon(e, mx, my);
       if (e.oneWay) {
-        const ang = Math.atan2(y2 - y1, x2 - x1);
+        const ang = Math.atan2(nxt[1] - mid[1], nxt[0] - mid[0]);
         ctx.save();
         ctx.translate(mx + Math.cos(ang) * 10, my + Math.sin(ang) * 10);
         ctx.rotate(ang);
@@ -1334,6 +1360,63 @@ export class Renderer {
 
     this.drawItemBar(game);
     this.drawMapPanel(game, link);
+  }
+
+  /** Kartenlinie einer Kante: gerade, oder bei frei geführten Kanten (dir) als Ecklinie. */
+  edgePoints(e) {
+    const [x1, y1] = this.mapPos(NODES[e.from]);
+    const [x2, y2] = this.mapPos(NODES[e.to]);
+    if (e.dir === undefined) return [[x1, y1], [x2, y2]];
+    const [dx, dy] = DIR_VEC[e.dir];
+    // quer versetzt je nach Lage des Ausgangs an der Seite (wie in der Arena)
+    const off = (pos) => ((pos ?? 0.5) - 0.5) * 24;
+    const o1 = off(e.fromPos);
+    const o2 = off(e.toPos);
+    const s1 = [x1 + Math.abs(dy) * o1, y1 + Math.abs(dx) * o1];
+    const s2 = [x2 + Math.abs(dy) * o2, y2 + Math.abs(dx) * o2];
+    const a = [s1[0] + dx * 31, s1[1] + dy * 22];
+    const b = [s2[0] - dx * 31, s2[1] - dy * 22];
+    const pts = [[x1, y1], s1, a];
+    if (a[0] !== b[0] && a[1] !== b[1]) pts.push(dx !== 0 ? [a[0], b[1]] : [b[0], a[1]]);
+    pts.push(b, s2, [x2, y2]);
+    return pts;
+  }
+
+  blockedIcon(e, x, y) {
+    const ctx = this.ctx;
+    const g = (e.gates || []).find((x) => !GATES[x.type].soft) || (e.gates || [])[0];
+    circle(ctx, x, y, 7, '#1a1020', '#ff6a5a', 1.5);
+    ctx.strokeStyle = '#ffffff';
+    ctx.fillStyle = '#ffffff';
+    ctx.lineWidth = 1.3;
+    const type = g ? g.type : 'rock';
+    ctx.beginPath();
+    if (type === 'rock') {
+      ctx.moveTo(x - 4, y + 3);
+      ctx.lineTo(x - 2, y - 3);
+      ctx.lineTo(x + 2, y - 2);
+      ctx.lineTo(x + 4, y + 3);
+      ctx.closePath();
+      ctx.fill();
+    } else if (type === 'narrow') {
+      ctx.moveTo(x - 3, y - 4);
+      ctx.lineTo(x - 1, y);
+      ctx.lineTo(x - 3, y + 4);
+      ctx.moveTo(x + 3, y - 4);
+      ctx.lineTo(x + 1, y);
+      ctx.lineTo(x + 3, y + 4);
+      ctx.stroke();
+    } else if (type === 'clock') {
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.moveTo(x, y);
+      ctx.lineTo(x, y - 3);
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + 2.5, y);
+      ctx.stroke();
+    } else {
+      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   drawItemBar(game) {

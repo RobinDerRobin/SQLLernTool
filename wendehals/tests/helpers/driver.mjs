@@ -102,8 +102,20 @@ export function turnTo(game, h) {
     } else if (game.items.has('DREHWURM')) {
       press(game, i % 2 ? {} : { power: true });
     } else if (ar.def.turntable) {
+      // Rechts herum (von links her waagerecht durch den Ring) oder links herum (von rechts her)
       const s = SPOTS.turntable;
-      press(game, ar.ringArmed ? steer(ar, s.x, s.y) : steer(ar, s.x, s.y - 64));
+      const cw = ((h - game.heading) & 3) !== 3;
+      const side = cw ? -1 : 1;
+      const from = [s.x + side * 50, s.y - 8];
+      const to = [s.x - side * 50, s.y - 8];
+      if (ar._ringPhase === undefined) ar._ringPhase = 0;
+      if (ar._ringPhase === 0) {
+        press(game, route(ar, from[0], from[1]));
+        if (ar.ringArmed && Math.hypot(ar.x - from[0], ar.y - from[1]) < 2) ar._ringPhase = 1;
+      } else {
+        press(game, steer(ar, to[0], to[1]));
+        if (Math.hypot(ar.x - to[0], ar.y - to[1]) < 2) ar._ringPhase = 0;
+      }
     } else throw new Error(`Drehen nach ${h} an ${game.node} nicht möglich`);
   }
   throw new Error('Drehen dauert zu lange an ' + game.node);
@@ -120,7 +132,9 @@ export function flyOut(game, edgeId) {
   let lined = false;
   for (let i = 0; i < 60 * 20 && game.screen === 'arena'; i++) {
     if (!lined && Math.hypot(ar.x - ax, ar.y - ay) < 3) lined = true;
-    press(game, lined ? steer(ar, ex + dx * 60, ey + dy * 60) : route(ar, ax, ay));
+    // Gesperrter Ausgang (gerade hereingekommen): wie ein Mensch kurz loslassen
+    if (ar.lockedExit) press(game, {});
+    else press(game, lined ? steer(ar, ex + dx * 60, ey + dy * 60) : route(ar, ax, ay));
     if (game.overlay) throw new Error('Unerwartetes Overlay in der Arena');
   }
   if (game.screen !== 'level') throw new Error('Abflug durch ' + edgeId + ' fehlgeschlagen');

@@ -7,7 +7,7 @@
 // Koordinaten wie die Karte: x nach Osten, y nach Süden, Norden ist oben.
 
 import { NODES } from '../data/world.js';
-import { DIR_VEC, E, S, W, N, turnCW, clamp } from '../core/math.js';
+import { DIR_VEC, E, S, W, N, turnCW, turnCCW, clamp } from '../core/math.js';
 import { linksAt, directionAllowed } from './worldgraph.js';
 
 export const ARENA_W = 480;
@@ -83,6 +83,14 @@ export class Arena {
     this.nudgeT = 0;
     this.bumpExit = null;
     this.turnFx = 0;
+    this.confusedT = 0;
+    // Ausgang, durch den man gerade zurückgekommen ist und auf den man schon schaut: bleibt zu,
+    // bis man die Richtungstaste einmal loslässt (sonst fliegt man aus Versehen gleich wieder hinein)
+    this.lockedExit = null;
+    if (entry && entry.side === heading) {
+      this.lockedExit = this.exits.find((e) => e.side === entry.side && Math.abs(e.pos - entry.pos) < 1e-9) || null;
+    }
+    this.lockRelease = 0;
     this.result = null;
     this.sfxQueue = [];
     this.events = [];
@@ -114,7 +122,13 @@ export class Arena {
 
   /** Ausgang offen? Nur in Blickrichtung und nur, wenn die Kante in diese Richtung befliegbar ist. */
   isOpen(ex) {
-    return ex.side === this.heading && directionAllowed(ex.link);
+    return ex.side === this.heading && directionAllowed(ex.link) && ex !== this.lockedExit;
+  }
+
+  /** "Geht nicht": Kopfschütteln mit Fragezeichen (z. B. Drehen ohne Drehwurm). */
+  confused() {
+    this.confusedT = 0.8;
+    this.nudge();
   }
 
   turnTo(h) {
@@ -139,6 +153,7 @@ export class Arena {
     this.py = this.y;
     this.nudgeT = Math.max(0, this.nudgeT - dt);
     this.turnFx = Math.max(0, this.turnFx - dt);
+    this.confusedT = Math.max(0, this.confusedT - dt);
     // Schiffssymbol dreht sich weich zur Blickrichtung
     let d = this.heading - this.shipAngle;
     while (d > 2) d -= 4;
@@ -148,6 +163,11 @@ export class Arena {
 
     const mx = input.mx || 0;
     const my = input.my || 0;
+    if (this.lockedExit) {
+      const [dx, dy] = DIR_VEC[this.lockedExit.side];
+      this.lockRelease = mx * dx + my * dy > 0.2 ? 0 : this.lockRelease + dt;
+      if (this.lockRelease > 0.25 || this.heading !== this.lockedExit.side) this.lockedExit = null;
+    }
     this.vx = mx * ARENA_SPEED;
     this.vy = my * ARENA_SPEED;
     let nx = this.x + this.vx * dt;
@@ -160,7 +180,11 @@ export class Arena {
     const inRing = this.inRing();
     if (inRing && this.ringArmed) {
       this.ringArmed = false;
-      this.turnTo(turnCW(this.heading));
+      // Drehsinn = Umlaufsinn beim Hineinfliegen (Bildschirm: y nach unten, also Kreuzprodukt > 0
+      // = im Uhrzeigersinn). Gerade von vorn hinein: rechts herum.
+      const s = SPOTS.turntable;
+      const cross = (this.x - s.x) * this.vy - (this.y - s.y) * this.vx;
+      this.turnTo(cross < -1e-6 ? turnCCW(this.heading) : turnCW(this.heading));
     } else if (!inRing && this.def.turntable) {
       const s = SPOTS.turntable;
       if (Math.hypot(this.x - s.x, this.y - s.y) > s.r + 4) this.ringArmed = true;

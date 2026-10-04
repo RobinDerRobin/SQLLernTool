@@ -5,7 +5,7 @@ export const ITEMS = {
   DREHWURM: {
     short: 'DW',
     name: 'Drehwurm',
-    desc: 'K / B: Drehen (an Kreuzungen)',
+    desc: 'K / B: Drehen',
     kind: 'ability',
     required: true,
   },
@@ -72,9 +72,9 @@ export const ITEMS = {
     kind: 'ability',
     required: false,
   },
-  WURST1: { short: 'W+', name: 'Extrawürstchen', desc: '', kind: 'health', required: false },
-  WURST2: { short: 'W+', name: 'Extrawürstchen', desc: '', kind: 'health', required: false },
-  WURST3: { short: 'W+', name: 'Extrawürstchen', desc: '', kind: 'health', required: false },
+  WURST1: { short: 'W+', name: 'Extrawürstchen', desc: '+1 Energie', kind: 'health', required: false },
+  WURST2: { short: 'W+', name: 'Extrawürstchen', desc: '+1 Energie', kind: 'health', required: false },
+  WURST3: { short: 'W+', name: 'Extrawürstchen', desc: '+1 Energie', kind: 'health', required: false },
 };
 
 export const ITEM_IDS = Object.keys(ITEMS);

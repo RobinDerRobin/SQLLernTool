@@ -420,8 +420,10 @@ export class Game {
   handleLevelResult(res) {
     const lv = this.level;
     if (res.type === 'retreat') {
-      // Umgekehrt vor einer unüberwindbaren Wand: wie "Etappe abbrechen", ohne Text
+      // Umgekehrt vor einer unüberwindbaren Wand: wie "Etappe abbrechen", ohne Text.
+      // Die Karte merkt sich die Kante als versperrt (Symbol des Hindernisses).
       this.progress.score += lv.score;
+      if (!this.progress.blockedEdges.includes(lv.edge.id)) this.progress.blockedEdges.push(lv.edge.id);
       this.abortLevel();
       this.nudge();
       return;
@@ -432,6 +434,7 @@ export class Game {
       return;
     }
     const before = new Set(this.items);
+    this.progress.blockedEdges = this.progress.blockedEdges.filter((id) => id !== lv.edge.id);
     const r = arrive(res.node, res.heading, this.items, res.rewards);
     this.items = r.items;
     if (res.goal) {
@@ -472,6 +475,7 @@ export class Game {
     this.items = r.items;
     this.enterArena(r.node, r.heading, null);
     this.sfx('warp');
+    this.toast('Rückholung: ' + NODES[r.node].name, 2);
   }
 
   startEnding() {
@@ -533,11 +537,11 @@ export class Game {
     // Drehen: Drehwurm (POWER-Taste) 90° rechts, Wendehals 180° – überall in der Arena.
     if (input.power) {
       if (this.items.has('DREHWURM')) ar.turnTo(turnCW(ar.heading));
-      else ar.nudge();
+      else ar.confused();
     }
     if (input.wende) {
       if (this.items.has('WENDEHALS')) ar.turnTo(opposite(ar.heading));
-      else ar.nudge();
+      else ar.confused();
     }
     ar.update(dt, { mx: input.mx, my: input.my });
     this._heading = ar.heading;

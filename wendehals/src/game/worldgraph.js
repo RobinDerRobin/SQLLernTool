@@ -4,7 +4,7 @@
 
 import { NODES, EDGES } from '../data/world.js';
 import { GATES } from '../data/items.js';
-import { dirBetween, opposite, turnCW } from '../core/math.js';
+import { dirBetween, opposite, turnCW, turnCCW } from '../core/math.js';
 
 export function edgeDir(edge) {
   if (edge.dir !== undefined) return edge.dir;
@@ -123,7 +123,11 @@ export function returnTarget(nodeId, items) {
 /** Mögliche Drehungen an einem Knoten (für Löser und Karten-UI). */
 export function turnOptions(nodeId, heading, items) {
   const out = [];
-  if (canTurnAt(nodeId, items)) out.push(turnCW(heading));
+  if (canTurnAt(nodeId, items)) {
+    out.push(turnCW(heading));
+    // Drehscheibe: Umlaufsinn beim Durchfliegen bestimmt die Richtung (rechts oder links)
+    if (NODES[nodeId].turntable) out.push(turnCCW(heading));
+  }
   if (items.has('WENDEHALS')) out.push(opposite(heading));
   return out;
 }

@@ -17,6 +17,7 @@ export function newProgress() {
     items: [],
     visited: [START_NODE],
     knownEdges: [],
+    blockedEdges: [],
     character: 'dackel',
     score: 0,
     playTime: 0,
@@ -41,6 +42,7 @@ export function sanitizeProgress(raw) {
   }
   if (!p.visited.includes(p.saveNode)) p.visited.push(p.saveNode);
   if (Array.isArray(raw.knownEdges)) p.knownEdges = [...new Set(raw.knownEdges.filter((e) => has(EDGE_BY_ID, e)))];
+  if (Array.isArray(raw.blockedEdges)) p.blockedEdges = [...new Set(raw.blockedEdges.filter((e) => has(EDGE_BY_ID, e)))];
   if (has(CHARACTERS, raw.character)) {
     const unlock = CHARACTERS[raw.character].unlock;
     if (!unlock || p.items.includes(unlock)) p.character = raw.character;

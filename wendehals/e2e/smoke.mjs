@@ -79,15 +79,19 @@ async function flyArena(tx, ty, maxMs = 4000, until = null) {
   }
   return false;
 }
-await flyArena(78, 166);
-await flyArena(78, 230, 2000, async (a) => a.h !== 0);
-check((await arena()).h === 1, 'Drehscheibe dreht nach Süden');
-await shot('03c-arena-gedreht');
-for (let k = 0; k < 3; k++) {
-  await flyArena(78, 166);
+// Von links waagerecht durch den Ring = rechts herum; zurück außen herum (oberhalb)
+async function ringPass() {
+  await flyArena(128, 150);
+  await flyArena(28, 150);
+  await flyArena(28, 222);
   const h0 = (await arena()).h;
-  await flyArena(78, 230, 2000, async (a) => a.h !== h0);
+  await flyArena(140, 222, 2000, async (a) => a.h !== h0);
+  await flyArena(128, 222);
 }
+await ringPass();
+check((await arena()).h === 1, 'Drehscheibe dreht nach Süden (rechts herum)');
+await shot('03c-arena-gedreht');
+for (let k = 0; k < 3; k++) await ringPass();
 check((await arena()).h === 0, 'nach vier Runden wieder Osten');
 // Hinaus durch den Ostausgang
 await flyArena(380, 135);
@@ -188,6 +192,9 @@ await scenario('30-karte-fortschritt', () => {
   g.items = new Set(['DREHWURM', 'GUMMIHAUT', 'LAMPE', 'OMA', 'WURST1']);
   g.progress.visited = ['toast', 'eier', 'marmelade', 'tasse', 'butter', 'stoepsel', 'seifenschale', 'duschkopf', 'handtuch', 'brotkorb', 'entenhafen'];
   g.progress.knownEdges = ['kruemelstrasse', 'marmeladenaufzug', 'butterberg', 'kaffeekraenzchen', 'abflussrohr', 'schaumbad', 'duschvorhang', 'handtuchleiste', 'waescheleine', 'kruemelfall', 'entenrennen', 'kruemelmauer'];
+  g.progress.blockedEdges = ['kruemelmauer'];
+  g.progress.knownEdges.push('ueberlauf', 'flusensieb');
+  g.progress.visited.push('blubber', 'sockenschublade');
   g.placeAt('entenhafen', 1);
   g.openMap();
 });

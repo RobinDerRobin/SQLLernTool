@@ -280,7 +280,7 @@ test('Show don\'t tell: Level-Meldungen verraten keine Items und keine Lösungen
     for (const t of seen) for (const n of names) assert.ok(!t.includes(n), `${edge.id}: "${t}" nennt ${n}`);
   }
   // Item-Texte enthalten höchstens eine Tastenbelegung
-  for (const [id, it] of Object.entries(ITEMS)) assert.ok(it.desc === '' || /[A-Z] ?\/ ?[A-Z]|Pfeile|\(X\)/.test(it.desc), id + ': ' + it.desc);
+  for (const [id, it] of Object.entries(ITEMS)) assert.ok(it.desc === '' || it.desc === '+1 Energie' || /[A-Z] ?\/ ?[A-Z]|Pfeile|\(X\)/.test(it.desc), id + ': ' + it.desc);
 });
 
 test('Show don\'t tell: vor einer unüberwindbaren Wand kehrt der Dackel nach einigen Sekunden selbst um', () => {
