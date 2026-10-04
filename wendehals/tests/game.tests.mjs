@@ -573,3 +573,44 @@ test('Drehscheibe: nur echtes Durchfliegen dreht – Streifen oder in die Ecke d
   for (let i = 0; i < 25; i++) press(game, { mx: 1, my: 0 });
   assert.equal(game.heading, S, 'durchflogen: rechts herum');
 });
+
+test('Drehscheibe: Durchflug in allen 8 Tastatur-Richtungen dreht genau einmal (Befund Robin)', () => {
+  const s = SPOTS.turntable;
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]];
+  for (const [dx, dy] of dirs) {
+    for (const off of [-6, 0, 6]) {
+      const { game } = newGame();
+      const len = Math.hypot(dx, dy);
+      const [ux, uy] = [dx / len, dy / len];
+      // Start 45 Einheiten vor dem Ring, quer um "off" versetzt
+      game.arena.x = s.x - ux * 45 - uy * off;
+      game.arena.y = s.y - uy * 45 + ux * off;
+      game.arena.ringArmed = true;
+      let turns = 0;
+      let last = game.heading;
+      for (let i = 0; i < 45; i++) {
+        press(game, { mx: ux, my: uy });
+        if (game.heading !== last) {
+          turns++;
+          last = game.heading;
+        }
+      }
+      assert.equal(turns, 1, `Richtung ${dx},${dy} Versatz ${off}: ${turns} Drehungen`);
+    }
+  }
+});
+
+test('Drehscheibe: schräg links herum dreht links, schräg rechts herum dreht rechts', () => {
+  const s = SPOTS.turntable;
+  // nach rechts unten fliegen: liegt die Ringmitte rechts der Flugbahn (links unten), umrundet man
+  // sie im Uhrzeigersinn → rechts; liegt sie links der Bahn (rechts oben) → links
+  for (const [off, expect] of [[-8, S], [8, N]]) {
+    const { game } = newGame();
+    const u = Math.SQRT1_2;
+    game.arena.x = s.x - u * 45 - u * off;
+    game.arena.y = s.y - u * 45 + u * off;
+    game.arena.ringArmed = true;
+    for (let i = 0; i < 45 && game.heading === E; i++) press(game, { mx: u, my: u });
+    assert.equal(game.heading, expect, 'Versatz ' + off);
+  }
+});

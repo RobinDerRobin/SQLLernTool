@@ -18,10 +18,10 @@ export const PLAYER_R = 8;
 export const ARENA_SPEED = 150;
 
 // Objekte liegen in den Ecken, abseits aller Wege zwischen Mitte und Ausgängen. Die Drehscheibe
-// sitzt neben der Ecke: weder die Diagonale Mitte→Ecke noch das Entlanggleiten an der Wand führt
-// durch ihre Mitte (beides per Test geprüft).
+// sitzt mit Abstand zur Wand (in alle 8 Richtungen durchfliegbar), aber weder die Diagonale
+// Mitte→Ecke noch das Entlanggleiten an der Wand führt durch ihre Mitte (per Test geprüft).
 export const SPOTS = {
-  turntable: { x: 130, y: 228, r: 26, trigger: 14 },
+  turntable: { x: 160, y: 205, r: 26, trigger: 18 },
   save: { x: 402, y: 230, r: 20 },
   ret: { x: 78, y: 42, r: 20 },
   item: { x: 402, y: 42, r: 14 },
@@ -185,9 +185,9 @@ export class Arena {
 
   /**
    * Drehscheibe: dreht erst, wenn man wirklich hindurchgeflogen ist – auf einer Seite hinein, nahe
-   * an der Mitte vorbei und auf der Gegenseite wieder hinaus. Streifen oder in der Ecke an den
-   * Ring gedrückt hängen bleiben dreht nicht. Drehsinn = Umlaufsinn beim Durchflug (Bildschirm:
-   * y nach unten, Querversatz > 0 = im Uhrzeigersinn); fast genau durch die Mitte (< 3) = rechts.
+   * an der Mitte vorbei und auf der anderen Hälfte wieder hinaus (auch schräg). Streifen oder
+   * hinein und zurück dreht nicht. Drehsinn = Umlaufsinn um die Mitte während des Durchflugs
+   * (Bildschirm: y nach unten, positiv = im Uhrzeigersinn); fast genau durch die Mitte = rechts.
    */
   updateRing() {
     if (!this.def.turntable) return;
@@ -197,20 +197,26 @@ export class Arena {
     const d = Math.hypot(rx, ry);
     const inside = d < s.r;
     if (inside && !this.ringPass && this.ringArmed) {
-      this.ringPass = { ex: rx / (d || 1), ey: ry / (d || 1), minD: d, off: 0 };
+      this.ringPass = { ex: rx / (d || 1), ey: ry / (d || 1), minD: d, off: 0, sweep: 0, lx: rx, ly: ry };
     }
     this.ringArmed = !inside;
     const pass = this.ringPass;
     if (!pass) return;
     const v = Math.hypot(this.vx, this.vy);
+    // Umlauf um die Mitte aufsummieren (Winkel zwischen letztem und jetzigem Ortsvektor)
+    pass.sweep += Math.atan2(pass.lx * ry - pass.ly * rx, pass.lx * rx + pass.ly * ry);
+    pass.lx = rx;
+    pass.ly = ry;
     if (d <= pass.minD) {
       pass.minD = d;
       if (v > 1e-6) pass.off = (rx * this.vy - ry * this.vx) / v;
     }
     if (inside) return;
     this.ringPass = null;
-    const through = pass.minD < s.trigger && (rx / d) * pass.ex + (ry / d) * pass.ey < -0.3;
-    if (through) this.turnTo(pass.off < -3 ? turnCCW(this.heading) : turnCW(this.heading));
+    const through = pass.minD < s.trigger && (rx / d) * pass.ex + (ry / d) * pass.ey < 0;
+    if (!through) return;
+    const cw = Math.abs(pass.off) < 3 || pass.sweep > 0;
+    this.turnTo(cw ? turnCW(this.heading) : turnCCW(this.heading));
   }
 
   /** Wände und Klappen; durch offene Ausgänge fliegt man hinaus (Ergebnis "launch"). */

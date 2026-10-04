@@ -1131,7 +1131,9 @@ export class Renderer {
     if (node.turntable) {
       const s = SPOTS.turntable;
       const pulse = ar.turnFx > 0 ? 1 + ar.turnFx : 1;
-      circle(ctx, s.x, s.y, s.r * pulse, 'rgba(255,255,255,0.08)', theme.accent, 3);
+      // Leuchtet, solange man drin ist: gleich passiert etwas
+      if (ar.ringPass) circle(ctx, s.x, s.y, s.r + 5, 'rgba(255,255,255,0.35)', '#ffffff', 2);
+      circle(ctx, s.x, s.y, s.r * pulse, 'rgba(255,255,255,0.08)', theme.accent, ar.ringPass ? 5 : 3);
       circle(ctx, s.x, s.y, s.r * pulse - 6, null, 'rgba(255,255,255,0.5)', 1);
       ctx.save();
       ctx.translate(s.x, s.y);
