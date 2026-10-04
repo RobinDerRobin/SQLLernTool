@@ -2,6 +2,14 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('node:path');
 
+// Linux-AppImage / Steam (Deck): Die Chromium-Prozess-Sandbox (setuid chrome-sandbox bzw.
+// User-Namespaces) lässt sich dort nicht einrichten – das Programm würde sofort beenden.
+// Die Sandbox der Webinhalte (webPreferences.sandbox) bleibt aktiv; das Spiel lädt nur die
+// lokale Datei und blockiert jede Navigation.
+if (process.platform === 'linux' && (process.env.APPIMAGE || process.env.SteamDeck || process.env.SteamGameId || process.env.SteamAppId)) {
+  app.commandLine.appendSwitch('no-sandbox');
+}
+
 // Im Steam-Deck-Spielmodus setzt Steam die Umgebungsvariable SteamDeck=1.
 const startFullscreen = process.argv.includes('--fullscreen') || process.env.SteamDeck === '1';
 

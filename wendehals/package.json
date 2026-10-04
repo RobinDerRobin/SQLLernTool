@@ -43,7 +43,10 @@
         "AppImage",
         "tar.gz"
       ],
-      "category": "Game"
+      "category": "Game",
+      "executableArgs": [
+        "--no-sandbox"
+      ]
     },
     "publish": null
   },
