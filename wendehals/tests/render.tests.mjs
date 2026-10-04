@@ -189,3 +189,31 @@ test('Blitz-Zählung erkennt Stroboskop und lässt sanftes Pulsieren durch', asy
   const twoHz = Array.from({ length: 60 }, (_, i) => 0.3 + 0.2 * Math.sin((i / 60) * Math.PI * 4));
   assert.ok(countFlashes(twoHz) <= 2);
 });
+
+test('Gegner-Kugeln und gefährliche Zahnräder heben sich in jedem Gebiet deutlich vom Hintergrund ab', async () => {
+  const { HAZARD_COLORS } = await import('../src/render/sprites.js');
+  const { THEMES } = await import('../src/data/themes.js');
+  const lum = (hex) => {
+    const v = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+  };
+  const ratio = (a, b) => {
+    const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+    return (x + 0.05) / (y + 0.05);
+  };
+  // Mindestens eine Farbe des Objekts (Füllung, Kontur oder Kante) erreicht 4,5:1 gegen jeden Hintergrund
+  for (const [kind, c] of Object.entries(HAZARD_COLORS)) {
+    for (const [id, th] of Object.entries(THEMES)) {
+      for (const bg of th.bg) {
+        const best = Math.max(...Object.values(c).map((col) => ratio(col, bg)));
+        assert.ok(best >= 4.5, `${kind} vor ${id} (${bg}): nur ${best.toFixed(2)}:1`);
+      }
+    }
+  }
+  // Gegner-Blase ist nicht weiß-durchsichtig wie die Deko-Blasen
+  assert.ok(ratio(HAZARD_COLORS.blase.fill, '#ffffff') >= 2, 'Blase zu weiß');
+  // Zahnrad: Warnfarbe (rot-orange) statt Messing wie die Deko-Zahnräder
+  const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const [r, g, b] = rgb(HAZARD_COLORS.zahnrad.fill);
+  assert.ok(r > 200 && g < 140 && b < 80, 'Zahnrad nicht in Warnfarbe');
+});

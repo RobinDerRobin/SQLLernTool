@@ -17,9 +17,11 @@ export const EXIT_HALF = 26; // halbe Breite einer Ausgangsöffnung
 export const PLAYER_R = 8;
 export const ARENA_SPEED = 150;
 
-// Objekte liegen in den Ecken, abseits aller Wege zwischen Mitte und Ausgängen.
+// Objekte liegen in den Ecken, abseits aller Wege zwischen Mitte und Ausgängen. Die Drehscheibe
+// sitzt neben der Ecke: weder die Diagonale Mitte→Ecke noch das Entlanggleiten an der Wand führt
+// durch ihre Mitte (beides per Test geprüft).
 export const SPOTS = {
-  turntable: { x: 78, y: 230, r: 26, trigger: 14 },
+  turntable: { x: 130, y: 228, r: 26, trigger: 14 },
   save: { x: 402, y: 230, r: 20 },
   ret: { x: 78, y: 42, r: 20 },
   item: { x: 402, y: 42, r: 14 },
@@ -79,7 +81,9 @@ export class Arena {
     this.y = this.py = y;
     this.vx = 0;
     this.vy = 0;
-    this.ringArmed = !this.inRing();
+    // scharf erst außerhalb des Rings (wer im Ring startet, muss erst hinaus)
+    this.ringArmed = !this.def.turntable || Math.hypot(this.x - SPOTS.turntable.x, this.y - SPOTS.turntable.y) >= SPOTS.turntable.r;
+    this.ringPass = null;
     this.nudgeT = 0;
     this.bumpExit = null;
     this.turnFx = 0;
@@ -176,22 +180,37 @@ export class Arena {
     this.x = nx;
     this.y = ny;
 
-    // Drehscheibe: Hineinfliegen dreht 90° (Umlaufsinn); erst nach dem Verlassen wieder scharf.
-    const inRing = this.inRing();
-    if (inRing && this.ringArmed) {
-      this.ringArmed = false;
-      // Drehsinn = Umlaufsinn beim Hineinfliegen (Bildschirm: y nach unten, also Kreuzprodukt > 0
-      // = im Uhrzeigersinn). Gerade von vorn hinein: rechts herum.
-      const s = SPOTS.turntable;
-      const cross = (this.x - s.x) * this.vy - (this.y - s.y) * this.vx;
-      // Totzone: fast genau auf die Mitte gezielt (Querabstand < 3) zählt als "von vorn" = rechts
-      const v = Math.hypot(this.vx, this.vy);
-      const offset = v > 1e-6 ? cross / v : 0;
-      this.turnTo(offset < -3 ? turnCCW(this.heading) : turnCW(this.heading));
-    } else if (!inRing && this.def.turntable) {
-      const s = SPOTS.turntable;
-      if (Math.hypot(this.x - s.x, this.y - s.y) > s.r + 4) this.ringArmed = true;
+    this.updateRing();
+  }
+
+  /**
+   * Drehscheibe: dreht erst, wenn man wirklich hindurchgeflogen ist – auf einer Seite hinein, nahe
+   * an der Mitte vorbei und auf der Gegenseite wieder hinaus. Streifen oder in der Ecke an den
+   * Ring gedrückt hängen bleiben dreht nicht. Drehsinn = Umlaufsinn beim Durchflug (Bildschirm:
+   * y nach unten, Querversatz > 0 = im Uhrzeigersinn); fast genau durch die Mitte (< 3) = rechts.
+   */
+  updateRing() {
+    if (!this.def.turntable) return;
+    const s = SPOTS.turntable;
+    const rx = this.x - s.x;
+    const ry = this.y - s.y;
+    const d = Math.hypot(rx, ry);
+    const inside = d < s.r;
+    if (inside && !this.ringPass && this.ringArmed) {
+      this.ringPass = { ex: rx / (d || 1), ey: ry / (d || 1), minD: d, off: 0 };
     }
+    this.ringArmed = !inside;
+    const pass = this.ringPass;
+    if (!pass) return;
+    const v = Math.hypot(this.vx, this.vy);
+    if (d <= pass.minD) {
+      pass.minD = d;
+      if (v > 1e-6) pass.off = (rx * this.vy - ry * this.vx) / v;
+    }
+    if (inside) return;
+    this.ringPass = null;
+    const through = pass.minD < s.trigger && (rx / d) * pass.ex + (ry / d) * pass.ey < -0.3;
+    if (through) this.turnTo(pass.off < -3 ? turnCCW(this.heading) : turnCW(this.heading));
   }
 
   /** Wände und Klappen; durch offene Ausgänge fliegt man hinaus (Ergebnis "launch"). */

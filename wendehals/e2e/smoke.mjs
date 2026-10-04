@@ -81,12 +81,12 @@ async function flyArena(tx, ty, maxMs = 4000, until = null) {
 }
 // Von links waagerecht durch den Ring = rechts herum; zurück außen herum (oberhalb)
 async function ringPass() {
-  await flyArena(128, 150);
-  await flyArena(28, 150);
-  await flyArena(28, 222);
+  await flyArena(180, 150);
+  await flyArena(80, 150);
+  await flyArena(80, 226);
   const h0 = (await arena()).h;
-  await flyArena(140, 222, 2000, async (a) => a.h !== h0);
-  await flyArena(128, 222);
+  await flyArena(190, 226, 2000, async (a) => a.h !== h0);
+  await flyArena(180, 226);
 }
 await ringPass();
 check((await arena()).h === 1, 'Drehscheibe dreht nach Süden (rechts herum)');

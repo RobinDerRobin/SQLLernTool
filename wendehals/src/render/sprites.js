@@ -5,6 +5,17 @@
 import { SPLIT_DELAY, SPLIT_WOBBLE } from '../game/enemies.js';
 
 const TAU = Math.PI * 2;
+
+/**
+ * Farben, die sich klar vom Hintergrund abheben müssen (per Test gegen alle Gebiete geprüft):
+ * Kugeln bekommen eine dunkle Kontur, gefährliche Zahnräder eine Warnfarbe mit heller Kante –
+ * nichts davon darf wie Deko (weiße Blasen, blasse Messing-Zahnräder) aussehen.
+ */
+export const HAZARD_COLORS = {
+  blase: { fill: '#ff5fb4', stroke: '#3a0a2a', shine: '#ffffff' },
+  tropfen: { fill: '#1f6fd0', stroke: '#0a1f45', rim: '#e8f6ff' },
+  zahnrad: { fill: '#ff6a2a', stroke: '#3a0e00', rim: '#fff1a0', hub: '#ffd34d' },
+};
 const DISCO5 = ['#ff4fb0', '#4fd0ff', '#ffe14d', '#ffffff', '#b04fff'];
 
 export function circle(ctx, x, y, r, fill, stroke, lw = 1) {
@@ -211,10 +222,13 @@ export function drawShot(ctx, s, charId) {
 // --------------------------------------------------------------- Kugeln
 export function drawBullet(ctx, b, t) {
   switch (b.kind) {
-    case 'blase':
-      circle(ctx, 0, 0, b.r + 1, 'rgba(200,240,255,0.35)', '#e8fbff', 1);
-      circle(ctx, -1, -1, 1, '#ffffff');
+    case 'blase': {
+      // Gegner-Blase: kräftig pink mit dunkler Kontur (Deko-Blasen sind weiß und durchsichtig)
+      const c = HAZARD_COLORS.blase;
+      circle(ctx, 0, 0, b.r + 1, c.fill, c.stroke, 1.6);
+      circle(ctx, -1.2, -1.2, 1.1, c.shine);
       break;
+    }
     case 'zucker':
       ctx.rotate(t * 5);
       rrect(ctx, -3, -3, 6, 6, 1, '#ffffff', '#b8b8b8', 0.7);
@@ -228,7 +242,8 @@ export function drawBullet(ctx, b, t) {
       circle(ctx, 4, -3, b.r * 0.6, 'rgba(250,250,250,0.7)');
       break;
     case 'tropfen':
-      circle(ctx, 0, 0, b.r, '#5ec8ff', '#1e6a9a', 0.7);
+      circle(ctx, 0, 0, b.r + 1.2, null, HAZARD_COLORS.tropfen.rim, 1); // helle Kante für dunkle Gebiete
+      circle(ctx, 0, 0, b.r, HAZARD_COLORS.tropfen.fill, HAZARD_COLORS.tropfen.stroke, 1.4);
       break;
     case 'pommes':
       ctx.rotate(Math.atan2(b.vc, b.va));
@@ -433,9 +448,14 @@ export function drawEnemy(ctx, e, t) {
       ctx.arc(0, 0, 6, 0, TAU);
       ctx.stroke();
       break;
-    case 'zahnrad':
-      drawGear(ctx, 15, 10, t * 1.5, '#8a7a5a', '#4a3a20');
+    case 'zahnrad': {
+      // Unzerstörbar und gefährlich: Warnfarbe mit heller Kante, klar anders als die Deko-Zahnräder
+      const c = HAZARD_COLORS.zahnrad;
+      drawGear(ctx, 16.5, 10, t * 1.5, c.rim, c.rim, 1);
+      drawGear(ctx, 15, 10, t * 1.5, c.fill, c.stroke, 1.6);
+      circle(ctx, 0, 0, 4.5, c.hub, c.stroke, 1.2);
       break;
+    }
     case 'wecker': {
       const shake = e.t > 1.8 && !e.rang ? Math.sin(t * 60) * 1.5 : 0;
       ctx.translate(shake, 0);
@@ -501,7 +521,7 @@ export function drawEnemy(ctx, e, t) {
   ctx.restore();
 }
 
-export function drawGear(ctx, r, teeth, rot, fill, stroke) {
+export function drawGear(ctx, r, teeth, rot, fill, stroke, lw = 1) {
   ctx.save();
   ctx.rotate(rot);
   ctx.beginPath();
@@ -514,7 +534,7 @@ export function drawGear(ctx, r, teeth, rot, fill, stroke) {
   ctx.fillStyle = fill;
   ctx.fill();
   ctx.strokeStyle = stroke;
-  ctx.lineWidth = 1;
+  ctx.lineWidth = lw;
   ctx.stroke();
   circle(ctx, 0, 0, r * 0.3, stroke);
   ctx.restore();

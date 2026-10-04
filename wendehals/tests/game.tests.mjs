@@ -537,3 +537,39 @@ test('Drehscheibe: fast genau auf die Mitte gezielt dreht immer rechts (Befund S
     assert.equal(game.heading, S, 'dy ' + dy);
   }
 });
+
+test('Drehscheibe: nur echtes Durchfliegen dreht – Streifen oder in die Ecke drücken nicht (Wunsch Robin)', () => {
+  const s = SPOTS.turntable;
+  // schräg nach links unten in die Ecke fliegen und dort hängen bleiben
+  let { game } = newGame();
+  game.arena.x = 240;
+  game.arena.y = 135;
+  for (let i = 0; i < 240; i++) press(game, { mx: -0.89, my: 0.457 });
+  assert.equal(game.heading, E, 'Mitte → Ecke und an der Wand entlang: keine Drehung');
+  ({ game } = newGame());
+  game.arena.x = 400;
+  game.arena.y = 200;
+  for (let i = 0; i < 240; i++) press(game, { mx: -1, my: 0.3 });
+  assert.equal(game.heading, E, 'an der Bodenwand nach links gleiten: keine Drehung');
+  // knapp am Ring vorbei (streifen, Mitte weit weg)
+  ({ game } = newGame());
+  game.arena.x = s.x - 50;
+  game.arena.y = s.y - 20;
+  for (let i = 0; i < 50; i++) press(game, { mx: 1, my: 0 });
+  assert.equal(game.heading, E, 'Streifen: keine Drehung');
+  // hinein und auf derselben Seite wieder hinaus: keine Drehung
+  ({ game } = newGame());
+  game.arena.x = s.x - 50;
+  game.arena.y = s.y - 4;
+  for (let i = 0; i < 20; i++) press(game, { mx: 1, my: 0 });
+  for (let i = 0; i < 30; i++) press(game, { mx: -1, my: 0 });
+  assert.equal(game.heading, E, 'umgekehrt: keine Drehung');
+  // richtig durch: Drehung erst beim Hinausfliegen
+  ({ game } = newGame());
+  game.arena.x = s.x - 50;
+  game.arena.y = s.y - 2;
+  for (let i = 0; i < 25; i++) press(game, { mx: 1, my: 0 });
+  assert.equal(game.heading, E, 'noch im Ring');
+  for (let i = 0; i < 25; i++) press(game, { mx: 1, my: 0 });
+  assert.equal(game.heading, S, 'durchflogen: rechts herum');
+});
