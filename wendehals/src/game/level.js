@@ -494,6 +494,7 @@ export class Level {
         // Uhr startet nur für Schranken vor einem (nicht hinter einem, z. B. nach einer Kehrtwende)
         if (this.camA + this.va >= g.a0 - CLOCK_RUN && g.a0 > this.player.a) {
           g.started = true;
+          if (this.items.has('ESPRESSO')) this.say('E / RB halten!', 2.5);
           g.timer = CLOCK_TIME;
           this.sfx('tick');
         }

@@ -1,7 +1,7 @@
 // Knoten als Arena: ein bildschirmgroßer Raum, den man frei durchfliegt (kein Zwangsscrollen).
 // Ausgänge liegen in den Wänden – mehrere pro Seite möglich. Offen ist nur, was in Blickrichtung
 // liegt; alle anderen Klappen sind zu. Dazu Objekte: Drehscheibe (Ring zum Durchfliegen,
-// dreht 90° rechts), Speicherstation (Berühren speichert, X öffnet das Menü) und
+// dreht 90° in Umlaufrichtung), Speicherstation (Berühren speichert, X öffnet das Menü) und
 // Rückholstation (X bringt zurück zu einer Kreuzung mit Ausweg).
 //
 // Koordinaten wie die Karte: x nach Osten, y nach Süden, Norden ist oben.
@@ -176,7 +176,7 @@ export class Arena {
     this.x = nx;
     this.y = ny;
 
-    // Drehscheibe: Hineinfliegen dreht 90° rechts; erst nach dem Verlassen wieder scharf.
+    // Drehscheibe: Hineinfliegen dreht 90° (Umlaufsinn); erst nach dem Verlassen wieder scharf.
     const inRing = this.inRing();
     if (inRing && this.ringArmed) {
       this.ringArmed = false;

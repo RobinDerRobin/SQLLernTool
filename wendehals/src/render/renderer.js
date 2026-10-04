@@ -1,6 +1,6 @@
 // Zeichnet den Spielzustand. Alle Koordinaten in der internen Auflösung 480x270.
 
-import { SCREEN_W, SCREEN_H, wrapDelta, DIR_NAMES, DIR_VEC } from '../core/math.js';
+import { SCREEN_W, SCREEN_H, wrapDelta, DIR_NAMES, DIR_VEC, W as W_DIR } from '../core/math.js';
 import { NODES, EDGES, AREAS } from '../data/world.js';
 import { ITEMS, GATES } from '../data/items.js';
 import { THEMES } from '../data/themes.js';
@@ -286,8 +286,12 @@ export class Renderer {
     this.drawDynamics(lv, theme, t);
     this.drawGates(lv, t);
     for (const pk of lv.pickups) this.at(pk.a, pk.c, () => drawCapsule(ctx, pk.t));
+    // Nach Westen steht die Welt Kopf (180° gedreht). Figuren sollen aber aufrecht bleiben:
+    // lokal an der Flugachse spiegeln (rein optisch, Trefferzonen sind symmetrisch).
+    const upright = lv.heading === W_DIR ? () => ctx.scale(1, -1) : () => {};
     for (const e of lv.enemies) {
       this.atObj(e, () => {
+        upright();
         if (e.flash > 0) drawWithFlash(ctx, e.r + 6, 0.8, (c) => drawEnemy(c, e, t));
         else drawEnemy(ctx, e, t);
       });
@@ -297,6 +301,7 @@ export class Renderer {
       for (const h of lv.hazards) this.at(h.a, h.c, () => drawHazard(ctx, h, t, kind));
       const b = lv.boss;
       this.atObj(b, () => {
+        if (!BOSSES[b.kind].hitTest) upright();
         if (b.flash > 0) drawWithFlash(ctx, b.r + 24, 0.6, (c) => drawBoss(c, b, t));
         else drawBoss(ctx, b, t);
       });
@@ -307,6 +312,7 @@ export class Renderer {
     if (lv.state !== 'dead') {
       for (const [oa, oc] of lv.optionPositions()) this.at(oa, oc, () => drawOption(ctx, lv.charId, t));
       this.atObj(p, () => {
+        upright();
         if (lv.powers.shield > 0) {
           circle(ctx, 0, 0, lv.small ? 9 : 16, `rgba(90,200,255,${0.15 + 0.08 * lv.powers.shield})`, 'rgba(160,230,255,0.8)', 1);
         }
@@ -1009,6 +1015,7 @@ export class Renderer {
       const fade = Math.min(1, (m.dur - m.t) * 3, m.t * 6);
       ctx.globalAlpha = Math.max(0, fade);
       if (m.style === 'title') {
+        ctx.globalAlpha *= 0.7; // Etappentitel verdeckt das Spiel nicht ganz
         text(ctx, m.text, W / 2, 110, 22, '#ffe14d');
         text(ctx, THEMES[lv.edge.theme].name, W / 2, 132, 9, '#ffffff');
       } else if (m.style === 'big') {
@@ -1186,7 +1193,7 @@ export class Renderer {
       }
       ctx.stroke();
       ctx.restore();
-      if (ar.near('ret')) this.keyBadge(s.x, s.y - 26, 'X', t);
+      if (ar.near('ret')) this.keyBadge(s.x, s.y + 26, 'X', t); // unten: oben steht der Arena-Name
     }
     // Schiff
     const k = this.alpha;
@@ -1204,6 +1211,7 @@ export class Renderer {
       ctx.rotate(Math.sin(t * 22) * 0.25); // Kopfschütteln
     }
     ctx.rotate((ar.shipAngle * Math.PI) / 2);
+    if (Math.cos((ar.shipAngle * Math.PI) / 2) < -0.01) ctx.scale(1, -1); // nach Westen: aufrecht, nicht kopfüber
     drawPlayer(ctx, game.progress.character, t, false, 0);
     ctx.restore();
     // Kopfzeile
@@ -1273,7 +1281,8 @@ export class Renderer {
         path();
         ctx.stroke();
       }
-      ctx.strokeStyle = known ? THEMES[e.theme].accent : 'rgba(200,200,220,0.45)';
+      // Gebietsfarbe wie die Knoten; Rot bleibt dem Versperrt-Symbol vorbehalten
+      ctx.strokeStyle = known ? AREAS[e.theme].color : 'rgba(200,200,220,0.45)';
       ctx.lineWidth = known ? 3.5 : 2;
       if (!known) ctx.setLineDash([4, 4]);
       path();
@@ -1502,7 +1511,7 @@ export class Renderer {
       ctx.restore();
     }
     text(ctx, 'Ein Dackel dreht durch', W / 2, 86, 11, '#ffffff');
-    text(ctx, 'v0.1 · offline · Tastatur oder Controller', W / 2, H - 8, 7, 'rgba(255,255,255,0.5)', 'center', null, false);
+    text(ctx, 'v0.2 · offline · Tastatur oder Controller', W / 2, H - 8, 7, 'rgba(255,255,255,0.5)', 'center', null, false);
   }
 
   // ================================================================ ENDE

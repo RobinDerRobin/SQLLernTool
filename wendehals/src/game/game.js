@@ -211,7 +211,6 @@ export class Game {
     items.push({ label: 'Weiter', action: () => (this.overlay = null) });
     this.overlay = this.menu('Station ' + node.name, items, {
       onBack: () => (this.overlay = null),
-      footer: 'Gespeichert.',
     });
   }
 
