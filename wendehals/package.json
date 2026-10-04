@@ -1,7 +1,7 @@
 {
   "name": "wendehals",
   "productName": "Wendehals",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Metroidvania-Shoot'em-Up: Welt erkunden, Richtung drehen, abgedrehte Gegner.",
   "private": true,
   "type": "module",
@@ -44,7 +44,8 @@
         "tar.gz"
       ],
       "category": "Game"
-    }
+    },
+    "publish": null
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

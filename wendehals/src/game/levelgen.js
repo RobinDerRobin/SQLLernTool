@@ -42,7 +42,7 @@ export function buildGates(edge, rng, H, L = edge.length) {
     } else if (g.type === 'dark') {
       out.push({ type: 'dark', a0, a1: a0 + g.len });
     } else if (g.type === 'clock') {
-      out.push({ type: 'clock', a0, a1: a0 + CLOCK_THICK, timer: -1, closed: false, shut: 0 });
+      out.push({ type: 'clock', a0, a1: a0 + CLOCK_THICK, timer: -1, started: false, closed: false, shut: 0 });
     }
   }
   return out;

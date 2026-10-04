@@ -495,3 +495,45 @@ test('Drehscheibe: rechts herum durchflogen dreht rechts, links herum links (Bef
     assert.equal(game.heading, expect, fromSide < 0 ? 'von links: rechts herum' : 'von rechts: links herum');
   }
 });
+
+test('Stationsmenü per X speichert auch ohne vorherige Berührung (Befund Software-Tester)', () => {
+  const { game, storage } = newGame();
+  game.placeAt('marmelade', W);
+  game.arena.x = SPOTS.save.x - 34;
+  game.arena.y = SPOTS.save.y;
+  press(game, { station: true });
+  assert.equal(game.overlay?.type, 'menu');
+  assert.equal(loadProgress(storage).saveNode, 'marmelade');
+});
+
+test('Nach dem Bosssieg keine Pause/Abbruch mehr – die Belohnung kann nicht verloren gehen (Befund Software-Tester)', () => {
+  const { game } = newGame();
+  game.placeAt('marmelade', E);
+  game.launch();
+  const lv = game.level;
+  lv.camA = lv.L - lv.va - 1;
+  lv.player.a = lv.camA + 80;
+  for (let i = 0; i < 60 * 60 && lv.state !== 'bossdown'; i++) {
+    if (lv.boss && lv.boss.enter <= 0) lv.damageBoss(lv.boss.hp);
+    press(game, { fire: true });
+  }
+  assert.equal(lv.state, 'bossdown');
+  press(game, { pause: true });
+  press(game, { map: true });
+  assert.equal(game.overlay, null);
+  for (let i = 0; i < 60 * 20 && game.screen === 'level'; i++) press(game, { pause: i % 2 === 0 });
+  closeDialogs(game);
+  assert.ok(game.items.has('DREHWURM'));
+});
+
+test('Drehscheibe: fast genau auf die Mitte gezielt dreht immer rechts (Befund Software-Tester)', () => {
+  for (const dy of [-0.5, -0.2, 0, 0.2, 0.5]) {
+    const { game } = newGame();
+    const s = SPOTS.turntable;
+    game.arena.x = s.x - 50;
+    game.arena.y = s.y + dy;
+    game.arena.ringArmed = true;
+    for (let i = 0; i < 40 && game.heading === E; i++) press(game, { mx: 1, my: 0 });
+    assert.equal(game.heading, S, 'dy ' + dy);
+  }
+});

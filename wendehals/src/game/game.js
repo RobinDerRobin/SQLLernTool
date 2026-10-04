@@ -423,7 +423,7 @@ export class Game {
       // Umgekehrt vor einer unüberwindbaren Wand: wie "Etappe abbrechen", ohne Text.
       // Die Karte merkt sich die Kante als versperrt (Symbol des Hindernisses).
       this.progress.score += lv.score;
-      if (!this.progress.blockedEdges.includes(lv.edge.id)) this.progress.blockedEdges.push(lv.edge.id);
+      if (lv.forward === lv.startForward && !this.progress.blockedEdges.includes(lv.edge.id)) this.progress.blockedEdges.push(lv.edge.id);
       this.abortLevel();
       this.nudge();
       return;
@@ -554,7 +554,13 @@ export class Game {
       this.saveAtStation();
     } else if (!ar.near('save', 30)) this.savedHere = false;
     if (input.station) {
-      if (ar.near('save')) this.openStation();
+      if (ar.near('save')) {
+        if (!this.savedHere) {
+          this.savedHere = true;
+          this.saveAtStation();
+        }
+        this.openStation();
+      }
       else if (ar.near('ret')) this.useReturn();
       else ar.nudge();
       return;
@@ -564,8 +570,11 @@ export class Game {
 
   updateLevel(dt, input) {
     // Während des Absturzes keine Pause: sonst ließe sich die Todesstrafe per Menü umgehen.
-    if (input.pause && this.level.state !== 'dead') return this.openPause();
-    if (input.map && this.level.state !== 'dead') return this.openMap();
+    // Während Absturz, Boss-Explosion und Zieleinlauf keine Pause/Karte: sonst ließe sich die
+    // Todesstrafe umgehen oder die schon verdiente Belohnung per "Etappe abbrechen" verwerfen.
+    const locked = ['dead', 'bossdown', 'clear'].includes(this.level.state);
+    if (input.pause && !locked) return this.openPause();
+    if (input.map && !locked) return this.openMap();
     const lv = this.level;
     lv.update(dt, { mx: input.mx, my: input.my, fire: input.fire, power: input.power, wende: input.wende, espresso: input.espresso });
     for (const s of lv.sfxQueue) this.sfxQueue.push(s);

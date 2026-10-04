@@ -101,6 +101,84 @@ Zwei Subagenten laufen parallel zu meiner Implementierung im Hintergrund (`Agent
    - Neue Option „Reduzierte Effekte“ in den Optionen (`game.js` `openOptions`): kein Wackeln, kein Pulsieren.
    - Neuer Test: 30 Screenshots pro Sekunde in Disco, Bosskampf und Abspann. Die mittlere Helligkeit darf höchstens 3-mal pro Sekunde stark springen (an WCAG 2.3.1 angelehnt).
 
+## Aktueller Stand (vor Phase 6)
+
+Fertig und gepusht auf `ccr-d78728c5-ncws9h`:
+- Phase 1–3 (inkl. 3c Splitter): 301e90c
+- Phase 4, Arenen und Kartenansicht: 16382c8
+- Tester-Befunde zu Phase 3: a64b729
+- Phase 5, Espresso und Zeitschranken: 22d9e0f
+
+Tests: 169/169 grün. Smoke-E2E und der Flacker-Test sind grün. Perf war beim letzten Lauf unzuverlässig, weil die Test-Agenten parallel Chromium laufen ließen. Das muss ohne Parallel-Last nachgemessen werden.
+
+Test-Agenten Phase 4:
+- **Software-Tester:** Am Sitzungslimit abgebrochen, kein Bericht. Läuft in Phase 6 neu, zusammen mit Phase 5.
+- **Spieletester:** Bericht liegt vor. Die Befunde stehen in Phase 6a.
+
+## Phase 6a: Befunde des Spieletesters zu Phase 4
+
+1. **Rückzug/Abbruch-Schleife (Fehler).**
+   - Problem: Nach dem Rückzug vor der Wand oder „Etappe abbrechen“ steht man 70 px vor derselben offenen Klappe. Gehaltenes „vorwärts“ startet die Etappe sofort wieder.
+   - Fix: In `game.abortLevel` wird die Arena mit umgekehrter Blickrichtung betreten (`opposite(o.heading)`), wie nach einer Kehrtwende. Die Klappe ist dann zu, und man schaut in die Arena.
+   - Erlaubt ist das, weil der Löser denselben Zustand über Wendehals bzw. Ankunft ohnehin kennt. Damit kein neuer Zustand ohne Ausweg entsteht, wird der Löser um den Übergang „Rückzug“ erweitert: `(node, h) → (node, opposite(h))` für Kanten mit harten Hindernissen, deren Item fehlt.
+   - Danach sorgen die Garantietests dafür, dass es keine Sackgassen gibt.
+   - Test: Rückzug, dann 2 s „vorwärts“ halten → man ist weiter in der Arena.
+2. **Karte zeigt versperrte Kanten nicht (Fehler).**
+   - `progress.blockedEdges` wird beim Rückzug gesetzt und beim Durchfliegen wieder gelöscht.
+   - In `drawMap` bekommt eine solche Kante ein Schloss bzw. ein Hindernis-Symbol (Fels, Spalt, Uhr) in der Mitte.
+   - Die Liste wird in `sanitizeProgress` geprüft.
+3. **Kartenfarben verwechselbar.** Die aktive Blickrichtung wird nicht mehr gelb gezeichnet, sondern weiß-pulsierend mit Pfeilspitze. Bekannte Kanten behalten ihre Themenfarbe.
+4. **Ring dreht nur rechts.**
+   - Die Drehscheibe dreht je nach Einflugrichtung:
+     - im Uhrzeigersinn umrundet → rechts;
+     - gegen den Uhrzeigersinn → links.
+   - Umgesetzt wird das über den Winkel beim Eintritt relativ zum Ringmittelpunkt bzw. die Querbewegung (Kreuzprodukt aus Ortsvektor und Geschwindigkeit). Die Pfeile am Ring zeigen beide Richtungen: außen rechts herum, innen links herum.
+   - Der Löser (`turnOptions`) bekommt an Drehscheiben `turnCW` **und** `turnCCW`.
+   - Der Test-Bot fliegt den Ring passend an.
+5. **Erste Drehung lernen:** Der Toastständer bekommt einen zweiten, sinnvollen Ausgang nach Süden. Das ist eine kurze, leichte Etappe, die als Einbahn zum Eierbecher führt. So lernt man den Ring, bevor die Krümelmauer einen abweist.
+   - Das wird nur gemacht, wenn der Löser grün bleibt. Sonst bleibt es weg, und der Spieler erfährt davon.
+6. **Kleinigkeiten:**
+   - Toast nach Rückholstation, z. B. „Rückholung: Marmeladenglas“.
+   - Dialog „Extrawürstchen“ mit Zeile „+1 Energie“.
+   - Drehwurm-Text: „K / B: Drehen“.
+   - K ohne Drehwurm zeigt sichtbares Kopfschütteln und „?“ wie beim Rückzug, statt nur Wackeln.
+   - Butterdose: Ankunftsposition einen Tick weiter in die Arena (`depth` 70), damit ↓ nicht sofort zurückführt.
+   - Überlauf-Kante auf der Karte als Ecklinie (erst horizontal raus, dann vertikal) statt diagonal.
+
+## Phase 6b: Abschluss
+
+1. Perf ohne parallele Agenten zweimal messen. Liegt Walross/Diva gedrosselt dauerhaft über 16 ms, mit Profil nachbessern (z. B. Walross-Sprite als Cache).
+2. `README.md` und `docs/DESIGN.md` aktualisieren:
+   - Arenen, Ring, Stationen, Rückholstation, Karte (M / Tab / View);
+   - Espresso (E / RB), Zeitschranke, Splitter, Sofort-Tod, Sparstrumpf, Vertikal-Zoom.
+   - `docs/PLAN-v0.2.md` mit diesem Stand synchronisieren.
+3. `npm run dist:linux` (und `dist:win`, falls wine/Tooling vorhanden, sonst nur zip/portable wie bisher) bauen. Danach `xvfb-run -a npm run e2e:desktop` gegen Electron und gegen `release/linux-unpacked`.
+4. Beide Test-Agenten auf dem Endstand neu starten (Software-Tester prüft Phase 4+5+6, Spieletester das Gesamtspiel). Ihre Fehler-Befunde werden vor dem letzten Commit eingearbeitet.
+5. Commit „Phase 6“ und Push, danach kurze Zusammenfassung an Robin. Offener Punkt aus dem Spieltest: Die vertikale Größe (Zoom 0,56) bleibt wie gewünscht; der Spieler soll sie auf dem Steam Deck beurteilen.
+
+## Verifikation Phase 6
+- `npm test`, darunter neue Tests für:
+  - Rückzug ohne Schleife;
+  - Ring in beide Richtungen;
+  - blockedEdges im Spielstand;
+  - Löser-Garantien mit Rückzug-Übergang.
+- `npm run e2e`: Ring links und rechts per Tastatur; Screenshot der Karte mit Schloss-Symbol.
+- `node e2e/flash.mjs`, `node e2e/perf.mjs` (zweimal, ohne Parallel-Last).
+- `xvfb-run -a npm run e2e:desktop` gegen das gepackte Linux-Release.
+
+## Stand bei Unterbrechung (Limit, historisch)
+
+- **Phase 1 ist fertig** und gepusht (Commit 212e869). Alle Tests und E2E-Budgets sind grün.
+- **Phase 2 ist teilweise erledigt**, noch nicht committet:
+  - Sofort-Tod an Terrain, Stacheln und Zahnrädern;
+  - Wandvorschau im Test-Bot;
+  - Kauf-Reihenfolge der Power-Ups und `powerupsAfterDeath`;
+  - Item Sparstrumpf mit Knoten `sockenschublade` und Etappe `flusensieb`;
+  - ruhigere Stachel-Lücken.
+  - Letzter Testlauf: 130/130 grün.
+- **Offen in Phase 2:** Fortschrittsleiste, „Show don't tell“-Texte, Tests für Sparstrumpf und Power-Up-Erhalt, danach Commit.
+- **Test-Agenten:** Die Prüfläufe nach Phase 1 sind am Limit abgebrochen. Sie starten nach dem Phase-2-Commit neu (Prüfung von Phase 1 und 2 zusammen).
+
 ## Phase 2: Regeln und Oberfläche
 
 1. **Schadensmodell** (`level.js`)

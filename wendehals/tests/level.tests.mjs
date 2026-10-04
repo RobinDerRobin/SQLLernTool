@@ -436,3 +436,32 @@ test('Zeitschranke: Uhr startet erst im Level, mit Espresso bleibt Luft für Men
     }
   }
 });
+
+test('Zeitschranke: Ablauf mit Spieler im Tor startet die Uhr nicht neu; Schranke hinter einem startet nicht (Befund Software-Tester)', () => {
+  const lv = new Level({ edge: EDGE_BY_ID.flusensieb, forward: true, items: withAll(), invincible: true, seed: 4 });
+  clearTerrain(lv);
+  lv.events = [];
+  const g = lv.gates.find((x) => x.type === 'clock');
+  g.started = true;
+  g.timer = 0.05;
+  lv.camA = g.a0 - lv.va + 100;
+  lv.player.a = g.a0 + 12;
+  let maxAfter = 0;
+  for (let i = 0; i < 30; i++) {
+    lv.player.a = g.a0 + 12; // steht im Tor
+    lv.update(1 / 60, {});
+    if (i > 5) maxAfter = Math.max(maxAfter, g.timer);
+  }
+  assert.equal(maxAfter, 0, 'Uhr bleibt abgelaufen');
+  assert.ok(!g.closed);
+  lv.player.a = g.a1 + 30;
+  lv.update(1 / 60, {});
+  assert.ok(g.closed, 'schließt, sobald man draußen ist');
+  // Schranke hinter dem Spieler: Uhr startet nicht
+  const lv2 = new Level({ edge: EDGE_BY_ID.flusensieb, forward: true, items: withAll(), invincible: true, seed: 4 });
+  const g2 = lv2.gates.find((x) => x.type === 'clock');
+  lv2.camA = g2.a1 + 10;
+  lv2.player.a = g2.a1 + 80;
+  lv2.update(1 / 60, {});
+  assert.equal(g2.started, false);
+});

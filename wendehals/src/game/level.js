@@ -490,15 +490,17 @@ export class Level {
       if (g.type !== 'clock') continue;
       g.shut = Math.max(0, Math.min(1, (g.shut || 0) + (g.closed ? dt * 6 : -dt * 6)));
       if (g.closed) continue;
-      if (g.timer < 0) {
-        if (this.camA + this.va >= g.a0 - CLOCK_RUN) {
+      if (!g.started) {
+        // Uhr startet nur für Schranken vor einem (nicht hinter einem, z. B. nach einer Kehrtwende)
+        if (this.camA + this.va >= g.a0 - CLOCK_RUN && g.a0 > this.player.a) {
+          g.started = true;
           g.timer = CLOCK_TIME;
           this.sfx('tick');
         }
         continue;
       }
       const before = Math.ceil(g.timer);
-      g.timer -= dt;
+      g.timer = Math.max(0, g.timer - dt);
       if (Math.ceil(g.timer) !== before && g.timer > 0) this.sfx('tick');
       if (g.timer <= 0 && (p.a + ha <= g.a0 || p.a - ha >= g.a1)) {
         g.closed = true;
@@ -710,6 +712,12 @@ export class Level {
       }
     }
     this.gates.sort((x, y) => x.a0 - y.a0);
+    for (const g of this.gates) {
+      if (g.type !== 'clock' || g.a0 <= p.a) continue;
+      g.closed = false;
+      g.started = false;
+      g.timer = -1;
+    }
     // Gegner werden schwindelig und purzeln aus dem Bild.
     for (const e of this.enemies) this.burst(ma(e.a), mc(e.c), '#ffffff', 4, 60, 2);
     this.enemies = [];
@@ -987,8 +995,17 @@ export class Level {
   /** Gegner fliegen nicht durch festes Terrain: an der Wand entlang statt hinein. */
   keepOutOfWalls(e) {
     if (!isSolid(this.map.at(e.a, e.c))) return;
+    // Zuerst an der Wand entlanggleiten (alte Querposition), sonst höchstens zwei Kacheln versetzen
+    if (e.pc !== undefined && !isSolid(this.map.at(e.a, e.pc))) {
+      e.c = e.pc;
+      return;
+    }
     const c = this.freeC(e.a, e.c);
-    if (c !== e.c) e.c = c;
+    if (Math.abs(this.dc(c, e.c)) <= 2 * TILE) e.c = c;
+    else if (e.pa !== undefined && !isSolid(this.map.at(e.pa, e.pc))) {
+      e.a = e.pa;
+      e.c = e.pc;
+    }
   }
 
   dropCapsule(a, c) {

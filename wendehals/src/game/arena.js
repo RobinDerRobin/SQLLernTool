@@ -184,7 +184,10 @@ export class Arena {
       // = im Uhrzeigersinn). Gerade von vorn hinein: rechts herum.
       const s = SPOTS.turntable;
       const cross = (this.x - s.x) * this.vy - (this.y - s.y) * this.vx;
-      this.turnTo(cross < -1e-6 ? turnCCW(this.heading) : turnCW(this.heading));
+      // Totzone: fast genau auf die Mitte gezielt (Querabstand < 3) zählt als "von vorn" = rechts
+      const v = Math.hypot(this.vx, this.vy);
+      const offset = v > 1e-6 ? cross / v : 0;
+      this.turnTo(offset < -3 ? turnCCW(this.heading) : turnCW(this.heading));
     } else if (!inRing && this.def.turntable) {
       const s = SPOTS.turntable;
       if (Math.hypot(this.x - s.x, this.y - s.y) > s.r + 4) this.ringArmed = true;
