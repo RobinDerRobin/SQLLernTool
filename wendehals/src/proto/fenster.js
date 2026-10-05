@@ -25,6 +25,8 @@ export const DOOR_T = 10; // Dicke der Türbalken
 export const DOG_SPEED = 120;
 export const DOG_R = 8;
 export const DOG_MARGIN = 14;
+export const CAMW = 40; // Scroll-Behälter: so weit darf die Fenstermitte quer von der Gangmitte abweichen
+export const FOLLOW = 5; // Folgegeschwindigkeit der Kamera quer zur Scrollrichtung (1/s)
 export const SWING_TIME = 0.5;
 export const TURN_RATE = 5; // Umkehr: 1/0,4 s * 2 (von -1 nach 1 in 0,4 s)
 
@@ -38,6 +40,17 @@ export const armIndex = (dir) => ARMS.findIndex((a) => a.dir === dir);
 
 /** Tür eines Arms offen: das Fenster scrollt entlang der Kartenachse dieses Arms (E9). */
 export const doorOpen = (armDir, h) => h === armDir || h === opposite(armDir);
+
+/** Fenstermitte auf den Scroll-Behälter begrenzen: Kreuz aus zwei Balken der Breite 2*CAMW, Länge CAM_END. */
+export function clampCam(x, y) {
+  x = clamp(x, -CAM_END, CAM_END);
+  y = clamp(y, -CAM_END, CAM_END);
+  if (Math.abs(x) > CAMW && Math.abs(y) > CAMW) {
+    if (Math.abs(x) >= Math.abs(y)) y = clamp(y, -CAMW, CAMW);
+    else x = clamp(x, -CAMW, CAMW);
+  }
+  return { x, y };
+}
 
 const smooth = (t) => t * t * (3 - 2 * t);
 const vec = (d) => DIR_VEC[d];
@@ -185,6 +198,7 @@ export class FensterScene {
     this.dir = approach(this.dir, this.s === 'R' ? 1 : -1, TURN_RATE * dt);
     this.moveCam(dt);
     this.moveDog(dt, input);
+    this.followCam(dt);
 
     const b = BONE_POS(this.target);
     const m = this.dogMap();
@@ -199,12 +213,30 @@ export class FensterScene {
   moveCam(dt) {
     const r = vec(this.theta);
     const step = SPEED * this.dir * dt;
-    const nx = clamp(this.cam.x + r[0] * step, -CAM_END, CAM_END);
-    const ny = clamp(this.cam.y + r[1] * step, -CAM_END, CAM_END);
-    const m = this.toMap(this.dog.x, this.dog.y, { x: nx, y: ny });
+    const n = { x: this.cam.x + r[0] * step, y: this.cam.y + r[1] * step };
+    // Nicht weiter aus dem Scroll-Behälter hinaus als jetzt (kein Sprung: Rückkehr macht followCam weich).
+    const out = (c) => Math.hypot(c.x - clampCam(c.x, c.y).x, c.y - clampCam(c.x, c.y).y);
+    if (out(n) > out(this.cam) + 1e-9) return;
+    const m = this.toMap(this.dog.x, this.dog.y, n);
     if (!this.walkable(m.x, m.y)) return;
-    this.cam.x = nx;
-    this.cam.y = ny;
+    this.cam.x = n.x;
+    this.cam.y = n.y;
+  }
+
+  /** Kamera folgt dem Dackel quer zur Scrollrichtung (innerhalb des Scroll-Behälters) und kehrt in ihn zurück.
+   *  Die Kartenposition des Dackels bleibt dabei gleich: seine Bildschirmstelle gleicht die Bewegung aus. */
+  followCam(dt) {
+    const r = vec(this.theta);
+    const d = vec(turnCW(this.theta));
+    const oy = this.dog.y - SCREEN_H / 2;
+    const t = clampCam(this.cam.x + d[0] * oy, this.cam.y + d[1] * oy);
+    const k = Math.min(1, FOLLOW * dt);
+    const dx = (t.x - this.cam.x) * k;
+    const dy = (t.y - this.cam.y) * k;
+    this.cam.x += dx;
+    this.cam.y += dy;
+    this.dog.x = clamp(this.dog.x - (dx * r[0] + dy * r[1]), DOG_MARGIN, SCREEN_W - DOG_MARGIN);
+    this.dog.y = clamp(this.dog.y - (dx * d[0] + dy * d[1]), DOG_MARGIN, SCREEN_H - DOG_MARGIN);
   }
 
   moveDog(dt, input) {

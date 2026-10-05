@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { E, S, W, N, opposite, turnCW, turnCCW, CARDINALS } from '../src/core/math.js';
-import { FensterScene, ARMS, doorOpen, SWING_TIME, BONE_POS, CAM_END, BONE_AT } from '../src/proto/fenster.js';
+import { FensterScene, ARMS, doorOpen, SWING_TIME, BONE_POS, CAM_END, BONE_AT, clampCam } from '../src/proto/fenster.js';
 import { Rng } from '../src/core/rng.js';
 
 const DT = 1 / 60;
@@ -102,5 +102,27 @@ test('Fenster: 3 Minuten Zufallseingabe – kein Fehler, Dackel bleibt auf dem B
     const m = sc.dogMap();
     assert.ok(Number.isFinite(m.x) && Number.isFinite(m.y));
     if (!sc.swing) assert.ok(sc.walkable(m.x, m.y, 0), `Dackel auf Boden bei Schritt ${i} (${m.x.toFixed(1)}, ${m.y.toFixed(1)})`);
+  }
+});
+
+test('Fenster: Scroll-Behälter – Drehen im Gang und zurück verschiebt das Bild nicht, Kamera bleibt im Behälter', () => {
+  const sc = new FensterScene();
+  for (let i = 0; i < 260; i++) sc.update(DT, {});
+  for (let i = 0; i < 60; i++) sc.update(DT, { my: 1 }); // Dackel nach unten, Kamera folgt
+  const turn = (input) => {
+    sc.update(DT, input);
+    for (let i = 0; i < 400; i++) sc.update(DT, {});
+  };
+  turn({ rotRight: true });
+  turn({ rotLeft: true });
+  assert.equal(sc.theta, E);
+  const c = clampCam(sc.cam.x, sc.cam.y);
+  assert.ok(Math.hypot(c.x - sc.cam.x, c.y - sc.cam.y) < 1e-6, 'Kamera im Behälter');
+  let prev = sc.dogMap();
+  for (let i = 0; i < 600; i++) {
+    sc.update(DT, { mx: Math.sin(i / 30), my: Math.cos(i / 20) });
+    const m = sc.dogMap();
+    assert.ok(Math.hypot(m.x - prev.x, m.y - prev.y) < 5, 'kein Sprung');
+    prev = m;
   }
 });
