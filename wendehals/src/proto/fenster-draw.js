@@ -38,6 +38,11 @@ function drawPlan(ctx, sc, cam, ang) {
   ctx.fillRect(-END, -HALF, 2 * END, 2 * HALF);
   ctx.fillRect(-HALF, -END, 2 * HALF, 2 * END);
   // Gitter, damit Scrollen und Drehung sichtbar sind
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-END, -HALF, 2 * END, 2 * HALF);
+  ctx.rect(-HALF, -END, 2 * HALF, 2 * END);
+  ctx.clip();
   ctx.fillStyle = FLOOR2;
   const dark = (gx, gy) => Math.abs(Math.round((gx + gy) / GRID)) % 2 === 1;
   for (let gx = -END; gx < END; gx += GRID) {
@@ -46,6 +51,7 @@ function drawPlan(ctx, sc, cam, ang) {
   for (let gy = -END; gy < END; gy += GRID) {
     for (let gx = -HALF; gx < HALF; gx += GRID) if (dark(gx, gy) && Math.abs(gy) >= HALF) ctx.fillRect(gx, gy, GRID, GRID);
   }
+  ctx.restore();
   // Mittelmarke
   ctx.strokeStyle = 'rgba(255,255,255,0.25)';
   ctx.lineWidth = 2;
