@@ -4,3 +4,4 @@ release/
 e2e/screenshots/
 e2e/playtest/
 e2e/perf-report.json
+tests/golden/out/
