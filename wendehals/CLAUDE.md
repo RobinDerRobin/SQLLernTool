@@ -12,13 +12,16 @@ Aktueller Arbeitsauftrag: **v0.3** nach `docs/PLAN-v0.3.md` (Phasen 0–11 der R
 | Befehl | Zweck | Dauer |
 |---|---|---|
 | `npm ci` | Abhängigkeiten installieren (Cloud-Container: mit `ELECTRON_SKIP_BINARY_DOWNLOAD=1`) | ~30 s |
-| `npm test` | Unit- und Löser-Tests (`node --test tests/*.tests.mjs`) | ~15 s |
+| `npm test` | Unit-, Löser- und Golden-Master-Tests (`node --test tests/*.tests.mjs`, ~1 GB Speicher) | ~35 s |
 | `npm run build` | `dist/index.html` bauen | ~1 s |
 | `npm run e2e` | Build + Smoke-Test im echten Chromium (`e2e/smoke.mjs`) | ~1 min |
 | `npm run e2e:perf` | Build + Frame-Budget je Szene, normal und gedrosselt | ~3 min |
 | `npm run e2e:flash` | Build + Flacker-Test (Fotosensibilität) | ~1 min |
 | `npm run check:welt` | Referenz-Löser über `docs/welt.json` → muss „Keine Probleme gefunden.“ melden | ~12 s |
 | `python3 tools/gegenpruefung.py` | unabhängige Gegenprüfung derselben Regeln (Zweitmeinung) | ~2 min |
+| `npm run gen:welt3` | `src/data/welt3.js` aus `docs/welt.json` neu erzeugen (nach jeder Änderung an welt.json) | <1 s |
+| `npm run golden:update` | Golden Master der v0.2-Welt neu schreiben (nur bei beabsichtigter Änderung, s. u.) | ~7 s |
+| `node tools/golden.mjs --dump` | Rohdaten des Golden Masters nach `tests/golden/out/` (zum Vergleichen per diff) | ~7 s |
 
 - Chromium für die E2E-Tests: `/opt/pw-browsers/chromium` oder `CHROMIUM_PATH`. Nie `playwright install`.
 - Ablauf jeder Phase: erkunden → Plan vorlegen → umsetzen → `npm test` + E2E → committen → pushen.
@@ -30,14 +33,15 @@ Aktueller Arbeitsauftrag: **v0.3** nach `docs/PLAN-v0.3.md` (Phasen 0–11 der R
 
 ```
 src/core/      math.js (Richtungen, Bildschirm-Transformationen), input.js, audio.js, rng.js
-src/data/      world.js (v0.2-Welt), items.js (Fähigkeiten, Hindernistypen), levels.js (Profile,
-               Set-Pieces), themes.js, characters.js, text.js
-src/game/      worldgraph.js (Weltregeln), solver.js (Softlock-Löser), level.js (Etappe, reverse()),
-               levelgen.js (prozedurale Etappen), arena.js (Kreuzungsraum), game.js, bosses.js, …
+src/data/      world.js (v0.2-Welt), welt3.js (v0.3-Welt, ERZEUGT aus docs/welt.json), items.js
+               (Fähigkeiten, Hindernistypen), levels.js (Profile, Set-Pieces), themes.js, …
+src/game/      worldgraph.js + solver.js (Regeln/Löser v0.2), worldgraph3.js + solver3.js (v0.3),
+               level.js (Etappe, reverse()), levelgen.js, arena.js (Kreuzungsraum), game.js, …
 src/render/    renderer.js, sprites.js, canvas.js
-tests/         *.tests.mjs (node --test), helpers/ (Bot, Treiber)
+tests/         *.tests.mjs (node --test), helpers/ (Bot, Treiber, Fingerabdruck), golden/ (Golden Master)
 e2e/           smoke.mjs, perf.mjs, flash.mjs, electron.mjs (Desktop)
-tools/         build.mjs, pruefe-welt.mjs (Referenz-Löser v3), gegenpruefung.py, make-icon.mjs
+tools/         build.mjs, gen-welt3.mjs, golden.mjs, pruefe-welt.mjs (Referenz-Löser v3),
+               gegenpruefung.py, make-icon.mjs
 docs/          DESIGN.md (v0.2), PLAN-v0.2.md, PLAN-v0.3.md, WELT-DESIGN.md, welt.json
 electron/      main.cjs, preload.cjs
 ```
@@ -45,9 +49,13 @@ electron/      main.cjs, preload.cjs
 ## Grundprinzip: Spiel und Löser teilen die Regeln
 
 Alle Weltregeln (wer darf wohin, wie wird gedreht, was passiert bei Ankunft) stehen **genau einmal**
-in `src/game/worldgraph.js`. Das Spiel **und** `solver.js` rufen dieselben Funktionen auf. Neue
-Regeln (Stationen, Drehstufen, Hindernisse) kommen dorthin, nie als Sonderfall nur ins Spiel.
-Jede Regel bekommt einen Test „Spiel gegen Löser“.
+in der Regeldatei der Welt: v0.2 `src/game/worldgraph.js`, v0.3 `src/game/worldgraph3.js`. Das
+Spiel **und** der Löser rufen dieselben Funktionen auf. Neue Regeln (Stationen, Drehstufen,
+Hindernisse) kommen dorthin, nie als Sonderfall nur ins Spiel. Jede Regel bekommt einen Test
+„Spiel gegen Löser“. Achtung: Das v0.2-Spiel dreht noch selbst (`arena.updateRing`, `game.js`);
+für v0.3 ruft das Spiel ab Phase 3 `worldgraph3.turnOptions`/`stationTurns` auf.
+`worldgraph3.js` ist an eine übersetzte Welt gebunden (`compileWorld3(data)`), nichts läuft beim
+Import. Der Port muss mit `tools/pruefe-welt.mjs` übereinstimmen (Test in `tests/world3.tests.mjs`).
 
 ## Koordinaten und Richtungen
 
@@ -55,11 +63,17 @@ Jede Regel bekommt einen Test „Spiel gegen Löser“.
   Flugrichtung immer 480 E; senkrecht wird dafür herausgezoomt (`viewDims`).
 - **Eingabe bleibt bildschirmbezogen:** `screenToLocalVec(heading, sx, sy)` dreht den Stick in
   lokale Koordinaten, `localToScreen` zurück.
-- **v0.2 (Stand heute):** 4 Richtungen `E=0, S=1, W=2, N=3`, im Uhrzeigersinn, `& 3`.
-- **v0.3 (Ziel Phase 1):** 8 Richtungen `E,SE,S,SW,W,NW,N,NE = 0..7`, `turn(h,k) = (h+k)&7`,
-  `opposite = (h+4)&7`, Bildwinkel `h·45°`. Alter Index ×2 = neuer Index.
-  Klassen: gerade = Kreuz (+), ungerade = Diagonale (×). 90°/180° bleiben in der Klasse,
-  nur 45° wechselt sie (Paritätsregel). Diagonale Ausgänge = Eck-Klappen, max. eine je Ecke.
+- **8 Richtungen** (seit Phase 1): `E,SE,S,SW,W,NW,N,NE = 0..7` im Uhrzeigersinn, `turnBy(h,k)`
+  in 45°-Schritten, `turnCW`/`turnCCW` = 90°, `opposite` = 180°, `headingAngle` = h·45°.
+  Klassen: gerade = Kreuz (+), ungerade = Diagonale (×); 90°/180° bleiben in der Klasse, nur 45°
+  wechselt sie (Paritätsregel). Die v0.2-Welt benutzt nur `CARDINALS` (E, S, W, N = 0, 2, 4, 6).
+- **Nie mit Richtungszahlen rechnen** außerhalb von `math.js`: Konstanten und Hilfen benutzen
+  (`CARDINALS`, `isHorizontal/isVertical/isDiagonal`, `quarterTurns`, `turnBy`, `rotationSteps`,
+  `HEADING_CODES` für welt.json). `tests/directions.tests.mjs` scannt danach; begründete Ausnahmen
+  tragen `// richtung-ok` in derselben Zeile.
+- Diagonalen werfen in `viewDims`/`crossPeriod`/`localToScreen*`, bis Phase 2 sie baut.
+- Spielstand: Version 2 speichert 8er-Richtungen; Version 1 (bis v0.2, Richtungen 0..3) wird beim
+  Laden umgerechnet (`save.js`), gleicher Schlüssel.
 - Simulation: fester 60-Hz-Takt, deterministischer Zufall (`core/rng.js`); Zeichnen interpoliert.
 
 ## Design-Quellen (verbindlich)
@@ -78,6 +92,15 @@ Jede Regel bekommt einen Test „Spiel gegen Löser“.
 Die v0.3-Welt entsteht hinter einem Schalter (`?welt=3` bzw. Electron `--welt=3`, Prototyp
 `?welt=proto`). Die v0.2-Welt bleibt Standard, bis Slice A spielbar ist (Phase 8). Jedes Release
 muss für Robin spielbar bleiben.
+
+## Golden Master der v0.2-Welt
+
+`tests/golden.tests.mjs` vergleicht einen Fingerabdruck von Logik (kompletter Durchlauf), allen
+Etappen und der Zeichnung (aufzeichnende Canvas) mit `tests/golden/v02-fingerprint.json`. Er muss
+bei jedem Umbau gleich bleiben, solange das v0.2-Spiel nicht absichtlich geändert wird. Abweichung →
+erst verstehen (`node tools/golden.mjs --dump` vor/nach, `diff`), nie einfach neu schreiben. Neu
+schreiben (`npm run golden:update`) nur bei beabsichtigter Änderung am v0.2-Spiel, mit Grund in der
+Commit-Nachricht.
 
 ## Do-not-Liste
 
@@ -105,3 +128,10 @@ Phase 4, 8 und 10.
 - `npm run e2e:flash`: bestanden (0 Blitze/s).
 - `npm run check:welt` und `gegenpruefung.py`: identisch, „Keine Probleme gefunden.“
   (ohne Können 197.188 Zustände, mit Können 394.368, 0 Sackgassen, 36/36 Fundstücke).
+
+## Stand nach Phase 1 (05.10.2026)
+
+- `npm test` 206/206 grün (~35 s): Golden Master unverändert über den Umbau auf 8 Richtungen,
+  Richtungs-Wächter, Spielstand-Umrechnung, v3-Invarianten I1–I8, Port = Referenz-Löser
+  (197.188 / 197.669 / 394.368 / 396.470 Zustände, gleiche Phasentabelle).
+- e2e, e2e:perf, e2e:flash grün. Das Spiel nutzt die v3-Welt noch nicht (nicht im Bundle).
