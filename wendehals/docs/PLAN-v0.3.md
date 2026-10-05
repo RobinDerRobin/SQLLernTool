@@ -1,5 +1,14 @@
 # Wendehals v0.3: Plan für Claude Code
 
+> **PAUSIERT nach Phase 1 (05.10.2026).** Robin arbeitet jetzt in kleinen Prototyp-Paketen; der aktuelle,
+> verbindliche Arbeitsauftrag steht in [`PROTOTYPEN.md`](PROTOTYPEN.md). Dieser Plan bleibt als Referenz.
+>
+> **Entscheidungen 05.10.2026** (Details in PROTOTYPEN.md): Bildschirm = Fenster auf einem Grundriss von
+> oben, Drehung links/rechts, 180° = nur Scroll-Umkehr, Gabelungen über die Scrollrichtung, keine
+> gespiegelten Räume, kopfüber erlaubt, kein vertikales Fliegen, kein Zoom-out. **E1 ist damit erledigt**
+> (Phase 2 in der unten beschriebenen Form entfällt). Minimap: später. **Setting offen** – das Haus ist
+> für das echte Spiel gestrichen (Prototypen dürfen es als Platzhalter nutzen); E6/E7 ruhen.
+
 Thema dieses Plans: Richtungssystem, neue Welt, dynamische Level.
 
 > **An Claude Code:** Dieser Plan ist die Arbeitsgrundlage für v0.3. Lies ihn vollständig, bevor du anfängst. Lies danach die Design-Grundlagen (Abschnitt 2).

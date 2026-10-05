@@ -5,7 +5,17 @@ esbuild zu einer einzigen `dist/index.html`, Desktop über Electron. Keine exter
 Grafik = Canvas-Vektoren, Ton = WebAudio-Synthese. Der Rest des Repos (SQL-Lern-Tool,
 `csharp-engine/`) gehört nicht zum Spiel.
 
-Aktueller Arbeitsauftrag: **v0.3** nach `docs/PLAN-v0.3.md` (Phasen 0–11 der Reihe nach).
+Aktueller Arbeitsauftrag (seit 05.10.2026): **Prototypen nach `docs/PROTOTYPEN.md`** – kleine
+Wegwerf-Prototypen, ein Konzept nach dem anderen, Bau nach einem Brief in `docs/prototypen/`.
+`docs/PLAN-v0.3.md` ist **nach Phase 1 pausiert** (nicht löschen). Das Haus als Setting ist für das echte
+Spiel gestrichen, **Setting offen**.
+
+**Modellwahl:** Jeder Plan und jeder Schritt nennt, welches Claude-Modell Robin wählen soll (Opus 5.5 für
+Design/Konzept/Planung, Sonnet 5.5 zum Bauen und Testen, Haiku 4.5 für Kleinkram; **kein Fable**).
+Tabelle in `docs/PROTOTYPEN.md`.
+
+**Recherche** und Agenten-Berichte liegen in `docs/forschung/` (Index: `docs/forschung/README.md`);
+neue Recherche dort ablegen.
 
 ## Befehle (alle im Ordner `wendehals/`)
 
@@ -76,8 +86,12 @@ Import. Der Port muss mit `tools/pruefe-welt.mjs` übereinstimmen (Test in `test
   Laden umgerechnet (`save.js`), gleicher Schlüssel.
 - Simulation: fester 60-Hz-Takt, deterministischer Zufall (`core/rng.js`); Zeichnen interpoliert.
 
-## Design-Quellen (verbindlich)
+## Design-Quellen
 
+- **Verbindlich:** `docs/PROTOTYPEN.md` (Robins Entscheidungen, Entscheidungsregister, Prototyp-Leiter,
+  Entscheidungsprotokoll) und der jeweilige Bau-Brief in `docs/prototypen/`. Wo die folgenden Dokumente
+  widersprechen, gilt PROTOTYPEN.md.
+- Referenz (pausiert, nicht mehr bindend wo widersprochen):
 - `docs/WELT-DESIGN.md`: Richtungssystem, Drehstufen, Drehzahl, Weltstruktur, Tempo-Zonen,
   Löser-Invarianten (Kap. 7: I1–I8), Regeln gegen Steckenbleiben (Kap. 8: R1–R15).
 - `docs/welt.json`: **Quelle der Wahrheit** für die neue Welt (8 Gebiete, 71 Arenen, 86 Etappen +
@@ -87,11 +101,15 @@ Import. Der Port muss mit `tools/pruefe-welt.mjs` übereinstimmen (Test in `test
 - `docs/PLAN-v0.3.md`: Phasen, Akzeptanzkriterien, offene Entscheidungen E1–E7 (Abschnitt 4).
 - Zahlen (Tempo, Zoom, Drehzahl-Strecken) sind Startwerte: als Konstanten an **einer** Stelle pflegen.
 
-## Altes und neues Spiel parallel
+## Prototypen und das v0.2-Spiel
 
-Die v0.3-Welt entsteht hinter einem Schalter (`?welt=3` bzw. Electron `--welt=3`, Prototyp
-`?welt=proto`). Die v0.2-Welt bleibt Standard, bis Slice A spielbar ist (Phase 8). Jedes Release
-muss für Robin spielbar bleiben.
+- Die v0.2-Welt bleibt das Standardspiel; jedes Release muss für Robin spielbar bleiben.
+- Prototyp-Code liegt nur in `src/proto/` (plus wenige Zeilen Anbindung laut Brief). Erreichbar auf dem
+  Deck über **Optionen → Prototyp: …** (nur vom Titel), im Browser über `?proto=<name>`.
+- Regeln aus Prototypen gehen nie direkt ins Spiel: nach Robins „keep“ werden sie in den echten Modulen
+  neu geschrieben (Spiel gegen Löser getestet), der Prototyp wird gelöscht.
+- Überholt durch Robins Entscheidungen vom 05.10.2026 (siehe PROTOTYPEN.md): vertikale Etappen mit
+  Zoom-out, gedrehte 45°-Diagonal-Etappen (E1), „Diagonalen werfen bis Phase 2“ als Plan.
 
 ## Golden Master der v0.2-Welt
 
@@ -104,8 +122,11 @@ Commit-Nachricht.
 
 ## Do-not-Liste
 
-- **Keine Designentscheidungen**, die nicht in `PLAN-v0.3.md` oder `WELT-DESIGN.md` stehen.
-  Offene Punkte (E1–E7) haben einen Standard; bei echter Blockade Robin fragen.
+- **Keine Designentscheidungen**, die nicht in `docs/PROTOTYPEN.md`, dem Bau-Brief oder (als Referenz)
+  `PLAN-v0.3.md`/`WELT-DESIGN.md` stehen. Offene Punkte stehen im Entscheidungsregister; bei echter
+  Blockade Robin fragen.
+- **Golden Master nicht neu schreiben**, um Prototypen grün zu bekommen: Prototypen dürfen das v0.2-Spiel
+  nicht verändern.
 - **Keine Tests löschen, überspringen oder abschwächen**, keine Toleranzen hochsetzen, um grün zu werden.
 - **`docs/welt.json` nicht ändern**, ohne dass `npm run check:welt` grün bleibt und
   `docs/WELT-DESIGN.md` im selben Commit nachgezogen wird.
@@ -113,11 +134,11 @@ Commit-Nachricht.
 - Keine externen Assets, keine neuen Laufzeit-Abhängigkeiten, kein Stack-Wechsel.
 - Nicht `csharp-engine/` oder das SQL-Lern-Tool anfassen.
 
-## Test-Agenten (wie in PLAN-v0.2)
+## Test-Agenten
 
-Nach jeder Phase prüft ein Software-Tester-Agent den Diff, ein Spieletester-Agent spielt den Stand.
-Befunde der Schwere „Fehler“ werden vor der nächsten Phase behoben. Spieltest-Tore mit Robin nach
-Phase 4, 8 und 10.
+Bei Produktionsarbeit (z. B. Übernahme eines Prototyps in die Engine) prüft ein Software-Tester-Agent
+den Diff, ein Spieletester-Agent spielt den Stand; Befunde „Fehler“ werden vorher behoben. Bei
+Wegwerf-Prototypen reicht das Sicherheitsnetz aus dem Brief; das eigentliche Tor ist Robin am Deck.
 
 ## Basislauf v0.2 (04.10.2026, vor v0.3)
 

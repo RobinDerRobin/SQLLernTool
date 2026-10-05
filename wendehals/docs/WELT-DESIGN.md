@@ -1,5 +1,12 @@
 # Wendehals – Weltdesign Runde 2: Richtungssystem, Progression, Weltgraph
 
+> **Hinweis 05.10.2026 – Referenz, nicht mehr bindend wo widersprochen.** Verbindlich ist
+> [`PROTOTYPEN.md`](PROTOTYPEN.md). **Setting offen:** Das Haus (Frühstückstisch, Bad, Keller, … und der
+> Querschnitt des Hauses) ist für das echte Spiel gestrichen; Graph, Regeln und IDs in `welt.json` bleiben
+> Arbeitsdaten. **Richtungen:** Bildschirm = Fenster auf einem Grundriss von oben (Robins Skizze), kein
+> vertikales Fliegen, kein Zoom-out, keine gedrehten 45°-Etappen (Kap. 2.2 überholt), 180° = nur
+> Scroll-Umkehr. Kapitel 5–6 (Tempo, Beispiel-Etappen) sind Beispiele – Level werden mehrfach neu gebaut.
+
 > Stand: 4. Oktober 2026 · Rolle: Game Designer · Grundlage: Code-Stand v0.2 (`src/data/world.js`, `worldgraph.js`, `solver.js`, `levelgen.js`, `docs/DESIGN.md`) und Rechercheergebnisse des Welt-Rhythmus-Analysten.
 > Alle Zahlen zu Minuten, Anteilen, Längen und Kosten in diesem Dokument sind **Designentscheidungen** (Zielwerte), keine Messwerte. Werte aus der Recherche sind mit [b] (belegt) bzw. [g] (geschätzt) markiert.
 > Maschinenlesbare Fassung: `docs/welt.json` (gleiche IDs). Prüfer: `tools/pruefe-welt.mjs` (Löser, siehe Kapitel 7), unabhängige Gegenprüfung: `tools/gegenpruefung.py`. Umsetzungsplan: `docs/PLAN-v0.3.md`.
