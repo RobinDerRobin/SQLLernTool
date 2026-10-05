@@ -86,7 +86,12 @@ export class Input {
     let mx = (held.right ? 1 : 0) - (held.left ? 1 : 0);
     let my = (held.down ? 1 : 0) - (held.up ? 1 : 0);
 
-    const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : [];
+    let pads = [];
+    try {
+      if (typeof navigator !== 'undefined' && navigator.getGamepads) pads = navigator.getGamepads();
+    } catch {
+      /* Gamepad per Berechtigungsrichtlinie gesperrt (z. B. eingebettetes Fenster): nur Tastatur */
+    }
     for (const pad of pads) {
       if (!pad || !pad.connected) continue;
       pad.buttons.forEach((b, i) => {
