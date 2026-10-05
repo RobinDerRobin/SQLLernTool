@@ -33,7 +33,8 @@ function createWindow() {
     },
   });
   win.setMenuBarVisibility(false);
-  win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  // Standard: Prototyp (P1). WENDEHALS_SPIEL=1 öffnet das alte v0.2-Spiel (für e2e/electron.mjs).
+  win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), process.env.WENDEHALS_SPIEL ? { query: { spiel: '1' } } : undefined);
   // Externe Links/Navigation verhindern – das Spiel braucht kein Internet.
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (e) => e.preventDefault());

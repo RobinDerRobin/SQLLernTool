@@ -25,7 +25,7 @@ page.on('console', (m) => {
 
 const url = pathToFileURL(path.join(root, 'dist/index.html')).href;
 // Unverwundbar: der Test fliegt mit festen Tastenfolgen und soll nicht am Terrain zerschellen
-await page.goto(url + '?unverwundbar');
+await page.goto(url + '?spiel&unverwundbar');
 await page.waitForFunction(() => window.__wendehals);
 const wait = (ms) => page.waitForTimeout(ms);
 const shot = async (name) => page.screenshot({ path: path.join(shots, name + '.png') });

@@ -17,7 +17,7 @@ const app = await electron.launch({
   executablePath,
   args: [...(packaged ? [] : [root]), '--no-sandbox', '--user-data-dir=' + profile],
   cwd: root,
-  env: { ...process.env, XDG_CONFIG_HOME: profile, APPDATA: profile },
+  env: { ...process.env, WENDEHALS_SPIEL: '1', XDG_CONFIG_HOME: profile, APPDATA: profile },
 });
 const page = await app.firstWindow();
 const errors = [];

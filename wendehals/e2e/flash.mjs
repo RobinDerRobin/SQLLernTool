@@ -23,7 +23,7 @@ const SCENES = [
 const exe = [process.env.CHROMIUM_PATH, '/opt/pw-browsers/chromium'].find((p) => p && existsSync(p));
 const browser = await chromium.launch({ executablePath: exe });
 const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
-await page.goto(pathToFileURL(path.join(root, 'dist/index.html')).href);
+await page.goto(pathToFileURL(path.join(root, 'dist/index.html')).href + '?spiel');
 await page.waitForFunction(() => window.__wendehals);
 
 let failed = 0;

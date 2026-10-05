@@ -49,7 +49,7 @@ const browser = await chromium.launch({ executablePath: exe });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
-await page.goto(pathToFileURL(path.join(root, 'dist/index.html')).href);
+await page.goto(pathToFileURL(path.join(root, 'dist/index.html')).href + '?spiel');
 await page.waitForFunction(() => window.__wendehals && window.__wendehals.perf);
 const cdp = await page.context().newCDPSession(page);
 

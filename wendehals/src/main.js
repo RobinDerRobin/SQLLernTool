@@ -82,7 +82,9 @@ export function boot() {
   const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true }) || canvas.getContext('2d');
   const params = new URLSearchParams(location.search);
   const game = new Game({ storage: pickStorage(), platform: makePlatform(), invincible: params.has('unverwundbar') });
-  if (params.get('proto') === 'fenster') game.startProto('fenster');
+  // P1-Build: Start direkt im Prototyp. `?spiel` öffnet das alte v0.2-Spiel (Titelmenü) direkt.
+  // Vor dem Übernehmen eines späteren Prototyps oder zurück zu v0.2 wird das wieder umgestellt.
+  if (!params.has('spiel')) game.startProto('fenster');
   const renderer = new Renderer(ctx);
   const input = new Input(window);
   const audio = new Audio();

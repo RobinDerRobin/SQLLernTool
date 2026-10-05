@@ -85,6 +85,8 @@ dürfen es als Platzhalter nutzen.
 
 ## 4. Prototyp-Leiter Paket 1 „Fenster“
 
+**P1-Builds starten direkt im Prototyp; vor dem Übernehmen eines späteren Prototyps oder zurück zu v0.2 wird das wieder umgestellt.** (`?spiel` in der URL bzw. `WENDEHALS_SPIEL=1` für Electron öffnet das alte Spiel direkt; Start/Esc im Prototyp → v0.2-Titelmenü, dort „Optionen → Prototyp: Fenster“ zurück.)
+
 | ID | Frage | Stand |
 |---|---|---|
 | **P1 „Kreuzung“** | Nehme ich die Gabelung, die ich will, indem ich das Fenster drehe – beim ersten Mal, ohne nachzudenken, auch nach der 180°-Umkehr und mit dem Plan kopfüber? | **Brief fertig:** [`prototypen/P1-kreuzung.md`](prototypen/P1-kreuzung.md) |

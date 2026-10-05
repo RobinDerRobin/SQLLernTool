@@ -115,7 +115,7 @@ Richtung. Nicht abschwächen – die Helfer benutzen.
   Im Titelmenü-Aufruf `fromTitle: true` übergeben. (Nicht ins Titelmenü selbst: das zeichnet der Golden
   Master. Nicht aus dem Pausenmenü: das würde ein laufendes Spiel verwerfen.)
 - `src/render/renderer.js`: in `draw()` ein `case 'proto'` → `drawFenster(ctx, game.proto, alpha)`.
-- `src/main.js`: bei `?proto=fenster` nach dem Erzeugen von `Game` direkt `game.startProto('fenster')`.
+- `src/main.js`: **P1-Builds starten direkt im Prototyp; vor dem Übernehmen eines späteren Prototyps oder zurück zu v0.2 wird das wieder umgestellt.** Ohne Parameter wird nach dem Erzeugen von `Game` direkt `game.startProto('fenster')` aufgerufen; `?spiel` öffnet das alte Spiel (Electron: `WENDEHALS_SPIEL=1`).
 
 ## 6. Sicherheitsnetz und Prüfung
 
@@ -152,7 +152,7 @@ Richtung. Nicht abschwächen – die Helfer benutzen.
 1. Was gebaut ist, Abweichungen vom Brief (mit Grund), Testergebnisse.
 2. **So kommt es aufs Steam Deck:** den Branch in `ccr-d78728c5-ncws9h` übernehmen → der Workflow
    `.github/workflows/wendehals-release.yml` baut die AppImage unter dem Tag `wendehals-latest` →
-   herunterladen, starten, **Optionen → Prototyp: Fenster**.
+   herunterladen, starten – das Spiel startet direkt im Prototyp.
 3. Die drei Fragen für Robin nach 2–5 Minuten Spielen:
    - Wann hast du die falsche Drehung gedrückt?
    - Fühlte sich der pausierte Schwenk wie Lenken an oder wie eine Unterbrechung?
