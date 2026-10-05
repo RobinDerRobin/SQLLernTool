@@ -2,7 +2,7 @@
 import { successors, maskOf } from '../../src/game/solver.js';
 import { linksAt } from '../../src/game/worldgraph.js';
 import { SPOTS, insideOf, exitPoint, ARENA_W, ARENA_H } from '../../src/game/arena.js';
-import { DIR_VEC, opposite, segPointDist2 } from '../../src/core/math.js';
+import { DIR_VEC, opposite, turnCCW, segPointDist2 } from '../../src/core/math.js';
 import { botInput } from './bot.mjs';
 
 export const DT = 1 / 60;
@@ -104,7 +104,7 @@ export function turnTo(game, h) {
     } else if (ar.def.turntable) {
       // Rechts herum (von links her waagerecht durch den Ring) oder links herum (von rechts her)
       const s = SPOTS.turntable;
-      const cw = ((h - game.heading) & 3) !== 3;
+      const cw = h !== turnCCW(game.heading); // nur eine Vierteldrehung links geht links herum
       const side = cw ? -1 : 1;
       const from = [s.x + side * 50, s.y - 8];
       const to = [s.x - side * 50, s.y - 8];

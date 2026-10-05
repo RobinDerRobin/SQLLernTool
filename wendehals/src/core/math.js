@@ -15,9 +15,20 @@ export const DIR_VEC = [
   [0, -1],
 ];
 
-export const turnCW = (d) => (d + 1) & 3;
-export const turnCCW = (d) => (d + 3) & 3;
-export const opposite = (d) => (d + 2) & 3;
+/** Die vier Haupt-Blickrichtungen (Kreuz), in Uhrzeigerfolge. */
+export const CARDINALS = [E, S, W, N];
+
+export const turnCW = (d) => (d + 1) & 3; // 90° rechts
+export const turnCCW = (d) => (d + 3) & 3; // 90° links
+export const opposite = (d) => (d + 2) & 3; // 180°
+
+// Bedeutung statt Zahlen-Arithmetik: Außerhalb dieser Datei rechnet niemand mit Richtungszahlen
+// (Prüfung: tests/directions.tests.mjs).
+export const isHorizontal = (h) => h === E || h === W;
+export const isVertical = (h) => h === S || h === N;
+export const isDiagonal = (h) => false;
+/** Blickrichtung als Anzahl Vierteldrehungen im Uhrzeigersinn ab Osten (O=0, S=1, W=2, N=3). */
+export const quarterTurns = (h) => h;
 
 /** Richtung von Punkt a nach Punkt b, wenn beide auf einer Achse liegen, sonst -1. */
 export function dirBetween(ax, ay, bx, by) {
@@ -60,7 +71,8 @@ export const SCREEN_H = 270;
 export function viewDims(heading) {
   // Die sichtbare Strecke in Flugrichtung ist immer 480 Einheiten – auch in vertikalen Leveln.
   // Dort wird rausgezoomt (zoom < 1), damit man gleich viel Reaktionszeit hat.
-  if (heading % 2 === 0) return { va: SCREEN_W, vc: SCREEN_H, zoom: 1 };
+  if (isHorizontal(heading)) return { va: SCREEN_W, vc: SCREEN_H, zoom: 1 };
+  if (!isVertical(heading)) throw new Error('Keine Etappen-Richtung: ' + heading);
   const zoom = SCREEN_H / SCREEN_W;
   return { va: SCREEN_W, vc: SCREEN_W / zoom, zoom };
 }
@@ -70,13 +82,14 @@ export function viewDims(heading) {
  * (34 Kacheln), mit Boden und Decke nur 288 – dann sieht man beide fast immer (wie bei Parodius).
  */
 export function crossPeriod(heading, wrap = true) {
-  if (heading % 2 === 1) return 960;
+  if (isVertical(heading)) return 960;
+  if (!isHorizontal(heading)) throw new Error('Keine Etappen-Richtung: ' + heading);
   return wrap ? 544 : 288;
 }
 
 /** Drehwinkel der Welt auf dem Bildschirm für eine Flugrichtung. */
 export function headingAngle(heading) {
-  return (heading * Math.PI) / 2;
+  return (quarterTurns(heading) * Math.PI) / 2;
 }
 
 /** Lokale Sichtfeld-Koordinate (a, c) -> Bildschirmkoordinate. */

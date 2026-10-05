@@ -10,6 +10,7 @@ import { writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
+import { E, S, W, N } from '../src/core/math.js';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const filter = process.argv[2] || '';
@@ -28,19 +29,19 @@ export const BUDGETS = {
 };
 
 const SCENES = [
-  { name: 'fruehstueck', node: 'toast', heading: 0, items: [] },
-  { name: 'bad', node: 'stoepsel', heading: 0, items: ['DREHWURM'] },
-  { name: 'keller-dunkel', node: 'tasse', heading: 1, items: ['DREHWURM'] },
-  { name: 'disco', node: 'discotuer', heading: 1, items: ['DREHWURM'] },
-  { name: 'uhrwerk', node: 'lavalampe', heading: 3, items: ['DREHWURM', 'PILZ'] },
-  { name: 'stacheln-nord', node: 'marmelade', heading: 3, items: [] },
-  { name: 'boss-kaffeekanne', node: 'marmelade', heading: 0, items: [], boss: true },
-  { name: 'boss-walross', node: 'seifenschale', heading: 3, items: ['DREHWURM'], boss: true },
-  { name: 'boss-kartoffel', node: 'einmachregal', heading: 2, items: ['DREHWURM'], boss: true },
-  { name: 'boss-diva', node: 'tanzflaeche', heading: 0, items: ['DREHWURM'], boss: true },
-  { name: 'boss-wecker', node: 'pendel', heading: 3, items: ['DREHWURM', 'BOHRER', 'PILZ'], boss: true },
-  { name: 'karte', map: 'karte' },
-  { name: 'arena', map: 'arena' },
+  { name: 'fruehstueck', node: 'toast', heading: E, items: [] },
+  { name: 'bad', node: 'stoepsel', heading: E, items: ['DREHWURM'] },
+  { name: 'keller-dunkel', node: 'tasse', heading: S, items: ['DREHWURM'] },
+  { name: 'disco', node: 'discotuer', heading: S, items: ['DREHWURM'] },
+  { name: 'uhrwerk', node: 'lavalampe', heading: N, items: ['DREHWURM', 'PILZ'] },
+  { name: 'stacheln-nord', node: 'marmelade', heading: N, items: [] },
+  { name: 'boss-kaffeekanne', node: 'marmelade', heading: E, items: [], boss: true },
+  { name: 'boss-walross', node: 'seifenschale', heading: N, items: ['DREHWURM'], boss: true },
+  { name: 'boss-kartoffel', node: 'einmachregal', heading: W, items: ['DREHWURM'], boss: true },
+  { name: 'boss-diva', node: 'tanzflaeche', heading: E, items: ['DREHWURM'], boss: true },
+  { name: 'boss-wecker', node: 'pendel', heading: N, items: ['DREHWURM', 'BOHRER', 'PILZ'], boss: true },
+  { name: 'karte', map: 'karte', heading: E },
+  { name: 'arena', map: 'arena', heading: E },
 ].filter((s) => s.name.includes(filter));
 
 const exe = [process.env.CHROMIUM_PATH, '/opt/pw-browsers/chromium'].find((p) => p && existsSync(p));
@@ -78,7 +79,7 @@ async function runScene(scene, measureMs = 3000) {
     window.__autoplay = !sc.map;
     if (sc.map) {
       g.progress.visited = ['toast', 'eier', 'marmelade', 'tasse', 'stoepsel', 'seifenschale', 'entenhafen', 'discotuer'];
-      g.placeAt('stoepsel', 0);
+      g.placeAt('stoepsel', sc.heading);
       if (sc.map === 'karte') g.openMap();
       return;
     }

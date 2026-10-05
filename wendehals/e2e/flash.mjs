@@ -5,17 +5,18 @@ import { chromium } from 'playwright-core';
 import { existsSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
+import { E, S, N } from '../src/core/math.js';
 import { countFlashes } from './flashcount.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const MAX_FLASHES_PER_SECOND = 3;
 
 const SCENES = [
-  { name: 'disco', setup: { node: 'discotuer', heading: 1, items: ['DREHWURM'], advance: 6 } },
-  { name: 'disco-boss', setup: { node: 'tanzflaeche', heading: 0, items: ['DREHWURM'], boss: true } },
-  { name: 'wecker-boss', setup: { node: 'pendel', heading: 3, items: ['DREHWURM', 'BOHRER', 'PILZ'], boss: true } },
-  { name: 'boss-explosion', setup: { node: 'marmelade', heading: 0, items: [], boss: true, kill: true } },
-  { name: 'dunkelzone', setup: { node: 'tasse', heading: 1, items: ['DREHWURM'], advance: 14 } },
+  { name: 'disco', setup: { node: 'discotuer', heading: S, items: ['DREHWURM'], advance: 6 } },
+  { name: 'disco-boss', setup: { node: 'tanzflaeche', heading: E, items: ['DREHWURM'], boss: true } },
+  { name: 'wecker-boss', setup: { node: 'pendel', heading: N, items: ['DREHWURM', 'BOHRER', 'PILZ'], boss: true } },
+  { name: 'boss-explosion', setup: { node: 'marmelade', heading: E, items: [], boss: true, kill: true } },
+  { name: 'dunkelzone', setup: { node: 'tasse', heading: S, items: ['DREHWURM'], advance: 14 } },
   { name: 'abspann', ending: true },
 ];
 
@@ -60,7 +61,7 @@ for (const scene of SCENES) {
         small.width = 32;
         small.height = 18;
         const sc = small.getContext('2d', { willReadFrequently: true });
-        const out = { all: [], q: [[], [], [], []] };
+        const out = { all: [], q: [[], [], [], []] }; // richtung-ok: Bildschirm-Viertel
         const lum = (d, x0, y0, x1, y1) => {
           let sum = 0;
           let n = 0;

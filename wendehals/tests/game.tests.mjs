@@ -239,7 +239,7 @@ test('kaputte Spielstände stürzen nicht ab', () => {
   assert.equal(loadProgress(storage), null);
   const g = new Game({ storage });
   assert.ok(!g.overlay.items.some((i) => i.label === 'Weiterspielen'));
-  const p = sanitizeProgress({ saveNode: 'gibtsnicht', saveHeading: 9, items: ['DREHWURM', 'QUATSCH', 5], visited: 'x', character: 'oma', score: -5 });
+  const p = sanitizeProgress({ saveNode: 'gibtsnicht', saveHeading: 9 /* richtung-ok: absichtlich ungültig */, items: ['DREHWURM', 'QUATSCH', 5], visited: 'x', character: 'oma', score: -5 });
   assert.equal(p.saveNode, 'toast');
   assert.equal(p.saveHeading, E);
   assert.deepEqual(p.items, ['DREHWURM']);

@@ -12,6 +12,7 @@ import { ENEMIES } from '../src/game/enemies.js';
 import { BOSSES } from '../src/game/bosses.js';
 import { TRACKS, parse } from '../src/core/audio.js';
 import { runLevel } from './helpers/bot.mjs';
+import { CARDINALS, E } from '../src/core/math.js';
 
 /** Canvas-Attrappe: nimmt alle Aufrufe an und prüft Zahlenargumente auf NaN. */
 function fakeCtx() {
@@ -89,7 +90,7 @@ test('Karte, Titel, Menüs, Dialoge und Abspann lassen sich zeichnen', () => {
   // Jede Arena in jeder Blickrichtung, dazu die Kartenansicht
   for (const id of Object.keys(NODES)) {
     if (NODES[id].goal) continue;
-    for (let h = 0; h < 4; h++) {
+    for (const h of CARDINALS) {
       game.placeAt(id, h);
       game.update(1 / 60, { mx: 1, my: 0.5 });
       r.draw(game, 0.5);
@@ -98,7 +99,7 @@ test('Karte, Titel, Menüs, Dialoge und Abspann lassen sich zeichnen', () => {
   game.openMap();
   r.draw(game);
   game.overlay = null;
-  game.placeAt('toast', 0);
+  game.placeAt('toast', E);
   game.openStation();
   r.draw(game);
   game.openCharacters();

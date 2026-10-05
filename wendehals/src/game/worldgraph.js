@@ -4,7 +4,7 @@
 
 import { NODES, EDGES } from '../data/world.js';
 import { GATES } from '../data/items.js';
-import { dirBetween, opposite, turnCW, turnCCW } from '../core/math.js';
+import { DIR_VEC, dirBetween, opposite, turnCW, turnCCW } from '../core/math.js';
 
 export function edgeDir(edge) {
   if (edge.dir !== undefined) return edge.dir;
@@ -21,7 +21,7 @@ const LINKS = buildLinks();
 
 function buildLinks() {
   const links = {};
-  for (const id of Object.keys(NODES)) links[id] = [[], [], [], []];
+  for (const id of Object.keys(NODES)) links[id] = DIR_VEC.map(() => []); // eine Liste je Richtung
   for (const edge of EDGES) {
     const d = edgeDir(edge);
     if (d < 0) throw new Error(`Kante ${edge.id} hat keine Richtung`);

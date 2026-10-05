@@ -7,6 +7,7 @@ import { mkdir } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import { E, S, W, N } from '../src/core/math.js';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const shots = path.join(root, 'e2e/screenshots');
@@ -89,10 +90,10 @@ async function ringPass() {
   await flyArena(210, 205);
 }
 await ringPass();
-check((await arena()).h === 1, 'Drehscheibe dreht nach Süden (rechts herum)');
+check((await arena()).h === S, 'Drehscheibe dreht nach Süden (rechts herum)');
 await shot('03c-arena-gedreht');
 for (let k = 0; k < 3; k++) await ringPass();
-check((await arena()).h === 0, 'nach vier Runden wieder Osten');
+check((await arena()).h === E, 'nach vier Runden wieder Osten');
 // Hinaus durch den Ostausgang
 await flyArena(380, 135);
 await flyArena(600, 135, 3000, async () => (await state()).screen === 'level');
@@ -119,8 +120,8 @@ await wait(100);
 check((await state()).overlay === null, 'Pause schließt sich mit Esc');
 
 // Über die Test-Schnittstelle in bestimmte Situationen springen
-async function scenario(name, setup) {
-  await page.evaluate(setup);
+async function scenario(name, setup, arg = { E, S, W, N }) {
+  await page.evaluate(setup, arg);
   await wait(900);
   await shot(name);
 }
@@ -150,43 +151,42 @@ async function flyTo(node, heading, items, advanceSeconds, name, extra = '') {
 }
 
 const ALL = ['DREHWURM', 'GUMMIHAUT', 'BOHRER', 'PILZ', 'WENDEHALS'];
-// Himmelsrichtungen: 0=O 1=S 2=W 3=N
-await flyTo('eier', 3, [], 6, '07-nach-norden');
-await flyTo('marmelade', 1, [], 6, '08-nach-sueden');
-await flyTo('tasse', 2, ['DREHWURM'], 6, '09-nach-westen');
-await flyTo('marmelade', 3, [], 18, '10-stacheln');
+await flyTo('eier', N, [], 6, '07-nach-norden');
+await flyTo('marmelade', S, [], 6, '08-nach-sueden');
+await flyTo('tasse', W, ['DREHWURM'], 6, '09-nach-westen');
+await flyTo('marmelade', N, [], 18, '10-stacheln');
 // Stachelfelder in weiteren Flugrichtungen (Regression des Renderfehlers)
-await flyTo('butter', 1, [], 22, '10b-stacheln-sued');
-await flyTo('entenhafen', 1, ['DREHWURM'], 24, '10c-stacheln-sued-disco');
-await flyTo('djpult', 3, ['DREHWURM'], 30, '10d-stacheln-nord-lava');
-await flyTo('tasse', 1, ['DREHWURM'], 16, '11-dunkel-ohne-lampe');
-await flyTo('tasse', 1, ['DREHWURM', 'LAMPE'], 16, '12-dunkel-mit-lampe');
-await flyTo('kartoffelkiste', 2, ['BOHRER'], 18, '13-felswand');
-await flyTo('einmachregal', 1, ['PILZ', 'DREHWURM'], 18, '14-enge-spalte');
-await flyTo('stoepsel', 0, ALL, 14, '15-bad');
-await flyTo('discotuer', 1, ALL, 14, '16-disco');
-await flyTo('lavalampe', 3, ALL, 14, '17-uhrwerk');
-await flyTo('kellertreppe', 1, ALL, 14, '18-keller');
+await flyTo('butter', S, [], 22, '10b-stacheln-sued');
+await flyTo('entenhafen', S, ['DREHWURM'], 24, '10c-stacheln-sued-disco');
+await flyTo('djpult', N, ['DREHWURM'], 30, '10d-stacheln-nord-lava');
+await flyTo('tasse', S, ['DREHWURM'], 16, '11-dunkel-ohne-lampe');
+await flyTo('tasse', S, ['DREHWURM', 'LAMPE'], 16, '12-dunkel-mit-lampe');
+await flyTo('kartoffelkiste', W, ['BOHRER'], 18, '13-felswand');
+await flyTo('einmachregal', S, ['PILZ', 'DREHWURM'], 18, '14-enge-spalte');
+await flyTo('stoepsel', E, ALL, 14, '15-bad');
+await flyTo('discotuer', S, ALL, 14, '16-disco');
+await flyTo('lavalampe', N, ALL, 14, '17-uhrwerk');
+await flyTo('kellertreppe', S, ALL, 14, '18-keller');
 // Zeitschranke: Uhr läuft (mit Espresso), bzw. schon zu (ohne)
-await flyTo('blubber', 0, [...ALL, 'ESPRESSO'], 12, '19-zeitschranke-uhr', 'for (let i = 0; i < 150; i++) lv.update(1/60, { espresso: true, mx: 1, my: 0, fire: true });');
-await flyTo('blubber', 0, ALL, 26, '19b-zeitschranke-zu');
+await flyTo('blubber', E, [...ALL, 'ESPRESSO'], 12, '19-zeitschranke-uhr', 'for (let i = 0; i < 150; i++) lv.update(1/60, { espresso: true, mx: 1, my: 0, fire: true });');
+await flyTo('blubber', E, ALL, 26, '19b-zeitschranke-zu');
 // Bosse: Kamera ans Levelende setzen
 const toBoss = 'lv.camA = lv.L - lv.va - 1; lv.player.a = lv.camA + 60; for (let i = 0; i < 60 * 6; i++) lv.update(1/60, { fire: true, my: Math.sin(i/30) });';
-await flyTo('marmelade', 0, [], 1, '20-boss-kaffeekanne', toBoss);
-await flyTo('seifenschale', 3, ['DREHWURM'], 1, '21-boss-walross', toBoss);
-await flyTo('einmachregal', 2, ['DREHWURM'], 1, '22-boss-kartoffel', toBoss);
-await flyTo('tanzflaeche', 0, ['DREHWURM'], 1, '23-boss-diva', toBoss);
-await flyTo('pendel', 3, ALL, 1, '24-boss-wecker', toBoss);
+await flyTo('marmelade', E, [], 1, '20-boss-kaffeekanne', toBoss);
+await flyTo('seifenschale', N, ['DREHWURM'], 1, '21-boss-walross', toBoss);
+await flyTo('einmachregal', W, ['DREHWURM'], 1, '22-boss-kartoffel', toBoss);
+await flyTo('tanzflaeche', E, ['DREHWURM'], 1, '23-boss-diva', toBoss);
+await flyTo('pendel', N, ALL, 1, '24-boss-wecker', toBoss);
 // Power-Ups sichtbar
-await flyTo('stoepsel', 0, ALL, 6, '25-powerups', "Object.assign(g.powers, { speed: 2, laser: true, options: 2, missile: true, shield: 3, cursor: 2 }); for (let i = 0; i < 60; i++) lv.update(1/60, { fire: true, my: Math.sin(i/10) });");
+await flyTo('stoepsel', E, ALL, 6, '25-powerups', "Object.assign(g.powers, { speed: 2, laser: true, options: 2, missile: true, shield: 3, cursor: 2 }); for (let i = 0; i < 60; i++) lv.update(1/60, { fire: true, my: Math.sin(i/10) });");
 // Wendehals-Animation (Mitte der Drehung)
-await flyTo('stoepsel', 0, ALL, 6, '26-wendehals-drehung', 'lv.update(1/60, { wende: true }); for (let i = 0; i < 20; i++) lv.update(1/60, {});');
+await flyTo('stoepsel', E, ALL, 6, '26-wendehals-drehung', 'lv.update(1/60, { wende: true }); for (let i = 0; i < 20; i++) lv.update(1/60, {});');
 // Spieler-Figuren
-await flyTo('stoepsel', 0, ['OMA'], 4, '27-oma', "g.progress.character='oma'; lv.charId='oma';");
-await flyTo('stoepsel', 0, ['TOASTER'], 4, '28-toaster', "g.progress.character='toaster'; lv.charId='toaster';");
+await flyTo('stoepsel', E, ['OMA'], 4, '27-oma', "g.progress.character='oma'; lv.charId='oma';");
+await flyTo('stoepsel', E, ['TOASTER'], 4, '28-toaster', "g.progress.character='toaster'; lv.charId='toaster';");
 
 // Karte mit Fortschritt und Stationsmenü
-await scenario('30-karte-fortschritt', () => {
+await scenario('30-karte-fortschritt', (d) => {
   const g = window.__wendehals.game;
   g.overlay = null;
   g.items = new Set(['DREHWURM', 'GUMMIHAUT', 'LAMPE', 'OMA', 'WURST1']);
@@ -195,7 +195,7 @@ await scenario('30-karte-fortschritt', () => {
   g.progress.blockedEdges = ['kruemelmauer'];
   g.progress.knownEdges.push('ueberlauf', 'flusensieb');
   g.progress.visited.push('blubber', 'sockenschublade');
-  g.placeAt('entenhafen', 1);
+  g.placeAt('entenhafen', d.S);
   g.openMap();
 });
 check((await state()).overlay === 'map', 'Karte mit Fortschritt');
@@ -205,22 +205,22 @@ await scenario('30b-arena-entenhafen', () => {
   g.arena.x = 372;
   g.arena.y = 230;
 });
-await scenario('30c-arena-stoepsel', () => {
+await scenario('30c-arena-stoepsel', (d) => {
   const g = window.__wendehals.game;
-  g.placeAt('stoepsel', 0);
+  g.placeAt('stoepsel', d.E);
 });
-await scenario('30d-arena-rueckhol', () => {
+await scenario('30d-arena-rueckhol', (d) => {
   const g = window.__wendehals.game;
-  g.placeAt('konfetti', 3);
+  g.placeAt('konfetti', d.N);
   g.arena.x = 100;
   g.arena.y = 60;
 });
-await page.evaluate(() => {
+await page.evaluate((d) => {
   const g = window.__wendehals.game;
-  g.placeAt('entenhafen', 1);
+  g.placeAt('entenhafen', d.S);
   g.arena.x = 380;
   g.arena.y = 230;
-});
+}, { S });
 await page.keyboard.press('KeyX');
 await wait(300);
 await shot('31-stationsmenue');

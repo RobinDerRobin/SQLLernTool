@@ -1,6 +1,6 @@
 // Zeichnet den Spielzustand. Alle Koordinaten in der internen Auflösung 480x270.
 
-import { SCREEN_W, SCREEN_H, wrapDelta, DIR_NAMES, DIR_VEC, W as W_DIR } from '../core/math.js';
+import { SCREEN_W, SCREEN_H, wrapDelta, DIR_NAMES, DIR_VEC, E as E_DIR, S as S_DIR, W as W_DIR, isDiagonal, isVertical, quarterTurns, headingAngle } from '../core/math.js';
 import { NODES, EDGES, AREAS } from '../data/world.js';
 import { ITEMS, GATES } from '../data/items.js';
 import { THEMES } from '../data/themes.js';
@@ -201,9 +201,9 @@ function backgroundTile(pattern) {
 
 /** Öffnung eines Arena-Ausgangs in der Wand: [x, y, w, h]. */
 function exitRect(ex) {
-  if (ex.side === 0) return [ARENA_W - WALL, ex.y - EXIT_HALF, WALL, EXIT_HALF * 2];
-  if (ex.side === 2) return [0, ex.y - EXIT_HALF, WALL, EXIT_HALF * 2];
-  if (ex.side === 1) return [ex.x - EXIT_HALF, ARENA_H - WALL, EXIT_HALF * 2, WALL];
+  if (ex.side === E_DIR) return [ARENA_W - WALL, ex.y - EXIT_HALF, WALL, EXIT_HALF * 2];
+  if (ex.side === W_DIR) return [0, ex.y - EXIT_HALF, WALL, EXIT_HALF * 2];
+  if (ex.side === S_DIR) return [ex.x - EXIT_HALF, ARENA_H - WALL, EXIT_HALF * 2, WALL];
   return [ex.x - EXIT_HALF, 0, EXIT_HALF * 2, WALL];
 }
 
@@ -419,7 +419,7 @@ export class Renderer {
     if (tile) {
       const ox = this.camA * tile.parallax;
       const oy = this.camC * tile.parallax;
-      const quarter = lv.turnAnim ? -1 : lv.heading;
+      const quarter = lv.turnAnim || isDiagonal(lv.heading) ? -1 : quarterTurns(lv.heading);
       // Achsenparallel füllen, wenn die Welt genau um 0/90/180/270° gedreht ist
       const ok =
         quarter >= 0 &&
@@ -485,7 +485,7 @@ export class Renderer {
             const iy = Math.round((y + oy) / s);
             if ((((ix * 7 + iy * 13 + beat) % 9) + 9) % 9 !== 0) continue;
             ctx.globalAlpha = 0.14 * fade;
-            ctx.fillStyle = cols[(ix + iy) & 3];
+            ctx.fillStyle = cols[(ix + iy) & 3]; // richtung-ok: Farbmuster, keine Richtung
             ctx.fillRect(x + 3, y + 3, s - 6, s - 6);
           }
         }
@@ -942,7 +942,7 @@ export class Renderer {
         ctx.beginPath();
         if (st.kind === 'circle') ctx.arc(dx, dy, st.r * z, 0, Math.PI * 2);
         else {
-          const vert = lv.heading % 2 === 1;
+          const vert = isVertical(lv.heading);
           const hw = (vert ? st.hc : st.ha) * z;
           const hh = (vert ? st.ha : st.hc) * z;
           ctx.rect(dx - hw, dy - hh, hw * 2, hh * 2);
@@ -1212,8 +1212,8 @@ export class Renderer {
       text(ctx, '?', 0, -19.5, 10, '#1a1020', 'center', null);
       ctx.rotate(Math.sin(t * 22) * 0.25); // Kopfschütteln
     }
-    ctx.rotate((ar.shipAngle * Math.PI) / 2);
-    if (Math.cos((ar.shipAngle * Math.PI) / 2) < -0.01) ctx.scale(1, -1); // nach Westen: aufrecht, nicht kopfüber
+    ctx.rotate((ar.shipAngle * Math.PI) / 2); // richtung-ok: shipAngle zählt Vierteldrehungen
+    if (Math.cos((ar.shipAngle * Math.PI) / 2) < -0.01) ctx.scale(1, -1); // richtung-ok: nach Westen aufrecht, nicht kopfüber
     drawPlayer(ctx, game.progress.character, t, false, 0);
     ctx.restore();
     // Kopfzeile
@@ -1362,7 +1362,7 @@ export class Renderer {
     const [px, py] = this.mapPos(cur);
     ctx.save();
     ctx.translate(px, py);
-    const ang = (game.heading * Math.PI) / 2;
+    const ang = headingAngle(game.heading);
     ctx.rotate(ang);
     ctx.translate(14, 0);
     ctx.scale(0.65, 0.65);

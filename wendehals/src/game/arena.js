@@ -7,7 +7,7 @@
 // Koordinaten wie die Karte: x nach Osten, y nach Süden, Norden ist oben.
 
 import { NODES } from '../data/world.js';
-import { DIR_VEC, E, S, W, N, turnCW, turnCCW, clamp } from '../core/math.js';
+import { DIR_VEC, CARDINALS, E, S, W, N, turnCW, turnCCW, quarterTurns, clamp } from '../core/math.js';
 import { linksAt, directionAllowed } from './worldgraph.js';
 
 export const ARENA_W = 480;
@@ -64,9 +64,9 @@ export class Arena {
     this.heading = heading;
     this.items = items;
     this.time = 0;
-    this.shipAngle = heading;
+    this.shipAngle = quarterTurns(heading); // in Vierteldrehungen, folgt der Blickrichtung weich
     this.exits = [];
-    for (let side = 0; side < 4; side++) {
+    for (const side of CARDINALS) {
       for (const link of linksAt(node, side)) {
         const [x, y] = exitPoint(side, link.pos);
         this.exits.push({ side, pos: link.pos, link, x, y, open: 0 });
@@ -159,7 +159,7 @@ export class Arena {
     this.turnFx = Math.max(0, this.turnFx - dt);
     this.confusedT = Math.max(0, this.confusedT - dt);
     // Schiffssymbol dreht sich weich zur Blickrichtung
-    let d = this.heading - this.shipAngle;
+    let d = quarterTurns(this.heading) - this.shipAngle;
     while (d > 2) d -= 4;
     while (d < -2) d += 4;
     this.shipAngle += d * Math.min(1, dt * 12);

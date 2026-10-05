@@ -4,6 +4,7 @@
 import { NODES, EDGE_BY_ID, START_NODE, START_HEADING } from '../data/world.js';
 import { ITEMS } from '../data/items.js';
 import { CHARACTERS } from '../data/characters.js';
+import { CARDINALS } from '../core/math.js';
 
 export const SAVE_KEY = 'wendehals.save.v1';
 export const SETTINGS_KEY = 'wendehals.settings.v1';
@@ -26,7 +27,7 @@ export function newProgress() {
   };
 }
 
-const isDir = (d) => Number.isInteger(d) && d >= 0 && d <= 3;
+const isDir = (d) => CARDINALS.includes(d); // v0.2-Welt: nur Kreuz-Richtungen
 // Nur eigene Schlüssel zählen ("constructor", "__proto__" usw. sind keine Items/Knoten).
 const has = (obj, k) => typeof k === 'string' && Object.hasOwn(obj, k);
 

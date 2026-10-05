@@ -5,7 +5,7 @@
 import { NODES, START_NODE, START_HEADING } from '../data/world.js';
 import { ITEM_IDS } from '../data/items.js';
 import { traverse, turnOptions, linksAt, directionAllowed, arrive, returnTarget } from './worldgraph.js';
-import { opposite } from '../core/math.js';
+import { CARDINALS, opposite } from '../core/math.js';
 
 const BIT = Object.fromEntries(ITEM_IDS.map((id, i) => [id, 1 << i]));
 
@@ -145,7 +145,7 @@ export function analyzeWithRespawn(skill = false) {
     const out = [];
     for (const save of saves) {
       if (!reachedWith.get(save).some((m) => (m & state.mask) === m)) continue;
-      for (let h = 0; h < 4; h++) out.push({ node: save, heading: h, mask: state.mask });
+      for (const h of CARDINALS) out.push({ node: save, heading: h, mask: state.mask });
     }
     return out;
   };

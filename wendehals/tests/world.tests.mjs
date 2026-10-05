@@ -4,7 +4,7 @@ import { NODES, EDGES, START_NODE } from '../src/data/world.js';
 import { ITEMS, GATES } from '../src/data/items.js';
 import { edgeDir, linkAt, linksAt, gatesFor, traverse, MIN_EXIT_GAP } from '../src/game/worldgraph.js';
 import { analyze, analyzeWithRespawn } from '../src/game/solver.js';
-import { E, N, S, W, opposite } from '../src/core/math.js';
+import { CARDINALS, E, N, S, W, opposite } from '../src/core/math.js';
 
 test('alle Kanten haben eine Richtung und verweisen auf gültige Knoten', () => {
   for (const e of EDGES) {
@@ -135,12 +135,12 @@ test('Löser erkennt Sackgassen (Gegenprobe mit künstlichem Zustand)', async ()
 });
 
 test('Arenen: mehrere Ausgänge pro Seite, mehr als vier insgesamt', () => {
-  const st = [0, 1, 2, 3].map((d) => linksAt('stoepsel', d).length);
+  const st = CARDINALS.map((d) => linksAt('stoepsel', d).length);
   assert.ok(st.reduce((x, y) => x + y) > 4, 'Stöpsel hat mehr als 4 Ausgänge');
   assert.equal(linksAt('stoepsel', E).length, 2);
   assert.equal(linksAt('sockenschublade', W).length, 2);
   for (const id of Object.keys(NODES)) {
-    for (let d = 0; d < 4; d++) {
+    for (const d of CARDINALS) {
       const l = linksAt(id, d);
       for (let i = 1; i < l.length; i++) assert.ok(l[i].pos - l[i - 1].pos >= MIN_EXIT_GAP - 1e-9);
     }
@@ -166,9 +166,9 @@ test('Rückholstationen: nur an Sackgassen, bringen zu einer Arena mit Ausweg', 
   assert.ok(withRet.length >= 4);
   for (const [id, n] of withRet) {
     assert.ok(NODES[n.ret.to], id + ': Ziel fehlt');
-    const exits = [0, 1, 2, 3].reduce((k, d) => k + linksAt(id, d).length, 0);
+    const exits = CARDINALS.reduce((k, d) => k + linksAt(id, d).length, 0);
     assert.equal(exits, 1, id + ' ist keine Sackgasse');
-    const s = successors({ node: id, heading: n.autoTurn ?? 0, mask: 0 }, false);
+    const s = successors({ node: id, heading: n.autoTurn ?? E, mask: 0 }, false);
     assert.ok(s.some((x) => x.via === 'rueckhol' && x.node === n.ret.to));
   }
 });

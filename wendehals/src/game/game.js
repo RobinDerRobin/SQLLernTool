@@ -7,7 +7,7 @@ import { ITEMS } from '../data/items.js';
 import { CHARACTERS, availableCharacters } from '../data/characters.js';
 import { THEMES } from '../data/themes.js';
 import { ENDING_LINES } from '../data/text.js';
-import { opposite, turnCW } from '../core/math.js';
+import { N, opposite, turnCW } from '../core/math.js';
 import { linksAt, directionAllowed, arrive, returnTarget } from './worldgraph.js';
 import { Arena } from './arena.js';
 import { Level } from './level.js';
@@ -480,7 +480,7 @@ export class Game {
   startEnding() {
     this.progress.finished = true;
     this.progress.saveNode = 'pendel';
-    this.progress.saveHeading = 3;
+    this.progress.saveHeading = N;
     this.save();
     this.screen = 'ending';
     this.screenTime = 0;
