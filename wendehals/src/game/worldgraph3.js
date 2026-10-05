@@ -10,10 +10,14 @@
 //   h = Blickrichtung 0..7 (core/math.js), m = Item-Maske (nur regelrelevante Items), f = Flags
 //   (Trommel-Stellung, geöffnete Abkürzungsklappen)
 
-import { HEADING_CODES, DIR_VEC, turnBy, isDiagonal } from '../core/math.js';
+import { HEADINGS, HEADING_CODES, DIR_VEC, turnBy, isDiagonal } from '../core/math.js';
 
 /** Fähigkeiten, die Drehregeln bestimmen (dazu kommt alles aus gateTypes[].solvedBy). */
 export const TURN_ABILITIES = ['ROLLLEINE', 'DREHWURM', 'WASSERWAAGE', 'WENDEHALS', 'KREISELKOMPASS', 'WIRBELWIND'];
+
+/** Stationstypen der Arenen (WELT-DESIGN.md 2.3; null = stille Arena) und der Weichenräume. */
+export const STATION_TYPES = ['ring90', 'ring45', 'wender180', 'kompass', 'kreisel', 'ratsche', 'klappe'];
+export const MID_STATION_TYPES = ['kreisel', 'klappe'];
 
 /** Mindestabstand zwischen Entscheidungspunkten in Einheiten (Drehzahl-Invariante R9). */
 export const MIN_DECISION_GAP = 480;
@@ -134,7 +138,7 @@ export function stationTurns(world, type, h, m, out = new Set()) {
       add(2);
       break;
     case 'kompass': // jede Richtung der eigenen Klasse, mit Wasserwaage alle 8
-      for (let k = 0; k < 8; k++) if (k % 2 === 0 || has('WASSERWAAGE')) add(k);
+      for (const t of HEADINGS) if (isDiagonal(t) === isDiagonal(h) || has('WASSERWAAGE')) out.add(t);
       break;
     case 'kreisel':
     case 'klappe':
@@ -244,21 +248,73 @@ export function validateWorld3(data) {
   const problems = [];
   const warnings = [];
   if (JSON.stringify(data.headings) !== JSON.stringify(HEADING_CODES)) problems.push('headings passen nicht zu core/math.js');
+
+  // Verweise und Richtungs-Kürzel zuerst – sonst scheitert schon das Übersetzen
+  const ids = new Set(data.nodes.map((n) => n.id));
+  if (ids.size !== data.nodes.length) problems.push('doppelte Arena-IDs');
+  const arena = (where, id) => ids.has(id) || problems.push(`${where}: unbekannte Arena ${id}`);
+  const dir = (where, code) => HEADING_CODES.includes(code) || problems.push(`${where}: unbekannte Richtung ${code}`);
+  arena('start', data.start.node);
+  dir('start', data.start.heading);
+  for (const n of data.nodes) {
+    if (n.ret) {
+      arena(n.id + ' Rückholung', n.ret.to);
+      dir(n.id + ' Rückholung', n.ret.heading);
+    }
+  }
+  for (const e of data.edges) {
+    arena(e.id, e.from);
+    arena(e.id, e.to);
+    dir(e.id, e.heading);
+    for (const m of e.midStations) {
+      if (m.branchTo) {
+        arena(e.id + ' Abzweig', m.branchTo);
+        dir(e.id + ' Abzweig', m.branchHeading);
+      }
+    }
+  }
+  if (problems.length) return { problems, warnings };
+
   let world;
   try {
     world = compileWorld3(data);
   } catch (err) {
     return { problems: [...problems, 'Übersetzen: ' + err.message], warnings };
   }
-  const { points, segs, exits, gate, node } = world;
+  const { points, segs, exits, gate, node, flag } = world;
 
-  // Verweise
+  // Stationen, Flags, Items: nur Bekanntes (sonst wirkte es still wie "keine Station"/"Flag aus")
+  const items = new Set([...data.abilities.map((a) => a.id), ...data.expansions.map((x) => x.id)]);
+  for (const n of data.nodes) {
+    const t = n.station?.type ?? null;
+    if (t !== null && !STATION_TYPES.includes(t)) problems.push(`${n.id}: unbekannter Stationstyp ${t}`);
+    if (n.softStation && !STATION_TYPES.includes(n.softStation.type)) problems.push(`${n.id}: unbekannte weiche Station ${n.softStation.type}`);
+    if (n.toggles && !(n.toggles in flag)) problems.push(`${n.id}: unbekannter Hebel ${n.toggles}`);
+    if (n.item && !items.has(n.item)) problems.push(`${n.id}: unbekanntes Item ${n.item}`);
+  }
+  for (const g of data.gateTypes) {
+    if (g.state && !(g.state.flag in flag)) problems.push(`${g.id}: unbekanntes Flag ${g.state.flag}`);
+    for (const id of g.solvedBy) if (!items.has(id)) problems.push(`${g.id}: unbekannte Fähigkeit ${id}`);
+  }
+  for (const id of data.intendedOrder) if (!items.has(id)) problems.push(`intendedOrder: unbekannt ${id}`);
   for (const e of data.edges) {
-    for (const id of [e.from, e.to, ...e.midStations.map((m) => m.branchTo).filter(Boolean)]) {
-      if (!node[id]) problems.push(`${e.id}: unbekannte Arena ${id}`);
+    if (!(Number.isFinite(e.length) && e.length > 0)) problems.push(`${e.id}: ungültige Länge ${e.length}`);
+    if (![null, 'forward', 'backward'].includes(e.current ?? null)) problems.push(`${e.id}: ungültige Strömung ${e.current}`);
+    for (const r of [e.reward, ...e.midStations.map((m) => m.branchReward)]) {
+      if (r && r !== 'GOAL' && !items.has(r)) problems.push(`${e.id}: unbekannte Belohnung ${r}`);
+    }
+    for (const m of e.midStations) {
+      if (!MID_STATION_TYPES.includes(m.type)) problems.push(`${e.id}: unbekannte Weiche ${m.type}`);
+      if (!(m.at > 0 && m.at < 1)) problems.push(`${e.id}: Weiche bei at=${m.at}`);
+      // R9 rechnet mit at, die Karte mit point: beide müssen zusammenpassen
+      if (m.point) {
+        const a = node[e.from];
+        const b = node[e.to];
+        const off = Math.hypot(a.x + (b.x - a.x) * m.at - m.point.x, a.y + (b.y - a.y) * m.at - m.point.y);
+        if (off > 0.05) problems.push(`${e.id}: Weiche at=${m.at} passt nicht zu point (${m.point.x}, ${m.point.y})`);
+      }
     }
   }
-  for (const n of data.nodes) if (n.ret && !node[n.ret.to]) problems.push(`${n.id}: Rückholziel ${n.ret.to} fehlt`);
 
   // I6: Richtung = Koordinatenrichtung, Diagonalen genau 45°, Weichenräume auf Rasterpunkten
   for (const s of segs) {

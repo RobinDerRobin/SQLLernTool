@@ -336,6 +336,16 @@ function renderSection(out, dump) {
         }
       }, dump);
     }
+    // Schiffssymbol dreht über die Nahtstelle Nord → Ost (Umbruch des Winkels)
+    scene(out, 'render:arena-drehung:nord-nach-ost', 3, () => {
+      const g = prepared();
+      g.placeAt('toast', N);
+      g.update(1 / 60, { power: true });
+      for (let i = 0; i < 10; i++) {
+        g.update(1 / 60, {});
+        r.draw(g, 0.5);
+      }
+    }, dump);
     // Karte mit Seitenleiste in jeder Blickrichtung
     for (const h of CARDINALS) {
       scene(out, `render:karte:${L(h)}`, 4, () => {
@@ -373,6 +383,33 @@ function renderSection(out, dump) {
             if (lv.result) break;
           }
           if (lv.result) rec.write('ergebnis ' + stable(lv.result));
+        }, dump);
+      }
+    }
+    // Dunkelzonen ohne Lampe: Umrisse beweglicher Teile, leuchtende Augen. Kolben und Blöcke kommen
+    // in v0.2-Dunkelzonen nicht vor – darum werden je einer eingesetzt (waagerecht und senkrecht).
+    for (const id of ['treppe', 'pendelbruecke', 'blubberschacht']) {
+      for (const forward of [true, false]) {
+        scene(out, `render:dunkel:${id}:${forward ? 'vor' : 'rueck'}`, 9, () => {
+          const g = prepared();
+          g.screen = 'level';
+          const edge = EDGES.find((e) => e.id === id);
+          const items = new Set(ITEM_IDS);
+          items.delete('LAMPE');
+          if (forward && edge.reward) items.delete(edge.reward);
+          const lv = new Level({ edge, forward, items, invincible: true, seed: 4 });
+          g.level = lv;
+          const dark = lv.gates.find((x) => x.type === 'dark');
+          for (let i = 0; i < 60 * 120 && lv.player.a < dark.a0 + 60 && !lv.result; i++) runLevel(lv, 1 / 60);
+          const a = lv.player.a;
+          lv.dyn.push(
+            { type: 'piston', a: a + 80, c: lv.camC + lv.vc * 0.3, dir: 1, w: 26, len: 120, speed: 1.1, phase: 0.4, sign: 1 },
+            { type: 'mover', a: a + 160, c: lv.camC + lv.vc * 0.6, w: 32, h: 40, amp: 50, speed: 0.8, phase: 1, sign: 1 },
+          );
+          for (let i = 0; i < 3; i++) {
+            runLevel(lv, 1 / 60, { input: () => ({}) });
+            r.draw(g, 0.5);
+          }
         }, dump);
       }
     }

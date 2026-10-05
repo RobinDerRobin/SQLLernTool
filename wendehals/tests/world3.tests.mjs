@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { WELT3 } from '../src/data/welt3.js';
-import { compileWorld3, validateWorld3, stationTurns, turnOptions, maskOf } from '../src/game/worldgraph3.js';
+import { compileWorld3, validateWorld3, stationTurns, turnOptions, successors, maskOf, headingOf } from '../src/game/worldgraph3.js';
 import { checkWorld3, phaseRow } from '../src/game/solver3.js';
 import { E, SE, S, W, N, HEADINGS, turnBy, isDiagonal } from '../src/core/math.js';
 
@@ -128,6 +128,14 @@ test('Mutationstest: Geometrie- und Datenfehler werden erkannt', () => {
     [(d) => (edge(d, 'kaltluftschwall').current = null), /gegenstrom ohne current/],
     [(d) => (edge(d, 'wasserhahnkanal').midStations[0].at = 0.1), /^R9: wasserhahnkanal/],
     [(d) => (edge(d, 'wasserhahnkanal').midStations[0].point = { x: 27.5, y: 11 }), /nicht auf einem Rasterpunkt/],
+    [(d) => (edge(d, 'wasserhahnkanal').midStations[0].at = 0.3), /passt nicht zu point/],
+    [(d) => (edge(d, 'kruemelstrasse').to = 'gibtsnicht'), /unbekannte Arena gibtsnicht/],
+    [(d) => (node(d, 'gully').ret.heading = 'X'), /unbekannte Richtung X/],
+    [(d) => (node(d, 'toast').station.type = 'ring60'), /unbekannter Stationstyp ring60/],
+    [(d) => (node(d, 'trommel').toggles = 'waschmaschine'), /unbekannter Hebel waschmaschine/],
+    [(d) => (d.gateTypes.find((g) => g.id === 'trommel_a').state.flag = 'schleuder'), /unbekanntes Flag schleuder/],
+    [(d) => delete edge(d, 'kruemelstrasse').length, /ungültige Länge/],
+    [(d) => (edge(d, 'kruemelstrasse').reward = 'GOLDSTERN'), /unbekannte Belohnung GOLDSTERN/],
   ];
   for (const [fn, want] of cases) {
     const { problems } = validateWorld3(clone(fn));
@@ -148,6 +156,56 @@ test('Regeln: Kreisel schubst ohne Fähigkeit zurück, Klappen brauchen den Wirb
   assert.equal(turns('kompass', m('WASSERWAAGE')).length, 8);
   assert.deepEqual(turns(null, m('DREHWURM', 'WASSERWAAGE')), [], 'stille Arena');
   assert.deepEqual(turns('ring45', 0), [SE, turnBy(E, -1)].sort());
+});
+
+test('Regeln: Rückholstation bringt aus jeder Blickrichtung zum Ziel, mit dessen Blickrichtung', () => {
+  const world = compileWorld3(WELT3);
+  const withRet = WELT3.nodes.filter((n) => n.ret);
+  assert.ok(withRet.length >= 6);
+  for (const n of withRet) {
+    for (const h of HEADINGS) {
+      const r = successors(world, { p: n.id, h, m: 0, f: 0 }).filter((x) => x.via === 'rueckhol');
+      assert.deepEqual(r.map((x) => [x.p, x.h]), [[n.ret.to, headingOf(n.ret.heading)]], n.id);
+    }
+  }
+  const plain = WELT3.nodes.find((n) => !n.ret);
+  assert.ok(!successors(world, { p: plain.id, h: E, m: 0, f: 0 }).some((x) => x.via === 'rueckhol'));
+});
+
+test('Regeln: Einbahn nur vorwärts; Abkürzungsklappen rückwärts erst nach dem ersten Durchflug', () => {
+  const world = compileWorld3(WELT3);
+  const all = maskOf(world, world.relevant);
+  const flights = (st) => successors(world, st).filter((x) => x.via.startsWith('flug:') || x.via === 'abbruch');
+  const oneWays = world.segs.filter((s) => s.oneWay);
+  assert.ok(oneWays.some((s) => s.shortcut) && oneWays.some((s) => !s.shortcut));
+  for (const s of oneWays) {
+    const back = { p: s.b, h: turnBy(s.h, 4), m: all, f: 0 };
+    assert.ok(!flights(back).some((x) => x.via === 'flug:' + s.id), s.id + ': rückwärts befliegbar');
+    if (!s.shortcut) continue;
+    const flag = world.flag[s.shortcut];
+    // Vorwärts durchfliegen öffnet die Klappe …
+    const fwd = successors(world, { p: s.a, h: s.h, m: all, f: 0 }).find((x) => x.via === 'flug:' + s.id);
+    assert.ok(fwd && fwd.f & flag, s.id + ': Durchflug öffnet nicht');
+    // … danach geht es auch rückwärts
+    assert.ok(flights({ ...back, f: flag }).some((x) => x.via === 'flug:' + s.id), s.id + ': offen, aber nicht befliegbar');
+  }
+});
+
+test('Regeln: Trommel-Hebel schaltet nur mit der Flexileine, die Stellung bestimmt die offenen Öffnungen', () => {
+  const world = compileWorld3(WELT3);
+  const levers = WELT3.nodes.filter((n) => n.toggles).map((n) => n.id);
+  assert.deepEqual(levers.sort(), ['trommel', 'waeschekorb']);
+  for (const p of levers) {
+    assert.ok(!successors(world, { p, h: E, m: 0, f: 0 }).some((x) => x.via === 'hebel'), p + ': Hebel ohne Leine');
+    const m = maskOf(world, ['ROLLLEINE']);
+    const lever = successors(world, { p, h: E, m, f: 0 }).filter((x) => x.via === 'hebel');
+    assert.deepEqual(lever.map((x) => x.f), [world.flag.trommel]);
+  }
+  // Stellung A: Bullauge (O) offen, Dampfstoß (NO) zu; Stellung B umgekehrt
+  const all = maskOf(world, world.relevant);
+  const out = (h, f) => successors(world, { p: 'trommel', h, m: all, f }).filter((x) => x.via.startsWith('flug:')).map((x) => x.via);
+  assert.deepEqual([out(E, 0).length > 0, out(E, world.flag.trommel).length > 0], [true, false]);
+  assert.deepEqual([out(turnBy(N, 1), 0).length > 0, out(turnBy(N, 1), world.flag.trommel).length > 0], [false, true]);
 });
 
 test('Paritätsregel: ohne Wasserwaage wechselt man die Klasse nur an Schrägringen', () => {

@@ -131,7 +131,7 @@ Phase 4, 8 und 10.
 
 ## Stand nach Phase 1 (05.10.2026)
 
-- `npm test` 206/206 grün (~35 s): Golden Master unverändert über den Umbau auf 8 Richtungen,
+- `npm test` 209/209 grün (~30–35 s): Golden Master unverändert über den Umbau auf 8 Richtungen,
   Richtungs-Wächter, Spielstand-Umrechnung, v3-Invarianten I1–I8, Port = Referenz-Löser
   (197.188 / 197.669 / 394.368 / 396.470 Zustände, gleiche Phasentabelle).
 - e2e, e2e:perf, e2e:flash grün. Das Spiel nutzt die v3-Welt noch nicht (nicht im Bundle).

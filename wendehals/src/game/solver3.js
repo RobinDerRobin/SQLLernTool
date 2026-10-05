@@ -2,9 +2,9 @@
 // mit den Regeln aus worldgraph3.js und prüft die Invarianten aus docs/WELT-DESIGN.md Kap. 7:
 // Ziel erreichbar (I1), keine Sackgasse ohne/mit Respawn (I2/I3), 100 % (I4), Pflichtreihenfolge
 // (I5), Geometrie und Hindernistypen (I6–I8, über validateWorld3).
-// Port von tools/pruefe-welt.mjs; tests/world3-reference.tests.mjs prüft, dass beide gleich zählen.
+// Port von tools/pruefe-welt.mjs; tests/world3.tests.mjs prüft, dass beide gleich zählen.
 
-import { HEADING_CODES } from '../core/math.js';
+import { HEADINGS, HEADING_CODES, isDiagonal } from '../core/math.js';
 import { compileWorld3, successors, hasItem, itemsOf, validateWorld3 } from './worldgraph3.js';
 
 const RESPAWN = '#respawn';
@@ -65,7 +65,7 @@ export function explore(world, { skill = false, allowed = null, respawn = false,
     if (st.p === RESPAWN) {
       for (const sv of saves) {
         if (![...reachedWith.get(sv)].some((mm) => (mm & st.m) === mm)) continue;
-        for (let h = 0; h < 8; h++) if (h % 2 === 0 || hasItem(world, st.m, 'WASSERWAAGE')) push(enc(sv, h, st.f, st.m));
+        for (const h of HEADINGS) if (!isDiagonal(h) || hasItem(world, st.m, 'WASSERWAAGE')) push(enc(sv, h, st.f, st.m));
       }
       edges.set(k, succ);
       continue;

@@ -98,13 +98,18 @@ test('Diagonalen sind bis Phase 2 keine Etappen-Richtung (laut statt still falsc
 const root = fileURLToPath(new URL('..', import.meta.url));
 const PATTERNS = [
   [/&\s*3\b/, 'Umbruch mit "& 3" setzt 4 Richtungen voraus (turnCW/opposite benutzen)'],
-  [/\b\w*([hH]eading|side|[dD]ir)\s*%\s*[24]\b/, 'Parität einer Richtung (isHorizontal/isVertical/isDiagonal benutzen)'],
-  [/\b\w*([hH]eading|side|[dD]ir|Angle)\w*\s*\*\s*Math\.PI/, 'Richtung × π (headingAngle/quarterTurns benutzen)'],
+  [/\b(\w*([hH]eading|side|[dD]ir)|h)\s*(%\s*[248]|&\s*[137])\b/, 'Parität/Umbruch einer Richtung (isHorizontal/isVertical/isDiagonal/turnBy benutzen)'],
+  [/\b\w*([hH]eading|side|[dD]ir|Angle)\w*\s*\*\s*(Math\.PI|90\b|45\b)/, 'Richtung × Winkel (headingAngle/quarterTurns benutzen)'],
+  [/Math\.PI\s*\*\s*\(?\s*\w*([hH]eading|side|[dD]ir)/, 'Richtung × π (headingAngle/quarterTurns benutzen)'],
+  [/\b\w*[hH]eading\s*=\s*[0-9]/, 'Richtung als Zahl zugewiesen (E/S/W/N benutzen)'],
+  [/\(\s*[\w.]+\s*[+-]\s*[\w.]+\s*\)\s*(%\s*[48]|&\s*[37])\b/, 'Umbruch nach 4/8 Schritten (turnBy/turnCW/opposite benutzen)'],
+  [/Array\.from\(\{\s*length:\s*[48]\s*\}/, 'Liste je Richtung mit fester Länge (HEADINGS/CARDINALS benutzen)'],
+  [/\[\[1,\s*0\],\s*\[(0,\s*1|1,\s*1)\]/, 'eigene Richtungsvektoren (DIR_VEC benutzen)'],
   [/for\s*\(let\s+(side|h|d|dir|heading)\s*=\s*0;\s*\1\s*<\s*4\b/, 'Schleife über 0..3 (CARDINALS benutzen)'],
   [/\[\[\],\s*\[\],\s*\[\],\s*\[\]\]/, 'Liste mit 4 Einträgen je Richtung'],
   [/\[0,\s*1,\s*2,\s*3\]/, 'Richtungsliste als Zahlen (CARDINALS benutzen)'],
   [/saveHeading\s*[:=]\s*[0-9]/, 'Richtung als Zahl (E/S/W/N benutzen)'],
-  [/(placeAt|flyTo)\([^,()]+,\s*[0-9]/, 'Richtung als Zahl (E/S/W/N benutzen)'],
+  [/(placeAt|flyTo|turnTo|enterArena)\([^,()]+,\s*[0-9]/, 'Richtung als Zahl (E/S/W/N benutzen)'],
   [/[hH]eading\s*(:|===?|!==?)\s*[0-9]/, 'Richtung als Zahl (E/S/W/N benutzen)'],
   [/\b(side|autoTurn|\.h)\s*(===?|!==?|\?\?)\s*[0-9]/, 'Richtung als Zahl (E/S/W/N benutzen)'],
 ];
@@ -136,6 +141,13 @@ test('Wächter: außerhalb von math.js wird nicht mit Richtungszahlen gerechnet'
 });
 
 test('Wächter: erkennt die typischen Fehler (Gegenprobe)', () => {
-  const bad = ['x = (h + 1) & 3;', 'if (lv.heading % 2 === 1)', 'rotate((game.heading * Math.PI) / 2)', 'for (let side = 0; side < 4; side++)', 'progress.saveHeading = 3;', "placeAt('pendel', 3)", 'heading: 1,', 'ex.side === 2'];
+  const bad = [
+    'x = (h + 1) & 3;', 'if (lv.heading % 2 === 1)', 'rotate((game.heading * Math.PI) / 2)', 'for (let side = 0; side < 4; side++)',
+    'progress.saveHeading = 3;', "placeAt('pendel', 3)", 'heading: 1,', 'ex.side === 2',
+    // Lücken aus dem Review von Phase 1
+    'game.heading = 3;', 'const d = (h + 1) % 4;', 'if (h % 2) x();', 'if (lv.heading & 1)', 'ctx.rotate(Math.PI * heading / 2)',
+    'const deg = heading * 90;', 'turnTo(game, 1)', "g.enterArena('toast', 2, null)", 'Array.from({ length: 4 }, () => [])',
+    'const V = [[1, 0], [0, 1], [-1, 0], [0, -1]][h];',
+  ];
   for (const line of bad) assert.ok(PATTERNS.some(([re]) => re.test(line)), line);
 });

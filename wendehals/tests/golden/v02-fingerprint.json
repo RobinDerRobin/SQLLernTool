@@ -86,6 +86,7 @@
  "render:arena:pendel:N": "6609a50c0c3d213ab7c9:856",
  "render:arena-drehung:drehwurm": "4c70a91e16c5a22f1a7c:2976",
  "render:arena-drehung:wendehals": "3bd7166d624a2b4febdb:2982",
+ "render:arena-drehung:nord-nach-ost": "7db09b062dc5cff9ebcf:3910",
  "render:karte:E": "c3911f6d658b7eacc9b9:1607",
  "render:karte:S": "fe9a3df04f15d2901e42:1590",
  "render:karte:W": "e423bc589fccc5527d22:1591",
@@ -151,6 +152,12 @@
  "render:etappe:pendelbruecke:vor": "82c307aca558a17e1679:6565",
  "render:etappe:pendelbruecke:rueck": "4a671a84117b26e233ef:6718",
  "render:etappe:uhrwerk:vor": "ddb6152945adf6957fa7:8358",
+ "render:dunkel:treppe:vor": "4881b91392606c9bb3a6:6516",
+ "render:dunkel:treppe:rueck": "01e7b9ede2d16a4083f9:6382",
+ "render:dunkel:pendelbruecke:vor": "f2f6b97aad0d7f8461bd:3750",
+ "render:dunkel:pendelbruecke:rueck": "c337fb76cc535b05ba76:3889",
+ "render:dunkel:blubberschacht:vor": "84bde4296295deacdc48:7098",
+ "render:dunkel:blubberschacht:rueck": "ded7be9aaf1114e11161:7235",
  "render:etappe-kehrtwende": "dcca75d2cdcd4f639cd0:3838",
  "render:abspann": "ddbdca658ea5271a3fd5:3279"
 }
