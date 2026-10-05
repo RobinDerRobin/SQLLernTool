@@ -26,6 +26,8 @@ const KEYMAP = {
   KeyC: 'station',
   KeyM: 'map',
   KeyE: 'espresso',
+  KeyU: 'rotLeft',
+  KeyO: 'rotRight',
   Tab: 'map',
   F11: 'fullscreen',
 };
@@ -36,6 +38,7 @@ const PADMAP = {
   1: 'power',
   2: 'station',
   3: 'wende',
+  4: 'rotLeft',
   5: 'espresso',
   8: 'map',
   9: 'pause',
@@ -45,7 +48,7 @@ const PADMAP = {
   15: 'right',
 };
 
-const ACTIONS = ['up', 'down', 'left', 'right', 'fire', 'confirm', 'power', 'wende', 'pause', 'back', 'station', 'map', 'espresso', 'fullscreen'];
+const ACTIONS = ['up', 'down', 'left', 'right', 'fire', 'confirm', 'power', 'wende', 'pause', 'back', 'station', 'map', 'espresso', 'rotLeft', 'rotRight', 'fullscreen'];
 const DEADZONE = 0.28;
 
 export class Input {
@@ -131,6 +134,9 @@ export class Input {
       pause: pressed('pause'),
       power: pressed('power'),
       wende: pressed('wende'),
+      rotLeft: pressed('rotLeft'),
+      rotRight: pressed('rotRight'),
+      espressoPressed: pressed('espresso'),
       station: pressed('station'),
       map: pressed('map'),
       fullscreen: pressed('fullscreen'),

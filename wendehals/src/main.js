@@ -82,6 +82,7 @@ export function boot() {
   const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true }) || canvas.getContext('2d');
   const params = new URLSearchParams(location.search);
   const game = new Game({ storage: pickStorage(), platform: makePlatform(), invincible: params.has('unverwundbar') });
+  if (params.get('proto') === 'fenster') game.startProto('fenster');
   const renderer = new Renderer(ctx);
   const input = new Input(window);
   const audio = new Audio();

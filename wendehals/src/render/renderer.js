@@ -1,6 +1,7 @@
 // Zeichnet den Spielzustand. Alle Koordinaten in der internen Auflösung 480x270.
 
 import { SCREEN_W, SCREEN_H, wrapDelta, DIR_NAMES, DIR_VEC, E as E_DIR, S as S_DIR, W as W_DIR, isDiagonal, isVertical, quarterTurns, headingAngle } from '../core/math.js';
+import { drawFenster } from '../proto/fenster-draw.js';
 import { NODES, EDGES, AREAS } from '../data/world.js';
 import { ITEMS, GATES } from '../data/items.js';
 import { THEMES } from '../data/themes.js';
@@ -248,6 +249,9 @@ export class Renderer {
         break;
       case 'ending':
         this.drawEnding(game);
+        break;
+      case 'proto':
+        drawFenster(ctx, game.proto, alpha);
         break;
     }
     this.drawToasts(game);

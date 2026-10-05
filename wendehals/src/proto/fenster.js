@@ -1,0 +1,235 @@
+// Prototyp P1 „Kreuzung“ – das drehende Fenster (Wegwerf-Prototyp, Brief: docs/prototypen/P1-kreuzung.md).
+//
+// Geparkt, nicht vergessen (bewusst NICHT in P1): Schleife/Landmarken/„wo ist zuhause“ (P2),
+// 45°-Drehungen und Diagonalen (P3), Gegner und Schießen (P4), Minimap oder Kompass, Halt-Zonen,
+// Protokolle und Messungen, Festhalten der Stick-Bedeutung, Speichern, Fähigkeiten/Drehzahl,
+// jede Änderung an worldgraph*/Löser/welt.json/Level/Arena, Bot- und Render-Tests,
+// Perf-/Flacker-Szenen, Tester-Agenten.
+//
+// Modell: Der Plan ist ein Grundriss (Karte, y nach unten, Norden oben). Der Bildschirm ist ein Fenster.
+// theta = Kartenrichtung, in die das rechte Fensterende zeigt; s = 'R'|'L' = Seite, zu der gescrollt wird.
+// Blickrichtung h = theta (s = R) bzw. opposite(theta) (s = L).
+
+import { E, S, W, N, DIR_VEC, turnCW, turnCCW, opposite, headingAngle, SCREEN_W, SCREEN_H, approach, clamp } from '../core/math.js';
+import { Rng } from '../core/rng.js';
+
+export const SPEED = 90; // Scrollgeschwindigkeit (Einheiten/s)
+export const ARM = 720; // Länge eines Arms (ab Kreuzungsrand)
+export const WIDTH = 200; // Gangbreite
+export const HALF = WIDTH / 2;
+export const END = HALF + ARM; // Ende der Arme (Mittelpunkt der Kreuzung = 0,0)
+export const CAM_END = END - 60; // so weit scrollt das Fenster höchstens
+export const BONE_AT = END - 30;
+export const BONE_R = 24;
+export const DOOR_T = 10; // Dicke der Türbalken
+export const DOG_SPEED = 120;
+export const DOG_R = 8;
+export const DOG_MARGIN = 14;
+export const SWING_TIME = 0.5;
+export const TURN_RATE = 5; // Umkehr: 1/0,4 s * 2 (von -1 nach 1 in 0,4 s)
+
+export const ARMS = [
+  { dir: N, name: 'Norden', color: '#e0443a' },
+  { dir: E, name: 'Osten', color: '#3f7be0' },
+  { dir: S, name: 'Süden', color: '#3fb04a' },
+  { dir: W, name: 'Westen', color: '#e8c63a' },
+];
+export const armIndex = (dir) => ARMS.findIndex((a) => a.dir === dir);
+
+/** Tür eines Arms offen: das Fenster scrollt entlang der Kartenachse dieses Arms (E9). */
+export const doorOpen = (armDir, h) => h === armDir || h === opposite(armDir);
+
+const smooth = (t) => t * t * (3 - 2 * t);
+const vec = (d) => DIR_VEC[d];
+
+export class FensterScene {
+  constructor({ rng = new Rng(0xf1e57e4) } = {}) {
+    this.rng = rng;
+    this.time = 0;
+    this.theta = E;
+    this.s = 'R';
+    this.ang = headingAngle(E); // Anzeigewinkel (fortlaufend); Plan wird um -ang gedreht
+    this.dir = 1; // weiche Scrollrichtung: +1 = R, -1 = L (Dackel-Spiegelung)
+    this.cam = { x: -CAM_END, y: 0 };
+    this.dog = { x: 120, y: SCREEN_H / 2 }; // Bildschirmkoordinaten
+    this.swing = null; // { t, a0, a1, c0, c1 }
+    this.score = 0;
+    this.target = 0;
+    this.hint = 8; // Sekunden Starthinweis
+    this.pickTarget(armIndex(W));
+  }
+
+  get h() {
+    return this.s === 'R' ? this.theta : opposite(this.theta);
+  }
+
+  pickTarget(not) {
+    let t;
+    do t = this.rng.int(0, ARMS.length - 1);
+    while (t === not);
+    this.target = t;
+  }
+
+  // ----------------------------------------------------- Koordinaten
+  /** Bildschirmpunkt -> Karte (mit der Ausrichtung theta). */
+  toMap(sx, sy, cam = this.cam, theta = this.theta) {
+    const r = vec(theta);
+    const d = vec(turnCW(theta));
+    const ox = sx - SCREEN_W / 2;
+    const oy = sy - SCREEN_H / 2;
+    return { x: cam.x + ox * r[0] + oy * d[0], y: cam.y + ox * r[1] + oy * d[1] };
+  }
+
+  /** Kreuz aus zwei Balken minus geschlossene Türen; Kreis mit Radius r. */
+  walkable(x, y, r = DOG_R) {
+    const inH = Math.abs(x) <= END - r && Math.abs(y) <= HALF - r;
+    const inV = Math.abs(y) <= END - r && Math.abs(x) <= HALF - r;
+    if (!inH && !inV) return false;
+    const h = this.h;
+    for (const arm of ARMS) {
+      if (doorOpen(arm.dir, h)) continue;
+      const v = vec(arm.dir);
+      const along = x * v[0] + y * v[1];
+      const across = Math.abs(x * v[1]) + Math.abs(y * v[0]);
+      if (along > HALF - r && along < HALF + DOOR_T + r && across < HALF + r) return false;
+    }
+    return true;
+  }
+
+  dogMap() {
+    return this.toMap(this.dog.x, this.dog.y);
+  }
+
+  /** Nächster begehbarer Punkt in Kartenkoordinaten (Raster-Suche). */
+  nearestValid(p) {
+    if (this.walkable(p.x, p.y)) return p;
+    for (let rad = 2; rad <= 400; rad += 2) {
+      let best = null;
+      let bd = Infinity;
+      for (let a = 0; a < 360; a += 10) {
+        const x = p.x + Math.cos((a * Math.PI) / 180) * rad;
+        const y = p.y + Math.sin((a * Math.PI) / 180) * rad;
+        if (this.walkable(x, y) && rad < bd) {
+          best = { x, y };
+          bd = rad;
+        }
+      }
+      if (best) return best;
+    }
+    return { x: this.cam.x, y: this.cam.y };
+  }
+
+  /** Dackel (Bildschirm) zurück auf begehbaren Boden setzen. */
+  fixDog() {
+    const m = this.dogMap();
+    if (this.walkable(m.x, m.y)) return;
+    const v = this.nearestValid(m);
+    const r = vec(this.theta);
+    const d = vec(turnCW(this.theta));
+    const ox = (v.x - this.cam.x) * r[0] + (v.y - this.cam.y) * r[1];
+    const oy = (v.x - this.cam.x) * d[0] + (v.y - this.cam.y) * d[1];
+    this.dog.x = clamp(SCREEN_W / 2 + ox, DOG_MARGIN, SCREEN_W - DOG_MARGIN);
+    this.dog.y = clamp(SCREEN_H / 2 + oy, DOG_MARGIN, SCREEN_H - DOG_MARGIN);
+  }
+
+  // ------------------------------------------------------- Aktionen
+  /** Fenster drehen: -1 = links (−90°), +1 = rechts (+90°). s bleibt. */
+  rotate(k) {
+    if (this.swing) return false;
+    const a0 = this.ang;
+    this.theta = k > 0 ? turnCW(this.theta) : turnCCW(this.theta);
+    // Kreuzungsmitte im Bild (vor der Drehung)? Dann gleitet das Fenster auf die Mitte.
+    const old = k > 0 ? turnCCW(this.theta) : turnCW(this.theta);
+    const r = vec(old);
+    const d = vec(turnCW(old));
+    const ox = -this.cam.x * r[0] - this.cam.y * r[1];
+    const oy = -this.cam.x * d[0] - this.cam.y * d[1];
+    const center = Math.abs(ox) < SCREEN_W / 2 && Math.abs(oy) < SCREEN_H / 2;
+    this.swing = {
+      t: 0,
+      a0,
+      a1: a0 + (k > 0 ? Math.PI / 2 : -Math.PI / 2),
+      c0: { ...this.cam },
+      c1: center ? { x: 0, y: 0 } : { ...this.cam },
+    };
+    return true;
+  }
+
+  /** 180°: nur s wechselt. */
+  flip() {
+    this.s = this.s === 'R' ? 'L' : 'R';
+  }
+
+  // --------------------------------------------------------- Update
+  update(dt, input = {}) {
+    this.time += dt;
+    if (this.hint > 0) this.hint -= dt;
+
+    if (this.swing) {
+      const sw = this.swing;
+      sw.t = Math.min(SWING_TIME, sw.t + dt);
+      const k = smooth(sw.t / SWING_TIME);
+      this.ang = sw.a0 + (sw.a1 - sw.a0) * k;
+      this.cam.x = sw.c0.x + (sw.c1.x - sw.c0.x) * k;
+      this.cam.y = sw.c0.y + (sw.c1.y - sw.c0.y) * k;
+      if (sw.t >= SWING_TIME) {
+        this.ang = sw.a1;
+        this.swing = null;
+        this.fixDog();
+      }
+      return; // Die Drehung pausiert das Spiel; Eingaben werden ignoriert.
+    }
+
+    if (input.rotLeft) return void this.rotate(-1);
+    if (input.rotRight || input.espressoPressed) return void this.rotate(1);
+    if (input.wende) this.flip();
+
+    // Umkehr: Scrollrichtung läuft weich durch null
+    this.dir = approach(this.dir, this.s === 'R' ? 1 : -1, TURN_RATE * dt);
+    this.moveCam(dt);
+    this.moveDog(dt, input);
+
+    const b = BONE_POS(this.target);
+    const m = this.dogMap();
+    if (Math.hypot(m.x - b.x, m.y - b.y) < BONE_R) {
+      this.score++;
+      this.pickTarget(this.target);
+    }
+  }
+
+  /** Fenster scrollt entlang der Kreuz-Skelettlinie und hält an, wo es nicht weiter kann. */
+  moveCam(dt) {
+    const r = vec(this.theta);
+    const step = SPEED * this.dir * dt;
+    const nx = this.cam.x + r[0] * step;
+    const ny = this.cam.y + r[1] * step;
+    // Das Fenster bleibt auf der Mittellinie des Gangs: quer dazu geht es nicht (Wand).
+    const onAxisX = r[0] !== 0; // Bewegung waagerecht -> y muss 0 sein
+    if (onAxisX ? Math.abs(this.cam.y) > 1e-6 : Math.abs(this.cam.x) > 1e-6) return;
+    this.cam.x = onAxisX ? clamp(nx, -CAM_END, CAM_END) : this.cam.x;
+    this.cam.y = onAxisX ? this.cam.y : clamp(ny, -CAM_END, CAM_END);
+  }
+
+  moveDog(dt, input) {
+    const dx = (input.mx || 0) * DOG_SPEED * dt;
+    const dy = (input.my || 0) * DOG_SPEED * dt;
+    const tryMove = (nx, ny) => {
+      nx = clamp(nx, DOG_MARGIN, SCREEN_W - DOG_MARGIN);
+      ny = clamp(ny, DOG_MARGIN, SCREEN_H - DOG_MARGIN);
+      const m = this.toMap(nx, ny);
+      if (this.walkable(m.x, m.y)) {
+        this.dog.x = nx;
+        this.dog.y = ny;
+      }
+    };
+    tryMove(this.dog.x + dx, this.dog.y);
+    tryMove(this.dog.x, this.dog.y + dy);
+    // Der Boden schiebt den Dackel mit dem Fenster mit: ist er trotzdem drin, zurücksetzen.
+    this.fixDog();
+  }
+}
+
+export function BONE_POS(armI) {
+  const v = vec(ARMS[armI].dir);
+  return { x: v[0] * BONE_AT, y: v[1] * BONE_AT };
+}

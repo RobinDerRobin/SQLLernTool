@@ -10,6 +10,7 @@ import { ENDING_LINES } from '../data/text.js';
 import { N, opposite, turnCW } from '../core/math.js';
 import { linksAt, directionAllowed, arrive, returnTarget } from './worldgraph.js';
 import { Arena } from './arena.js';
+import { FensterScene } from '../proto/fenster.js';
 import { Level } from './level.js';
 import { freshPowers, powerupsAfterDeath } from './powerups.js';
 import {
@@ -117,7 +118,7 @@ export class Game {
     const items = [];
     if (this.hasSave()) items.push({ label: 'Weiterspielen', action: () => this.continueGame() });
     items.push({ label: 'Neues Spiel', action: () => this.askNewGame() });
-    items.push({ label: 'Optionen', action: () => this.openOptions(() => this.openTitleMenu()) });
+    items.push({ label: 'Optionen', action: () => this.openOptions(() => this.openTitleMenu(), { fromTitle: true }) });
     items.push({ label: 'Steuerung', action: () => this.showControls(() => this.openTitleMenu()) });
     if (this.platform.quit) items.push({ label: 'Beenden', action: () => this.platform.quit() });
     this.overlay = this.menu(null, items);
@@ -135,7 +136,7 @@ export class Game {
     );
   }
 
-  openOptions(back) {
+  openOptions(back, { fromTitle = false } = {}) {
     const s = this.settings;
     const items = [
       { label: 'Musik', kind: 'slider', get: () => s.music, set: (v) => (s.music = v) },
@@ -162,6 +163,7 @@ export class Game {
         },
       });
     }
+    if (fromTitle) items.push({ label: 'Prototyp: Fenster', action: () => this.startProto('fenster') });
     items.push({ label: 'Zurück', action: back });
     this.overlay = this.menu('Optionen', items, {
       onBack: () => {
@@ -335,6 +337,23 @@ export class Game {
     const p = this.progress;
     p.items = [...this.items];
     storeProgress(this.storage, p);
+  }
+
+  /** Wegwerf-Prototypen (src/proto/), nur vom Titel aus erreichbar. */
+  startProto(name) {
+    if (name !== 'fenster') return;
+    this.proto = new FensterScene();
+    this.screen = 'proto';
+    this.screenTime = 0;
+    this.overlay = null;
+    this.dialogQueue = [];
+  }
+
+  leaveProto() {
+    this.proto = null;
+    this.screen = 'title';
+    this.screenTime = 0;
+    this.openTitleMenu();
   }
 
   toTitle() {
@@ -525,6 +544,10 @@ export class Game {
         break;
       case 'ending':
         this.updateEnding(dt, input);
+        break;
+      case 'proto':
+        if (input.pause) this.leaveProto();
+        else this.proto.update(dt, input);
         break;
     }
   }
