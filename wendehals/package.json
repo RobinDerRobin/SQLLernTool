@@ -19,7 +19,8 @@
     "e2e:perf": "npm run build && node e2e/perf.mjs",
     "e2e:flash": "npm run build && node e2e/flash.mjs",
     "check:welt": "node tools/pruefe-welt.mjs",
-    "golden:update": "node tools/golden.mjs"
+    "golden:update": "node tools/golden.mjs",
+    "gen:welt3": "node tools/gen-welt3.mjs"
   },
   "build": {
     "appId": "de.robin.wendehals",

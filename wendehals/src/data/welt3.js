@@ -1,0 +1,4014 @@
+// ERZEUGT aus docs/welt.json – nicht von Hand ändern. Neu erzeugen: npm run gen:welt3
+// Die v0.3-Welt als Daten (8 Gebiete, Arenen, Etappen, Fähigkeiten, Hindernisse). Schreibgeschützt;
+// wer sie verändern will (z. B. Mutationstests), arbeitet auf einer Kopie (structuredClone).
+
+function freeze(o) {
+  if (o && typeof o === 'object' && !Object.isFrozen(o)) {
+    Object.freeze(o);
+    for (const v of Object.values(o)) freeze(v);
+  }
+  return o;
+}
+
+export const WELT3 = freeze({
+ "title": "Wendehals – Weltdesign Runde 2",
+ "headings": [
+  "E",
+  "SE",
+  "S",
+  "SW",
+  "W",
+  "NW",
+  "N",
+  "NE"
+ ],
+ "start": {
+  "node": "toast",
+  "heading": "E"
+ },
+ "goal": {
+  "node": "uhrturm",
+  "viaEdge": "grosses_uhrwerk"
+ },
+ "abilities": [
+  {
+   "id": "ROLLLEINE",
+   "name": "Omas Flexileine",
+   "required": true,
+   "percent": 4,
+   "minute": 9,
+   "kind": "ability",
+   "desc": "Kampf: Lasso zieht Bonbons und kleine Gegner heran. Bewegung: an Leinenpflöcken festmachen = Kamera hält (Anker). Rätsel: Zugschalter, Schleuderhebel.",
+   "opens": [
+    "zugschalter"
+   ]
+  },
+  {
+   "id": "ESPRESSO",
+   "name": "Doppelter Espresso",
+   "required": true,
+   "percent": 9,
+   "minute": 22,
+   "kind": "ability",
+   "desc": "Taste halten: doppelt so schnell scrollen. Lädt die Drehzahl doppelt so schnell (Strecke). Zeitschranken.",
+   "opens": [
+    "zeitschranke"
+   ]
+  },
+  {
+   "id": "DREHWURM",
+   "name": "Drehwurm",
+   "required": true,
+   "percent": 14,
+   "minute": 33,
+   "kind": "ability",
+   "turn": {
+    "angles": [
+     90
+    ],
+    "where": "kreisel"
+   },
+   "desc": "Drehstufe 1: an jedem Kreisel (Arena und Weiche mitten in der Etappe) um 90° drehen, beliebig oft, kostenlos.",
+   "opens": []
+  },
+  {
+   "id": "FOEHN",
+   "name": "Opas Föhn",
+   "required": true,
+   "percent": 19,
+   "minute": 46,
+   "kind": "ability",
+   "desc": "Kampf: Pusten wirft Kugeln zurück. Bewegung: gegen Strömungen fliegen. Rätsel: Flusen/Krümel wegblasen, Windräder drehen.",
+   "opens": [
+    "gegenstrom",
+    "flusen"
+   ]
+  },
+  {
+   "id": "LAMPE",
+   "name": "Opas Grubenlampe",
+   "required": false,
+   "percent": 23,
+   "minute": 55,
+   "kind": "ability",
+   "desc": "Lichtkegel in Flugrichtung; Lichtsensoren. Dunkelzonen (weich).",
+   "opens": [
+    "dunkel"
+   ]
+  },
+  {
+   "id": "BOHRER",
+   "name": "Zahnarztbohrer",
+   "required": true,
+   "percent": 27,
+   "minute": 65,
+   "kind": "ability",
+   "desc": "Schüsse zerstören Felsen und Bauklötze; Bohrschuss durchschlägt Schilde.",
+   "opens": [
+    "fels"
+   ]
+  },
+  {
+   "id": "WASSERWAAGE",
+   "name": "Schiefe Wasserwaage",
+   "required": true,
+   "percent": 32,
+   "minute": 77,
+   "kind": "ability",
+   "breadth": true,
+   "turn": {
+    "angles": [
+     45
+    ],
+    "where": "kreisel+kompass"
+   },
+   "desc": "Drehstufe 2 (Breitenwirkung 1): an Kreiseln und Kompassrosen auch 45°. Erst damit wechselt man zwischen Kreuz (O/S/W/N) und Andreaskreuz (Diagonalen). Kompassschlösser.",
+   "opens": [
+    "kompassschloss"
+   ]
+  },
+  {
+   "id": "SPARSTRUMPF",
+   "name": "Omas Sparstrumpf",
+   "required": false,
+   "percent": 35,
+   "minute": 84,
+   "kind": "ability",
+   "desc": "Beim Tod bleibt die erste Hälfte der gekauften Power-Ups.",
+   "opens": []
+  },
+  {
+   "id": "WENDEHALS",
+   "name": "Wendehals",
+   "required": true,
+   "percent": 40,
+   "minute": 96,
+   "kind": "ability",
+   "turn": {
+    "angles": [
+     180
+    ],
+    "where": "ueberall",
+    "cost": 4
+   },
+   "desc": "Drehstufe 3: 180° überall, auch mitten in der Etappe (Etappe wird rückwärts geflogen). Kostet 4 Drehzahl-Segmente. Rückschalter.",
+   "opens": [
+    "rueckschalter"
+   ]
+  },
+  {
+   "id": "PILZ",
+   "name": "Schrumpfpilz",
+   "required": true,
+   "percent": 47,
+   "minute": 113,
+   "kind": "ability",
+   "desc": "Taste: winzig (kleinere Trefferbox, schwächerer Schuss). Enge Spalten.",
+   "opens": [
+    "spalt"
+   ]
+  },
+  {
+   "id": "OMA",
+   "name": "Oma Turbo (Pilotin)",
+   "required": false,
+   "percent": 50,
+   "minute": 120,
+   "kind": "character",
+   "desc": "Weitere Pilotin.",
+   "opens": []
+  },
+  {
+   "id": "KREISELKOMPASS",
+   "name": "Kreiselkompass",
+   "required": true,
+   "percent": 55,
+   "minute": 132,
+   "kind": "ability",
+   "turn": {
+    "angles": [
+     45,
+     90,
+     135,
+     180
+    ],
+    "where": "arena",
+    "cost": "Winkel/45"
+   },
+   "desc": "Drehstufe 4: in jeder Arena frei drehen (auch ohne Station), kostet Drehzahl. Stille Arenen.",
+   "opens": []
+  },
+  {
+   "id": "STOEPSEL",
+   "name": "Stöpsel gezogen (Ereignis)",
+   "required": true,
+   "percent": 55,
+   "minute": 133,
+   "kind": "event",
+   "desc": "Wilmas Abpumpen lässt das Bad ab: Zustandswechsel Badewannen-Ozean.",
+   "opens": [
+    "abgelassen"
+   ]
+  },
+  {
+   "id": "GUMMIHAUT",
+   "name": "Quietscheentenhaut",
+   "required": false,
+   "percent": 58,
+   "minute": 140,
+   "kind": "ability",
+   "desc": "Stacheln und Eiszapfen harmlos (weich).",
+   "opens": [
+    "stacheln",
+    "eiszapfen"
+   ]
+  },
+  {
+   "id": "TOASTER",
+   "name": "Toaster Tim (Pilot)",
+   "required": false,
+   "percent": 63,
+   "minute": 152,
+   "kind": "character",
+   "desc": "Weiterer Pilot.",
+   "opens": []
+  },
+  {
+   "id": "WIRBELWIND",
+   "name": "Wirbelwind",
+   "required": true,
+   "percent": 67,
+   "minute": 161,
+   "kind": "ability",
+   "breadth": true,
+   "turn": {
+    "angles": [
+     45,
+     90,
+     135,
+     180
+    ],
+    "where": "ueberall",
+    "cost": "Winkel/45"
+   },
+   "desc": "Drehstufe 5 (Breitenwirkung 2): immer und überall drehen, auch an Seitenklappen mitten in Etappen ohne Kreisel. Drehzahl lädt doppelt so schnell.",
+   "opens": []
+  },
+  {
+   "id": "MINUTENZEIGER",
+   "name": "Minutenzeiger",
+   "required": true,
+   "percent": 74,
+   "minute": 178,
+   "kind": "key",
+   "desc": "Schlüsselteil für das Zifferblatt-Tor.",
+   "opens": []
+  },
+  {
+   "id": "STUNDENZEIGER",
+   "name": "Stundenzeiger",
+   "required": true,
+   "percent": 79,
+   "minute": 190,
+   "kind": "key",
+   "desc": "Schlüsselteil für das Zifferblatt-Tor.",
+   "opens": []
+  },
+  {
+   "id": "SEKUNDENZEIGER",
+   "name": "Sekundenzeiger",
+   "required": true,
+   "percent": 84,
+   "minute": 202,
+   "kind": "key",
+   "desc": "Schlüsselteil für das Zifferblatt-Tor.",
+   "opens": [
+    "zifferblatt"
+   ]
+  }
+ ],
+ "expansions": [
+  {
+   "id": "W1",
+   "type": "wurst",
+   "name": "Extrawürstchen",
+   "desc": "+1 Energie"
+  },
+  {
+   "id": "W2",
+   "type": "wurst",
+   "name": "Extrawürstchen",
+   "desc": "+1 Energie"
+  },
+  {
+   "id": "W3",
+   "type": "wurst",
+   "name": "Extrawürstchen",
+   "desc": "+1 Energie"
+  },
+  {
+   "id": "W4",
+   "type": "wurst",
+   "name": "Extrawürstchen",
+   "desc": "+1 Energie"
+  },
+  {
+   "id": "W5",
+   "type": "wurst",
+   "name": "Extrawürstchen",
+   "desc": "+1 Energie"
+  },
+  {
+   "id": "W6",
+   "type": "wurst",
+   "name": "Extrawürstchen",
+   "desc": "+1 Energie"
+  },
+  {
+   "id": "W7",
+   "type": "wurst",
+   "name": "Extrawürstchen",
+   "desc": "+1 Energie"
+  },
+  {
+   "id": "BK1",
+   "type": "brummkreisel",
+   "name": "Brummkreisel",
+   "desc": "+1 Drehzahl-Segment (45°)"
+  },
+  {
+   "id": "BK2",
+   "type": "brummkreisel",
+   "name": "Brummkreisel",
+   "desc": "+1 Drehzahl-Segment (45°)"
+  },
+  {
+   "id": "BK3",
+   "type": "brummkreisel",
+   "name": "Brummkreisel",
+   "desc": "+1 Drehzahl-Segment (45°)"
+  },
+  {
+   "id": "BK4",
+   "type": "brummkreisel",
+   "name": "Brummkreisel",
+   "desc": "+1 Drehzahl-Segment (45°)"
+  },
+  {
+   "id": "BG1",
+   "type": "bonbonglas",
+   "name": "Bonbonglas",
+   "desc": "+1 Start-Bonbon nach Tod/Respawn (Power-Leiste)"
+  },
+  {
+   "id": "BG2",
+   "type": "bonbonglas",
+   "name": "Bonbonglas",
+   "desc": "+1 Start-Bonbon nach Tod/Respawn (Power-Leiste)"
+  },
+  {
+   "id": "BG3",
+   "type": "bonbonglas",
+   "name": "Bonbonglas",
+   "desc": "+1 Start-Bonbon nach Tod/Respawn (Power-Leiste)"
+  },
+  {
+   "id": "BG4",
+   "type": "bonbonglas",
+   "name": "Bonbonglas",
+   "desc": "+1 Start-Bonbon nach Tod/Respawn (Power-Leiste)"
+  },
+  {
+   "id": "BG5",
+   "type": "bonbonglas",
+   "name": "Bonbonglas",
+   "desc": "+1 Start-Bonbon nach Tod/Respawn (Power-Leiste)"
+  },
+  {
+   "id": "BG6",
+   "type": "bonbonglas",
+   "name": "Bonbonglas",
+   "desc": "+1 Start-Bonbon nach Tod/Respawn (Power-Leiste)"
+  }
+ ],
+ "gateTypes": [
+  {
+   "id": "fels",
+   "name": "Felswand / Bauklötze",
+   "solvedBy": [
+    "BOHRER"
+   ],
+   "soft": false,
+   "directional": null,
+   "appliesTo": "both"
+  },
+  {
+   "id": "spalt",
+   "name": "Enge Spalte",
+   "solvedBy": [
+    "PILZ"
+   ],
+   "soft": false,
+   "directional": null,
+   "appliesTo": "both"
+  },
+  {
+   "id": "stacheln",
+   "name": "Stachelfeld",
+   "solvedBy": [
+    "GUMMIHAUT"
+   ],
+   "soft": true,
+   "directional": null,
+   "appliesTo": "both"
+  },
+  {
+   "id": "dunkel",
+   "name": "Dunkelzone",
+   "solvedBy": [
+    "LAMPE"
+   ],
+   "soft": true,
+   "directional": null,
+   "appliesTo": "both"
+  },
+  {
+   "id": "zeitschranke",
+   "name": "Zeitschranke",
+   "solvedBy": [
+    "ESPRESSO"
+   ],
+   "soft": false,
+   "directional": null,
+   "appliesTo": "both"
+  },
+  {
+   "id": "zugschalter",
+   "name": "Zugschalter (Tischdecke, Hebel)",
+   "solvedBy": [
+    "ROLLLEINE"
+   ],
+   "soft": false,
+   "directional": null,
+   "appliesTo": "both"
+  },
+  {
+   "id": "flusen",
+   "name": "Flusen-/Krümelpfropf",
+   "solvedBy": [
+    "FOEHN"
+   ],
+   "soft": false,
+   "directional": null,
+   "appliesTo": "both"
+  },
+  {
+   "id": "gegenstrom",
+   "name": "Strömung / Gegenwind",
+   "solvedBy": [
+    "FOEHN"
+   ],
+   "soft": false,
+   "appliesTo": "against-current",
+   "directional": "Gilt nur gegen die Strömung (Kantenfeld current). Mit der Strömung ist die Etappe frei und schnell (Sog-Zone)."
+  },
+  {
+   "id": "rueckschalter",
+   "name": "Rückschalter (nur von hinten treffbar)",
+   "solvedBy": [
+    "WENDEHALS"
+   ],
+   "soft": false,
+   "appliesTo": "forward",
+   "directional": "Gilt nur in Kantenrichtung from->to: Der Schalter, der das Ende öffnet, liegt hinter einer Blende und ist nur nach einer Wende treffbar. Rückwärts ist die Klappe von innen offen."
+  },
+  {
+   "id": "kompassschloss",
+   "name": "Kompassschloss",
+   "solvedBy": [
+    "WASSERWAAGE"
+   ],
+   "soft": false,
+   "appliesTo": "both",
+   "directional": "Tür öffnet nach einer Richtungsfolge mit Diagonalen (z. B. N, NO, O), geflogen in der Halt-Zone davor."
+  },
+  {
+   "id": "abgelassen",
+   "name": "Nur bei abgelassenem Bad",
+   "solvedBy": [
+    "STOEPSEL"
+   ],
+   "soft": false,
+   "directional": null,
+   "appliesTo": "both"
+  },
+  {
+   "id": "zifferblatt",
+   "name": "Zifferblatt-Tor (alle drei Zeiger)",
+   "solvedBy": [
+    "STUNDENZEIGER",
+    "MINUTENZEIGER",
+    "SEKUNDENZEIGER"
+   ],
+   "soft": false,
+   "directional": null,
+   "appliesTo": "both"
+  },
+  {
+   "id": "eiszapfen",
+   "name": "Eiszapfen (abwärts Stachelfeld)",
+   "solvedBy": [
+    "GUMMIHAUT"
+   ],
+   "soft": true,
+   "appliesTo": "backward",
+   "directional": "Nur rückwärts (to->from, abwärts) gefährlich; aufwärts liegen die Zapfen flach."
+  },
+  {
+   "id": "trommel_a",
+   "name": "Trommel in Stellung A",
+   "solvedBy": [],
+   "soft": false,
+   "appliesTo": "both",
+   "state": {
+    "flag": "trommel",
+    "value": false
+   },
+   "directional": "Zustand: Öffnung liegt nur in Stellung A an dieser Kante."
+  },
+  {
+   "id": "trommel_b",
+   "name": "Trommel in Stellung B (45° gedreht)",
+   "solvedBy": [],
+   "soft": false,
+   "appliesTo": "both",
+   "state": {
+    "flag": "trommel",
+    "value": true
+   },
+   "directional": "Zustand: Öffnung liegt nur in Stellung B an dieser Kante."
+  }
+ ],
+ "stationTypes": {
+  "ring90": "Drehring (orange): Durchfliegen dreht 90° im Umlaufsinn. Ohne Fähigkeit, wiederholbar.",
+  "ring45": "Schrägring (blau, doppelter Rand): wie Drehring, aber 45°. Ohne Fähigkeit.",
+  "wender180": "Wender (U-Rohr): Hineinfliegen dreht 180°. Ohne Fähigkeit.",
+  "kompass": "Kompassrose (an jeder Speicherstation): jede Richtung der eigenen Klasse (+ oder ×) frei wählbar; mit Wasserwaage alle 8.",
+  "kreisel": "Kreisel (grüner Brummkreisel-Nagel): Drehanker für Fähigkeiten. Drehwurm 90°, Wasserwaage 45°. Ohne Fähigkeit schubst er nur zurück (180°, mechanisch). Kostet keine Drehzahl und füllt sie auf.",
+  "ratsche": "Ratsche (Uhrwerk): dreht nur im Uhrzeigersinn um 90°. Ohne Fähigkeit.",
+  "klappe": "Seitenklappe mitten in einer Etappe (nur midStations): Abzweig ohne Kreisel; nur mit Wirbelwind nutzbar. Jeder Weichenraum hat zusätzlich eine Kehrschleife (180°).",
+  "null": "Stille Arena: keine Station; drehen nur mit Kreiselkompass/Wirbelwind (oder Wendehals 180°). Hat immer eine Rückholstation als Notausgang."
+ },
+ "areas": [
+  {
+   "id": "fruehstueck",
+   "name": "Frühstückstisch",
+   "theme": "Küche, Erdgeschoss Mitte; Toaster, Krümel, Honig. Waagerecht, erste Schrägringe."
+  },
+  {
+   "id": "bad",
+   "name": "Badewannen-Ozean",
+   "theme": "Obergeschoss rechts; Strömungen und Sog, Weichen in Etappen. Zustandswechsel: abgelassen."
+  },
+  {
+   "id": "keller",
+   "name": "Omas Keller",
+   "theme": "Untergeschoss; Dunkelheit, Regal-Labyrinth, Einmachgläser. Beinahe-Gefangenschaft."
+  },
+  {
+   "id": "kinderzimmer",
+   "name": "Kinderzimmer",
+   "theme": "Dachgeschoss links; Murmelbahnen (diagonal), Modelleisenbahn-Weichen, Bauklötze."
+  },
+  {
+   "id": "kuehlschrank",
+   "name": "Kühlschrank-Pol",
+   "theme": "Hoch und schmal (vertikal); Kaltluft-Sog nach unten, Eis, Pinguine."
+  },
+  {
+   "id": "waschkueche",
+   "name": "Waschküche",
+   "theme": "Untergeschoss links; drehbare Schleudertrommel, Wäscheleinen, Dampf."
+  },
+  {
+   "id": "disco",
+   "name": "Disco-Vulkan",
+   "theme": "Ganz unten; Takt, Spiegel, Lava."
+  },
+  {
+   "id": "uhrwerk",
+   "name": "Uhrwerk-Himmel",
+   "theme": "Über dem Dach; Zahnräder, Ratschen, Uhrzeigersinn-Regel. Finale."
+  }
+ ],
+ "nodes": [
+  {
+   "id": "toast",
+   "name": "Toastständer",
+   "area": "fruehstueck",
+   "x": 10,
+   "y": 20,
+   "save": true,
+   "station": {
+    "type": "kompass"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": "I",
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": true,
+   "notes": "Start und erster Hub. Teaser: Kellerluke (Flusen) im Boden."
+  },
+  {
+   "id": "serviettenring",
+   "name": "Serviettenring",
+   "area": "fruehstueck",
+   "x": 6,
+   "y": 20,
+   "save": false,
+   "station": {
+    "type": "ring45"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Erster Schrägring: 45° ohne Fähigkeit. Führt in die diagonale Übungsschleife."
+  },
+  {
+   "id": "honigtopf",
+   "name": "Honigtopf",
+   "area": "fruehstueck",
+   "x": 9,
+   "y": 17,
+   "save": false,
+   "station": {
+    "type": "ring45"
+   },
+   "softStation": null,
+   "item": "W1",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Ende der Diagonal-Übungsschleife. Teaser: Kompassschloss Richtung Kinderzimmer (NW)."
+  },
+  {
+   "id": "marmelade",
+   "name": "Marmeladenglas",
+   "area": "fruehstueck",
+   "x": 13,
+   "y": 17,
+   "save": true,
+   "station": {
+    "type": "kompass"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Teaser: Eck-Klappe NW (Treppengeländer), erst mit Wasserwaage."
+  },
+  {
+   "id": "eier",
+   "name": "Eierbecher",
+   "area": "fruehstueck",
+   "x": 13,
+   "y": 20,
+   "save": false,
+   "station": {
+    "type": "ring90"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Kreuzung; Süd-Klappe = Krümelmauer (Fels) zum Keller."
+  },
+  {
+   "id": "butter",
+   "name": "Butterdose",
+   "area": "fruehstueck",
+   "x": 17,
+   "y": 17,
+   "save": false,
+   "station": {
+    "type": "ring90"
+   },
+   "softStation": null,
+   "item": "ROLLLEINE",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "zucker",
+   "name": "Zuckerdose",
+   "area": "fruehstueck",
+   "x": 17,
+   "y": 20,
+   "save": false,
+   "station": {
+    "type": "ring90"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Vor dem ersten Boss."
+  },
+  {
+   "id": "tasse",
+   "name": "Untertasse",
+   "area": "fruehstueck",
+   "x": 21,
+   "y": 20,
+   "save": true,
+   "station": {
+    "type": "kompass"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": "I",
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Nach Graf Kaffeekanne. Ost: Kühlschranktür (Gegenstrom, Föhn)."
+  },
+  {
+   "id": "brotkorb",
+   "name": "Brotkorb",
+   "area": "fruehstueck",
+   "x": 21,
+   "y": 17,
+   "save": false,
+   "station": {
+    "type": "ring90"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Treppe nach oben ins Bad."
+  },
+  {
+   "id": "salzstreuer",
+   "name": "Salzstreuer",
+   "area": "fruehstueck",
+   "x": 15,
+   "y": 23,
+   "save": false,
+   "station": {
+    "type": "wender180"
+   },
+   "softStation": null,
+   "item": "BG1",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Hinter Seitenklappe der Zuckerstraße (Wirbelwind)."
+  },
+  {
+   "id": "handtuch",
+   "name": "Handtuchhaken",
+   "area": "bad",
+   "x": 21,
+   "y": 14,
+   "save": false,
+   "station": {
+    "type": "ring90"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "zahnputz",
+   "name": "Zahnputzbecher",
+   "area": "bad",
+   "x": 21,
+   "y": 11,
+   "save": false,
+   "station": {
+    "type": "ring90"
+   },
+   "softStation": null,
+   "item": "BG2",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "spiegelschrank",
+   "name": "Spiegelschrank",
+   "area": "bad",
+   "x": 15,
+   "y": 11,
+   "save": false,
+   "station": {
+    "type": "kreisel"
+   },
+   "softStation": {
+    "type": "ring45"
+   },
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Sequence Break SB1: Spiegeltür-Scharnier wirkt mit Können als Schrägring."
+  },
+  {
+   "id": "strudel",
+   "name": "Abflussstrudel",
+   "area": "bad",
+   "x": 24,
+   "y": 11,
+   "save": false,
+   "station": {
+    "type": "kreisel"
+   },
+   "softStation": null,
+   "item": "DREHWURM",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Drehwurm liegt im Kreisel: sofort ausprobieren. Nord: Dampfsäule zum Zifferblatt (Teaser bis zum Finale)."
+  },
+  {
+   "id": "stoepsel",
+   "name": "Stöpsel",
+   "area": "bad",
+   "x": 24,
+   "y": 14,
+   "save": true,
+   "station": {
+    "type": "kompass"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": "I",
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Hub des Bades."
+  },
+  {
+   "id": "wannenrand",
+   "name": "Wannenrand",
+   "area": "bad",
+   "x": 32,
+   "y": 11,
+   "save": false,
+   "station": {
+    "type": "ring90"
+   },
+   "softStation": null,
+   "item": "W3",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "seifenschale",
+   "name": "Seifenschale",
+   "area": "bad",
+   "x": 28,
+   "y": 14,
+   "save": true,
+   "station": {
+    "type": "kompass"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": "I",
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Nach Admiral Walross."
+  },
+  {
+   "id": "entenhafen",
+   "name": "Quietscheentenhafen",
+   "area": "bad",
+   "x": 32,
+   "y": 14,
+   "save": true,
+   "station": {
+    "type": "kompass"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Vor dem Föhn eine Sackgasse (Entenrennen gegen die Strömung)."
+  },
+  {
+   "id": "wannengrund",
+   "name": "Wannengrund",
+   "area": "bad",
+   "x": 30,
+   "y": 16,
+   "save": false,
+   "station": {
+    "type": "kreisel"
+   },
+   "softStation": null,
+   "item": "BG3",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Existiert erst, wenn das Bad abgelassen ist (Zustandswechsel)."
+  },
+  {
+   "id": "haarsieb",
+   "name": "Haarsieb",
+   "area": "bad",
+   "x": 30,
+   "y": 19,
+   "save": false,
+   "station": {
+    "type": "wender180"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": {
+    "to": "entenhafen",
+    "heading": "N"
+   },
+   "toggles": null,
+   "start": false,
+   "notes": "Hinter der Haarknäuel-Hydra (optional)."
+  },
+  {
+   "id": "puppenhaus",
+   "name": "Puppenhaus",
+   "area": "kinderzimmer",
+   "x": 10,
+   "y": 14,
+   "save": false,
+   "station": {
+    "type": "kreisel"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "bauklotz",
+   "name": "Bauklotzturm",
+   "area": "kinderzimmer",
+   "x": 6,
+   "y": 14,
+   "save": false,
+   "station": {
+    "type": "kreisel"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Diagonales Drehkreuz: vier Murmelbahnen."
+  },
+  {
+   "id": "spielteppich",
+   "name": "Spielteppich",
+   "area": "kinderzimmer",
+   "x": 3,
+   "y": 11,
+   "save": true,
+   "station": {
+    "type": "kompass"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": "II",
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Hub des Kinderzimmers."
+  },
+  {
+   "id": "bahnhof",
+   "name": "Spielzeugbahnhof",
+   "area": "kinderzimmer",
+   "x": 9,
+   "y": 11,
+   "save": false,
+   "station": {
+    "type": "kreisel"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "dachboden",
+   "name": "Dachboden",
+   "area": "kinderzimmer",
+   "x": 12,
+   "y": 8,
+   "save": true,
+   "station": {
+    "type": "kompass"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": "II",
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Nach dem Brummkreisel-Baron."
+  },
+  {
+   "id": "lokschuppen",
+   "name": "Lokschuppen",
+   "area": "kinderzimmer",
+   "x": 6,
+   "y": 8,
+   "save": false,
+   "station": {
+    "type": "wender180"
+   },
+   "softStation": null,
+   "item": "BK1",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Hinter der Weiche der Modellbahn."
+  },
+  {
+   "id": "murmelgrube",
+   "name": "Murmelgrube",
+   "area": "kinderzimmer",
+   "x": 0,
+   "y": 14,
+   "save": false,
+   "station": {
+    "type": "wender180"
+   },
+   "softStation": null,
+   "item": "W4",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": {
+    "to": "spielteppich",
+    "heading": "NE"
+   },
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "kuckucksuhr",
+   "name": "Kuckucksuhr",
+   "area": "kinderzimmer",
+   "x": 2,
+   "y": 13,
+   "save": false,
+   "station": {
+    "type": "wender180"
+   },
+   "softStation": null,
+   "item": "MINUTENZEIGER",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "kuehltuer",
+   "name": "Kühlschranktür",
+   "area": "kuehlschrank",
+   "x": 25,
+   "y": 20,
+   "save": false,
+   "station": {
+    "type": "kreisel"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Vorraum: vor der Wasserwaage nur Butterfach erreichbar."
+  },
+  {
+   "id": "butterfach",
+   "name": "Butterfach",
+   "area": "kuehlschrank",
+   "x": 25,
+   "y": 17,
+   "save": false,
+   "station": {
+    "type": "ring90"
+   },
+   "softStation": null,
+   "item": "W2",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "eiswuerfel",
+   "name": "Eiswürfelschale",
+   "area": "kuehlschrank",
+   "x": 28,
+   "y": 23,
+   "save": true,
+   "station": {
+    "type": "kompass"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": "II",
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Hub des Kühlschranks."
+  },
+  {
+   "id": "gemuesefach",
+   "name": "Gemüsefach",
+   "area": "kuehlschrank",
+   "x": 28,
+   "y": 27,
+   "save": false,
+   "station": {
+    "type": "kreisel"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "joghurt",
+   "name": "Joghurtbecher",
+   "area": "kuehlschrank",
+   "x": 25,
+   "y": 27,
+   "save": false,
+   "station": {
+    "type": "ring90"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "gefrierfach",
+   "name": "Gefrierfach",
+   "area": "kuehlschrank",
+   "x": 28,
+   "y": 17,
+   "save": true,
+   "station": {
+    "type": "kompass"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Nach Pinguin-Admiral Pingo."
+  },
+  {
+   "id": "puddingschale",
+   "name": "Puddingschale",
+   "area": "kuehlschrank",
+   "x": 25,
+   "y": 30,
+   "save": false,
+   "station": {
+    "type": "wender180"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": {
+    "to": "eiswuerfel",
+    "heading": "S"
+   },
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "eisberg",
+   "name": "Eisberg im Tiefkühlfach",
+   "area": "kuehlschrank",
+   "x": 31,
+   "y": 25,
+   "save": false,
+   "station": {
+    "type": "wender180"
+   },
+   "softStation": null,
+   "item": "STUNDENZEIGER",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "kellertreppe",
+   "name": "Kellertreppe",
+   "area": "keller",
+   "x": 10,
+   "y": 25,
+   "save": true,
+   "station": {
+    "type": "kompass"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": "II",
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Ankunft durch die Kellerluke (Einbahn): Beinahe-Gefangenschaft."
+  },
+  {
+   "id": "einmachregal",
+   "name": "Einmachregal",
+   "area": "keller",
+   "x": 13,
+   "y": 25,
+   "save": false,
+   "station": {
+    "type": "ring90"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "vorratskammer",
+   "name": "Vorratskammer",
+   "area": "keller",
+   "x": 17,
+   "y": 25,
+   "save": true,
+   "station": {
+    "type": "kompass"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "werkbank",
+   "name": "Opas Werkbank",
+   "area": "keller",
+   "x": 21,
+   "y": 25,
+   "save": false,
+   "station": {
+    "type": "kreisel"
+   },
+   "softStation": null,
+   "item": "WASSERWAAGE",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "kohlenkeller",
+   "name": "Kohlenkeller",
+   "area": "keller",
+   "x": 10,
+   "y": 28,
+   "save": false,
+   "station": {
+    "type": "ring90"
+   },
+   "softStation": null,
+   "item": "LAMPE",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "gurkenfass",
+   "name": "Gurkenfass",
+   "area": "keller",
+   "x": 13,
+   "y": 28,
+   "save": false,
+   "station": {
+    "type": "ring90"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "kartoffelkiste",
+   "name": "Kartoffelkiste",
+   "area": "keller",
+   "x": 17,
+   "y": 28,
+   "save": false,
+   "station": {
+    "type": "ring90"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "tresor",
+   "name": "Omas Tresor",
+   "area": "keller",
+   "x": 21,
+   "y": 28,
+   "save": false,
+   "station": {
+    "type": "wender180"
+   },
+   "softStation": null,
+   "item": "BG4",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "siphon",
+   "name": "Siphon",
+   "area": "keller",
+   "x": 17,
+   "y": 31,
+   "save": false,
+   "station": {
+    "type": "ring90"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "gully",
+   "name": "Gully",
+   "area": "keller",
+   "x": 21,
+   "y": 31,
+   "save": false,
+   "station": {
+    "type": null
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": {
+    "to": "siphon",
+    "heading": "W"
+   },
+   "toggles": null,
+   "start": false,
+   "notes": "Stille Arena (keine Station): braucht freie Drehung (Kreiselkompass). Rückholstation als Notausgang."
+  },
+  {
+   "id": "zwergenbau",
+   "name": "Zwergenbau",
+   "area": "keller",
+   "x": 24,
+   "y": 25,
+   "save": false,
+   "station": {
+    "type": "wender180"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": {
+    "to": "vorratskammer",
+    "heading": "E"
+   },
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "mauseloch",
+   "name": "Mauseloch",
+   "area": "keller",
+   "x": 11,
+   "y": 23,
+   "save": false,
+   "station": {
+    "type": "wender180"
+   },
+   "softStation": null,
+   "item": "BG6",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "standuhr",
+   "name": "Omas Standuhr",
+   "area": "keller",
+   "x": 10,
+   "y": 34,
+   "save": false,
+   "station": {
+    "type": "ring90"
+   },
+   "softStation": null,
+   "item": "SEKUNDENZEIGER",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "waeschekorb",
+   "name": "Wäschekorb",
+   "area": "waschkueche",
+   "x": 7,
+   "y": 28,
+   "save": true,
+   "station": {
+    "type": "kompass"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": "II",
+   "goal": false,
+   "ret": null,
+   "toggles": "trommel",
+   "start": false,
+   "notes": "Hub. Schleuderhebel (Rollleine) dreht die Trommel um 45°."
+  },
+  {
+   "id": "trommel",
+   "name": "Schleudertrommel",
+   "area": "waschkueche",
+   "x": 4,
+   "y": 28,
+   "save": false,
+   "station": {
+    "type": "kreisel"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": "trommel",
+   "start": false,
+   "notes": "Drehbare Arena: Stellung A = Ausgänge O/N/W, Stellung B = Ausgänge NO/SO/SW/NW."
+  },
+  {
+   "id": "flusensieb",
+   "name": "Flusensieb",
+   "area": "waschkueche",
+   "x": 4,
+   "y": 25,
+   "save": false,
+   "station": {
+    "type": "ring90"
+   },
+   "softStation": null,
+   "item": "W5",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "buegelbrett",
+   "name": "Bügelbrett",
+   "area": "waschkueche",
+   "x": 7,
+   "y": 25,
+   "save": false,
+   "station": {
+    "type": "kreisel"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "weichspueler",
+   "name": "Weichspülerflasche",
+   "area": "waschkueche",
+   "x": 1,
+   "y": 28,
+   "save": false,
+   "station": {
+    "type": "wender180"
+   },
+   "softStation": null,
+   "item": "OMA",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "schleuderkammer",
+   "name": "Schleuderkammer",
+   "area": "waschkueche",
+   "x": 7,
+   "y": 31,
+   "save": true,
+   "station": {
+    "type": "kompass"
+   },
+   "softStation": null,
+   "item": "STOEPSEL",
+   "boss": null,
+   "warp": "II",
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Nach Wäschekönigin Wilma: ihr Abpumpen lässt das Bad ab (Ereignis)."
+  },
+  {
+   "id": "sockenberg",
+   "name": "Sockenberg",
+   "area": "waschkueche",
+   "x": 1,
+   "y": 31,
+   "save": false,
+   "station": {
+    "type": "wender180"
+   },
+   "softStation": null,
+   "item": "BK3",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "klammernest",
+   "name": "Wäscheklammer-Nest",
+   "area": "waschkueche",
+   "x": 1,
+   "y": 25,
+   "save": false,
+   "station": {
+    "type": "wender180"
+   },
+   "softStation": null,
+   "item": "BG5",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "discotuer",
+   "name": "Discotür",
+   "area": "disco",
+   "x": 21,
+   "y": 34,
+   "save": true,
+   "station": {
+    "type": "kompass"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": "III",
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "spiegelsaal",
+   "name": "Spiegelsaal",
+   "area": "disco",
+   "x": 17,
+   "y": 34,
+   "save": false,
+   "station": {
+    "type": "ring90"
+   },
+   "softStation": null,
+   "item": "TOASTER",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "tanzflaeche",
+   "name": "Tanzfläche",
+   "area": "disco",
+   "x": 24,
+   "y": 34,
+   "save": false,
+   "station": {
+    "type": "kreisel"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "djpult",
+   "name": "DJ-Pult",
+   "area": "disco",
+   "x": 28,
+   "y": 34,
+   "save": true,
+   "station": {
+    "type": "kompass"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": "III",
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Nach der Diskokugel-Diva."
+  },
+  {
+   "id": "konfetti",
+   "name": "Konfettikanone",
+   "area": "disco",
+   "x": 24,
+   "y": 37,
+   "save": false,
+   "station": {
+    "type": "ring90"
+   },
+   "softStation": null,
+   "item": "W6",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "lavalampe",
+   "name": "Lavalampe",
+   "area": "disco",
+   "x": 28,
+   "y": 37,
+   "save": false,
+   "station": {
+    "type": "ring90"
+   },
+   "softStation": null,
+   "item": "BK4",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "zifferblatt",
+   "name": "Zifferblatt-Tor",
+   "area": "uhrwerk",
+   "x": 24,
+   "y": 7,
+   "save": true,
+   "station": {
+    "type": "kompass"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": "III",
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "hemmung",
+   "name": "Hemmung",
+   "area": "uhrwerk",
+   "x": 20,
+   "y": 7,
+   "save": false,
+   "station": {
+    "type": "ratsche"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "federhaus",
+   "name": "Federhaus",
+   "area": "uhrwerk",
+   "x": 28,
+   "y": 7,
+   "save": false,
+   "station": {
+    "type": "ratsche"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "unruh",
+   "name": "Unruh",
+   "area": "uhrwerk",
+   "x": 20,
+   "y": 3,
+   "save": false,
+   "station": {
+    "type": null
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": {
+    "to": "hemmung",
+    "heading": "E"
+   },
+   "toggles": null,
+   "start": false,
+   "notes": "Stille Arena: freie Drehung nötig. Rückholstation als Notausgang."
+  },
+  {
+   "id": "ankerrad",
+   "name": "Ankerrad",
+   "area": "uhrwerk",
+   "x": 28,
+   "y": 3,
+   "save": false,
+   "station": {
+    "type": "ratsche"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "glockenstuhl",
+   "name": "Glockenstuhl",
+   "area": "uhrwerk",
+   "x": 24,
+   "y": 3,
+   "save": true,
+   "station": {
+    "type": "kompass"
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": "Letzte Station vor dem Endboss."
+  },
+  {
+   "id": "uhrturm",
+   "name": "Uhrturm",
+   "area": "uhrwerk",
+   "x": 24,
+   "y": 0,
+   "save": false,
+   "station": {
+    "type": null
+   },
+   "softStation": null,
+   "item": null,
+   "boss": null,
+   "warp": null,
+   "goal": true,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  },
+  {
+   "id": "kuckucksnest",
+   "name": "Kuckucksnest",
+   "area": "uhrwerk",
+   "x": 31,
+   "y": 4,
+   "save": false,
+   "station": {
+    "type": "wender180"
+   },
+   "softStation": null,
+   "item": "W7",
+   "boss": null,
+   "warp": null,
+   "goal": false,
+   "ret": null,
+   "toggles": null,
+   "start": false,
+   "notes": ""
+  }
+ ],
+ "edges": [
+  {
+   "id": "kruemelstrasse",
+   "name": "Krümelstraße",
+   "from": "toast",
+   "to": "eier",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2000,
+   "difficulty": 1,
+   "tempo": "Gefecht(langsam)→Halt(Bonbon-Lektion)→Gefecht",
+   "notes": "Tutorial."
+  },
+  {
+   "id": "tischkante",
+   "name": "Tischkante",
+   "from": "toast",
+   "to": "serviettenring",
+   "heading": "W",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1400,
+   "difficulty": 1,
+   "tempo": "Gefecht→Freiflug",
+   "notes": ""
+  },
+  {
+   "id": "kruemelrampe",
+   "name": "Krümelrampe",
+   "from": "serviettenring",
+   "to": "honigtopf",
+   "heading": "NE",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1500,
+   "difficulty": 1,
+   "tempo": "Diagonal: Gefecht(langsam)",
+   "notes": "Erste Diagonal-Etappe, fast ohne Gegner."
+  },
+  {
+   "id": "honigspur",
+   "name": "Honigspur",
+   "from": "honigtopf",
+   "to": "marmelade",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1800,
+   "difficulty": 1,
+   "tempo": "Zähzone→Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "marmeladenaufzug",
+   "name": "Marmeladenaufzug",
+   "from": "eier",
+   "to": "marmelade",
+   "heading": "N",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1800,
+   "difficulty": 1,
+   "tempo": "Vertikal: Gefecht→Zähzone",
+   "notes": ""
+  },
+  {
+   "id": "butterberg",
+   "name": "Butterberg",
+   "from": "marmelade",
+   "to": "butter",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [
+    {
+     "at": 0.5,
+     "type": "klappe",
+     "branchTo": "spiegelschrank",
+     "branchHeading": "N",
+     "branchId": "butterschacht",
+     "branchName": "Butterschacht",
+     "branchGates": [],
+     "branchBoss": null,
+     "branchReward": null,
+     "branchTempo": "Vertikal: Sog nach oben (Abkürzung)",
+     "point": {
+      "x": 15,
+      "y": 17
+     }
+    }
+   ],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2000,
+   "difficulty": 2,
+   "tempo": "Gefecht→Halt(Seitenklappe)→Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "zuckerstrasse",
+   "name": "Zuckerstraße",
+   "from": "eier",
+   "to": "zucker",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [
+    {
+     "at": 0.5,
+     "type": "klappe",
+     "branchTo": "salzstreuer",
+     "branchHeading": "S",
+     "branchId": "salzrinne",
+     "branchName": "Salzrinne",
+     "branchGates": [],
+     "branchBoss": null,
+     "branchReward": null,
+     "branchTempo": "Vertikal: Halt→Rätsel",
+     "point": {
+      "x": 15,
+      "y": 20
+     }
+    }
+   ],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2000,
+   "difficulty": 2,
+   "tempo": "Gefecht→Halt(Seitenklappe)→Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "wuerfelzuckerschacht",
+   "name": "Würfelzuckerschacht",
+   "from": "butter",
+   "to": "zucker",
+   "heading": "S",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1600,
+   "difficulty": 2,
+   "tempo": "Vertikal: Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "kaffeekraenzchen",
+   "name": "Kaffeekränzchen",
+   "from": "zucker",
+   "to": "tasse",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "zugschalter"
+   ],
+   "midStations": [],
+   "boss": "kaffeekanne",
+   "reward": "ESPRESSO",
+   "optionalBoss": false,
+   "length": 2400,
+   "difficulty": 2,
+   "tempo": "Halt(Tischdecke ziehen)→Gefecht→Boss",
+   "notes": ""
+  },
+  {
+   "id": "toasterschacht",
+   "name": "Toasterschacht",
+   "from": "tasse",
+   "to": "brotkorb",
+   "heading": "N",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "zeitschranke"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1800,
+   "difficulty": 2,
+   "tempo": "Vertikal: Gefecht→Zeitschranke",
+   "notes": ""
+  },
+  {
+   "id": "brotkrumenleiter",
+   "name": "Brotkrumenleiter",
+   "from": "brotkorb",
+   "to": "handtuch",
+   "heading": "N",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1800,
+   "difficulty": 2,
+   "tempo": "Vertikal: Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "kellerluke",
+   "name": "Kellerluke",
+   "from": "toast",
+   "to": "kellertreppe",
+   "heading": "S",
+   "oneWay": true,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "flusen"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1400,
+   "difficulty": 2,
+   "tempo": "Vertikal: Sog nach unten",
+   "notes": "Einbahn-Trichter in den Keller."
+  },
+  {
+   "id": "kruemelmauer",
+   "name": "Krümelmauer",
+   "from": "einmachregal",
+   "to": "eier",
+   "heading": "N",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "fels"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2000,
+   "difficulty": 3,
+   "tempo": "Vertikal: Gefecht→Felswand→Gefecht",
+   "notes": "Ausgang aus der Keller-Gefangenschaft."
+  },
+  {
+   "id": "kaltluftschwall",
+   "name": "Kaltluftschwall",
+   "from": "kuehltuer",
+   "to": "tasse",
+   "heading": "W",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": "forward",
+   "gates": [
+    "gegenstrom"
+   ],
+   "midStations": [
+    {
+     "at": 0.25,
+     "type": "klappe",
+     "branchTo": "zwergenbau",
+     "branchHeading": "S",
+     "branchId": "kuehlrippe",
+     "branchName": "Kühlrippe",
+     "branchGates": [
+      "fels"
+     ],
+     "branchBoss": null,
+     "branchReward": null,
+     "branchTempo": "Vertikal: Gefecht→Felswand",
+     "point": {
+      "x": 24,
+      "y": 20
+     }
+    }
+   ],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2000,
+   "difficulty": 2,
+   "tempo": "Sog Richtung Küche; Halt(Seitenklappe)",
+   "notes": ""
+  },
+  {
+   "id": "bauklotzrampe",
+   "name": "Bauklotzrampe",
+   "from": "honigtopf",
+   "to": "bauklotz",
+   "heading": "NW",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "kompassschloss"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1800,
+   "difficulty": 3,
+   "tempo": "Diagonal: Halt(Kompassschloss)→Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "treppengelaender",
+   "name": "Treppengeländer",
+   "from": "marmelade",
+   "to": "puppenhaus",
+   "heading": "NW",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1800,
+   "difficulty": 3,
+   "tempo": "Diagonal: Gefecht→Freiflug",
+   "notes": ""
+  },
+  {
+   "id": "schaumbad",
+   "name": "Schaumbad",
+   "from": "handtuch",
+   "to": "stoepsel",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2200,
+   "difficulty": 2,
+   "tempo": "Gefecht→Freiflug(Schaum)",
+   "notes": ""
+  },
+  {
+   "id": "zahnpastatube",
+   "name": "Zahnpastatube",
+   "from": "zahnputz",
+   "to": "handtuch",
+   "heading": "S",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1400,
+   "difficulty": 2,
+   "tempo": "Vertikal: Zähzone",
+   "notes": ""
+  },
+  {
+   "id": "zahnputzrinne",
+   "name": "Zahnputzrinne",
+   "from": "strudel",
+   "to": "zahnputz",
+   "heading": "W",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1400,
+   "difficulty": 2,
+   "tempo": "Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "spiegelschrankleiste",
+   "name": "Spiegelschrankleiste",
+   "from": "zahnputz",
+   "to": "spiegelschrank",
+   "heading": "W",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2000,
+   "difficulty": 2,
+   "tempo": "Gefecht→Halt",
+   "notes": ""
+  },
+  {
+   "id": "strudelschacht",
+   "name": "Strudelschacht",
+   "from": "stoepsel",
+   "to": "strudel",
+   "heading": "N",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1600,
+   "difficulty": 2,
+   "tempo": "Vertikal: Strömung quer",
+   "notes": ""
+  },
+  {
+   "id": "wasserhahnkanal",
+   "name": "Wasserhahn-Kanal",
+   "from": "strudel",
+   "to": "wannenrand",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [
+    {
+     "at": 0.5,
+     "type": "kreisel",
+     "branchTo": "seifenschale",
+     "branchHeading": "S",
+     "branchId": "duschvorhang",
+     "branchName": "Duschvorhang",
+     "branchGates": [],
+     "branchBoss": "walross",
+     "branchReward": "FOEHN",
+     "branchTempo": "Vertikal: Gefecht→Boss",
+     "point": {
+      "x": 28,
+      "y": 11
+     }
+    }
+   ],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2800,
+   "difficulty": 3,
+   "tempo": "Gefecht→Halt(Kreisel-Weiche)→Gefecht",
+   "notes": "Erste Pflicht-Weiche mitten in der Etappe (Drehwurm)."
+  },
+  {
+   "id": "shampooflasche",
+   "name": "Shampooflasche",
+   "from": "wannenrand",
+   "to": "entenhafen",
+   "heading": "S",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1600,
+   "difficulty": 3,
+   "tempo": "Vertikal: Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "seifenrutsche",
+   "name": "Seifenrutsche",
+   "from": "seifenschale",
+   "to": "stoepsel",
+   "heading": "W",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": "forward",
+   "gates": [
+    "gegenstrom"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1600,
+   "difficulty": 2,
+   "tempo": "Sog West (Cruise-Abkürzung)",
+   "notes": ""
+  },
+  {
+   "id": "entenrennen",
+   "name": "Entenrennen",
+   "from": "seifenschale",
+   "to": "entenhafen",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": "forward",
+   "gates": [
+    "gegenstrom"
+   ],
+   "midStations": [
+    {
+     "at": 0.5,
+     "type": "klappe",
+     "branchTo": "wannengrund",
+     "branchHeading": "S",
+     "branchId": "entenloch",
+     "branchName": "Entenloch",
+     "branchGates": [
+      "abgelassen"
+     ],
+     "branchBoss": null,
+     "branchReward": null,
+     "branchTempo": "Vertikal: kurz",
+     "point": {
+      "x": 30,
+      "y": 14
+     }
+    }
+   ],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2400,
+   "difficulty": 3,
+   "tempo": "Sog Ost→Halt(Seitenklappe)→Sog",
+   "notes": ""
+  },
+  {
+   "id": "wannenbucht",
+   "name": "Wannenbucht",
+   "from": "seifenschale",
+   "to": "wannengrund",
+   "heading": "SE",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "abgelassen"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1400,
+   "difficulty": 3,
+   "tempo": "Diagonal: Freiflug (trockener Wannenboden)",
+   "notes": ""
+  },
+  {
+   "id": "wannenkante",
+   "name": "Wannenkante",
+   "from": "entenhafen",
+   "to": "wannengrund",
+   "heading": "SW",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "abgelassen"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1400,
+   "difficulty": 3,
+   "tempo": "Diagonal: Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "haarknaeuel",
+   "name": "Haarknäuel-Abfluss",
+   "from": "wannengrund",
+   "to": "haarsieb",
+   "heading": "S",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "dunkel"
+   ],
+   "midStations": [],
+   "boss": "hydra",
+   "reward": "GUMMIHAUT",
+   "optionalBoss": true,
+   "length": 1800,
+   "difficulty": 4,
+   "tempo": "Vertikal: Dunkel→Boss",
+   "notes": ""
+  },
+  {
+   "id": "kondensrohr",
+   "name": "Kondensrohr",
+   "from": "gefrierfach",
+   "to": "seifenschale",
+   "heading": "N",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "spalt"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1400,
+   "difficulty": 3,
+   "tempo": "Vertikal: Spalt",
+   "notes": ""
+  },
+  {
+   "id": "dachrinne",
+   "name": "Dachrinne",
+   "from": "dachboden",
+   "to": "spiegelschrank",
+   "heading": "SE",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "rueckschalter"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2000,
+   "difficulty": 4,
+   "tempo": "Diagonal: Gefecht→Halt(Rückschalter)",
+   "notes": ""
+  },
+  {
+   "id": "dampfsaeule",
+   "name": "Dampfsäule",
+   "from": "strudel",
+   "to": "zifferblatt",
+   "heading": "N",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "zifferblatt"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1800,
+   "difficulty": 4,
+   "tempo": "Vertikal: Halt(Zifferblatt-Tor)→Sog nach oben",
+   "notes": ""
+  },
+  {
+   "id": "puppenflur",
+   "name": "Puppenflur",
+   "from": "puppenhaus",
+   "to": "bauklotz",
+   "heading": "W",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1800,
+   "difficulty": 3,
+   "tempo": "Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "murmelbahn",
+   "name": "Murmelbahn",
+   "from": "bauklotz",
+   "to": "spielteppich",
+   "heading": "NW",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [
+    {
+     "at": 0.333,
+     "type": "klappe",
+     "branchTo": "kuckucksuhr",
+     "branchHeading": "W",
+     "branchId": "kuckucksgang",
+     "branchName": "Kuckucksgang",
+     "branchGates": [
+      "fels",
+      "rueckschalter"
+     ],
+     "branchBoss": null,
+     "branchReward": null,
+     "branchTempo": "Halt(Rätsel)→Gefecht",
+     "point": {
+      "x": 5,
+      "y": 13
+     }
+    }
+   ],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2100,
+   "difficulty": 3,
+   "tempo": "Diagonal: Gefecht→Halt(Seitenklappe)→Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "kugelbahn",
+   "name": "Kugelbahn",
+   "from": "bauklotz",
+   "to": "bahnhof",
+   "heading": "NE",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1800,
+   "difficulty": 3,
+   "tempo": "Diagonal: Sog(Murmeln)→Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "modellbahn",
+   "name": "Modellbahnstrecke",
+   "from": "spielteppich",
+   "to": "bahnhof",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [
+    {
+     "at": 0.5,
+     "type": "kreisel",
+     "branchTo": "lokschuppen",
+     "branchHeading": "N",
+     "branchId": "abstellgleis",
+     "branchName": "Abstellgleis",
+     "branchGates": [],
+     "branchBoss": null,
+     "branchReward": null,
+     "branchTempo": "Vertikal: kurz",
+     "point": {
+      "x": 6,
+      "y": 11
+     }
+    }
+   ],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2400,
+   "difficulty": 3,
+   "tempo": "Gefecht→Halt(Kreisel-Weiche)→Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "kreiselbahn",
+   "name": "Kreiselbahn",
+   "from": "bahnhof",
+   "to": "dachboden",
+   "heading": "NE",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": "baron",
+   "reward": "WENDEHALS",
+   "optionalBoss": false,
+   "length": 2400,
+   "difficulty": 4,
+   "tempo": "Diagonal: Gefecht→Boss",
+   "notes": ""
+  },
+  {
+   "id": "murmelsturz",
+   "name": "Murmelsturz",
+   "from": "spielteppich",
+   "to": "murmelgrube",
+   "heading": "SW",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1400,
+   "difficulty": 3,
+   "tempo": "Diagonal: Sog",
+   "notes": ""
+  },
+  {
+   "id": "murmelrueckweg",
+   "name": "Murmelrückweg",
+   "from": "murmelgrube",
+   "to": "bauklotz",
+   "heading": "E",
+   "oneWay": true,
+   "opensAfterPass": true,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1800,
+   "difficulty": 3,
+   "tempo": "Gefecht→Sog",
+   "notes": "Schleife zurück; Klappe bleibt danach offen."
+  },
+  {
+   "id": "butterfachklappe",
+   "name": "Butterfachklappe",
+   "from": "kuehltuer",
+   "to": "butterfach",
+   "heading": "N",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1200,
+   "difficulty": 2,
+   "tempo": "Vertikal: kurz",
+   "notes": ""
+  },
+  {
+   "id": "eiswuerfelrutsche",
+   "name": "Eiswürfelrutsche",
+   "from": "kuehltuer",
+   "to": "eiswuerfel",
+   "heading": "SE",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1800,
+   "difficulty": 3,
+   "tempo": "Diagonal: Eis (Trägheit)",
+   "notes": ""
+  },
+  {
+   "id": "kaltluftfall",
+   "name": "Kaltluftfall",
+   "from": "eiswuerfel",
+   "to": "gemuesefach",
+   "heading": "S",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": "forward",
+   "gates": [
+    "gegenstrom"
+   ],
+   "midStations": [
+    {
+     "at": 0.5,
+     "type": "klappe",
+     "branchTo": "eisberg",
+     "branchHeading": "E",
+     "branchId": "tiefkuehlgang",
+     "branchName": "Tiefkühlgang",
+     "branchGates": [
+      "spalt",
+      "zeitschranke"
+     ],
+     "branchBoss": null,
+     "branchReward": null,
+     "branchTempo": "Gefecht→Zeitschranke",
+     "point": {
+      "x": 28,
+      "y": 25
+     }
+    }
+   ],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2000,
+   "difficulty": 3,
+   "tempo": "Vertikal: Sog→Halt(Seitenklappe)→Sog",
+   "notes": ""
+  },
+  {
+   "id": "joghurtdeckel",
+   "name": "Joghurtdeckel",
+   "from": "gemuesefach",
+   "to": "joghurt",
+   "heading": "W",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1600,
+   "difficulty": 3,
+   "tempo": "Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "eiszapfenleiter",
+   "name": "Eiszapfenleiter",
+   "from": "joghurt",
+   "to": "kuehltuer",
+   "heading": "N",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "eiszapfen"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2000,
+   "difficulty": 3,
+   "tempo": "Vertikal: Gefecht",
+   "notes": "Abwärts hängende Eiszapfen = Stachelfeld (weich): SB3."
+  },
+  {
+   "id": "eisnebel",
+   "name": "Eisnebel-Aufstieg",
+   "from": "eiswuerfel",
+   "to": "gefrierfach",
+   "heading": "N",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": "backward",
+   "gates": [
+    "gegenstrom"
+   ],
+   "midStations": [],
+   "boss": "pingo",
+   "reward": "PILZ",
+   "optionalBoss": false,
+   "length": 2400,
+   "difficulty": 4,
+   "tempo": "Vertikal: Gegenwind→Boss",
+   "notes": ""
+  },
+  {
+   "id": "eisfachrutsche",
+   "name": "Eisfach-Rutsche",
+   "from": "gefrierfach",
+   "to": "butterfach",
+   "heading": "W",
+   "oneWay": true,
+   "opensAfterPass": true,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1200,
+   "difficulty": 2,
+   "tempo": "Eis-Sog West",
+   "notes": ""
+  },
+  {
+   "id": "puddingberg",
+   "name": "Puddingberg",
+   "from": "joghurt",
+   "to": "puddingschale",
+   "heading": "S",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": "wackelpudding",
+   "reward": "BK2",
+   "optionalBoss": true,
+   "length": 1800,
+   "difficulty": 4,
+   "tempo": "Vertikal: Zähzone→Boss",
+   "notes": ""
+  },
+  {
+   "id": "kompressor",
+   "name": "Kompressor-Aufwind",
+   "from": "djpult",
+   "to": "gemuesefach",
+   "heading": "N",
+   "oneWay": true,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2400,
+   "difficulty": 3,
+   "tempo": "Vertikal: Sog nach oben (Rückweg)",
+   "notes": ""
+  },
+  {
+   "id": "spinnwebengang",
+   "name": "Spinnwebengang",
+   "from": "kellertreppe",
+   "to": "einmachregal",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "dunkel"
+   ],
+   "midStations": [
+    {
+     "at": 0.333,
+     "type": "klappe",
+     "branchTo": "mauseloch",
+     "branchHeading": "N",
+     "branchId": "mausgang",
+     "branchName": "Mausgang",
+     "branchGates": [],
+     "branchBoss": null,
+     "branchReward": null,
+     "branchTempo": "Vertikal: kurz",
+     "point": {
+      "x": 11,
+      "y": 25
+     }
+    }
+   ],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2000,
+   "difficulty": 3,
+   "tempo": "Dunkel→Halt(Seitenklappe)→Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "kohlenrutsche",
+   "name": "Kohlenrutsche",
+   "from": "kellertreppe",
+   "to": "kohlenkeller",
+   "heading": "S",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1600,
+   "difficulty": 3,
+   "tempo": "Vertikal: Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "gurkengasse",
+   "name": "Gurkengasse",
+   "from": "kohlenkeller",
+   "to": "gurkenfass",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1800,
+   "difficulty": 3,
+   "tempo": "Gefecht→Halt(Gläser zerschießen)",
+   "notes": ""
+  },
+  {
+   "id": "gurkenglas",
+   "name": "Gurkenglas-Schacht",
+   "from": "einmachregal",
+   "to": "gurkenfass",
+   "heading": "S",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "stacheln"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1600,
+   "difficulty": 3,
+   "tempo": "Vertikal: Stacheln",
+   "notes": ""
+  },
+  {
+   "id": "regalgang",
+   "name": "Regalgang",
+   "from": "einmachregal",
+   "to": "vorratskammer",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2200,
+   "difficulty": 3,
+   "tempo": "Gefecht(Labyrinth)",
+   "notes": ""
+  },
+  {
+   "id": "kartoffeldruck",
+   "name": "Kartoffeldruck",
+   "from": "gurkenfass",
+   "to": "kartoffelkiste",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": "kartoffel",
+   "reward": "BOHRER",
+   "optionalBoss": false,
+   "length": 2400,
+   "difficulty": 3,
+   "tempo": "Gefecht→Boss",
+   "notes": ""
+  },
+  {
+   "id": "kartoffelschacht",
+   "name": "Kartoffelschacht",
+   "from": "kartoffelkiste",
+   "to": "vorratskammer",
+   "heading": "N",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1600,
+   "difficulty": 3,
+   "tempo": "Vertikal: Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "werkzeugwand",
+   "name": "Werkzeugwand",
+   "from": "vorratskammer",
+   "to": "werkbank",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "fels"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1800,
+   "difficulty": 3,
+   "tempo": "Gefecht→Felswand→Halt",
+   "notes": ""
+  },
+  {
+   "id": "zwergenstollen",
+   "name": "Zwergenstollen",
+   "from": "werkbank",
+   "to": "zwergenbau",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "dunkel"
+   ],
+   "midStations": [],
+   "boss": "gartenzwerg",
+   "reward": "SPARSTRUMPF",
+   "optionalBoss": true,
+   "length": 1800,
+   "difficulty": 4,
+   "tempo": "Dunkel→Boss",
+   "notes": ""
+  },
+  {
+   "id": "tresorgang",
+   "name": "Tresorgang",
+   "from": "kartoffelkiste",
+   "to": "tresor",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "kompassschloss"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1600,
+   "difficulty": 3,
+   "tempo": "Halt(Kompassschloss)→Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "kanalrohr",
+   "name": "Kanalrohr",
+   "from": "kartoffelkiste",
+   "to": "siphon",
+   "heading": "S",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "abgelassen"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1600,
+   "difficulty": 3,
+   "tempo": "Vertikal: Sog",
+   "notes": ""
+  },
+  {
+   "id": "gullygitter",
+   "name": "Gullygitter",
+   "from": "siphon",
+   "to": "gully",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "spalt"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1800,
+   "difficulty": 4,
+   "tempo": "Gefecht→Spalt",
+   "notes": ""
+  },
+  {
+   "id": "rueckstauklappe",
+   "name": "Rückstauklappe",
+   "from": "gully",
+   "to": "discotuer",
+   "heading": "S",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "rueckschalter"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1800,
+   "difficulty": 4,
+   "tempo": "Vertikal: Gefecht→Halt(Rückschalter)",
+   "notes": ""
+  },
+  {
+   "id": "pendelgang",
+   "name": "Pendelgang",
+   "from": "standuhr",
+   "to": "spiegelsaal",
+   "heading": "E",
+   "oneWay": true,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2400,
+   "difficulty": 4,
+   "tempo": "Gefecht(Pendel)",
+   "notes": ""
+  },
+  {
+   "id": "waescheleine",
+   "name": "Wäscheleine",
+   "from": "kellertreppe",
+   "to": "waeschekorb",
+   "heading": "SW",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1800,
+   "difficulty": 3,
+   "tempo": "Diagonal: Gefecht(Wäscheklammern)",
+   "notes": ""
+  },
+  {
+   "id": "bullauge",
+   "name": "Bullauge",
+   "from": "waeschekorb",
+   "to": "trommel",
+   "heading": "W",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "trommel_a"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1200,
+   "difficulty": 3,
+   "tempo": "Kurz",
+   "notes": ""
+  },
+  {
+   "id": "flusenschacht",
+   "name": "Flusenschacht",
+   "from": "trommel",
+   "to": "flusensieb",
+   "heading": "N",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "trommel_a",
+    "flusen"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1400,
+   "difficulty": 3,
+   "tempo": "Vertikal: Flusen",
+   "notes": ""
+  },
+  {
+   "id": "weichspuelerrinne",
+   "name": "Weichspülerrinne",
+   "from": "trommel",
+   "to": "weichspueler",
+   "heading": "W",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "trommel_a"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1400,
+   "difficulty": 3,
+   "tempo": "Zähzone",
+   "notes": ""
+  },
+  {
+   "id": "dampfstoss",
+   "name": "Dampfstoß",
+   "from": "trommel",
+   "to": "buegelbrett",
+   "heading": "NE",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "trommel_b"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1400,
+   "difficulty": 3,
+   "tempo": "Diagonal: Sog",
+   "notes": ""
+  },
+  {
+   "id": "buegelfalte",
+   "name": "Bügelfalte",
+   "from": "buegelbrett",
+   "to": "flusensieb",
+   "heading": "W",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1400,
+   "difficulty": 3,
+   "tempo": "Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "waschmittelgang",
+   "name": "Waschmittelgang",
+   "from": "buegelbrett",
+   "to": "kellertreppe",
+   "heading": "E",
+   "oneWay": true,
+   "opensAfterPass": true,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1400,
+   "difficulty": 3,
+   "tempo": "Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "schleudergang",
+   "name": "Schleudergang",
+   "from": "trommel",
+   "to": "schleuderkammer",
+   "heading": "SE",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "trommel_b"
+   ],
+   "midStations": [],
+   "boss": "wilma",
+   "reward": "KREISELKOMPASS",
+   "optionalBoss": false,
+   "length": 2200,
+   "difficulty": 4,
+   "tempo": "Diagonal: Gefecht→Boss",
+   "notes": ""
+  },
+  {
+   "id": "sockenschleuder",
+   "name": "Sockenschleuder",
+   "from": "trommel",
+   "to": "sockenberg",
+   "heading": "SW",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "trommel_b"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1400,
+   "difficulty": 3,
+   "tempo": "Diagonal: Sog",
+   "notes": ""
+  },
+  {
+   "id": "klammerflug",
+   "name": "Klammerflug",
+   "from": "trommel",
+   "to": "klammernest",
+   "heading": "NW",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "trommel_b"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1400,
+   "difficulty": 3,
+   "tempo": "Diagonal: Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "laugenkanal",
+   "name": "Laugenkanal",
+   "from": "schleuderkammer",
+   "to": "siphon",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [
+    {
+     "at": 0.3,
+     "type": "klappe",
+     "branchTo": "standuhr",
+     "branchHeading": "S",
+     "branchId": "uhrenschacht",
+     "branchName": "Uhrenschacht",
+     "branchGates": [
+      "dunkel",
+      "zeitschranke"
+     ],
+     "branchBoss": null,
+     "branchReward": null,
+     "branchTempo": "Vertikal: Dunkel→Zeitschranke",
+     "point": {
+      "x": 10,
+      "y": 31
+     }
+    },
+    {
+     "at": 0.6,
+     "type": "klappe",
+     "branchTo": "gurkenfass",
+     "branchHeading": "N",
+     "branchId": "laugenleiter",
+     "branchName": "Laugenleiter",
+     "branchGates": [],
+     "branchBoss": null,
+     "branchReward": null,
+     "branchTempo": "Vertikal: kurz (Abkürzung)",
+     "point": {
+      "x": 13,
+      "y": 31
+     }
+    }
+   ],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 3000,
+   "difficulty": 4,
+   "tempo": "Gefecht→Halt(Klappe)→Gefecht→Halt(Klappe)",
+   "notes": ""
+  },
+  {
+   "id": "spiegelkabinett",
+   "name": "Spiegelkabinett",
+   "from": "discotuer",
+   "to": "spiegelsaal",
+   "heading": "W",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1800,
+   "difficulty": 4,
+   "tempo": "Spiegel: Gefecht",
+   "notes": "Spiegelwände werfen Schüsse zurück."
+  },
+  {
+   "id": "tanzflaechenrand",
+   "name": "Tanzflächenrand",
+   "from": "discotuer",
+   "to": "tanzflaeche",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2000,
+   "difficulty": 4,
+   "tempo": "Gefecht im Takt",
+   "notes": ""
+  },
+  {
+   "id": "plattenteller",
+   "name": "Plattenteller",
+   "from": "tanzflaeche",
+   "to": "djpult",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": "diva",
+   "reward": "WIRBELWIND",
+   "optionalBoss": false,
+   "length": 2400,
+   "difficulty": 5,
+   "tempo": "Gefecht→Boss",
+   "notes": ""
+  },
+  {
+   "id": "konfettiregen",
+   "name": "Konfettiregen",
+   "from": "tanzflaeche",
+   "to": "konfetti",
+   "heading": "S",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "dunkel"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1600,
+   "difficulty": 4,
+   "tempo": "Vertikal: Dunkel",
+   "notes": ""
+  },
+  {
+   "id": "lavastrom",
+   "name": "Lavastrom",
+   "from": "djpult",
+   "to": "lavalampe",
+   "heading": "S",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "stacheln"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1600,
+   "difficulty": 4,
+   "tempo": "Vertikal: Stacheln",
+   "notes": ""
+  },
+  {
+   "id": "lavafluss",
+   "name": "Lavafluss",
+   "from": "konfetti",
+   "to": "lavalampe",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": "forward",
+   "gates": [
+    "gegenstrom"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1800,
+   "difficulty": 4,
+   "tempo": "Sog Ost",
+   "notes": ""
+  },
+  {
+   "id": "hemmungsgang",
+   "name": "Hemmungsgang",
+   "from": "zifferblatt",
+   "to": "hemmung",
+   "heading": "W",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "zeitschranke"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2200,
+   "difficulty": 5,
+   "tempo": "Gefecht→Zeitschranke",
+   "notes": ""
+  },
+  {
+   "id": "federspirale",
+   "name": "Federspirale",
+   "from": "zifferblatt",
+   "to": "federhaus",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "spalt"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2200,
+   "difficulty": 5,
+   "tempo": "Gefecht→Spalt",
+   "notes": ""
+  },
+  {
+   "id": "unruhschacht",
+   "name": "Unruhschacht",
+   "from": "hemmung",
+   "to": "unruh",
+   "heading": "N",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "rueckschalter"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2200,
+   "difficulty": 5,
+   "tempo": "Vertikal: Pendel→Halt(Rückschalter)",
+   "notes": ""
+  },
+  {
+   "id": "glockenseil_west",
+   "name": "Glockenseil West",
+   "from": "unruh",
+   "to": "glockenstuhl",
+   "heading": "E",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2000,
+   "difficulty": 5,
+   "tempo": "Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "ankerradzaehne",
+   "name": "Ankerradzähne",
+   "from": "federhaus",
+   "to": "ankerrad",
+   "heading": "N",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [
+    "fels"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2200,
+   "difficulty": 5,
+   "tempo": "Vertikal: Zahnräder→Felswand",
+   "notes": ""
+  },
+  {
+   "id": "glockenseil_ost",
+   "name": "Glockenseil Ost",
+   "from": "ankerrad",
+   "to": "glockenstuhl",
+   "heading": "W",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": "backward",
+   "gates": [
+    "gegenstrom"
+   ],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 2000,
+   "difficulty": 5,
+   "tempo": "Gefecht→Gegenwind",
+   "notes": ""
+  },
+  {
+   "id": "kuckucksast",
+   "name": "Kuckucksast",
+   "from": "federhaus",
+   "to": "kuckucksnest",
+   "heading": "NE",
+   "oneWay": false,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": null,
+   "reward": null,
+   "optionalBoss": false,
+   "length": 1600,
+   "difficulty": 5,
+   "tempo": "Diagonal: Gefecht",
+   "notes": ""
+  },
+  {
+   "id": "grosses_uhrwerk",
+   "name": "Das große Uhrwerk",
+   "from": "glockenstuhl",
+   "to": "uhrturm",
+   "heading": "N",
+   "oneWay": true,
+   "opensAfterPass": false,
+   "current": null,
+   "gates": [],
+   "midStations": [],
+   "boss": "wecker",
+   "reward": "GOAL",
+   "optionalBoss": false,
+   "length": 2600,
+   "difficulty": 5,
+   "tempo": "Vertikal: Gefecht→Boss",
+   "notes": ""
+  }
+ ],
+ "turnRules": "Richtungen: 8er-Raster E, SE, S, SW, W, NW, N, NE (Index 0-7 im Uhrzeigersinn). Klasse \"Kreuz\" = E/S/W/N, Klasse \"Andreaskreuz\" = Diagonalen. Paritätsregel: 90° und 180° bleiben in der Klasse; nur 45°-Drehungen (Schrägring, Wasserwaage) wechseln die Klasse. Arena: Ausgang offen nur in Blickrichtung. Drehen an Stationen: ring90 ±90, ring45 ±45, wender180 +180, ratsche +90 (nur cw), kompass = jede Richtung der eigenen Klasse (mit WASSERWAAGE alle 8), kreisel = 180° immer (mechanisch), ±90 mit DREHWURM, ±45 mit WASSERWAAGE (beliebig oft, kombinierbar). Freie Drehungen (ohne Station) kosten Drehzahl: 1 Segment je 45°. Start 4 Segmente (= eine Wende), +1 je Brummkreisel (max 8). Nachladen: 1 Segment je 120 Einheiten Etappenstrecke bzw. 80 px Arenaflug; mit WIRBELWIND halbe Strecke. Kreisel, Ringe und Kompassrosen kosten nichts und füllen voll auf. WENDEHALS: 180° überall (Arena und Etappe). In der Etappe: Etappe wird rückwärts geflogen (bestehende reverse()-Logik). KREISELKOMPASS: Kreisel-Funktion (DREHWURM/WASSERWAAGE) in jeder Arena ohne Station. In Etappen keine Wirkung. WIRBELWIND: zusätzlich an Seitenklappen (midStation type klappe) mitten in Etappen. Ohne Abzweig dreht man mitten in der Etappe nicht seitlich (nur 180° per Wendehals). Station mitten in der Etappe (midStation): Kamera hält (Halt-Zone, Weichenraum). Weiterfliegen und Umkehren (Kehrschleife, 180°, kostenlos) gehen immer. Abbiegen in branchHeading, wenn die Drehung von der aktuellen Richtung dorthin nach Stationstyp und Fähigkeiten möglich ist. Ankunft an einer midStation aus dem Abzweig: dieselben Regeln. Ankunft in Arena: Blickrichtung = Flugrichtung der Etappe. Abbruch/Rückzug: zurück zum letzten Entscheidungspunkt mit umgekehrter Blickrichtung. Weltregel Uhrwerk-Himmel: freie Drehungen nur im Uhrzeigersinn (Sperrklinke); graphisch neutral, kostet nur Drehzahl. Invariante: zwischen zwei Entscheidungspunkten liegen mindestens 480 Einheiten Strecke; dadurch ist die Drehzahl an jedem Entscheidungspunkt voll und der Löser darf sie ignorieren.",
+ "intendedOrder": [
+  "ROLLLEINE",
+  "ESPRESSO",
+  "DREHWURM",
+  "FOEHN",
+  "BOHRER",
+  "WASSERWAAGE",
+  "WENDEHALS",
+  "PILZ",
+  "KREISELKOMPASS",
+  "STOEPSEL",
+  "WIRBELWIND",
+  "MINUTENZEIGER",
+  "STUNDENZEIGER",
+  "SEKUNDENZEIGER"
+ ],
+ "sequenceBreaks": [
+  {
+   "id": "SB1",
+   "name": "Spiegeltür-Trick",
+   "desc": "Am Spiegelschrank wirkt das schwingende Türscharnier mit genauem Timing wie ein Schrägring (weiche Station). Über die Dachrinne (rückwärts frei) erreicht man das Kinderzimmer von oben, besiegt den Brummkreisel-Baron und holt den Wendehals vor Keller und Wasserwaage. Gag: Der Baron kämpft im Schlafanzug mit halber Energie (\"Ich hab mich noch nicht warmgekreiselt!\").",
+   "skips": "Wasserwaage vor Wendehals; Kinderzimmer vor Keller",
+   "requires": "Können (softStation spiegelschrank) und Espresso für den Weg ins Bad; geht sogar vor dem Drehwurm, weil Kreisel ohne Fähigkeit 180° drehen"
+  },
+  {
+   "id": "SB2",
+   "name": "Kartoffelpüree",
+   "desc": "Wer Kaiser Kartoffel schon mit Wendehals bekämpft (nur nach SB1), wendet im Kampf und trifft seine weiche Rückseite: ein Treffer, Püree. Belohnung: Goldener Kartoffelstampfer (Trophäe) und der Kampf dauert 10 s statt 2 min.",
+   "skips": "Bosskampf Kaiser Kartoffel",
+   "requires": "SB1 (WENDEHALS vor BOHRER)"
+  },
+  {
+   "id": "SB3",
+   "name": "Eiszapfen-Abstieg",
+   "desc": "Mit Föhn und Drehwurm durch die Kühlschranktür, dann die Eiszapfenleiter abwärts (weiches Stachelfeld) zum Gemüsefach, gegen den Kaltluftfall hoch zur Eiswürfelschale und zu Pingo. Schrumpfpilz noch vor dem Keller. Gag: Pingo trägt noch Badehose (\"Es ist doch noch gar nicht Winter!\") und ruft Verstärkung aus dem Eisfach.",
+   "skips": "Wasserwaage als Schlüssel zum Kühlschrank; Schrumpfpilz rund 90 min früher",
+   "requires": "FOEHN, DREHWURM, Können (eiszapfen weich)"
+  }
+ ],
+ "fieldNotes": {
+  "edge.heading": "Richtung from->to; rückwärts = Gegenrichtung (außer oneWay).",
+  "edge.current": "Strömungsrichtung relativ zu from->to; gegenstrom gilt gegen sie.",
+  "edge.opensAfterPass": "Einbahn (Rückschlagklappe), die nach dem ersten Vorwärtsflug dauerhaft in beide Richtungen offen ist.",
+  "midStations.branchGates/branchBoss/branchReward": "Hindernisse/Boss der Abzweig-Etappe (Richtung Station -> branchTo).",
+  "node.softStation": "Station, die nur mit Können wirkt (für Löser mit skill=true).",
+  "node.toggles": "Hebel, der einen Weltzustand umschaltet (braucht ROLLLEINE).",
+  "node.ret": "Rückholstation an Sackgassen.",
+  "gateType.solvedBy": "UND-Verknüpfung: alle genannten Fähigkeiten nötig.",
+  "gateType.appliesTo": "both | forward | backward | against-current",
+  "y": "Kartenraster: x nach Osten, y nach Süden. Diagonalen = gleiche |dx| und |dy|."
+ }
+});
