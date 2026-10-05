@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { E, S, W, N, opposite, turnCW, turnCCW, CARDINALS } from '../src/core/math.js';
-import { FensterScene, ARMS, doorOpen, SWING_TIME, BONE_POS } from '../src/proto/fenster.js';
+import { FensterScene, ARMS, doorOpen, SWING_TIME, BONE_POS, CAM_END, BONE_AT } from '../src/proto/fenster.js';
 import { Rng } from '../src/core/rng.js';
 
 const DT = 1 / 60;
@@ -78,8 +78,9 @@ test('Fenster: Dackel erreicht Knochen, Ziel wechselt und ist nie der alte Arm',
   assert.notEqual(t0, 3, 'erstes Ziel nicht Gelb');
   const b = BONE_POS(t0);
   // Dackel direkt auf den Knochen setzen (Kartenkoordinaten -> Bildschirm über Kamera/theta)
-  sc.cam = { x: b.x, y: b.y };
-  sc.dog = { x: 240, y: 135 };
+  // Das Fenster scrollt höchstens bis CAM_END (30 vor dem Knochen); theta = Osten: Bildschirm-x = Karte-x, -y = Karte-y
+  sc.cam = { x: (b.x * CAM_END) / BONE_AT, y: (b.y * CAM_END) / BONE_AT };
+  sc.dog = { x: 240 + (b.x - sc.cam.x), y: 135 + (b.y - sc.cam.y) };
   sc.update(DT, {});
   assert.equal(sc.score, 1);
   assert.notEqual(sc.target, t0);

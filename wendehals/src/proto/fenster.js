@@ -52,7 +52,7 @@ export class FensterScene {
     this.dir = 1; // weiche Scrollrichtung: +1 = R, -1 = L (Dackel-Spiegelung)
     this.cam = { x: -CAM_END, y: 0 };
     this.dog = { x: 120, y: SCREEN_H / 2 }; // Bildschirmkoordinaten
-    this.swing = null; // { t, a0, a1, c0, c1 }
+    this.swing = null; // { t, a0, a1, pivot }
     this.score = 0;
     this.target = 0;
     this.hint = 8; // Sekunden Starthinweis
@@ -138,19 +138,12 @@ export class FensterScene {
     if (this.swing) return false;
     const a0 = this.ang;
     this.theta = k > 0 ? turnCW(this.theta) : turnCCW(this.theta);
-    // Kreuzungsmitte im Bild (vor der Drehung)? Dann gleitet das Fenster auf die Mitte.
-    const old = k > 0 ? turnCCW(this.theta) : turnCW(this.theta);
-    const r = vec(old);
-    const d = vec(turnCW(old));
-    const ox = -this.cam.x * r[0] - this.cam.y * r[1];
-    const oy = -this.cam.x * d[0] - this.cam.y * d[1];
-    const center = Math.abs(ox) < SCREEN_W / 2 && Math.abs(oy) < SCREEN_H / 2;
+    // Das Fenster dreht sich um den Dackel: seine Kartenposition und Bildschirmstelle bleiben fest.
     this.swing = {
       t: 0,
       a0,
       a1: a0 + (k > 0 ? Math.PI / 2 : -Math.PI / 2),
-      c0: { ...this.cam },
-      c1: center ? { x: 0, y: 0 } : { ...this.cam },
+      pivot: this.toMap(this.dog.x, this.dog.y, this.cam, k > 0 ? turnCCW(this.theta) : turnCW(this.theta)),
     };
     return true;
   }
@@ -170,8 +163,12 @@ export class FensterScene {
       sw.t = Math.min(SWING_TIME, sw.t + dt);
       const k = smooth(sw.t / SWING_TIME);
       this.ang = sw.a0 + (sw.a1 - sw.a0) * k;
-      this.cam.x = sw.c0.x + (sw.c1.x - sw.c0.x) * k;
-      this.cam.y = sw.c0.y + (sw.c1.y - sw.c0.y) * k;
+      const ox = this.dog.x - SCREEN_W / 2;
+      const oy = this.dog.y - SCREEN_H / 2;
+      const c = Math.cos(this.ang);
+      const sn = Math.sin(this.ang);
+      this.cam.x = sw.pivot.x - (ox * c - oy * sn);
+      this.cam.y = sw.pivot.y - (ox * sn + oy * c);
       if (sw.t >= SWING_TIME) {
         this.ang = sw.a1;
         this.swing = null;
@@ -197,17 +194,17 @@ export class FensterScene {
     }
   }
 
-  /** Fenster scrollt entlang der Kreuz-Skelettlinie und hält an, wo es nicht weiter kann. */
+  /** Fenster scrollt in Blickrichtung (überall gleich, auch im Gang) und hält an, wenn der Dackel
+   *  sonst in eine Wand/geschlossene Tür geriete oder das Ende der Karte erreicht ist. */
   moveCam(dt) {
     const r = vec(this.theta);
     const step = SPEED * this.dir * dt;
-    const nx = this.cam.x + r[0] * step;
-    const ny = this.cam.y + r[1] * step;
-    // Das Fenster bleibt auf der Mittellinie des Gangs: quer dazu geht es nicht (Wand).
-    const onAxisX = r[0] !== 0; // Bewegung waagerecht -> y muss 0 sein
-    if (onAxisX ? Math.abs(this.cam.y) > 1e-6 : Math.abs(this.cam.x) > 1e-6) return;
-    this.cam.x = onAxisX ? clamp(nx, -CAM_END, CAM_END) : this.cam.x;
-    this.cam.y = onAxisX ? this.cam.y : clamp(ny, -CAM_END, CAM_END);
+    const nx = clamp(this.cam.x + r[0] * step, -CAM_END, CAM_END);
+    const ny = clamp(this.cam.y + r[1] * step, -CAM_END, CAM_END);
+    const m = this.toMap(this.dog.x, this.dog.y, { x: nx, y: ny });
+    if (!this.walkable(m.x, m.y)) return;
+    this.cam.x = nx;
+    this.cam.y = ny;
   }
 
   moveDog(dt, input) {
