@@ -4,7 +4,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  E, S, W, N, CARDINALS, DIR_VEC, DIR_NAMES, turnCW, turnCCW, opposite, isHorizontal, isVertical, isDiagonal,
+  E, SE, S, SW, W, NW, N, NE, HEADINGS, HEADING_CODES, DIR_SHORT, turnBy, rotationSteps, localToScreen, CARDINALS, DIR_VEC, DIR_NAMES, turnCW, turnCCW, opposite, isHorizontal, isVertical, isDiagonal,
   quarterTurns, headingAngle, viewDims, crossPeriod, localToScreenVec, screenToLocalVec,
 } from '../src/core/math.js';
 
@@ -56,6 +56,40 @@ test('Richtungen: Sichtfeld und Querachse nur für Etappen-Richtungen', () => {
   for (const h of [S, N]) assert.deepEqual([viewDims(h).zoom, crossPeriod(h)], [270 / 480, 960]);
   assert.throws(() => viewDims(-1));
   assert.throws(() => crossPeriod(-1));
+});
+
+test('8 Richtungen: 45°-Raster, Kürzel wie welt.json, Paritätsregel', () => {
+  assert.deepEqual(HEADINGS, [E, SE, S, SW, W, NW, N, NE]);
+  assert.deepEqual(HEADING_CODES, ['E', 'SE', 'S', 'SW', 'W', 'NW', 'N', 'NE']);
+  assert.equal(new Set(HEADINGS).size, 8);
+  assert.equal(DIR_NAMES.length, 8);
+  assert.equal(DIR_SHORT.length, 8);
+  HEADINGS.forEach((h, i) => {
+    assert.equal(turnBy(h, 1), HEADINGS[(i + 1) % 8], '+1 = 45° rechts');
+    assert.equal(turnBy(h, -1), HEADINGS[(i + 7) % 8]);
+    assert.equal(turnBy(h, 8), h);
+    assert.ok(close(headingAngle(h), (i * Math.PI) / 4), 'Bildwinkel h · 45°');
+    // Rasterschritt zeigt in die Bildrichtung (y nach unten)
+    const [dx, dy] = DIR_VEC[h];
+    const ang = headingAngle(h);
+    assert.ok(close(dx / Math.hypot(dx, dy), Math.cos(ang)) && close(dy / Math.hypot(dx, dy), Math.sin(ang)), HEADING_CODES[i]);
+    // Paritätsregel: 90° und 180° bleiben in der Klasse, 45° wechselt sie
+    assert.equal(isDiagonal(h), i % 2 === 1);
+    assert.equal(isDiagonal(turnCW(h)), isDiagonal(h));
+    assert.equal(isDiagonal(opposite(h)), isDiagonal(h));
+    assert.notEqual(isDiagonal(turnBy(h, 1)), isDiagonal(h));
+    for (let k = 0; k < 8; k++) assert.equal(rotationSteps(h, turnBy(h, k)), k);
+  });
+});
+
+test('Diagonalen sind bis Phase 2 keine Etappen-Richtung (laut statt still falsch)', () => {
+  for (const h of [SE, SW, NW, NE]) {
+    assert.throws(() => viewDims(h));
+    assert.throws(() => crossPeriod(h));
+    assert.throws(() => localToScreen(h, 1, 0));
+    assert.throws(() => localToScreenVec(h, 1, 0));
+    assert.throws(() => screenToLocalVec(h, 1, 0));
+  }
 });
 
 // ------------------------------------------------------------ Wächter

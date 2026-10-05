@@ -8,7 +8,10 @@ import { CARDINALS } from '../core/math.js';
 
 export const SAVE_KEY = 'wendehals.save.v1';
 export const SETTINGS_KEY = 'wendehals.settings.v1';
-export const SAVE_VERSION = 1;
+// Version 2 (v0.3): Richtungen im 8er-Raster (O=0, S=2, W=4, N=6). Version 1 bzw. ohne Angabe
+// (bis v0.2): O=0, S=1, W=2, N=3 – wird beim Laden umgerechnet, der Schlüssel bleibt gleich.
+export const SAVE_VERSION = 2;
+const V1_HEADINGS = CARDINALS; // Index = alte Zahl
 
 export function newProgress() {
   return {
@@ -36,7 +39,9 @@ export function sanitizeProgress(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const p = newProgress();
   if (has(NODES, raw.saveNode) && NODES[raw.saveNode].save) p.saveNode = raw.saveNode;
-  if (isDir(raw.saveHeading)) p.saveHeading = raw.saveHeading;
+  const v1 = !(Number.isInteger(raw.version) && raw.version >= 2);
+  const heading = v1 ? (Number.isInteger(raw.saveHeading) ? V1_HEADINGS[raw.saveHeading] : undefined) : raw.saveHeading;
+  if (isDir(heading)) p.saveHeading = heading;
   if (Array.isArray(raw.items)) p.items = [...new Set(raw.items.filter((i) => has(ITEMS, i)))];
   if (Array.isArray(raw.visited)) {
     p.visited = [...new Set([START_NODE, ...raw.visited.filter((n) => has(NODES, n))])];

@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game/game.js';
-import { MemoryStorage, SAVE_KEY, loadProgress, sanitizeProgress } from '../src/game/save.js';
+import { MemoryStorage, SAVE_KEY, SAVE_VERSION, loadProgress, storeProgress, sanitizeProgress } from '../src/game/save.js';
 import { NODES } from '../src/data/world.js';
 import { ITEMS } from '../src/data/items.js';
-import { E, N, S, W } from '../src/core/math.js';
+import { E, SE, N, S, W } from '../src/core/math.js';
+import { linksAt, directionAllowed } from '../src/game/worldgraph.js';
 import { successors, maskOf } from '../src/game/solver.js';
 import { press, closeDialogs, chooseMenu, planToGoal, plan, doStep, flyLevel, turnAndLaunch, turnTo, flyOut, useReturn } from './helpers/driver.mjs';
 import { SPOTS } from '../src/game/arena.js';
@@ -231,6 +232,42 @@ test('Spielstand: Speichern und Laden ergibt denselben Zustand', () => {
   assert.equal(g2.node, 'marmelade');
   assert.equal(g2.heading, W);
   assert.ok(g2.items.has('DREHWURM'));
+});
+
+test('Spielstand aus v0.2 (Version 1, Richtungen 0..3) wird beim Laden umgerechnet', () => {
+  // Robins Spielstand vom Steam Deck: Station Stöpsel, Blick nach Westen (alte Zahl 2)
+  for (const version of [1, undefined]) {
+    const storage = new MemoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({ version, saveNode: 'stoepsel', saveHeading: 2 /* richtung-ok: altes Format */, items: ['DREHWURM'], visited: ['toast', 'stoepsel'] }));
+    const g = new Game({ storage });
+    chooseMenu(g, 'Weiterspielen');
+    assert.equal(g.node, 'stoepsel');
+    assert.equal(g.heading, W, 'Version ' + version);
+  }
+  const old = (h) => sanitizeProgress({ version: 1, saveNode: 'stoepsel', saveHeading: h }).saveHeading;
+  assert.deepEqual([0, 1, 2, 3].map(old), [E, S, W, N]); // richtung-ok: altes Format
+  assert.equal(old(4), E, 'ungültig im alten Format');
+  // Neues Format bleibt, wie es ist; Diagonalen gibt es in der v0.2-Welt nicht
+  const cur = (h) => sanitizeProgress({ version: SAVE_VERSION, saveNode: 'stoepsel', saveHeading: h }).saveHeading;
+  assert.deepEqual([E, S, W, N].map(cur), [E, S, W, N]);
+  assert.equal(cur(SE), E);
+  // Gespeichert wird im neuen Format, und es lädt unverändert
+  const storage = new MemoryStorage();
+  const p = sanitizeProgress({ version: 1, saveNode: 'stoepsel', saveHeading: 3 /* richtung-ok: altes Format */ });
+  storeProgress(storage, p);
+  assert.equal(JSON.parse(storage.getItem(SAVE_KEY)).version, SAVE_VERSION);
+  assert.equal(loadProgress(storage).saveHeading, N);
+});
+
+test('Abspann → Weiterspielen: am Pendel mit Blick nach Norden, der Ausgang ist offen', () => {
+  const { game, storage } = newGame();
+  game.startEnding();
+  for (let k = 0; k < 2000 && game.screen === 'ending'; k++) press(game, { confirm: k % 30 === 0 });
+  const g2 = new Game({ storage });
+  chooseMenu(g2, 'Weiterspielen');
+  assert.equal(g2.node, 'pendel');
+  assert.equal(g2.heading, N);
+  assert.ok(linksAt('pendel', g2.heading).some(directionAllowed), 'kein Ausgang in Blickrichtung');
 });
 
 test('kaputte Spielstände stürzen nicht ab', () => {

@@ -47,7 +47,8 @@ export function stable(v, seen = new WeakSet()) {
   const keys = Object.keys(v).sort();
   return '{' + keys.map((k) => k + ':' + (HEADING_KEYS.has(k) && typeof v[k] === 'number' ? L(v[k]) : stable(v[k], seen))).join(',') + '}';
 }
-const HEADING_KEYS = new Set(['heading', 'dir', 'side', 'autoTurn', 'saveHeading', 'entry']);
+// Nicht 'dir': das ist bei Kolben ±1 (wächst aus Decke/Boden), keine Blickrichtung.
+const HEADING_KEYS = new Set(['heading', 'side', 'autoTurn', 'saveHeading', 'entry']);
 
 const hash = (s) => createHash('sha256').update(s).digest('hex').slice(0, 20);
 

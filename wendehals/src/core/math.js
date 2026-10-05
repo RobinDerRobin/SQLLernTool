@@ -1,36 +1,53 @@
 // Grundlegende Mathe- und Richtungshilfen.
-// Richtungen sind im Uhrzeigersinn nummeriert, damit "+1" eine Rechtsdrehung ist.
+// Acht Blickrichtungen im 45°-Raster, im Uhrzeigersinn nummeriert, damit "+1" eine Rechtsdrehung
+// um 45° ist. Gerade Zahlen = Kreuz (O, S, W, N), ungerade = Diagonalen. 90° und 180° bleiben in
+// der Klasse, nur 45° wechselt sie (Paritätsregel, docs/WELT-DESIGN.md 2.1).
+// Außerhalb dieser Datei rechnet niemand mit Richtungszahlen (Prüfung: tests/directions.tests.mjs).
 
 export const E = 0;
-export const S = 1;
-export const W = 2;
-export const N = 3;
+export const SE = 1;
+export const S = 2;
+export const SW = 3;
+export const W = 4;
+export const NW = 5;
+export const N = 6;
+export const NE = 7;
 
-export const DIR_NAMES = ['Osten', 'Süden', 'Westen', 'Norden'];
-export const DIR_SHORT = ['O', 'S', 'W', 'N'];
+/** Alle 8 Blickrichtungen und ihre Kürzel wie in docs/welt.json ("headings"). */
+export const HEADINGS = [E, SE, S, SW, W, NW, N, NE];
+export const HEADING_CODES = ['E', 'SE', 'S', 'SW', 'W', 'NW', 'N', 'NE'];
+export const DIR_NAMES = ['Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten', 'Norden', 'Nordosten'];
+export const DIR_SHORT = ['O', 'SO', 'S', 'SW', 'W', 'NW', 'N', 'NO'];
+/** Rasterschritt je Richtung (Diagonalen nicht normiert: ein Feld schräg). */
 export const DIR_VEC = [
   [1, 0],
+  [1, 1],
   [0, 1],
+  [-1, 1],
   [-1, 0],
+  [-1, -1],
   [0, -1],
+  [1, -1],
 ];
 
 /** Die vier Haupt-Blickrichtungen (Kreuz), in Uhrzeigerfolge. */
 export const CARDINALS = [E, S, W, N];
 
-export const turnCW = (d) => (d + 1) & 3; // 90° rechts
-export const turnCCW = (d) => (d + 3) & 3; // 90° links
-export const opposite = (d) => (d + 2) & 3; // 180°
+/** Um k Achtel (45°-Schritte) im Uhrzeigersinn drehen; negative k drehen links herum. */
+export const turnBy = (h, k) => (((h + k) % 8) + 8) % 8;
+export const turnCW = (d) => turnBy(d, 2); // 90° rechts
+export const turnCCW = (d) => turnBy(d, -2); // 90° links
+export const opposite = (d) => turnBy(d, 4); // 180°
+/** Wie viele 45°-Schritte im Uhrzeigersinn von a nach b (0..7). */
+export const rotationSteps = (a, b) => turnBy(b, -a);
 
-// Bedeutung statt Zahlen-Arithmetik: Außerhalb dieser Datei rechnet niemand mit Richtungszahlen
-// (Prüfung: tests/directions.tests.mjs).
 export const isHorizontal = (h) => h === E || h === W;
 export const isVertical = (h) => h === S || h === N;
-export const isDiagonal = (h) => false;
-/** Blickrichtung als Anzahl Vierteldrehungen im Uhrzeigersinn ab Osten (O=0, S=1, W=2, N=3). */
-export const quarterTurns = (h) => h;
+export const isDiagonal = (h) => h === SE || h === SW || h === NW || h === NE;
+/** Blickrichtung als Anzahl Vierteldrehungen im Uhrzeigersinn ab Osten (O=0, S=1, W=2, N=3; Diagonalen x,5). */
+export const quarterTurns = (h) => h / 2;
 
-/** Richtung von Punkt a nach Punkt b, wenn beide auf einer Achse liegen, sonst -1. */
+/** Kreuz-Richtung von Punkt a nach Punkt b, wenn beide auf einer Achse liegen, sonst -1 (v0.2-Welt). */
 export function dirBetween(ax, ay, bx, by) {
   if (ay === by && bx > ax) return E;
   if (ay === by && bx < ax) return W;
@@ -89,7 +106,7 @@ export function crossPeriod(heading, wrap = true) {
 
 /** Drehwinkel der Welt auf dem Bildschirm für eine Flugrichtung. */
 export function headingAngle(heading) {
-  return (quarterTurns(heading) * Math.PI) / 2;
+  return (heading * Math.PI) / 4;
 }
 
 /** Lokale Sichtfeld-Koordinate (a, c) -> Bildschirmkoordinate. */
