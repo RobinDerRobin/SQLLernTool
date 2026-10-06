@@ -129,7 +129,7 @@ test('Fenster: Scroll-Behälter – Drehen im Gang und zurück verschiebt das Bi
 
 test('Fenster: abgerundete Innenecken – Ecke begehbar, Wand dahinter nicht', () => {
   const sc = new FensterScene();
-  assert.ok(sc.walkable(HALF + 2, HALF + 2, 0) === false, 'Spitze der Wandecke ist Wand');
+  assert.ok(!sc.walkable(HALF + RC + 5, HALF + RC + 5, 0), 'Wandblock ist Wand');
   assert.ok(sc.walkable(HALF - 20, HALF - 20), 'Kreuzungsrand begehbar');
   sc.theta = S; // Nord-Süd-Türen offen
   assert.ok(sc.walkable(HALF + 30, HALF + 3, 0), 'Rundung der Ecke ist begehbarer Boden');
