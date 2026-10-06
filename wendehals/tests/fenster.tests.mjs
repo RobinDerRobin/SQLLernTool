@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { E, S, W, N, opposite, turnCW, turnCCW, CARDINALS } from '../src/core/math.js';
-import { FensterScene, ARMS, doorOpen, SWING_TIME, BONE_POS, CAM_END, BONE_AT, clampCam } from '../src/proto/fenster.js';
+import { E, S, W, N, opposite, turnCW, turnCCW, CARDINALS, DIR_VEC } from '../src/core/math.js';
+import { FensterScene, ARMS, doorOpen, SWING_TIME, BONE_POS, CAM_END, BONE_AT, clampCam, HALF, RC, CAMW } from '../src/proto/fenster.js';
 import { Rng } from '../src/core/rng.js';
 
 const DT = 1 / 60;
@@ -124,5 +124,41 @@ test('Fenster: Scroll-Behälter – Drehen im Gang und zurück verschiebt das Bi
     const m = sc.dogMap();
     assert.ok(Math.hypot(m.x - prev.x, m.y - prev.y) < 5, 'kein Sprung');
     prev = m;
+  }
+});
+
+test('Fenster: abgerundete Innenecken – Ecke begehbar, Wand dahinter nicht', () => {
+  const sc = new FensterScene();
+  assert.ok(sc.walkable(HALF + 2, HALF + 2, 0) === false, 'Spitze der Wandecke ist Wand');
+  assert.ok(sc.walkable(HALF - 20, HALF - 20), 'Kreuzungsrand begehbar');
+  sc.theta = S; // Nord-Süd-Türen offen
+  assert.ok(sc.walkable(HALF + 30, HALF + 3, 0), 'Rundung der Ecke ist begehbarer Boden');
+  assert.ok(!sc.walkable(HALF + RC + 20, HALF + 20), 'Wand dahinter bleibt Wand');
+});
+
+test('Fenster: nach 90°-Drehung nahe der Kreuzungsecke bleibt das Fenster nicht stecken', () => {
+  for (const [cx, cy] of [[-20, -60], [-20, 0], [20, 60]]) {
+    for (const dx of [-60, 0, 60]) {
+      for (const dy of [-80, -40, 40, 80]) {
+        for (const rot of ['rotLeft', 'rotRight']) {
+          const sc = new FensterScene();
+          sc.hint = 0;
+          sc.cam = { x: cx, y: cy };
+          sc.dog = { x: 240 + dx, y: 135 + dy };
+          const m = sc.dogMap();
+          if (!sc.walkable(m.x, m.y)) continue;
+          sc.update(DT, { [rot]: true });
+          for (let i = 0; i < 100; i++) sc.update(DT, {});
+          const c0 = { ...sc.cam };
+          for (let i = 0; i < 120; i++) sc.update(DT, {});
+          const v = DIR_VEC[sc.theta];
+          const across = Math.abs(sc.cam.x * v[1]) + Math.abs(sc.cam.y * v[0]);
+          const pos = (sc.cam.x * v[0] + sc.cam.y * v[1]) * (sc.s === 'R' ? 1 : -1);
+          if (across <= CAMW + 1 && pos < CAM_END - 2) {
+            assert.ok(Math.hypot(sc.cam.x - c0.x, sc.cam.y - c0.y) >= 1, `steckt: cam ${cx},${cy} dog ${dx},${dy} ${rot}`);
+          }
+        }
+      }
+    }
   }
 });

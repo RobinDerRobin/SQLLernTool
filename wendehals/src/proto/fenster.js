@@ -17,6 +17,7 @@ export const SPEED = 90; // Scrollgeschwindigkeit (Einheiten/s)
 export const ARM = 720; // Länge eines Arms (ab Kreuzungsrand)
 export const WIDTH = 200; // Gangbreite
 export const HALF = WIDTH / 2;
+export const RC = 50; // Radius der abgerundeten Innenecken der Kreuzung
 export const END = HALF + ARM; // Ende der Arme (Mittelpunkt der Kreuzung = 0,0)
 export const CAM_END = END - 60; // so weit scrollt das Fenster höchstens
 export const BONE_AT = END - 30;
@@ -93,11 +94,14 @@ export class FensterScene {
     return { x: cam.x + ox * r[0] + oy * d[0], y: cam.y + ox * r[1] + oy * d[1] };
   }
 
-  /** Kreuz aus zwei Balken minus geschlossene Türen; Kreis mit Radius r. */
+  /** Kreuz aus zwei Balken mit abgerundeten Innenecken (Radius RC) minus geschlossene Türen; Kreis mit Radius r. */
   walkable(x, y, r = DOG_R) {
-    const inH = Math.abs(x) <= END - r && Math.abs(y) <= HALF - r;
-    const inV = Math.abs(y) <= END - r && Math.abs(x) <= HALF - r;
-    if (!inH && !inV) return false;
+    const ax = Math.abs(x);
+    const ay = Math.abs(y);
+    if (ax > END - r || ay > END - r) return false;
+    // Abstand zum Wandblock mit abgerundeter Ecke = Abstand zum Kasten ab (HALF+RC) abzüglich RC
+    const wall = Math.hypot(Math.max(0, HALF + RC - ax), Math.max(0, HALF + RC - ay)) - RC;
+    if (wall < r) return false;
     const h = this.h;
     for (const arm of ARMS) {
       if (doorOpen(arm.dir, h)) continue;
@@ -216,11 +220,24 @@ export class FensterScene {
     const n = { x: this.cam.x + r[0] * step, y: this.cam.y + r[1] * step };
     // Nicht weiter aus dem Scroll-Behälter hinaus als jetzt (kein Sprung: Rückkehr macht followCam weich).
     const out = (c) => Math.hypot(c.x - clampCam(c.x, c.y).x, c.y - clampCam(c.x, c.y).y);
-    if (out(n) > out(this.cam) + 1e-9) return;
+    if (out(n) > out(this.cam) + 0.05) return;
     const m = this.toMap(this.dog.x, this.dog.y, n);
-    if (!this.walkable(m.x, m.y)) return;
+    if (this.walkable(m.x, m.y)) {
+      this.cam.x = n.x;
+      this.cam.y = n.y;
+      return;
+    }
+    // Der Dackel würde in eine Wand getragen: das Fenster scrollt trotzdem weiter, der Dackel bleibt an
+    // seiner Kartenstelle und rutscht im Bild zurück. Erst am Bildrand hält das Fenster an.
+    const p = this.dogMap();
+    const d = vec(turnCW(this.theta));
+    const sx = SCREEN_W / 2 + (p.x - n.x) * r[0] + (p.y - n.y) * r[1];
+    const sy = SCREEN_H / 2 + (p.x - n.x) * d[0] + (p.y - n.y) * d[1];
+    if (sx < DOG_MARGIN || sx > SCREEN_W - DOG_MARGIN || sy < DOG_MARGIN || sy > SCREEN_H - DOG_MARGIN) return;
     this.cam.x = n.x;
     this.cam.y = n.y;
+    this.dog.x = sx;
+    this.dog.y = sy;
   }
 
   /** Kamera folgt dem Dackel quer zur Scrollrichtung (innerhalb des Scroll-Behälters) und kehrt in ihn zurück.
