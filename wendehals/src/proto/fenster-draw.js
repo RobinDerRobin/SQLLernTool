@@ -1,7 +1,7 @@
 // Zeichnen für P1 „Kreuzung“ (Wegwerf-Prototyp). Plan wird um -ang gedreht, HUD nie.
 import { SCREEN_W, SCREEN_H, DIR_VEC } from '../core/math.js';
 import { drawDackel } from '../render/sprites.js';
-import { ARMS, END, HALF, RC, DOOR_T, BONE_POS, doorOpen } from './fenster.js';
+import { ARMS, END, HALF, DOOR_T, BONE_POS, doorOpen } from './fenster.js';
 
 const FLOOR = '#6a5f55';
 const FLOOR2 = '#756a5f';
@@ -26,21 +26,6 @@ function drawBone(ctx, x, y, color, t) {
   ctx.restore();
 }
 
-/** Abgerundete Innenecken: Quadrat HALF..HALF+RC minus Kreis, an allen vier Ecken der Kreuzung. */
-function fillets(ctx) {
-  for (const [sx, sy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
-    ctx.save();
-    ctx.scale(sx, sy);
-    ctx.moveTo(HALF - 1, HALF - 1);
-    ctx.lineTo(HALF + RC, HALF - 1);
-    ctx.lineTo(HALF + RC, HALF);
-    ctx.arc(HALF + RC, HALF + RC, RC, -Math.PI / 2, -Math.PI, true);
-    ctx.lineTo(HALF - 1, HALF + RC);
-    ctx.closePath();
-    ctx.restore();
-  }
-}
-
 function drawPlan(ctx, sc, cam, ang) {
   ctx.save();
   ctx.translate(SCREEN_W / 2, SCREEN_H / 2);
@@ -52,9 +37,6 @@ function drawPlan(ctx, sc, cam, ang) {
   ctx.fillStyle = FLOOR;
   ctx.fillRect(-END, -HALF, 2 * END, 2 * HALF);
   ctx.fillRect(-HALF, -END, 2 * HALF, 2 * END);
-  ctx.beginPath();
-  fillets(ctx);
-  ctx.fill();
   // Gitter, damit Scrollen und Drehung sichtbar sind
   ctx.save();
   ctx.beginPath();

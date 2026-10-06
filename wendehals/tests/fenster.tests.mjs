@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { E, S, W, N, opposite, turnCW, turnCCW, CARDINALS, DIR_VEC } from '../src/core/math.js';
-import { FensterScene, ARMS, doorOpen, SWING_TIME, BONE_POS, CAM_END, BONE_AT, clampCam, HALF, RC, CAMW } from '../src/proto/fenster.js';
+import { FensterScene, ARMS, doorOpen, SWING_TIME, BONE_POS, CAM_END, BONE_AT, clampCam, CAMW } from '../src/proto/fenster.js';
 import { Rng } from '../src/core/rng.js';
 
 const DT = 1 / 60;
@@ -125,15 +125,6 @@ test('Fenster: Scroll-Behälter – Drehen im Gang und zurück verschiebt das Bi
     assert.ok(Math.hypot(m.x - prev.x, m.y - prev.y) < 5, 'kein Sprung');
     prev = m;
   }
-});
-
-test('Fenster: abgerundete Innenecken – Ecke begehbar, Wand dahinter nicht', () => {
-  const sc = new FensterScene();
-  assert.ok(!sc.walkable(HALF + RC + 5, HALF + RC + 5, 0), 'Wandblock ist Wand');
-  assert.ok(sc.walkable(HALF - 20, HALF - 20), 'Kreuzungsrand begehbar');
-  sc.theta = S; // Nord-Süd-Türen offen
-  assert.ok(sc.walkable(HALF + 30, HALF + 3, 0), 'Rundung der Ecke ist begehbarer Boden');
-  assert.ok(!sc.walkable(HALF + RC + 20, HALF + 20), 'Wand dahinter bleibt Wand');
 });
 
 test('Fenster: nach 90°-Drehung nahe der Kreuzungsecke bleibt das Fenster nicht stecken', () => {
