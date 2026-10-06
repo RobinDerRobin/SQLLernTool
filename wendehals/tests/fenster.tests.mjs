@@ -204,7 +204,7 @@ test('Fenster: Kamera fährt in einer Kurve in die Gabelung (kein L: seitlich un
   assert.ok(maxTurn < 0.35, 'keine harte Richtungsänderung (max ' + maxTurn.toFixed(2) + ' rad/Frame)');
 });
 
-test('Fenster: Toleranz – schon vor der Kreuzung drehen, Fenster samt Dackel gleitet auf die Kreuzung', () => {
+test('Fenster: Toleranz – schon vor der Kreuzung drehen; die Drehung ändert die Position des Dackels nie', () => {
   const sc = new FensterScene();
   // Dackel 120 Einheiten vor dem Kreuzungsquadrat im Westarm (Fenster scrollt nach Osten)
   sc.cam = { x: -(HALF - 8) - 120, y: 0 };
@@ -213,17 +213,11 @@ test('Fenster: Toleranz – schon vor der Kreuzung drehen, Fenster samt Dackel g
   const m0 = sc.dogMap();
   sc.update(DT, { rotRight: true });
   assert.equal(sc.theta, S);
-  assert.ok(sc.swing.dur >= SWING_TIME);
-  let prev = sc.dogMap();
   while (sc.swing) {
     sc.update(DT, { mx: 1 }); // Eingabe wird während des Schwenks ignoriert
     const m = sc.dogMap();
-    if (sc.swing) assert.ok(m.x >= prev.x - 1e-6, 'gleitet stetig nach Osten');
-    prev = m;
+    assert.ok(Math.hypot(m.x - m0.x, m.y - m0.y) < 1e-6, 'Kartenposition fest');
   }
-  const m = sc.dogMap();
-  assert.ok(Math.abs(m.x) <= HALF - 8 + 1e-6 && Math.abs(m.y) <= HALF - 8, 'Dackel steht danach auf der Kreuzung: ' + JSON.stringify(m));
-  assert.ok(Math.abs(m.y - m0.y) < 1e-6, 'nur entlang des Gangs geglitten');
   assert.deepEqual({ x: sc.dog.x, y: sc.dog.y }, { x: 240, y: 135 }, 'Bildschirmstelle des Dackels bleibt');
   // Zu weit weg: abgelehnt
   const far = new FensterScene();
