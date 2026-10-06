@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { E, S, W, N, opposite, turnCW, turnCCW, CARDINALS, DIR_VEC } from '../src/core/math.js';
-import { FensterScene, ARMS, doorOpen, SWING_TIME, BONE_POS, CAM_END, BONE_AT, clampCam, CAMW, HALF } from '../src/proto/fenster.js';
+import { FensterScene, ARMS, SWING_TIME, BONE_POS, CAM_END, BONE_AT, clampCam, CAMW, HALF } from '../src/proto/fenster.js';
 import { Rng } from '../src/core/rng.js';
 
 const DT = 1 / 60;
@@ -44,20 +44,6 @@ test('Fenster: Y ändert nur s, Blickrichtung +180°, theta bleibt', () => {
   assert.ok(!sc.swing, 'keine Pause bei der Umkehr');
   run(sc, 0.5);
   assert.equal(sc.dir, -1);
-});
-
-test('Fenster: Tür offen genau dann, wenn h oder h+180° die Armrichtung ist', () => {
-  for (const h of CARDINALS) {
-    for (const arm of ARMS) {
-      const expected = h === arm.dir || h === opposite(arm.dir);
-      assert.equal(doorOpen(arm.dir, h), expected);
-    }
-  }
-  const sc = toJunction(new FensterScene());
-  // Osten/Westen offen, wenn waagerecht gescrollt wird; nach Rechtsdrehung Norden/Süden
-  assert.deepEqual(ARMS.filter((a) => doorOpen(a.dir, sc.h)).map((a) => a.dir).sort(), [E, W].sort());
-  sc.update(DT, { rotRight: true });
-  assert.deepEqual(ARMS.filter((a) => doorOpen(a.dir, sc.h)).map((a) => a.dir).sort(), [N, S].sort());
 });
 
 test('Fenster: Schwenk pausiert und ignoriert Eingabe; danach wirkt „rechts“ bildschirmbezogen', () => {
@@ -224,4 +210,29 @@ test('Fenster: Toleranz – schon vor der Kreuzung drehen; die Drehung ändert d
   far.cam = { x: -(HALF - 8) - 200, y: 0 };
   far.dog = { x: 240, y: 135 };
   assert.ok(!far.canTurn);
+});
+
+test('Fenster: ohne Eingabe ändert sich die Kartenposition des Dackels nur in Blickrichtung (nie seitlich geschoben)', () => {
+  const sc = new FensterScene();
+  sc.hint = 0;
+  // Viele Lagen auf und um die Kreuzung, nach Drehung ohne Eingabe weiterlaufen lassen
+  for (const cx of [-200, -60, 0, 60]) {
+    for (const dy of [-80, 0, 80]) {
+      const q = new FensterScene();
+      q.cam = { x: cx, y: 0 };
+      q.dog = { x: 240, y: 135 + dy };
+      if (q.canTurn) {
+        q.update(DT, { rotRight: true });
+        while (q.swing) q.update(DT, {});
+      }
+      for (let i = 0; i < 300; i++) {
+        const m0 = q.dogMap();
+        q.update(DT, {});
+        const m = q.dogMap();
+        const v = DIR_VEC[q.theta];
+        const side = Math.abs((m.x - m0.x) * v[1] - (m.y - m0.y) * v[0]);
+        assert.ok(side < 1e-6, `seitlich geschoben: ${side} (cam ${cx}, dy ${dy})`);
+      }
+    }
+  }
 });

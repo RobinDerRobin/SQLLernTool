@@ -1,7 +1,7 @@
 // Zeichnen für P1 „Kreuzung“ (Wegwerf-Prototyp). Plan wird um -ang gedreht, HUD nie.
 import { SCREEN_W, SCREEN_H, DIR_VEC } from '../core/math.js';
 import { drawDackel } from '../render/sprites.js';
-import { ARMS, END, HALF, DENY_TIME, DOOR_T, BONE_POS, doorOpen } from './fenster.js';
+import { ARMS, END, HALF, DENY_TIME, BONE_POS } from './fenster.js';
 
 const FLOOR = '#6a5f55';
 const FLOOR2 = '#756a5f';
@@ -56,22 +56,9 @@ function drawPlan(ctx, sc, cam, ang) {
   ctx.strokeStyle = 'rgba(255,255,255,0.25)';
   ctx.lineWidth = 2;
   ctx.strokeRect(-HALF, -HALF, WIDTH2, WIDTH2);
-  // Türen und Knochen
-  const h = sc.h;
+  // Armfarbe am Ende des Arms und Knochen
   ARMS.forEach((arm, i) => {
     const v = DIR_VEC[arm.dir];
-    const open = doorOpen(arm.dir, h);
-    ctx.save();
-    ctx.translate(v[0] * (HALF + DOOR_T / 2), v[1] * (HALF + DOOR_T / 2));
-    const w = v[0] ? DOOR_T : 2 * HALF;
-    const hh = v[0] ? 2 * HALF : DOOR_T;
-    ctx.fillStyle = arm.color;
-    if (open) {
-      ctx.strokeStyle = arm.color;
-      ctx.lineWidth = 3;
-      ctx.strokeRect(-w / 2, -hh / 2, w, hh);
-    } else ctx.fillRect(-w / 2, -hh / 2, w, hh);
-    ctx.restore();
     // Armfarbe als Streifen am Ende des Arms
     ctx.fillStyle = arm.color;
     ctx.globalAlpha = 0.35;

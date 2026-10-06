@@ -158,3 +158,14 @@ Richtung. Nicht abschwächen – die Helfer benutzen.
    - Fühlte sich der pausierte Schwenk wie Lenken an oder wie eine Unterbrechung?
    - Passte „links = der Dackel dreht nach links“ zu deinem Denken?
 4. Robins Antwort kommt als **F1** ins Entscheidungsprotokoll in `docs/PROTOTYPEN.md`.
+
+## 9. Änderungen nach Robins Spieltests (05./06.10.2026)
+
+- Direktstart im Prototyp (siehe Abschnitt 5).
+- Schwenk dreht um den Dackel (nicht um die Bildmitte); die Drehung ändert die Position des Dackels nie.
+- Scroll-Behälter: Kamera folgt dem Dackel quer, höchstens ±40 um die Gangmitte, stetig ohne Ruck.
+- Drehen nur auf der Kreuzung, mit Toleranz bis 160 Einheiten davor/dahinter; ein Dreh-Symbol unten in der Mitte
+  leuchtet, wenn Drehen geht, und wackelt rot mit Ton bei Ablehnung. Die 180°-Umkehr geht überall.
+- **Türen entfernt** (Robin). Damit entfällt die Türregel E9 im P1.
+- Der Dackel wird von der Kamera nie seitlich geschoben; ohne Eingabe ändert sich seine Kartenposition nur durch das
+  Scrollen in Blickrichtung.
