@@ -26,6 +26,8 @@ export const DOG_SPEED = 120;
 export const DOG_R = 8;
 export const DOG_MARGIN = 14;
 export const CAMW = 40; // Scroll-Behälter: so weit darf die Fenstermitte quer von der Gangmitte abweichen
+export const LOOK = 120; // so weit schaut die Kamera voraus, um vor einer Kante rechtzeitig einzuschwenken (Kurve)
+export const DENY_TIME = 0.45; // Dauer der Ablehnungs-Anzeige (Tastensymbol wackelt rot)
 export const FOLLOW_MAX = 150; // höchstes Nachzieh-Tempo der Kamera quer (Einheiten/s)
 export const SLIDE_MAX = 120; // so weit sucht die Kamera seitlich nach einem Weg um eine Kante
 export const SLIDE_RATE = 700; // Beschleunigung des seitlichen Gleitens (Einheiten/s²)
@@ -70,10 +72,20 @@ export class FensterScene {
     this.dog = { x: 120, y: SCREEN_H / 2 }; // Bildschirmkoordinaten
     this.swing = null; // { t, a0, a1, pivot }
     this.score = 0;
+    this.denied = null; // { side: 'L'|'R', t } – Drehen außerhalb der Kreuzung abgelehnt
+    this.sfx = []; // Töne für das Spiel (wird von game.js geleert)
     this.slide = 0; // seitliche Gleitgeschwindigkeit der Kamera (an Kanten)
     this.target = 0;
     this.hint = 8; // Sekunden Starthinweis
     this.pickTarget(armIndex(W));
+  }
+
+  /** Drehen geht nur, wo Platz dafür ist: auf der Kreuzung. Der Dackel muss ganz im Kreuzungsquadrat stehen, nicht
+   *  in einer Türöffnung – sonst würde die Drehung die Tür vor oder hinter ihm schließen. */
+  get canTurn() {
+    const m = this.dogMap();
+    const lim = HALF - DOG_R;
+    return Math.abs(m.x) <= lim && Math.abs(m.y) <= lim;
   }
 
   get h() {
@@ -175,6 +187,7 @@ export class FensterScene {
   update(dt, input = {}) {
     this.time += dt;
     if (this.hint > 0) this.hint -= dt;
+    if (this.denied && (this.denied.t -= dt) <= 0) this.denied = null;
 
     if (this.swing) {
       const sw = this.swing;
@@ -195,15 +208,19 @@ export class FensterScene {
       return; // Die Drehung pausiert das Spiel; Eingaben werden ignoriert.
     }
 
-    if (input.rotLeft) return void this.rotate(-1);
-    if (input.rotRight || input.espressoPressed) return void this.rotate(1);
+    const rotK = input.rotLeft ? -1 : input.rotRight || input.espressoPressed ? 1 : 0;
+    if (rotK && this.canTurn) return void this.rotate(rotK);
+    if (rotK) {
+      this.denied = { side: rotK < 0 ? 'L' : 'R', t: DENY_TIME };
+      this.sfx.push('nope');
+    }
     if (input.wende) this.flip();
 
     // Umkehr: Scrollrichtung läuft weich durch null
     this.dir = approach(this.dir, this.s === 'R' ? 1 : -1, TURN_RATE * dt);
     this.moveCam(dt);
     this.moveDog(dt, input);
-    if (Math.abs(this.slide) < 1) this.followCam(dt); // beim Gleiten an einer Kante kein Quer-Folgen (sonst Gegenzug)
+    this.followCam(dt);
 
     const b = BONE_POS(this.target);
     const m = this.dogMap();
@@ -213,38 +230,49 @@ export class FensterScene {
     }
   }
 
-  /** Kamera-Position c gültig: im Scroll-Behälter (nicht weiter draußen als jetzt) und der Dackel, den das Fenster
-   *  mitträgt, steht dort auf begehbarem Boden. Die Kamera wird nur von ihren Kanten geschoben, nie der Dackel. */
+  /** Kamera-Position c gültig: nicht über die Kartenenden hinaus, und der Dackel, den das Fenster mitträgt, steht
+   *  dort auf begehbarem Boden. Den Scroll-Behälter hält followCam weich ein (seit gedreht nur noch auf der Kreuzung
+   *  wird, kann das Fenster nie quer in einen Gang zeigen). Die Kamera wird nur von Kanten gelenkt, nie der Dackel. */
   camOk(c) {
-    const out = (q) => Math.hypot(q.x - clampCam(q.x, q.y).x, q.y - clampCam(q.x, q.y).y);
-    if (out(c) > out(this.cam) + 0.05) return false;
+    if (Math.abs(c.x) > CAM_END || Math.abs(c.y) > CAM_END) return false;
     const m = this.toMap(this.dog.x, this.dog.y, c);
     return this.walkable(m.x, m.y, DOG_R - 0.05); // kleine Toleranz: Dackel darf exakt an der Wand stehen
   }
 
-  /** Fenster scrollt in Blickrichtung (überall gleich). Läuft es frontal auf eine Kante, gleitet es seitlich an ihr
-   *  entlang um die Ecke (weich: seitliche Geschwindigkeit baut sich auf und ab) statt stehen zu bleiben. */
+  /** Fenster scrollt in Blickrichtung (überall gleich). Liegt voraus eine Kante, schwenkt es rechtzeitig und
+   *  zunehmend seitlich ein (je näher die Kante, desto stärker) – so fährt es in einer Kurve in die Gabelung statt
+   *  im L erst anzuhalten und dann seitlich zu rutschen. Gesamttempo bleibt SPEED. */
   moveCam(dt) {
     const r = vec(this.theta);
     const d = vec(turnCW(this.theta));
-    const step = SPEED * this.dir * dt;
-    const at = (f, l) => ({ x: this.cam.x + r[0] * f + d[0] * l, y: this.cam.y + r[1] * f + d[1] * l });
-    let target = 0;
-    if (!this.camOk(at(step, 0))) {
-      // Frontal blockiert: kleinster seitlicher Versatz, bei dem es nach vorn weitergeht (beide Seiten)
-      let best = 0;
-      for (let l = 2; l <= SLIDE_MAX && !best; l += 2) {
-        const left = this.camOk(at(step, -l)) && this.camOk(at(0, -l));
-        const right = this.camOk(at(step, l)) && this.camOk(at(0, l));
-        if (left && right) best = this.slide < 0 ? -1 : 1;
-        else if (left) best = -1;
-        else if (right) best = 1;
+    const sg = this.dir < 0 ? -1 : 1;
+    const at = (f, l) => ({ x: this.cam.x + r[0] * f * sg + d[0] * l, y: this.cam.y + r[1] * f * sg + d[1] * l });
+    // Erste blockierte Stelle voraus
+    let fb = 0;
+    for (let f = 2; f <= LOOK; f += 2) {
+      if (!this.camOk(at(f, 0))) {
+        fb = f;
+        break;
       }
-      target = best * SPEED;
+    }
+    let target = 0;
+    if (fb) {
+      // Seite und kleinster Versatz, mit dem es an der blockierten Stelle weitergeht
+      let side = 0;
+      for (let l = 2; l <= SLIDE_MAX && !side; l += 2) {
+        const okL = this.camOk(at(fb, -l)) && this.camOk(at(0, -l));
+        const okR = this.camOk(at(fb, l)) && this.camOk(at(0, l));
+        if (okL && okR) side = this.slide < 0 ? -1 : 1;
+        else if (okL) side = -1;
+        else if (okR) side = 1;
+      }
+      const near = 1 - (fb - 2) / LOOK; // 0 weit weg … 1 direkt davor
+      target = side * SPEED * smooth(clamp(near, 0, 1));
     }
     this.slide = approach(this.slide, target, SLIDE_RATE * dt);
     const lat = this.slide * dt;
-    for (const [f, l] of [[step, lat], [0, lat], [step, 0]]) {
+    const fwd = Math.abs(this.dir) * Math.sqrt(Math.max(0, SPEED * SPEED - this.slide * this.slide)) * dt;
+    for (const [f, l] of [[fwd, lat], [0, lat], [fwd, 0]]) {
       const c = at(f, l);
       if ((f || l) && this.camOk(c)) {
         this.cam.x = c.x;
@@ -257,20 +285,16 @@ export class FensterScene {
   /** Kamera folgt dem Dackel quer zur Scrollrichtung (innerhalb des Scroll-Behälters) und kehrt in ihn zurück.
    *  Die Kartenposition des Dackels bleibt dabei gleich: seine Bildschirmstelle gleicht die Bewegung aus. */
   followCam(dt) {
+    // Nur quer zur Scrollachse: Ziel = Dackelhöhe, begrenzt auf ±CAMW um die Mittellinie der Scrollachse.
+    // (Stetig – kein Umspringen zwischen den Armen, also kein Ruck.)
     const r = vec(this.theta);
     const d = vec(turnCW(this.theta));
-    const oy = this.dog.y - SCREEN_H / 2;
-    const t = clampCam(this.cam.x + d[0] * oy, this.cam.y + d[1] * oy);
-    const k = Math.min(1, FOLLOW * dt);
-    // weiches Nachziehen mit Tempolimit (kein Ruck, auch wenn die Kamera nach einem Schwenk weit draußen liegt)
-    let dx = (t.x - this.cam.x) * k;
-    let dy = (t.y - this.cam.y) * k;
-    const len = Math.hypot(dx, dy);
-    const cap = FOLLOW_MAX * dt;
-    if (len > cap) {
-      dx *= cap / len;
-      dy *= cap / len;
-    }
+    const cross = this.cam.x * d[0] + this.cam.y * d[1];
+    const want = clamp(cross + (this.dog.y - SCREEN_H / 2), -CAMW, CAMW);
+    let delta = (want - cross) * Math.min(1, FOLLOW * dt);
+    delta = clamp(delta, -FOLLOW_MAX * dt, FOLLOW_MAX * dt); // Tempolimit, auch wenn die Kamera nach einem Schwenk weit draußen liegt
+    const dx = d[0] * delta;
+    const dy = d[1] * delta;
     this.cam.x += dx;
     this.cam.y += dy;
     this.dog.x = clamp(this.dog.x - (dx * r[0] + dy * r[1]), DOG_MARGIN, SCREEN_W - DOG_MARGIN);

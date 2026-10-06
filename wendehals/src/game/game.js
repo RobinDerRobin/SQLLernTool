@@ -547,7 +547,11 @@ export class Game {
         break;
       case 'proto':
         if (input.pause) this.leaveProto();
-        else this.proto.update(dt, input);
+        else {
+          this.proto.update(dt, input);
+          for (const name of this.proto.sfx) this.sfx(name);
+          this.proto.sfx.length = 0;
+        }
         break;
     }
   }

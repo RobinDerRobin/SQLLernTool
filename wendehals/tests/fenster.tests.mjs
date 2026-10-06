@@ -9,9 +9,15 @@ const run = (sc, sec, input = {}) => {
   for (let i = 0; i < Math.round(sec / DT); i++) sc.update(DT, input);
 };
 const finishSwing = (sc) => run(sc, SWING_TIME + 0.05);
+/** Fenster und Dackel mitten auf die Kreuzung setzen (nur dort darf gedreht werden). */
+const toJunction = (sc) => {
+  sc.cam = { x: 0, y: 0 };
+  sc.dog = { x: 240, y: 135 };
+  return sc;
+};
 
 test('Fenster: Drehen ändert theta um ±90°, s bleibt (Skizze: Osten, rechts → R-Ende nach Süden)', () => {
-  const sc = new FensterScene();
+  const sc = toJunction(new FensterScene());
   assert.equal(sc.theta, E);
   sc.update(DT, { rotRight: true });
   assert.equal(sc.theta, S);
@@ -47,7 +53,7 @@ test('Fenster: Tür offen genau dann, wenn h oder h+180° die Armrichtung ist', 
       assert.equal(doorOpen(arm.dir, h), expected);
     }
   }
-  const sc = new FensterScene();
+  const sc = toJunction(new FensterScene());
   // Osten/Westen offen, wenn waagerecht gescrollt wird; nach Rechtsdrehung Norden/Süden
   assert.deepEqual(ARMS.filter((a) => doorOpen(a.dir, sc.h)).map((a) => a.dir).sort(), [E, W].sort());
   sc.update(DT, { rotRight: true });
@@ -55,7 +61,7 @@ test('Fenster: Tür offen genau dann, wenn h oder h+180° die Armrichtung ist', 
 });
 
 test('Fenster: Schwenk pausiert und ignoriert Eingabe; danach wirkt „rechts“ bildschirmbezogen', () => {
-  const sc = new FensterScene();
+  const sc = toJunction(new FensterScene());
   sc.update(DT, { rotRight: true });
   const dog = { ...sc.dog };
   run(sc, SWING_TIME / 2, { mx: 1, rotLeft: true, wende: true });
@@ -137,7 +143,7 @@ test('Fenster: nach 90°-Drehung nahe der Kreuzungsecke bleibt das Fenster nicht
           sc.cam = { x: cx, y: cy };
           sc.dog = { x: 240 + dx, y: 135 + dy };
           const m = sc.dogMap();
-          if (!sc.walkable(m.x, m.y)) continue;
+          if (!sc.walkable(m.x, m.y) || !sc.canTurn) continue;
           sc.update(DT, { [rot]: true });
           for (let i = 0; i < 100; i++) sc.update(DT, {});
           const c0 = { ...sc.cam };
@@ -152,4 +158,48 @@ test('Fenster: nach 90°-Drehung nahe der Kreuzungsecke bleibt das Fenster nicht
       }
     }
   }
+});
+
+test('Fenster: Drehen nur auf der Kreuzung – im Gang abgelehnt mit Anzeige und Ton', () => {
+  const sc = new FensterScene(); // Start am Ende des Westarms
+  assert.ok(!sc.canTurn);
+  sc.update(DT, { rotRight: true });
+  assert.equal(sc.theta, E, 'im Gang keine Drehung');
+  assert.ok(!sc.swing);
+  assert.equal(sc.denied?.side, 'R');
+  assert.deepEqual(sc.sfx, ['nope']);
+  sc.update(DT, { rotLeft: true });
+  assert.equal(sc.denied?.side, 'L');
+  run(sc, 1);
+  assert.equal(sc.denied, null, 'Anzeige verschwindet wieder');
+  toJunction(sc);
+  assert.ok(sc.canTurn);
+  sc.update(DT, { rotRight: true });
+  assert.equal(sc.theta, S);
+});
+
+test('Fenster: Kamera fährt in einer Kurve in die Gabelung (kein L: seitlich und vorwärts gleichzeitig)', () => {
+  // Nach Rechtsdrehung auf der Kreuzung mit der Kamera seitlich versetzt: Fenster muss in den Südarm einschwenken
+  const sc = toJunction(new FensterScene());
+  sc.cam = { x: 35, y: 0 };
+  sc.dog = { x: 240, y: 135 - 85 }; // Dackel nahe der Ostwand des Südarms (nach der Drehung)
+  sc.update(DT, { rotRight: true });
+  finishSwing(sc);
+  let both = 0;
+  let maxTurn = 0;
+  let prev = null;
+  let p = { ...sc.cam };
+  for (let i = 0; i < 240; i++) {
+    sc.update(DT, {});
+    const v = { x: sc.cam.x - p.x, y: sc.cam.y - p.y };
+    if (Math.abs(v.x) > 0.05 && Math.abs(v.y) > 0.05) both++;
+    if (prev && Math.hypot(v.x, v.y) > 0.5 && Math.hypot(prev.x, prev.y) > 0.5) {
+      const a = Math.abs(Math.atan2(v.x * prev.y - v.y * prev.x, v.x * prev.x + v.y * prev.y));
+      maxTurn = Math.max(maxTurn, a);
+    }
+    prev = v;
+    p = { ...sc.cam };
+  }
+  assert.ok(sc.cam.y > 150, 'Fenster ist in den Südarm gefahren: ' + JSON.stringify(sc.cam));
+  assert.ok(maxTurn < 0.35, 'keine harte Richtungsänderung (max ' + maxTurn.toFixed(2) + ' rad/Frame)');
 });
