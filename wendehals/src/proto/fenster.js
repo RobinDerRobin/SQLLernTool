@@ -26,6 +26,8 @@ export const DOG_SPEED = 120;
 export const DOG_R = 8;
 export const DOG_MARGIN = 14;
 export const CAMW = 40; // Scroll-Behälter: so weit darf die Fenstermitte quer von der Gangmitte abweichen
+export const TURN_AHEAD = 160; // Toleranz: so weit vor/hinter der Kreuzung (im Gang) darf schon gedreht werden
+export const GLIDE_SPEED = 320; // Tempo, mit dem das Fenster bei früher Drehung auf die Kreuzung gleitet
 export const LOOK = 120; // so weit schaut die Kamera voraus, um vor einer Kante rechtzeitig einzuschwenken (Kurve)
 export const DENY_TIME = 0.45; // Dauer der Ablehnungs-Anzeige (Tastensymbol wackelt rot)
 export const FOLLOW_MAX = 150; // höchstes Nachzieh-Tempo der Kamera quer (Einheiten/s)
@@ -70,7 +72,7 @@ export class FensterScene {
     this.dir = 1; // weiche Scrollrichtung: +1 = R, -1 = L (Dackel-Spiegelung)
     this.cam = { x: -CAM_END, y: 0 };
     this.dog = { x: 120, y: SCREEN_H / 2 }; // Bildschirmkoordinaten
-    this.swing = null; // { t, a0, a1, pivot }
+    this.swing = null; // { t, dur, a0, a1, p0, p1 } – Drehpunkt gleitet von p0 nach p1
     this.score = 0;
     this.denied = null; // { side: 'L'|'R', t } – Drehen außerhalb der Kreuzung abgelehnt
     this.sfx = []; // Töne für das Spiel (wird von game.js geleert)
@@ -80,12 +82,23 @@ export class FensterScene {
     this.pickTarget(armIndex(W));
   }
 
-  /** Drehen geht nur, wo Platz dafür ist: auf der Kreuzung. Der Dackel muss ganz im Kreuzungsquadrat stehen, nicht
-   *  in einer Türöffnung – sonst würde die Drehung die Tür vor oder hinter ihm schließen. */
-  get canTurn() {
+  /** Wohin der Dackel bei einer Drehung gleitet – oder null, wenn hier nicht gedreht werden darf.
+   *  Gedreht wird nur, wo Platz ist: auf der Kreuzung. Mit Toleranz: bis TURN_AHEAD vor (oder hinter) der Kreuzung
+   *  im Gang darf man schon drücken; dann gleitet das Fenster samt Dackel während des Schwenks auf die Kreuzung
+   *  (ganz ins Quadrat, nicht in eine Türöffnung – sonst schlösse die Drehung die Tür neben ihm). */
+  turnTarget() {
     const m = this.dogMap();
     const lim = HALF - DOG_R;
-    return Math.abs(m.x) <= lim && Math.abs(m.y) <= lim;
+    const ax = Math.abs(m.x);
+    const ay = Math.abs(m.y);
+    if (ax <= lim && ay <= lim) return { x: m.x, y: m.y };
+    if (ay <= lim && ax - lim <= TURN_AHEAD) return { x: Math.sign(m.x) * lim, y: m.y };
+    if (ax <= lim && ay - lim <= TURN_AHEAD) return { x: m.x, y: Math.sign(m.y) * lim };
+    return null;
+  }
+
+  get canTurn() {
+    return this.turnTarget() !== null;
   }
 
   get h() {
@@ -165,15 +178,22 @@ export class FensterScene {
   /** Fenster drehen: -1 = links (−90°), +1 = rechts (+90°). s bleibt. */
   rotate(k) {
     if (this.swing) return false;
+    const p1 = this.turnTarget();
+    if (!p1) return false;
     this.slide = 0;
+    const p0 = this.dogMap();
     const a0 = this.ang;
     this.theta = k > 0 ? turnCW(this.theta) : turnCCW(this.theta);
-    // Das Fenster dreht sich um den Dackel: seine Kartenposition und Bildschirmstelle bleiben fest.
+    // Das Fenster dreht sich um den Dackel (Bildschirmstelle bleibt fest). Stand er noch vor der Kreuzung, gleitet der
+    // Drehpunkt – Fenster samt Dackel – dabei auf die Kreuzung; längere Wege verlängern den Schwenk (GLIDE_SPEED).
+    const dist = Math.hypot(p1.x - p0.x, p1.y - p0.y);
     this.swing = {
       t: 0,
+      dur: Math.max(SWING_TIME, dist / GLIDE_SPEED),
       a0,
       a1: a0 + (k > 0 ? Math.PI / 2 : -Math.PI / 2),
-      pivot: this.toMap(this.dog.x, this.dog.y, this.cam, k > 0 ? turnCCW(this.theta) : turnCW(this.theta)),
+      p0,
+      p1,
     };
     return true;
   }
@@ -191,16 +211,19 @@ export class FensterScene {
 
     if (this.swing) {
       const sw = this.swing;
-      sw.t = Math.min(SWING_TIME, sw.t + dt);
-      const k = smooth(sw.t / SWING_TIME);
+      sw.t = Math.min(sw.dur, sw.t + dt);
+      const k = smooth(Math.min(1, sw.t / SWING_TIME));
+      const g = smooth(sw.t / sw.dur);
       this.ang = sw.a0 + (sw.a1 - sw.a0) * k;
+      const px = sw.p0.x + (sw.p1.x - sw.p0.x) * g;
+      const py = sw.p0.y + (sw.p1.y - sw.p0.y) * g;
       const ox = this.dog.x - SCREEN_W / 2;
       const oy = this.dog.y - SCREEN_H / 2;
       const c = Math.cos(this.ang);
       const sn = Math.sin(this.ang);
-      this.cam.x = sw.pivot.x - (ox * c - oy * sn);
-      this.cam.y = sw.pivot.y - (ox * sn + oy * c);
-      if (sw.t >= SWING_TIME) {
+      this.cam.x = px - (ox * c - oy * sn);
+      this.cam.y = py - (ox * sn + oy * c);
+      if (sw.t >= sw.dur) {
         this.ang = sw.a1;
         this.swing = null;
         this.fixDog();
@@ -209,7 +232,7 @@ export class FensterScene {
     }
 
     const rotK = input.rotLeft ? -1 : input.rotRight || input.espressoPressed ? 1 : 0;
-    if (rotK && this.canTurn) return void this.rotate(rotK);
+    if (rotK && this.rotate(rotK)) return;
     if (rotK) {
       this.denied = { side: rotK < 0 ? 'L' : 'R', t: DENY_TIME };
       this.sfx.push('nope');

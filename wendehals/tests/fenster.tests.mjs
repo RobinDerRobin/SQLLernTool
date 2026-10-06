@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { E, S, W, N, opposite, turnCW, turnCCW, CARDINALS, DIR_VEC } from '../src/core/math.js';
-import { FensterScene, ARMS, doorOpen, SWING_TIME, BONE_POS, CAM_END, BONE_AT, clampCam, CAMW } from '../src/proto/fenster.js';
+import { FensterScene, ARMS, doorOpen, SWING_TIME, BONE_POS, CAM_END, BONE_AT, clampCam, CAMW, HALF } from '../src/proto/fenster.js';
 import { Rng } from '../src/core/rng.js';
 
 const DT = 1 / 60;
@@ -202,4 +202,32 @@ test('Fenster: Kamera fährt in einer Kurve in die Gabelung (kein L: seitlich un
   }
   assert.ok(sc.cam.y > 150, 'Fenster ist in den Südarm gefahren: ' + JSON.stringify(sc.cam));
   assert.ok(maxTurn < 0.35, 'keine harte Richtungsänderung (max ' + maxTurn.toFixed(2) + ' rad/Frame)');
+});
+
+test('Fenster: Toleranz – schon vor der Kreuzung drehen, Fenster samt Dackel gleitet auf die Kreuzung', () => {
+  const sc = new FensterScene();
+  // Dackel 120 Einheiten vor dem Kreuzungsquadrat im Westarm (Fenster scrollt nach Osten)
+  sc.cam = { x: -(HALF - 8) - 120, y: 0 };
+  sc.dog = { x: 240, y: 135 };
+  assert.ok(sc.canTurn, 'innerhalb der Toleranz');
+  const m0 = sc.dogMap();
+  sc.update(DT, { rotRight: true });
+  assert.equal(sc.theta, S);
+  assert.ok(sc.swing.dur >= SWING_TIME);
+  let prev = sc.dogMap();
+  while (sc.swing) {
+    sc.update(DT, { mx: 1 }); // Eingabe wird während des Schwenks ignoriert
+    const m = sc.dogMap();
+    if (sc.swing) assert.ok(m.x >= prev.x - 1e-6, 'gleitet stetig nach Osten');
+    prev = m;
+  }
+  const m = sc.dogMap();
+  assert.ok(Math.abs(m.x) <= HALF - 8 + 1e-6 && Math.abs(m.y) <= HALF - 8, 'Dackel steht danach auf der Kreuzung: ' + JSON.stringify(m));
+  assert.ok(Math.abs(m.y - m0.y) < 1e-6, 'nur entlang des Gangs geglitten');
+  assert.deepEqual({ x: sc.dog.x, y: sc.dog.y }, { x: 240, y: 135 }, 'Bildschirmstelle des Dackels bleibt');
+  // Zu weit weg: abgelehnt
+  const far = new FensterScene();
+  far.cam = { x: -(HALF - 8) - 200, y: 0 };
+  far.dog = { x: 240, y: 135 };
+  assert.ok(!far.canTurn);
 });
