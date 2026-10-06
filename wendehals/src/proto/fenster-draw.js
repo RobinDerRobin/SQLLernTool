@@ -86,37 +86,50 @@ function drawPlan(ctx, sc, cam, ang) {
 }
 const WIDTH2 = 2 * HALF;
 
-/** Tastensymbole LB/RB unten links/rechts: leuchten und pulsieren, wenn Drehen geht (Kreuzung), sonst grau.
- *  Abgelehnter Druck: Symbol wackelt kurz und blinkt rot. */
-function drawTurnKeys(ctx, sc) {
+/** Ein Dreh-Symbol unten in der Mitte (für beide Richtungen): leuchtet und pulsiert, wenn Drehen geht (Kreuzung),
+ *  sonst grau. Abgelehnter Druck: wackelt kurz und blinkt rot. Selbst gezeichnet (keine Schriftzeichen nötig). */
+function drawTurnIcon(ctx, sc) {
   const on = sc.canTurn && !sc.swing;
+  const deny = sc.denied ? sc.denied.t / DENY_TIME : 0;
   const pulse = 0.5 + 0.5 * Math.sin(sc.time * 6);
-  for (const side of ['L', 'R']) {
-    const deny = sc.denied && sc.denied.side === side ? sc.denied.t / DENY_TIME : 0;
-    const w = 54;
-    const hh = 22;
-    let x = side === 'L' ? 10 : SCREEN_W - 10 - w;
-    const y = SCREEN_H - 10 - hh;
-    if (deny) x += Math.sin(deny * 40) * 4 * deny;
-    ctx.save();
-    if (on) {
-      ctx.shadowColor = '#ffe27a';
-      ctx.shadowBlur = 6 + 8 * pulse;
-    }
-    ctx.globalAlpha = on || deny ? 1 : 0.45;
-    ctx.fillStyle = deny ? `rgba(220,50,50,${0.5 + 0.5 * deny})` : on ? `rgba(255,214,90,${0.75 + 0.25 * pulse})` : '#3a3640';
-    ctx.beginPath();
-    ctx.roundRect(x, y, w, hh, 7);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = on && !deny ? '#2a2010' : '#ddd';
-    ctx.font = 'bold 11px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const arrow = side === 'L' ? '⟲' : '⟳';
-    ctx.fillText(side === 'L' ? `${arrow} LB·U` : `RB·O ${arrow}`, x + w / 2, y + hh / 2 + 1);
-    ctx.restore();
+  const R = 13;
+  const x = SCREEN_W / 2 + (deny ? Math.sin(deny * 40) * 4 * deny : 0);
+  const y = SCREEN_H - 6 - R;
+  ctx.save();
+  ctx.globalAlpha = on || deny ? 1 : 0.45;
+  if (on && !deny) {
+    ctx.shadowColor = '#ffe27a';
+    ctx.shadowBlur = 6 + 8 * pulse;
   }
+  ctx.fillStyle = deny ? `rgba(220,50,50,${0.5 + 0.5 * deny})` : on ? `rgba(255,214,90,${0.75 + 0.25 * pulse})` : '#3a3640';
+  ctx.beginPath();
+  ctx.arc(x, y, R, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  // Bogen mit Pfeilspitzen an beiden Enden (links/rechts drehen)
+  const col = on && !deny ? '#2a2010' : '#ddd';
+  const r = 7;
+  const a0 = Math.PI * 0.85;
+  const a1 = Math.PI * 2.15;
+  ctx.strokeStyle = col;
+  ctx.fillStyle = col;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(x, y + 1, r, a0, a1);
+  ctx.stroke();
+  for (const [a, dirSign] of [[a0, -1], [a1, 1]]) {
+    const px = x + Math.cos(a) * r;
+    const py = y + 1 + Math.sin(a) * r;
+    const tx = -Math.sin(a) * dirSign; // Tangente in Laufrichtung des Bogens nach außen
+    const ty = Math.cos(a) * dirSign;
+    ctx.beginPath();
+    ctx.moveTo(px + tx * 4, py + ty * 4);
+    ctx.lineTo(px - ty * 3.5, py + tx * 3.5);
+    ctx.lineTo(px + ty * 3.5, py - tx * 3.5);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 export function drawFenster(ctx, sc) {
@@ -140,7 +153,7 @@ export function drawFenster(ctx, sc) {
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   ctx.fillText('Knochen: ' + sc.score, 30, 17);
-  drawTurnKeys(ctx, sc);
+  drawTurnIcon(ctx, sc);
   if (sc.hint > 0) {
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.fillRect(SCREEN_W / 2 - 150, SCREEN_H - 58, 300, 20);
