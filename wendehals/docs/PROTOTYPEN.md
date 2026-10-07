@@ -89,7 +89,7 @@ dürfen es als Platzhalter nutzen.
 
 | ID | Frage | Stand |
 |---|---|---|
-| **P1 „Kreuzung“** | Nehme ich die Gabelung, die ich will, indem ich das Fenster drehe – beim ersten Mal, ohne nachzudenken, auch nach der 180°-Umkehr und mit dem Plan kopfüber? | **Brief fertig:** [`prototypen/P1-kreuzung.md`](prototypen/P1-kreuzung.md) |
+| **P1 „Kreuzung“** | Nehme ich die Gabelung, die ich will, indem ich das Fenster drehe – beim ersten Mal, ohne nachzudenken, auch nach der 180°-Umkehr und mit dem Plan kopfüber? | **keep (07.10.2026)** – [Brief](prototypen/P1-kreuzung.md), [Retrospektive](prototypen/P1-retro.md) |
 | P1b | Nur falls P1 „nein“: dog-bezogen vs. bildschirmbezogen drehen, umschaltbar | wartet auf P1 |
 | P2 „Orientierung“ | Behalte ich in einer Schleife mit Landmarken die Orientierung, ohne Karte? (→ Minimap nötig?) | wartet auf P1 |
 | P3 „45°“ | Passen 45°-Drehungen zur selben Aktion? (Diagonal-Arm, achteckige Kreuzung, LT/RT) | wartet auf P1 |
@@ -98,12 +98,36 @@ dürfen es als Platzhalter nutzen.
 Geparkt (nicht vergessen): Minimap (nach P2), Gabelungen mit Drehfähigkeiten (nach P3), sanftes
 Steigen, Schächte, kopfüber als Spielelement, Form der Arenen im gedrehten Fenster.
 
+## 4a. Abnahme-Checkliste „Fenster drehen“ (aus P1, Robin 07.10.2026)
+
+Gilt für die Übernahme ins Spiel (Paket 8) und jeden weiteren Fenster-Prototyp.
+
+- [ ] **Flüssige Kamera:** keine Sprünge, keine harten Knicke – auch beim Quer-Folgen und beim Einfahren nach einer
+      Drehung.
+- [ ] **Die Spielerposition ändert sich nie von selbst:** nicht durch Drehen, Kamera-Folgen, Wände oder den Bildrand.
+      Ohne Eingabe bewegt sich die Figur nur in Scrollrichtung.
+- [ ] **Drehen nahe einem Ort mit Platz dafür** (Kreuzung), mit Toleranz davor und dahinter; im Gang nicht.
+- [ ] **Auf festem Boden nie festsitzen:** nach jeder erlaubten Drehung kommt man weiter oder mit dem Stick heraus.
+      (Im echten Spiel töten die meisten Flächen; die Regel gilt für festen Boden.)
+- [ ] **Gleiches Bild nach Hin- und Zurückdrehen:** Kamera bleibt im Levelbereich, zeigt nicht mehr Leere als nötig.
+- [ ] **Vorhersehbares Drehen:** Bild dreht um die Figur, feste Dauer (0,5 s), Spiel pausiert; die Welt „landet“ nie
+      auf der Figur.
+- [ ] **Eingabe bleibt bildschirmbezogen:** nach der Drehung ist „rechts“ rechts; Drücke im Schwenk werden ignoriert.
+- [ ] **Sichtbare Rückmeldung, dass Drehen gerade geht** (nicht unbedingt ein Knopf; im P1 ein leuchtendes Symbol),
+      und dass ein Druck abgelehnt wurde. Nichts im HUD dreht mit.
+
+**Für das ganze Spiel (nicht nur das Fenster):**
+- 180°-Umkehr geht überall, ohne Pause, Figur dreht sichtbar um.
+- Gleiches Verhalten überall – keine Sonderfälle, die der Spieler bemerkt.
+- **Alles muss auf dem Steam Deck funktionieren:** Controller und Tastatur, 60 fps, Symbole selbst gezeichnet (keine
+  Abhängigkeit von Schriftarten).
+
 ## 5. Entscheidungsprotokoll
 
 | ID | Datum | Prototyp/Thema | Robins Antwort (Wortlaut) | Urteil | Nächster Schritt |
 |---|---|---|---|---|---|
 | F0 | 05.10.2026 | Richtungen: Fenster-Konzept | siehe Abschnitt 2 | keep (Konzept) | P1 bauen |
-| F1 | – | P1 „Kreuzung“ | – | – | – |
+| F1 | 07.10.2026 | P1 „Kreuzung“ | „I am happy with the feature for now.“ (Änderungen nach Spieltests: Brief Abschnitt 9) | keep (Feature) | Checkliste 4a; [Retrospektive](prototypen/P1-retro.md); nächster Prototyp offen (P2 laut Leiter) |
 
 ## 6. Arbeitspakete – **Entwurf, in Validierung**
 
