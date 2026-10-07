@@ -93,6 +93,7 @@ dürfen es als Platzhalter nutzen.
 | ID | Frage | Stand |
 |---|---|---|
 | **P1 „Kreuzung“** | Nehme ich die Gabelung, die ich will, indem ich das Fenster drehe – beim ersten Mal, ohne nachzudenken, auch nach der 180°-Umkehr und mit dem Plan kopfüber? | **keep (07.10.2026)** – [Brief](prototypen/P1-kreuzung.md), [Retrospektive](prototypen/P1-retro.md) |
+| **P1c „Netz“** | Hält das Drehen die Checkliste 4a an T, L, überlappenden Zonen, versetzten Abzweigen, breitem/schmalem Gang, Ring? | Brief vorgelegt: [`prototypen/P1c-netz.md`](prototypen/P1c-netz.md) |
 | P1b | Nur falls P1 „nein“: dog-bezogen vs. bildschirmbezogen drehen, umschaltbar | wartet auf P1 |
 | P2 „Orientierung“ | Behalte ich in einer Schleife mit Landmarken die Orientierung, ohne Karte? (→ Minimap nötig?) | wartet auf P1 |
 | P3 „45°“ | Passen 45°-Drehungen zur selben Aktion? (Diagonal-Arm, achteckige Kreuzung, LT/RT) | wartet auf P1 |
