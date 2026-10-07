@@ -117,9 +117,10 @@ Import. Der Port muss mit `tools/pruefe-welt.mjs` übereinstimmen (Test in `test
 Aus der Retrospektive zu P1 ([`docs/prototypen/P1-retro.md`](docs/prototypen/P1-retro.md)). Gelten in jeder
 Session, für jeden Prototyp, ohne dass Robin sie wiederholen muss.
 
-1. **Erst verstehen, dann bauen.** Ändert eine Rückmeldung mehr als einen Zahlenwert: zuerst Deutung und
-   Lösungsansatz in höchstens drei Sätzen an Robin, auf sein „ja“ (oder seine Korrektur) warten, dann bauen.
-   Folgeprobleme, die eine von Robins Regeln berühren, vorlegen statt still lösen.
+1. **Erst validieren, dann bauen.** „Validieren“ heißt: Robin fragen, ob es das ist, was er will. Ändert eine
+   Rückmeldung mehr als einen Zahlenwert, oder ist ein neuer Prototyp/Brief geplant: zuerst Deutung und
+   Lösungsansatz kurz an Robin, mit der ausdrücklichen Frage „Ist es das, was du willst?“; erst nach seinem „ja“
+   (oder seiner Korrektur) bauen. Folgeprobleme, die eine von Robins Regeln berühren, vorlegen statt still lösen.
 2. **Abnahme-Checkliste zuerst.** Jeder Bau-Brief beginnt mit einer Checkliste der Invarianten (Vorbild:
    `docs/PROTOTYPEN.md` Abschnitt 4a, die für alles mit dem drehenden Fenster gilt). Jede Zeile bekommt einen
    automatischen Test aus Spielersicht.
