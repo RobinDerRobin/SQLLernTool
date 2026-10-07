@@ -4,7 +4,7 @@
 > Wegwerf-Prototyp. Baut auf P1 „Kreuzung“ auf ([`P1-kreuzung.md`](P1-kreuzung.md), Abschnitt 9 = aktueller Stand;
 > [`P1-retro.md`](P1-retro.md)). **Vorher lesen und befolgen:** `wendehals/CLAUDE.md`, Abschnitt „Regeln für jede
 > Prototyp-Arbeit“ (u. a. Regel 1: vor jeder Abweichung Robin fragen, ob es das ist, was er will).
-> Status: Rahmen und Regeln von Robin validiert am 07.10.2026 (Abschnitt 3); Brief zur Bestätigung vorgelegt.
+> Status: **von Robin validiert am 07.10.2026** (Regeln Abschnitt 3, Karte, Direktstart, Prüfmaße, Technik).
 
 ## 1. Fragekarte
 
@@ -24,6 +24,8 @@ Alle Punkte aus [`../PROTOTYPEN.md`](../PROTOTYPEN.md) Abschnitt 4a, an **jeder*
 - [ ] Drehen geht nur in der Dreh-Zone einer Kreuzung und nur, wenn in der neuen Flugrichtung ein Gang von dieser
       Kreuzung wegführt (Abschnitt 3).
 - [ ] Nie festsitzen: von jeder erreichbaren Lage kommt der Dackel mit dem Stick (und ggf. Drehen/Umkehr) weiter.
+- [ ] Zu früh gedreht: die Kamera gleitet ohne Ruck in den neuen Gang und scrollt dort weiter; die Kartenposition des
+      Dackels ändert sich dabei nicht; am Bildrand wartet die Kamera, bis der Dackel nachkommt.
 - [ ] Hin- und Zurückdrehen ergibt dasselbe Bild; die Kamera zeigt nicht mehr Leere als nötig.
 - [ ] Schwenk um den Dackel, 0,5 s, Spiel pausiert, Eingaben im Schwenk ignoriert; „rechts“ bleibt rechts.
 - [ ] Sichtbare Rückmeldung: Symbol leuchtet, wenn mindestens eine Drehung möglich ist; abgelehnter Druck wackelt rot
@@ -47,10 +49,11 @@ nie, keine Türen, 180°-Umkehr überall, ein Dreh-Symbol. Neu bzw. präzisiert 
    beiden Drehungen, an der T-Kreuzung je nach Flugrichtung eine oder zwei. Das Symbol leuchtet, sobald mindestens
    eine Drehung möglich ist; die andere wird rot abgelehnt.
 2. **Dreh-Zone = Kreuzungsquadrat plus Toleranz `TURN_AHEAD` (160) davor und dahinter** in jedem angeschlossenen Gang.
-3. **Zu früh gedreht:** Verhalten wie in P1 – das Fenster scrollt gegen die Gangwand und steht, der Spieler steuert den
-   Dackel mit dem Stick selbst auf die Kreuzung bzw. in den neuen Gang. Das ist seine Entscheidung; es gibt kein
-   automatisches Hineingleiten und kein Weiterscrollen in alter Richtung. „Nie festsitzen“ heißt: er kommt mit dem
-   Stick immer heraus.
+3. **Zu früh gedreht** (Dackel noch im Gang vor oder hinter der Kreuzung, innerhalb der Toleranz): **Nur die Kamera
+   gleitet weich in den neuen Gang.** Der Dackel bleibt an seiner Kartenstelle (die Drehung verschiebt ihn nie); im
+   Bild wandert er dadurch ein Stück zur Seite. Im neuen Gang scrollt die Kamera weiter, ohne anzuhalten; der Spieler
+   fliegt den Dackel mit dem Stick hinterher. **Erreicht der Dackel dabei den Bildrand, wartet die Kamera am Rand auf
+   ihn** (Robin: Variante a), bis er in den Gang fliegt – der Bildrand schiebt den Dackel nie.
 4. **Breiter Raum:** Die Kamera folgt dem Dackel quer bis an die Raumwände (nicht Kernaufgabe, aber ruckfrei).
 
 ## 4. Karte (Daten, Werte als Konstanten oben in der Datei)
