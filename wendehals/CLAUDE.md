@@ -104,12 +104,35 @@ Import. Der Port muss mit `tools/pruefe-welt.mjs` übereinstimmen (Test in `test
 ## Prototypen und das v0.2-Spiel
 
 - Die v0.2-Welt bleibt das Standardspiel; jedes Release muss für Robin spielbar bleiben.
-- Prototyp-Code liegt nur in `src/proto/` (plus wenige Zeilen Anbindung laut Brief). Erreichbar auf dem
-  Deck über **Optionen → Prototyp: …** (nur vom Titel), im Browser über `?proto=<name>`.
+- Prototyp-Code liegt nur in `src/proto/` (plus wenige Zeilen Anbindung laut Brief). Prototyp-Builds starten
+  **direkt im Prototyp** (`src/main.js`); `?spiel` (Electron: `WENDEHALS_SPIEL=1`) öffnet v0.2, Start/Esc im
+  Prototyp führt zum v0.2-Titel, dort „Optionen → Prototyp: …“ zurück.
 - Regeln aus Prototypen gehen nie direkt ins Spiel: nach Robins „keep“ werden sie in den echten Modulen
   neu geschrieben (Spiel gegen Löser getestet), der Prototyp wird gelöscht.
 - Überholt durch Robins Entscheidungen vom 05.10.2026 (siehe PROTOTYPEN.md): vertikale Etappen mit
   Zoom-out, gedrehte 45°-Diagonal-Etappen (E1), „Diagonalen werfen bis Phase 2“ als Plan.
+
+## Regeln für jede Prototyp-Arbeit (Robin, 07.10.2026 – gelten immer)
+
+Aus der Retrospektive zu P1 ([`docs/prototypen/P1-retro.md`](docs/prototypen/P1-retro.md)). Gelten in jeder
+Session, für jeden Prototyp, ohne dass Robin sie wiederholen muss.
+
+1. **Erst verstehen, dann bauen.** Ändert eine Rückmeldung mehr als einen Zahlenwert: zuerst Deutung und
+   Lösungsansatz in höchstens drei Sätzen an Robin, auf sein „ja“ (oder seine Korrektur) warten, dann bauen.
+   Folgeprobleme, die eine von Robins Regeln berühren, vorlegen statt still lösen.
+2. **Abnahme-Checkliste zuerst.** Jeder Bau-Brief beginnt mit einer Checkliste der Invarianten (Vorbild:
+   `docs/PROTOTYPEN.md` Abschnitt 4a, die für alles mit dem drehenden Fenster gilt). Jede Zeile bekommt einen
+   automatischen Test aus Spielersicht.
+3. **Messen, was der Spieler sieht.** Prüfungen und Simulationen messen Position und Bildschirmstelle der
+   Spielfigur, nicht nur Kamerawerte. Nichts als „erledigt“ oder „greift nie“ melden, was nicht so gemessen ist.
+4. **Direkt spielbar ausliefern.** Prototyp-Builds starten direkt im Prototyp. Nach jeder Runde `dist/index.html`
+   als Datei an Robin schicken und das Artifact unter derselben URL aktualisieren; einmal im Artifact selbst prüfen
+   (eingebettetes Fenster hat andere Rechte, z. B. kein Gamepad).
+5. **Bewegungs- und Kameraregeln im Brief sind Hypothesen**, keine festen Regeln – der Spieltest entscheidet.
+6. **Push nur nach** `npm test && npm run e2e` (als eine Kette, nie mit `;`), Golden Master unverändert.
+7. **Modellwahl** laut `docs/PROTOTYPEN.md`: Deutungs- und Design-Runden Opus 5.5, Bauen und Testen Sonnet 5.5.
+8. **Alles muss auf dem Steam Deck funktionieren** (Controller und Tastatur, 60 fps, Symbole selbst gezeichnet,
+   keine Abhängigkeit von Schriftarten) – gilt fürs ganze Spiel.
 
 ## Golden Master der v0.2-Welt
 

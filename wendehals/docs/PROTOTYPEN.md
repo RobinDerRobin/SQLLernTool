@@ -27,8 +27,11 @@ Konzept nicht stehen (Level werden mehrfach neu gebaut).
   `worldgraph*`, Löser und Spielstand bleiben unberührt.
 - `npm test` bleibt grün, **der Golden Master der v0.2-Welt bleibt unverändert** (beweist: das Spiel ist
   unberührt), `npm run e2e` grün.
-- Erreichbar auf dem Deck über **Optionen → Prototyp: …** (nur vom Titel aus), im Browser über
-  `?proto=<name>`. v0.2 bleibt das Standardspiel.
+- Prototyp-Builds starten **direkt im Prototyp**; `?spiel` öffnet v0.2, das vom Prototyp aus (Start/Esc)
+  erreichbar bleibt. Vor dem Übernehmen eines Prototyps ins Spiel wird wieder auf v0.2 als Start umgestellt.
+- **Arbeitsregeln für jede Prototyp-Session** (erst verstehen, dann bauen; Checkliste zuerst; messen, was der
+  Spieler sieht; direkt spielbar ausliefern; …): verbindlich in [`../CLAUDE.md`](../CLAUDE.md), Abschnitt
+  „Regeln für jede Prototyp-Arbeit“.
 
 ### Modellwahl (feste Regel)
 
