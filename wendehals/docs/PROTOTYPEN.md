@@ -88,12 +88,12 @@ dürfen es als Platzhalter nutzen.
 
 ## 4. Prototyp-Leiter Paket 1 „Fenster“
 
-**P1-Builds starten direkt im Prototyp; vor dem Übernehmen eines späteren Prototyps oder zurück zu v0.2 wird das wieder umgestellt.** (`?spiel` in der URL bzw. `WENDEHALS_SPIEL=1` für Electron öffnet das alte Spiel direkt; Start/Esc im Prototyp → v0.2-Titelmenü, dort „Optionen → Prototyp: Fenster“ zurück.)
+**Prototyp-Builds starten direkt im Prototyp (seit P1c: im „Netz“; `?proto=fenster` = P1 „Kreuzung“); vor dem Übernehmen eines späteren Prototyps oder zurück zu v0.2 wird das wieder umgestellt.** (`?spiel` in der URL bzw. `WENDEHALS_SPIEL=1` für Electron öffnet das alte Spiel direkt; Start/Esc im Prototyp → v0.2-Titelmenü, dort „Optionen → Prototyp: Fenster / Netz“ zurück.)
 
 | ID | Frage | Stand |
 |---|---|---|
 | **P1 „Kreuzung“** | Nehme ich die Gabelung, die ich will, indem ich das Fenster drehe – beim ersten Mal, ohne nachzudenken, auch nach der 180°-Umkehr und mit dem Plan kopfüber? | **keep (07.10.2026)** – [Brief](prototypen/P1-kreuzung.md), [Retrospektive](prototypen/P1-retro.md) |
-| **P1c „Netz“** | Hält das Drehen die Checkliste 4a an T, L, überlappenden Zonen, versetzten Abzweigen, breitem/schmalem Gang, Ring? | **Brief validiert (07.10.2026):** [`prototypen/P1c-netz.md`](prototypen/P1c-netz.md) – Bau in eigener Sonnet-Session |
+| **P1c „Netz“** | Hält das Drehen die Checkliste 4a an T, L, überlappenden Zonen, versetzten Abzweigen, breitem/schmalem Gang, Ring? | **gebaut (07.10.2026), wartet auf Robins Spieltest (F2):** [`prototypen/P1c-netz.md`](prototypen/P1c-netz.md), Stand in Abschnitt 9 |
 | P1b | Nur falls P1 „nein“: dog-bezogen vs. bildschirmbezogen drehen, umschaltbar | wartet auf P1 |
 | P2 „Orientierung“ | Behalte ich in einer Schleife mit Landmarken die Orientierung, ohne Karte? (→ Minimap nötig?) | wartet auf P1 |
 | P3 „45°“ | Passen 45°-Drehungen zur selben Aktion? (Diagonal-Arm, achteckige Kreuzung, LT/RT) | wartet auf P1 |

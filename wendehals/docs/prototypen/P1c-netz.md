@@ -114,3 +114,33 @@ maßstabsgetreu):
 
 Was gebaut ist, jede Abweichung vom Brief mit Grund (vorher gefragt, Regel 1), Testergebnisse, und die Frage:
 „An welcher Stelle (A–I) hat sich das Drehen falsch angefühlt?“ Antwort als F2 ins Entscheidungsprotokoll.
+
+## 9. Stand nach dem Bau (07.10.2026, Sonnet 5.5)
+
+**Gebaut:** `src/proto/karte.js` (Gänge als Rechtecke, Kreuzungen = Überschneidungen, Ports, Dreh-Zonen), `src/proto/netz-map.js`
+(Netz mit den Stellen A–I, `STELLEN`), `FensterScene` mit Karte als Parameter (P1 = Kreuz, P1c = Netz), `tests/netz.tests.mjs`
+(+ `tests/helpers/netz-bot.mjs`), `e2e/netz.mjs`. Direktstart im Netz, `?proto=fenster` = P1, `?spiel` = v0.2, Optionen → „Prototyp: Netz“.
+
+**Kamera (alles Hypothesen, Regel 5 – der Spieltest entscheidet):**
+- Das Fenster scrollt durch den Gang K (Kamerabereich = Gang ±60 an den Enden, quer ±40 % der halben Breite; im Raum F bis zu den
+  Wänden: ±87). K wird beim Drehen gesetzt: der Gang der Kreuzung, der in der neuen Flugrichtung wegführt.
+- Steht der Dackel beim Drehen schon im neuen Gang (Kreuzungsquadrat), trägt ihn die Kamera wie in P1. Steht er noch im alten Gang
+  („zu früh“, `glide`), gleitet nur die Kamera und scrollt weiter; der Dackel bleibt an seiner Kartenstelle und wandert im Bild zurück;
+  am Bildrand wartet sie (weich, `EASE` = 100). Sobald er im neuen Gang steht, trägt sie ihn wieder.
+- Weiches Anfahren/Bremsen (`SCROLL_RAMP` 1/s, `SCROLL_DECEL` 1,5/s, Auslauf `EASE`), Quer-Folgen mit begrenzter Beschleunigung
+  (`FOLLOW_ACC` 90, `FOLLOW_MAX` 120), Komfortzone `COMFORT` 95 (Dackel weicht quer höchstens so weit von der Bildmitte ab).
+  Das gilt jetzt auch in P1 (gleiche Klasse); die P1-Tests sind unverändert grün.
+
+**Checkliste → Tests** (`tests/netz.tests.mjs`, alle aus Spielersicht: Kartenposition und Bildschirmstelle des Dackels):
+Flüssige Kamera → `Monitor` in jedem Test (Sprung ≤ 4, Knick ≤ 0,1 rad/Frame; im Schwenk Drehwinkel ≤ 0,1 rad/Frame);
+Position ändert sich nie von selbst → `Monitor` (seitlich 0, im Schwenk 0, `shoves` = 0); Drehregeln → Orakel an allen Stellen +
+Grenzfälle; nie festsitzen → Bot erreicht von 254 Startlagen aus jeden der 6 Knochen (1.524 Wege, längster 39 s); zu früh gedreht → eigener Test + Gitter; Hin- und
+Zurückdrehen → exakt gleiches Bild; Schwenk/Eingabe → eigener Test; Rückmeldung → HUD-Zeichnung geprüft; D → Symbol erlischt nie;
+viele Drehungen → Ring-Runden (rechts, links, kopfüber) und 4×/12× Drehen auf A/D; F und G → eigene Tests; 60 fps → `e2e/netz.mjs`.
+
+**Bekannte Grenzen (ehrlich):**
+- Kamera-Knick ≤ 0,1 rad/Frame gilt ab 0,5 E/Frame sichtbarer Bewegung (wie im P1-Test) und **nicht** für das harte Anhalten vor
+  einer Wand, in die der Spieler den Dackel gerade gesteuert hat (wie in P1; im Zufallsspiel 20 von 120.000 Frames).
+- Nach einem Schwenk um einen Dackel am Bildrand liegt die Fenstermitte bis zu einer halben Bildbreite neben dem Dackel (außerhalb der
+  Karte möglich); das Scrollen bringt sie zurück (`pullBack`).
+- Die Stellen A–I und ihre Maße stehen in `netz-map.js`; Knochen: Stummel, Raum, Ecke NO, Ecke SW, Gangmitte, Abzweig.
