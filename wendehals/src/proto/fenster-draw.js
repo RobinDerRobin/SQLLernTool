@@ -1,7 +1,7 @@
-// Zeichnen für P1 „Kreuzung“ (Wegwerf-Prototyp). Plan wird um -ang gedreht, HUD nie.
-import { SCREEN_W, SCREEN_H, DIR_VEC } from '../core/math.js';
+// Zeichnen für P1 „Kreuzung“ und P1c „Netz“ (Wegwerf-Prototyp), beliebige Gänge. Plan wird um -ang gedreht, HUD nie.
+import { SCREEN_W, SCREEN_H } from '../core/math.js';
 import { drawDackel } from '../render/sprites.js';
-import { ARMS, END, HALF, DENY_TIME, BONE_POS } from './fenster.js';
+import { DENY_TIME } from './fenster.js';
 
 const FLOOR = '#6a5f55';
 const FLOOR2 = '#756a5f';
@@ -27,51 +27,48 @@ function drawBone(ctx, x, y, color, t) {
 }
 
 function drawPlan(ctx, sc, cam, ang) {
+  const map = sc.map;
+  const b = map.bounds;
   ctx.save();
   ctx.translate(SCREEN_W / 2, SCREEN_H / 2);
   ctx.rotate(-ang);
   ctx.translate(-cam.x, -cam.y);
-  // Wand (alles) und Boden (Kreuz aus zwei Balken)
+  // Wand (alles) und Boden (Vereinigung der Gänge)
   ctx.fillStyle = WALL;
-  ctx.fillRect(-END - 600, -END - 600, 2 * END + 1200, 2 * END + 1200);
+  ctx.fillRect(b.x0 - 700, b.y0 - 700, b.x1 - b.x0 + 1400, b.y1 - b.y0 + 1400);
   ctx.fillStyle = FLOOR;
-  ctx.fillRect(-END, -HALF, 2 * END, 2 * HALF);
-  ctx.fillRect(-HALF, -END, 2 * HALF, 2 * END);
-  // Gitter, damit Scrollen und Drehung sichtbar sind
+  for (const c of map.corridors) ctx.fillRect(c.x0, c.y0, c.x1 - c.x0, c.y1 - c.y0);
+  // Gitter, damit Scrollen und Drehung sichtbar sind (nur der sichtbare Teil)
   ctx.save();
   ctx.beginPath();
-  ctx.rect(-END, -HALF, 2 * END, 2 * HALF);
-  ctx.rect(-HALF, -END, 2 * HALF, 2 * END);
+  for (const c of map.corridors) ctx.rect(c.x0, c.y0, c.x1 - c.x0, c.y1 - c.y0);
   ctx.clip();
   ctx.fillStyle = FLOOR2;
-  const dark = (gx, gy) => Math.abs(Math.round((gx + gy) / GRID)) % 2 === 1;
-  for (let gx = -END; gx < END; gx += GRID) {
-    for (let gy = -HALF; gy < HALF; gy += GRID) if (dark(gx, gy)) ctx.fillRect(gx, gy, GRID, GRID);
-  }
-  for (let gy = -END; gy < END; gy += GRID) {
-    for (let gx = -HALF; gx < HALF; gx += GRID) if (dark(gx, gy) && Math.abs(gy) >= HALF) ctx.fillRect(gx, gy, GRID, GRID);
+  const R = 290;
+  const gx0 = Math.floor((cam.x - R) / GRID) * GRID;
+  const gy0 = Math.floor((cam.y - R) / GRID) * GRID;
+  for (let gx = gx0; gx < cam.x + R; gx += GRID) {
+    for (let gy = gy0; gy < cam.y + R; gy += GRID) {
+      if (Math.abs(Math.round((gx + gy) / GRID)) % 2 === 1) ctx.fillRect(gx, gy, GRID, GRID);
+    }
   }
   ctx.restore();
-  // Mittelmarke
+  // Kreuzungsquadrate (dünne Marke)
   ctx.strokeStyle = 'rgba(255,255,255,0.25)';
   ctx.lineWidth = 2;
-  ctx.strokeRect(-HALF, -HALF, WIDTH2, WIDTH2);
-  // Armfarbe am Ende des Arms und Knochen
-  ARMS.forEach((arm, i) => {
-    const v = DIR_VEC[arm.dir];
-    // Armfarbe als Streifen am Ende des Arms
-    ctx.fillStyle = arm.color;
-    ctx.globalAlpha = 0.35;
-    ctx.fillRect(v[0] ? (v[0] > 0 ? END - 8 : -END) : -HALF, v[1] ? (v[1] > 0 ? END - 8 : -END) : -HALF, v[0] ? 8 : 2 * HALF, v[1] ? 8 : 2 * HALF);
+  for (const j of map.junctions) ctx.strokeRect(j.x0, j.y0, j.x1 - j.x0, j.y1 - j.y0);
+  // Knochenplätze in ihrer Farbe (Landmarken) und der gesuchte Knochen
+  map.bones.forEach((bone, i) => {
+    ctx.fillStyle = bone.color;
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath();
+    ctx.arc(bone.x, bone.y, 30, 0, Math.PI * 2);
+    ctx.fill();
     ctx.globalAlpha = 1;
-    if (i === sc.target) {
-      const b = BONE_POS(i);
-      drawBone(ctx, b.x, b.y, arm.color, sc.time);
-    }
+    if (i === sc.target) drawBone(ctx, bone.x, bone.y, bone.color, sc.time);
   });
   ctx.restore();
 }
-const WIDTH2 = 2 * HALF;
 
 /** Ein Dreh-Symbol unten in der Mitte (für beide Richtungen): leuchtet und pulsiert, wenn Drehen geht (Kreuzung),
  *  sonst grau. Abgelehnter Druck: wackelt kurz und blinkt rot. Selbst gezeichnet (keine Schriftzeichen nötig). */
@@ -130,7 +127,7 @@ export function drawFenster(ctx, sc) {
   drawDackel(ctx, sc.time);
   ctx.restore();
   // HUD (nie mitgedreht)
-  const arm = ARMS[sc.target];
+  const arm = sc.map.bones[sc.target];
   ctx.fillStyle = 'rgba(0,0,0,0.55)';
   ctx.fillRect(6, 6, 118, 22);
   ctx.fillStyle = arm.color;
@@ -143,9 +140,9 @@ export function drawFenster(ctx, sc) {
   drawTurnIcon(ctx, sc);
   if (sc.hint > 0) {
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(SCREEN_W / 2 - 150, SCREEN_H - 58, 300, 20);
+    ctx.fillRect(SCREEN_W / 2 - 190, SCREEN_H - 58, 380, 20);
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
-    ctx.fillText('LB/RB drehen (nur auf der Kreuzung) · Y umkehren', SCREEN_W / 2, SCREEN_H - 48);
+    ctx.fillText('LB/RB drehen (nur an Kreuzungen, wo ein Gang abgeht) · Y umkehren', SCREEN_W / 2, SCREEN_H - 48);
   }
 }

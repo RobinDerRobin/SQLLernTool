@@ -14,7 +14,7 @@ const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-await page.goto(pathToFileURL(path.join(root, 'dist/index.html')).href);
+await page.goto(pathToFileURL(path.join(root, 'dist/index.html')).href + '?proto=fenster');
 await page.waitForFunction(() => window.__wendehals?.game.proto);
 const wait = (ms) => page.waitForTimeout(ms);
 const shot = (n) => page.screenshot({ path: path.join(shots, `fenster-${n}.png`) });

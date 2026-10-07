@@ -16,7 +16,7 @@ const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-await page.goto(pathToFileURL(path.join(root, 'dist/index.html')).href); // KEIN Parameter
+await page.goto(pathToFileURL(path.join(root, 'dist/index.html')).href + '?proto=fenster'); // seit P1c startet der Build ohne Parameter im Netz
 await page.waitForFunction(() => window.__wendehals);
 const wait = (ms) => page.waitForTimeout(ms);
 const shot = (n) => page.screenshot({ path: path.join(shots, `runde-${n}.png`) });
@@ -37,7 +37,7 @@ const check = (c, m) => {
 
 await wait(400);
 await shot('01-start-ohne-parameter');
-check((await st()).screen === 'proto', 'Start ohne Parameter im Prototyp');
+check((await st()).screen === 'proto', 'Start mit ?proto=fenster im Prototyp');
 const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
 const hold = async (want) => {
   for (const k of keys) await (want.includes(k) ? page.keyboard.down(k) : page.keyboard.up(k));

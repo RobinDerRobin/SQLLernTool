@@ -11,6 +11,7 @@ import { N, opposite, turnCW } from '../core/math.js';
 import { linksAt, directionAllowed, arrive, returnTarget } from './worldgraph.js';
 import { Arena } from './arena.js';
 import { FensterScene } from '../proto/fenster.js';
+import { NETZ_MAP } from '../proto/netz-map.js';
 import { Level } from './level.js';
 import { freshPowers, powerupsAfterDeath } from './powerups.js';
 import {
@@ -163,7 +164,10 @@ export class Game {
         },
       });
     }
-    if (fromTitle) items.push({ label: 'Prototyp: Fenster', action: () => this.startProto('fenster') });
+    if (fromTitle) {
+      items.push({ label: 'Prototyp: Fenster', action: () => this.startProto('fenster') });
+      items.push({ label: 'Prototyp: Netz', action: () => this.startProto('netz') });
+    }
     items.push({ label: 'Zurück', action: back });
     this.overlay = this.menu('Optionen', items, {
       onBack: () => {
@@ -341,8 +345,8 @@ export class Game {
 
   /** Wegwerf-Prototypen (src/proto/), nur vom Titel aus erreichbar. */
   startProto(name) {
-    if (name !== 'fenster') return;
-    this.proto = new FensterScene();
+    if (name !== 'fenster' && name !== 'netz') return;
+    this.proto = name === 'netz' ? new FensterScene({ map: NETZ_MAP }) : new FensterScene();
     this.screen = 'proto';
     this.screenTime = 0;
     this.overlay = null;
