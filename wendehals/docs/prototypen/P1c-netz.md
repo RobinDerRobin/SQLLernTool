@@ -115,7 +115,7 @@ maßstabsgetreu):
 Was gebaut ist, jede Abweichung vom Brief mit Grund (vorher gefragt, Regel 1), Testergebnisse, und die Frage:
 „An welcher Stelle (A–I) hat sich das Drehen falsch angefühlt?“ Antwort als F2 ins Entscheidungsprotokoll.
 
-## 9. Stand nach dem Bau (07.10.2026, Sonnet 5.5)
+## 9. Stand nach dem Bau (07.10.2026, Sonnet 5.5) – Kameraregeln überholt durch Abschnitt 10
 
 **Gebaut:** `src/proto/karte.js` (Gänge als Rechtecke, Kreuzungen = Überschneidungen, Ports, Dreh-Zonen), `src/proto/netz-map.js`
 (Netz mit den Stellen A–I, `STELLEN`), `FensterScene` mit Karte als Parameter (P1 = Kreuz, P1c = Netz), `tests/netz.tests.mjs`
@@ -144,3 +144,24 @@ viele Drehungen → Ring-Runden (rechts, links, kopfüber) und 4×/12× Drehen a
 - Nach einem Schwenk um einen Dackel am Bildrand liegt die Fenstermitte bis zu einer halben Bildbreite neben dem Dackel (außerhalb der
   Karte möglich); das Scrollen bringt sie zurück (`pullBack`).
 - Die Stellen A–I und ihre Maße stehen in `netz-map.js`; Knochen: Stummel, Raum, Ecke NO, Ecke SW, Gangmitte, Abzweig.
+
+## 10. Änderungen nach Robins Besprechung (08.10.2026, Paket A) – ersetzt die Kameraregeln aus Abschnitt 3 Nr. 3 und 9
+
+Robins Entscheidungen, gebaut in dieser Reihenfolge:
+1. **Kamera-Gang laufend wählen:** `K` (Gang, dessen Mittellinie die Kamera quer folgt) ist der dem Dackel nächste Gang in Flugrichtung unter
+   den Gängen der Kreuzungen, in deren Dreh-Zone er steht (Hysterese `K_HYST` 40). Behebt: bei zwei nahen Gängen folgte die Kamera nur einem.
+2. **Weiches Anfahren entfernt** (und das Bremsen vor Wänden: die Kamera hält nirgends mehr an).
+3. **Der Dackel wird immer und ausnahmslos mitgetragen** (feste Bildschirmstelle längs der Flugrichtung). Kein Gleiten, kein Warten am Bildrand.
+   Wer zu früh dreht, wird in die Wand des alten Gangs getragen, wenn er nicht in den neuen Gang lenkt.
+4. **Kamera hält an keiner Wand, Sackgasse oder dem Kartenrand an** („ungebremst weiter“).
+5. **Tod** bei Berührung von Wand oder Bildrand (Kreis des Dackels, Radius 8, alle Seiten) → kurzer Neustart (0,7 s, roter Blitz mit X)
+   **an der letzten Kreuzung** (Mitte des Quadrats, mit der Ausrichtung, mit der der Dackel es verließ). Zielfarbe und Punkte bleiben, keine Strafe.
+6. **Scrollgeschwindigkeit 70** (vorher 90; gilt auch für P1).
+7. **Dreh-Zone bleibt bei 160** (`TURN_AHEAD`). Eine Formel für das Dreh-Symbol (Scrollgeschwindigkeit, Dackel-Geschwindigkeit, Strecke zum
+   Gang, Puffer) wird im **Prototyp „Drehformel“** getestet – noch nicht gebaut (Robin: „Paket B jetzt nicht“).
+8. Tests neu gefasst (`tests/netz.tests.mjs`, Bot angepasst): Messgerät erlaubt Tod/Neustart; neue Tests für zu früh gedrehte Drehungen
+   (Tod ohne Lenken, Überleben mit Lenken), Neustart an der letzten Kreuzung, zwei nahe Gänge (A/D); Bot fliegt ohne Tod.
+   P1-Tests: drei Prüfungen minimal angepasst (Umkehr nicht am Armende; Tod/Neustart ist kein „Sprung“ und kein „Schieben“).
+
+Kamera quer folgt weiter dem Dackel im Scroll-Behälter von `K` (jetzt mit höherer Beschleunigung `FOLLOW_ACC` 250, weil das Scrollen
+immer mit voller Geschwindigkeit läuft und kleine Quer-Änderungen kaum noch Richtungsknicke erzeugen).

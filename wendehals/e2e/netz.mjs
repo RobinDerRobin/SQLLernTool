@@ -55,8 +55,8 @@ const SZENEN = [
   { id: 'C', name: 'l-knick', x: 452, y: -500, theta: N.E, s: 'R', key: 'KeyO', text: 'L-Knick Nordost, zu früh rechts gedreht', abgelehnt: 'KeyU' },
   { id: 'D', name: 'zwei-kreuzungen', x: 130, y: 0, theta: N.E, s: 'R', key: 'KeyU', text: 'zwischen A und D, links (Stummel) geht' },
   { id: 'E', name: 'versetzte-abzweige', x: -560, y: 0, theta: N.E, s: 'R', key: 'KeyU', text: 'versetzte Abzweige, links ab' },
-  { id: 'F', name: 'breiter-raum', x: 250, y: 500, theta: N.E, s: 'R', fly: { my: 1, ms: 1500 }, text: 'breiter Raum, der Dackel fliegt an die Südwand' },
-  { id: 'F2', name: 'breiter-raum-kopfueber', x: 450, y: 500, theta: N.W, s: 'R', fly: { my: -1, ms: 1500 }, text: 'breiter Raum kopfüber (Plan steht auf dem Kopf)' },
+  { id: 'F', name: 'breiter-raum', x: 250, y: 500, theta: N.E, s: 'R', fly: { my: 1, ms: 800 }, text: 'breiter Raum, der Dackel fliegt an die Südwand' },
+  { id: 'F2', name: 'breiter-raum-kopfueber', x: 450, y: 500, theta: N.W, s: 'R', fly: { my: -1, ms: 800 }, text: 'breiter Raum kopfüber (Plan steht auf dem Kopf)' },
   { id: 'G', name: 'schmaler-gang', x: -900, y: -250, theta: N.S, s: 'R', fly: { my: 0.5, ms: 800 }, text: 'schmaler Gang (West-Ring)' },
   { id: 'H', name: 'stummel', x: 260, y: -200, theta: N.N, s: 'R', key: 'KeyO', text: 'Stummel nördlich von D, rechts (Osten)' },
   { id: 'I', name: 'ring-ecke', x: 700, y: 500, theta: N.S, s: 'R', key: 'KeyO', text: 'Ring, Südost-Ecke, rechts herum (Westen)' },
@@ -74,7 +74,7 @@ for (const sz of SZENEN) {
   await page.screenshot({ path: base + '-1-vor.png' });
   const before = await proto(() => {
     const p = window.__wendehals.game.proto;
-    return { m: p.dogMap(), theta: p.theta };
+    return { m: p.dogMap(), theta: p.theta, deaths: p.deaths };
   });
   if (sz.abgelehnt) {
     await page.keyboard.press(sz.abgelehnt);
@@ -89,11 +89,12 @@ for (const sz of SZENEN) {
     await page.screenshot({ path: base + '-3-nach.png' });
     const after = await proto(() => {
       const p = window.__wendehals.game.proto;
-      return { m: p.dogMap(), theta: p.theta, swing: !!p.swing, glide: p.glide };
+      return { m: p.dogMap(), theta: p.theta, swing: !!p.swing, deaths: p.deaths };
     });
     check(after.theta !== before.theta && !after.swing, `${sz.id}: Drehung angenommen (${sz.text})`);
     // Die Drehung ändert die Kartenposition des Dackels nur durch das Scrollen in der kurzen Zeit davor/danach, nie quer.
-    check(Math.hypot(after.m.x - before.m.x, after.m.y - before.m.y) < 140, `${sz.id}: Dackel bleibt in der Nähe seiner Kartenstelle`);
+    // Der Dackel wird nur in Flugrichtung getragen (70/s); wer zu früh dreht und nicht lenkt, stirbt und beginnt an der letzten Kreuzung neu
+    check(after.deaths > before.deaths || Math.hypot(after.m.x - before.m.x, after.m.y - before.m.y) < 140, `${sz.id}: Dackel nur ein Stück getragen (oder gestorben und neu gestartet)`);
     await wait(1500);
     await page.screenshot({ path: base + '-4-spaeter.png' });
   }

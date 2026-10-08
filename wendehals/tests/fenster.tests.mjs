@@ -36,6 +36,7 @@ test('Fenster: Drehen ändert theta um ±90°, s bleibt (Skizze: Osten, rechts �
 
 test('Fenster: Y ändert nur s, Blickrichtung +180°, theta bleibt', () => {
   const sc = new FensterScene();
+  sc.warp(0, 0, E, 'R'); // auf der Kreuzung (am Armende tötet die Wand hinter dem Dackel nach der Umkehr, Robin 08.10.2026)
   const h0 = sc.h;
   sc.update(DT, { wende: true });
   assert.equal(sc.s, 'L');
@@ -111,10 +112,13 @@ test('Fenster: Scroll-Behälter – Drehen im Gang und zurück verschiebt das Bi
   const c = clampCam(sc.cam.x, sc.cam.y);
   assert.ok(Math.hypot(c.x - sc.cam.x, c.y - sc.cam.y) < 1e-6, 'Kamera im Behälter');
   let prev = sc.dogMap();
+  let deaths = sc.deaths;
   for (let i = 0; i < 600; i++) {
     sc.update(DT, { mx: Math.sin(i / 30), my: Math.cos(i / 20) });
     const m = sc.dogMap();
-    assert.ok(Math.hypot(m.x - prev.x, m.y - prev.y) < 5, 'kein Sprung');
+    // Tod und Neustart an der letzten Kreuzung sind gewollte Sprünge (Robin 08.10.2026), sonst kein Sprung
+    if (sc.deaths === deaths) assert.ok(Math.hypot(m.x - prev.x, m.y - prev.y) < 5, 'kein Sprung');
+    deaths = sc.deaths;
     prev = m;
   }
 });
@@ -227,7 +231,9 @@ test('Fenster: ohne Eingabe ändert sich die Kartenposition des Dackels nur in B
       }
       for (let i = 0; i < 300; i++) {
         const m0 = q.dogMap();
+        const d0 = q.deaths;
         q.update(DT, {});
+        if (q.deaths !== d0) continue; // Tod und Neustart (Robin 08.10.2026) sind kein Schieben
         const m = q.dogMap();
         const v = DIR_VEC[q.theta];
         const side = Math.abs((m.x - m0.x) * v[1] - (m.y - m0.y) * v[0]);

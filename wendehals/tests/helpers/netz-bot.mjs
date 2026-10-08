@@ -2,10 +2,10 @@
 // was ein Spieler sieht (Position des Dackels, Flugrichtung, ob Drehen geht). Weg: Breitensuche auf einem Raster über der
 // Karte (nur zur Wegfindung), dann Stick in Wegrichtung, an Kreuzungen drehen, bei Gegenrichtung umkehren.
 
-import { DIR_VEC, turnCW } from '../../src/core/math.js';
+import { DIR_VEC, turnCW, SCREEN_W } from '../../src/core/math.js';
 
 const STEP = 20;
-const CLEAR = 10; // Abstand zur Wand beim Planen (größer als der Dackelradius)
+const CLEAR = 30; // Abstand zur Wand beim Planen (deutlich größer als der Dackelradius: das Scrollen trägt den Dackel mit)
 
 export class NavBot {
   constructor(map) {
@@ -83,45 +83,57 @@ export class NavBot {
     return { x: this.x0 + i * STEP, y: this.y0 + j * STEP };
   }
 
-  /** Eingabe für diesen Frame, um (tx,ty) zu erreichen. */
+  /** Eingabe für diesen Frame, um (tx,ty) zu erreichen. Der Dackel hängt am Scrollen: vorwärts trägt ihn die Kamera, der Stick
+   *  korrigiert nur quer zum Weg und hält ihn in der Bildmitte; gedreht wird erst im Kreuzungsquadrat; ist der Weg
+   *  hinter dem Dackel, kehrt der Bot um. */
   control(sc, tx, ty, dt = 1 / 60) {
     this.cool = Math.max(0, this.cool - dt);
-    if (sc.swing) return {};
+    if (sc.swing || sc.respawn) return {};
     const m = sc.dogMap();
     const dist = this.field(tx, ty);
     const w = this.waypoint(dist, m);
-    let gx = w.x - m.x;
-    let gy = w.y - m.y;
-    const len = Math.hypot(gx, gy);
-    if (len < 1e-6) return {};
-    gx /= len;
-    gy /= len;
+    const ex = w.x - m.x;
+    const ey = w.y - m.y;
     const hv = DIR_VEC[sc.h];
-    const fwd = gx * hv[0] + gy * hv[1];
+    const lv = DIR_VEC[turnCW(sc.h)];
+    const eF = ex * hv[0] + ey * hv[1]; // Weg voraus (+) oder hinter dem Dackel (−)
+    const eL = ex * lv[0] + ey * lv[1]; // Weg seitlich
+    // Für die Entscheidung zu drehen schaut der Bot weiter voraus (6 Zellen = 120 Einheiten)
+    // (Richtung des Wegs vorn, nicht der Abstand des Dackels zur Mitte)
+    const w8 = this.waypoint(dist, m, 8);
+    const fx = w8.x - w.x;
+    const fy = w8.y - w.y;
+    const fF = fx * hv[0] + fy * hv[1];
+    const fL = fx * lv[0] + fy * lv[1];
     const input = {};
-    if (this.cool <= 0) {
-      if (Math.abs(fwd) >= Math.abs(gx * hv[1] - gy * hv[0])) {
-        if (fwd < -0.5) {
+    const turnNeeded = Math.hypot(fx, fy) >= 20 && Math.abs(fL) >= 0.7 * Math.abs(fF);
+    if (this.cool <= 0 && Math.hypot(fx, fy) > 1e-6) {
+      if (!turnNeeded) {
+        if (Math.hypot(fx, fy) >= 20 && fF < 0 && Math.abs(fL) < Math.abs(fF)) {
           input.wende = true;
           this.cool = 0.6;
         }
       } else {
-        // quer zur Flugrichtung: dorthin drehen, wenn es geht
-        const rv = DIR_VEC[turnCW(sc.h)];
-        const k = gx * rv[0] + gy * rv[1] > 0 ? 1 : -1;
-        if (sc.canTurnBy(k)) {
+        // quer zur Flugrichtung: dorthin drehen – im Kreuzungsquadrat (dort steht der Dackel schon im neuen Gang)
+        const k = fL > 0 ? 1 : -1;
+        const j = sc.turnJunction(k);
+        const r = 8;
+        if (j && m.x >= j.x0 + r && m.x <= j.x1 - r && m.y >= j.y0 + r && m.y <= j.y1 - r) {
           if (k > 0) input.rotRight = true;
           else input.rotLeft = true;
           this.cool = 0.7;
         }
       }
     }
-    // Stick: Wegrichtung in Bildschirmkoordinaten (Bild dreht nie mit dem Stick mit)
+    // Stick: in der Gangmitte bleiben (quer, Karten-Richtung → Bildschirm), längs nur die Bildmitte halten (Bildschirm)
+    const K = sc.K;
+    const latAxis = K.axis === 'h' ? [0, 1] : [1, 0];
+    const centerErr = K.c - (m.x * latAxis[0] + m.y * latAxis[1]);
+    const sideCmd = Math.abs(centerErr) < 3 ? 0 : Math.max(-1, Math.min(1, centerErr / 24));
     const r = DIR_VEC[sc.theta];
     const d = DIR_VEC[turnCW(sc.theta)];
-    input.mx = gx * r[0] + gy * r[1];
-    input.my = gx * d[0] + gy * d[1];
+    input.mx = (latAxis[0] * r[0] + latAxis[1] * r[1]) * sideCmd + Math.max(-0.5, Math.min(0.5, (SCREEN_W / 2 - sc.dog.x) / 60));
+    input.my = (latAxis[0] * d[0] + latAxis[1] * d[1]) * sideCmd;
     return input;
   }
 }
-

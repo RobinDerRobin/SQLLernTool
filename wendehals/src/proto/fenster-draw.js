@@ -138,6 +138,22 @@ export function drawFenster(ctx, sc) {
   ctx.textAlign = 'left';
   ctx.fillText('Knochen: ' + sc.score, 30, 17);
   drawTurnIcon(ctx, sc);
+  if (sc.deadFx > 0) {
+    // Tod: roter Blitz mit großem X, bis der Neustart beginnt (selbst gezeichnet, keine Schrift)
+    const k = Math.min(1, sc.deadFx / 0.7);
+    ctx.save();
+    ctx.fillStyle = `rgba(200,30,30,${0.45 * k})`;
+    ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * k})`;
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(SCREEN_W / 2 - 24, SCREEN_H / 2 - 24);
+    ctx.lineTo(SCREEN_W / 2 + 24, SCREEN_H / 2 + 24);
+    ctx.moveTo(SCREEN_W / 2 + 24, SCREEN_H / 2 - 24);
+    ctx.lineTo(SCREEN_W / 2 - 24, SCREEN_H / 2 + 24);
+    ctx.stroke();
+    ctx.restore();
+  }
   if (sc.hint > 0) {
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.fillRect(SCREEN_W / 2 - 190, SCREEN_H - 58, 380, 20);

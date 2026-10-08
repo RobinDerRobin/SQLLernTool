@@ -10,16 +10,16 @@
 // theta = Kartenrichtung, in die das rechte Fensterende zeigt; s = 'R'|'L' = Seite, zu der gescrollt wird.
 // Blickrichtung h = theta (s = R) bzw. opposite(theta) (s = L).
 //
-// Kamera (Hypothesen, der Spieltest entscheidet): Das Fenster scrollt in Blickrichtung durch den Gang K (Kamerabereich =
-// Gang minus Rand). Der Dackel hängt am Fenster (feste Bildschirmstelle), solange vor ihm Platz ist; sonst hält das Fenster.
-// Wurde „zu früh“ gedreht (der Dackel steht noch im alten Gang), gleitet nur die Kamera in den neuen Gang und scrollt weiter
-// („Gleiten“): der Dackel bleibt an seiner Kartenstelle und wandert im Bild zur Seite; am Bildrand wartet die Kamera.
+// Kamera (Hypothesen, der Spieltest entscheidet): Das Fenster scrollt in Blickrichtung mit SPEED und hält nirgends an (nicht an
+// Wänden, nicht an Gangenden). Der Dackel hängt immer und ausnahmslos am Fenster (feste Bildschirmstelle plus Stick). Berührt der
+// Kreis des Dackels eine Wand oder den Bildrand, stirbt er und beginnt kurz darauf an der letzten Kreuzung neu (keine Strafe).
+// Quer folgt die Kamera dem Dackel im Scroll-Behälter des Gangs K; K ist der dem Dackel nächste Gang in Flugrichtung.
 
 import { E, S, W, N, DIR_VEC, turnCW, turnCCW, opposite, headingAngle, SCREEN_W, SCREEN_H, approach, clamp } from '../core/math.js';
 import { Rng } from '../core/rng.js';
 import { compileMap } from './karte.js';
 
-export const SPEED = 90; // Scrollgeschwindigkeit (Einheiten/s)
+export const SPEED = 70; // Scrollgeschwindigkeit (Einheiten/s)
 export const ARM = 720; // Länge eines Arms (ab Kreuzungsrand) – P1
 export const WIDTH = 200; // Gangbreite
 export const HALF = WIDTH / 2;
@@ -33,13 +33,12 @@ export const DOG_MARGIN = 14;
 export const CAMW = 40; // Scroll-Behälter: so weit darf die Fenstermitte quer von der Gangmitte abweichen (Gang 200)
 export const TURN_AHEAD = 160; // Toleranz: so weit vor/hinter der Kreuzung (im Gang) darf schon gedreht werden
 export const DENY_TIME = 0.45; // Dauer der Ablehnungs-Anzeige (Tastensymbol wackelt rot)
-export const FOLLOW_MAX = 120; // höchstes Nachzieh-Tempo der Kamera quer (Einheiten/s)
+export const FOLLOW_MAX = 140; // höchstes Nachzieh-Tempo der Kamera quer (Einheiten/s)
 export const FOLLOW_TAIL = 5; // letzte Einheiten vor dem Ziel: Geschwindigkeit 5/s · Abstand (weiches Ausklingen)
-export const FOLLOW_ACC = 90; // höchste Beschleunigung des Quer-Folgens (Einheiten/s²): kein Richtungsknick
-export const SCROLL_RAMP = 1; // Anfahren: so schnell darf das Scrolltempo (Anteil von SPEED) pro Sekunde wachsen – kein Ruck nach Halt oder Schwenk
-export const SCROLL_DECEL = 1.5; // Bremsen: so schnell darf das Scrolltempo (Anteil von SPEED) pro Sekunde fallen, solange der Platz reicht
+export const FOLLOW_ACC = 250; // höchste Beschleunigung des Quer-Folgens (Einheiten/s²): kein Richtungsknick
 export const COMFORT = 95; // so weit darf der Dackel (quer) von der Bildmitte abweichen, bevor die Kamera nachzieht (Bildrand: 121)
-export const EASE = 100; // Auslauf: so weit vor einer Grenze (Wand, Gangende, Bildrand) bremst das Scrollen weich ab
+export const K_HYST = 40; // Kamera-Gang: so viel näher muss der Dackel am anderen Gang sein, bevor die Kamera umschaltet
+export const RESPAWN_TIME = 0.7; // kurzer Neustart nach dem Tod (Sekunden, ohne Strafe)
 export const SWING_TIME = 0.5;
 export const TURN_RATE = 5; // Umkehr: 1/0,4 s * 2 (von -1 nach 1 in 0,4 s)
 
@@ -89,11 +88,10 @@ export class FensterScene {
     this.cam = { ...st.cam };
     this.dog = { ...st.dog }; // Bildschirmkoordinaten
     this.K = map.byId[st.corridor]; // der Gang, durch den das Fenster gerade scrollt
-    this.glide = false; // true: zu früh gedreht, Kamera gleitet in den neuen Gang, der Dackel wird nicht mitgetragen
     this.vc = 0; // Quer-Geschwindigkeit der Kamera (Einheiten/s)
-    this.sp = 1; // Scrolltempo als Anteil von SPEED (läuft nach Halt und Schwenk weich an)
-    this.hardStop = false;
-    this.shoves = 0; // Zähler Sicherheitsnetz: so oft wurde der Dackel versetzt (muss 0 bleiben)
+    this.deaths = 0;
+    this.respawn = null; // { t } – kurzer Neustart nach dem Tod
+    this.deadFx = 0; // Anzeige: roter Blitz nach dem Tod (Sekunden)
     this.swing = null; // { t, a0, a1, pivot } – Drehpunkt = Kartenposition des Dackels
     this.score = 0;
     this.denied = null; // { side: 'L'|'R', t } – Drehen abgelehnt
@@ -101,7 +99,9 @@ export class FensterScene {
     this.target = 0;
     this.hint = 8; // Sekunden Starthinweis
     this.pickTarget(st.notTarget ?? -1);
-    this.fixDog(true); // Startlage in den Boden setzen (zählt nicht)
+    this.fixDog(); // Startlage in den Boden setzen
+    this.checkpoint = { ...this.dogMap(), theta: this.theta, s: this.s };
+    this.trackJunction();
   }
 
   get h() {
@@ -159,16 +159,17 @@ export class FensterScene {
     this.ang = headingAngle(theta);
     this.dir = s === 'R' ? 1 : -1;
     this.swing = null;
-    this.glide = false;
     this.vc = 0;
-    this.sp = 1;
+    this.respawn = null;
     this.dog = { ...dogScreen };
     const r = vec(theta);
     const d = vec(turnCW(theta));
     const ox = dogScreen.x - SCREEN_W / 2;
     const oy = dogScreen.y - SCREEN_H / 2;
     this.cam = { x: mx - ox * r[0] - oy * d[0], y: my - ox * r[1] - oy * d[1] };
-    this.K = this.map.corridorAt(mx, my, theta);
+    this.K = this.map.corridorAt(mx, my, this.h);
+    this.checkpoint = { x: mx, y: my, theta, s };
+    this.trackJunction();
     return this;
   }
 
@@ -191,11 +192,10 @@ export class FensterScene {
     return { x: this.cam.x, y: this.cam.y };
   }
 
-  /** Dackel (Bildschirm) zurück auf begehbaren Boden setzen. Sicherheitsnetz: Tests verlangen shoves === 0. */
-  fixDog(initial = false) {
+  /** Startlage: liegt der Dackel beim Anlegen der Szene nicht auf Boden, kommt er auf den nächsten begehbaren Punkt. */
+  fixDog() {
     const m = this.dogMap();
-    if (this.walkable(m.x, m.y, DOG_R - 0.1)) return; // Toleranz größer als beim Mitnehmen: Scrollen bis an die Wand löst nie ein Versetzen aus
-    if (!initial) this.shoves++;
+    if (this.walkable(m.x, m.y, DOG_R)) return;
     const v = this.nearestValid(m);
     const r = vec(this.theta);
     const d = vec(turnCW(this.theta));
@@ -216,10 +216,6 @@ export class FensterScene {
     this.theta = k > 0 ? turnCW(this.theta) : turnCCW(this.theta);
     this.K = this.map.corridorFor(j, this.h);
     this.vc = 0;
-    this.sp = 0;
-    // Steht der Dackel schon im neuen Gang (Kreuzungsquadrat), trägt die Kamera ihn wie gewohnt mit; sonst („zu früh
-    // gedreht“, er steht noch im alten Gang) gleitet nur die Kamera in den neuen Gang.
-    this.glide = !this.inGang(pivot);
     // Das Fenster dreht sich um den Dackel: seine Kartenposition und Bildschirmstelle bleiben fest.
     this.swing = { t: 0, a0, a1: a0 + (k > 0 ? Math.PI / 2 : -Math.PI / 2), pivot };
     return true;
@@ -235,6 +231,7 @@ export class FensterScene {
     this.time += dt;
     if (this.hint > 0) this.hint -= dt;
     if (this.denied && (this.denied.t -= dt) <= 0) this.denied = null;
+    if (this.deadFx > 0) this.deadFx = Math.max(0, this.deadFx - dt);
 
     if (this.swing) {
       const sw = this.swing;
@@ -252,9 +249,13 @@ export class FensterScene {
       if (sw.t >= SWING_TIME) {
         this.ang = sw.a1;
         this.swing = null;
-        this.fixDog();
       }
       return; // Die Drehung pausiert das Spiel; Eingaben werden ignoriert.
+    }
+
+    if (this.respawn) {
+      if ((this.respawn.t -= dt) <= 0) this.respawn = null;
+      return; // kurzer Neustart: nichts bewegt sich
     }
 
     const rotK = input.rotLeft ? -1 : input.rotRight || input.espressoPressed ? 1 : 0;
@@ -269,8 +270,13 @@ export class FensterScene {
     this.dir = approach(this.dir, this.s === 'R' ? 1 : -1, TURN_RATE * dt);
     this.moveCam(dt);
     this.moveDog(dt, input);
+    this.selectK();
     this.followCam(dt);
-    if (this.glide && this.inGang(this.dogMap())) this.glide = false; // der Dackel ist im neuen Gang angekommen
+    if (this.touchesDanger()) {
+      this.die();
+      return;
+    }
+    this.trackJunction();
 
     const b = this.map.bones[this.target];
     const m = this.dogMap();
@@ -280,72 +286,85 @@ export class FensterScene {
     }
   }
 
-  /** Der Dackel steht im Gang K (dem Gang der Flugrichtung): dort darf ihn die Kamera mitnehmen. */
+  /** Wand oder Bildrand berührt (Kreis des Dackels, Radius DOG_R)? */
+  touchesDanger() {
+    const { x, y } = this.dog;
+    if (x < DOG_R || x > SCREEN_W - DOG_R || y < DOG_R || y > SCREEN_H - DOG_R) return true;
+    const m = this.dogMap();
+    return !this.walkable(m.x, m.y, DOG_R);
+  }
+
+  /** Letzte Kreuzung merken, in deren Quadrat der Dackel war (samt Ausrichtung, mit der er dort flog). */
+  trackJunction() {
+    const m = this.dogMap();
+    const r = DOG_R;
+    let best = null;
+    let bd = Infinity;
+    for (const j of this.map.junctions) {
+      if (m.x < j.x0 + r || m.x > j.x1 - r || m.y < j.y0 + r || m.y > j.y1 - r) continue;
+      const d = Math.hypot(m.x - j.cx, m.y - j.cy);
+      if (d < bd) {
+        best = j;
+        bd = d;
+      }
+    }
+    if (best) this.checkpoint = { x: best.cx, y: best.cy, theta: this.theta, s: this.s };
+  }
+
+  /** Tod: kurzer Neustart ohne Strafe an der letzten Kreuzung (Zielfarbe und Punkte bleiben). */
+  die() {
+    const c = this.checkpoint;
+    this.deaths++;
+    this.sfx.push('death');
+    this.warp(c.x, c.y, c.theta, c.s);
+    this.respawn = { t: RESPAWN_TIME };
+    this.deadFx = RESPAWN_TIME;
+  }
+
+  /** Kamera-Gang K laufend wählen: der Gang in Flugrichtung, in dem der Dackel steht; sonst der ihm nächste Gang der
+   *  Kreuzungen, in deren Dreh-Zone er steht. Der alte Gang bleibt, solange der neue nicht deutlich (K_HYST) näher liegt. */
+  selectK() {
+    const m = this.dogMap();
+    const map = this.map;
+    const hv = this.h;
+    const dist = (c) => Math.hypot(Math.max(c.x0 - m.x, 0, m.x - c.x1), Math.max(c.y0 - m.y, 0, m.y - c.y1));
+    const cand = new Set();
+    for (const j of map.zonesAt(m.x, m.y, DOG_R, TURN_AHEAD)) if (j.ports.includes(hv)) cand.add(map.corridorFor(j, hv));
+    for (const c of map.corridors) if (c.axis === this.K.axis && this.inGang(m, c)) cand.add(c);
+    if (!cand.size) return;
+    let best = null;
+    let bd = Infinity;
+    for (const c of cand) {
+      const d = dist(c);
+      if (d < bd - 1e-9 || (Math.abs(d - bd) <= 1e-9 && best && c.hw < best.hw)) {
+        best = c;
+        bd = d;
+      }
+    }
+    if (best === this.K) return;
+    const curIn = this.inGang(m, this.K);
+    const bestIn = this.inGang(m, best);
+    if ((bestIn && !curIn) || dist(this.K) > bd + K_HYST) this.K = best;
+  }
+
+  /** Der Dackel steht im Gang K (Kreis ganz im Rechteck des Gangs). */
   inGang(m, K = this.K) {
     const r = DOG_R - 0.05;
     return m.x >= K.x0 + r && m.x <= K.x1 - r && m.y >= K.y0 + r && m.y <= K.y1 - r;
   }
 
-  /** Freie Scrollstrecke in Richtung sign*r: Ende des Kamerabereichs im Gang K; im Gleiten der Bildrand hinter dem Dackel
-   *  (die Kamera wartet am Rand), sonst der Platz vor dem mitgetragenen Dackel (Wand). */
-  scrollLimit(sign, r) {
-    const [lo, hi] = this.map.camRange(this.K);
-    const along = this.K.axis === 'h' ? r[0] : r[1]; // ±1: Scrollachse liegt auf der Achse des Gangs
-    const a = this.cam.x * r[0] + this.cam.y * r[1];
-    const rLo = along > 0 ? lo : -hi;
-    const rHi = along > 0 ? hi : -lo;
-    let lim = sign > 0 ? rHi - a : a - rLo;
-    if (this.glide) {
-      lim = Math.min(lim, sign > 0 ? this.dog.x - DOG_MARGIN : SCREEN_W - DOG_MARGIN - this.dog.x);
-    } else {
-      const m = this.dogMap();
-      lim = Math.min(lim, this.map.freeDistance(m.x, m.y, r[0] * sign, r[1] * sign, EASE, DOG_R - 0.05));
-    }
-    return Math.max(0, lim);
-  }
-
-  /** Fenster scrollt in Blickrichtung (überall gleich), bremst vor Grenzen weich ab und hält dort an. Es schiebt den Dackel
-   *  nie: seine Kartenposition ändert sich nur durch das Scrollen in Blickrichtung und durch den Stick. */
+  /** Fenster scrollt in Blickrichtung mit SPEED und hält nie an; der Dackel wird immer mitgetragen (feste Bildschirmstelle). */
   moveCam(dt) {
     const sign = this.dir >= 0 ? 1 : -1;
     const r = vec(this.theta);
-    const lim = this.scrollLimit(sign, r);
-    const want = Math.abs(this.dir) * Math.min(1, lim / EASE);
-    this.sp = want < this.sp ? Math.max(want, this.sp - SCROLL_DECEL * dt) : Math.min(want, this.sp + SCROLL_RAMP * dt);
-    const nominal = SPEED * this.sp * dt;
-    const step = Math.min(nominal, lim); // nie weiter, als Platz ist (die Kamera schiebt den Dackel nie in eine Wand)
-    this.hardStop = step < nominal - 1e-9; // Messhilfe: die Wand hat die Kamera angehalten (der Spieler steuerte den Dackel davor)
-    this.sp = Math.min(this.sp, step / (SPEED * dt)); // hielt die Wand sie an, fährt sie danach von null an (kein Ruck beim Lösen)
-    if (step > 0) {
-      this.cam.x += r[0] * sign * step;
-      this.cam.y += r[1] * sign * step;
-      if (this.glide) this.dog.x -= sign * step; // Dackel bleibt an seiner Kartenstelle, wandert im Bild zurück
-    }
-    this.pullBack(sign, r, dt);
+    const step = SPEED * Math.abs(this.dir) * dt;
+    this.cam.x += r[0] * sign * step;
+    this.cam.y += r[1] * sign * step;
   }
 
-  /** Liegt die Fenstermitte außerhalb des Kamerabereichs (z. B. nach einem Schwenk um einen Dackel am Bildrand) und zeigt die
-   *  Flugrichtung vom Bereich weg, kehrt sie weich zurück. Der Dackel bleibt dabei an seiner Kartenstelle. */
-  pullBack(sign, r, dt) {
-    const [lo, hi] = this.map.camRange(this.K);
-    const along = this.K.axis === 'h' ? r[0] : r[1];
-    const a = this.cam.x * r[0] + this.cam.y * r[1];
-    const rLo = along > 0 ? lo : -hi;
-    const rHi = along > 0 ? hi : -lo;
-    const out = a < rLo ? a - rLo : a > rHi ? a - rHi : 0;
-    if (out === 0 || out < 0 !== sign < 0) return; // drin, oder die Flugrichtung führt in den Bereich hinein
-    const toward = out < 0 ? 1 : -1;
-    const room = toward > 0 ? this.dog.x - DOG_MARGIN : SCREEN_W - DOG_MARGIN - this.dog.x;
-    const dlt = Math.min(Math.abs(out), room, Math.min(SPEED * 0.7, Math.abs(out) * 2 + 3) * dt);
-    if (dlt <= 0) return;
-    this.cam.x += r[0] * toward * dlt;
-    this.cam.y += r[1] * toward * dlt;
-    this.dog.x -= toward * dlt;
-  }
-
-  /** Kamera folgt dem Dackel quer zur Scrollrichtung (innerhalb des Scroll-Behälters des Gangs K) und kehrt in ihn zurück.
-   *  Die Kartenposition des Dackels bleibt dabei gleich: seine Bildschirmstelle gleicht die Bewegung aus. Die Quer-
-   *  Geschwindigkeit ändert sich nur begrenzt (FOLLOW_ACC): keine Richtungsknicke. */
+  /** Kamera folgt dem Dackel quer zur Scrollrichtung (innerhalb des Scroll-Behälters des Gangs K). Die Kartenposition des
+   *  Dackels bleibt dabei gleich: seine Bildschirmstelle gleicht die Bewegung aus. Die Quer-Geschwindigkeit ändert sich
+   *  nur begrenzt (FOLLOW_ACC): keine Richtungsknicke. */
   followCam(dt) {
     if (dt <= 0) return;
     const d = vec(turnCW(this.theta));
@@ -357,16 +376,16 @@ export class FensterScene {
     const dogCross = cross + (this.dog.y - SCREEN_H / 2);
     let want = clamp(dogCross, centerD - half, centerD + half);
     want = clamp(want, dogCross - COMFORT, dogCross + COMFORT); // der Dackel bleibt in der Komfortzone, die Kamera zieht rechtzeitig nach
-    // Nur so weit, dass der Dackel im Bild bleibt – sonst würde der Bildrand ihn in der Karte verschieben.
-    const lo = this.dog.y - (SCREEN_H - DOG_MARGIN);
-    const hi = this.dog.y - DOG_MARGIN;
+    // Nur so weit, dass der Dackel nicht über den Bildrand geschoben wird.
+    const lo = Math.min(0, this.dog.y - (SCREEN_H - DOG_MARGIN));
+    const hi = Math.max(0, this.dog.y - DOG_MARGIN);
     const err = clamp(want - cross, lo, hi);
     // Zielgeschwindigkeit: so schnell, dass die Kamera mit höchstens FOLLOW_ACC noch rechtzeitig am Ziel zum Stehen kommt
     // (weiches Anfahren und Bremsen, kein Überschwingen, keine Richtungsknicke).
     const vt = Math.sign(err) * Math.min(FOLLOW_MAX, Math.sqrt(0.5 * FOLLOW_ACC * Math.abs(err)), FOLLOW_TAIL * Math.abs(err));
     this.vc += clamp(vt - this.vc, -FOLLOW_ACC * dt, FOLLOW_ACC * dt);
     let delta = this.vc * dt;
-    if (Math.abs(err) < 0.02 && Math.abs(this.vc) < 4) delta = err; // am Ziel einrasten (nur noch Rest-Zittern)
+    if (Math.abs(err) < 0.02 && Math.abs(this.vc) < 1) delta = err; // am Ziel einrasten (nur noch Rest-Zittern)
     delta = clamp(delta, lo, hi);
     this.vc = delta / dt;
     this.cam.x += d[0] * delta;
@@ -374,21 +393,10 @@ export class FensterScene {
     this.dog.y -= delta; // Kartenposition des Dackels bleibt gleich
   }
 
+  /** Stick bewegt den Dackel im Bild. Wände und Bildrand halten ihn nicht auf: Berührung ist tödlich (touchesDanger). */
   moveDog(dt, input) {
-    const dx = (input.mx || 0) * DOG_SPEED * dt;
-    const dy = (input.my || 0) * DOG_SPEED * dt;
-    const tryMove = (nx, ny) => {
-      nx = clamp(nx, DOG_MARGIN, SCREEN_W - DOG_MARGIN);
-      ny = clamp(ny, DOG_MARGIN, SCREEN_H - DOG_MARGIN);
-      const m = this.toMap(nx, ny);
-      if (this.walkable(m.x, m.y)) {
-        this.dog.x = nx;
-        this.dog.y = ny;
-      }
-    };
-    tryMove(this.dog.x + dx, this.dog.y);
-    tryMove(this.dog.x, this.dog.y + dy);
-    this.fixDog();
+    this.dog.x += (input.mx || 0) * DOG_SPEED * dt;
+    this.dog.y += (input.my || 0) * DOG_SPEED * dt;
   }
 }
 
