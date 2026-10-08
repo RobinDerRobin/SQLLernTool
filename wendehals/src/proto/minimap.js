@@ -102,9 +102,10 @@ export function updateMinimap(st, sc, input = {}, dt = 1 / 60) {
   const f = st.cur;
   if (!f) {
     st.cur = startFill(sc.K, sc.theta, pos);
-  } else if (sc.K !== f.K || sc.theta !== f.theta || st.curS !== sc.s) {
+  } else if (sc.K !== f.K || sc.theta !== f.theta || st.curS !== sc.s || (st.prevPos && Math.hypot(pos.x - st.prevPos.x, pos.y - st.prevPos.y) > JUMP)) {
     // Drehung (90°) oder Umkehr (180°): bisherige Füllung wird grau, die neue beginnt dort, wo der Dackel in diesem Moment war
-    // (Stelle am Ende des vorigen Frames; wurde er versetzt, gilt die neue Stelle).
+    // (Stelle am Ende des vorigen Frames; wurde er versetzt – Neustart nach dem Tod –, gilt die neue Stelle). Ein Gangwechsel ohne
+    // Drehung (die Kamera wählt den Gang laufend, siehe FensterScene.selectK) beginnt ebenfalls eine neue Füllung im neuen Gang.
     const from = st.prevPos && Math.hypot(pos.x - st.prevPos.x, pos.y - st.prevPos.y) <= JUMP ? st.prevPos : pos;
     archive(st);
     st.fade = sc.K !== f.K ? { from: { K: f.K, theta: f.theta }, t: 0 } : null;

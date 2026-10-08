@@ -109,10 +109,13 @@ Gilt für die Übernahme ins Spiel (Paket 8) und jeden weiteren Fenster-Prototyp
 - [ ] **Flüssige Kamera:** keine Sprünge, keine harten Knicke – auch beim Quer-Folgen und beim Einfahren nach einer
       Drehung.
 - [ ] **Die Spielerposition ändert sich nie von selbst:** nicht durch Drehen, Kamera-Folgen, Wände oder den Bildrand.
-      Ohne Eingabe bewegt sich die Figur nur in Scrollrichtung.
+      Ohne Eingabe bewegt sich die Figur nur in Scrollrichtung. (Seit 08.10.2026: Wand und Bildrand schieben nicht, sie
+      töten; Tod und Neustart an der letzten Kreuzung sind die einzige Ausnahme.)
 - [ ] **Drehen nahe einem Ort mit Platz dafür** (Kreuzung), mit Toleranz davor und dahinter; im Gang nicht.
 - [ ] **Auf festem Boden nie festsitzen:** nach jeder erlaubten Drehung kommt man weiter oder mit dem Stick heraus.
-      (Im echten Spiel töten die meisten Flächen; die Regel gilt für festen Boden.)
+      (Im echten Spiel töten die meisten Flächen; die Regel gilt für festen Boden.) Seit 08.10.2026: Die Kamera trägt die
+      Figur immer weiter und hält nie an; wer falsch lenkt, stirbt. Die Drehanzeige soll niemanden in den Tod locken –
+      Prototyp „Drehformel“ (offen) prüft, wann das Symbol leuchten darf; bis dahin gelten die festen 160.
 - [ ] **Gleiches Bild nach Hin- und Zurückdrehen:** Kamera bleibt im Levelbereich, zeigt nicht mehr Leere als nötig.
 - [ ] **Vorhersehbares Drehen:** Bild dreht um die Figur, feste Dauer (0,5 s), Spiel pausiert; die Welt „landet“ nie
       auf der Figur.

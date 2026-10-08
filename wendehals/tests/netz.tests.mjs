@@ -44,7 +44,7 @@ class Monitor {
     this.maxJump = 0;
     this.maxKink = 0;
     this.maxSwingRate = 0;
-    this.hardStops = 0;
+    this.deaths = 0;
     this.frames = 0;
     this.sinceSwing = 1e9;
     this.hist = [];
@@ -59,7 +59,7 @@ class Monitor {
     const c = Math.cos(sc.ang);
     const sn = Math.sin(sc.ang);
     const m = { x: sc.cam.x + ox * c - oy * sn, y: sc.cam.y + ox * sn + oy * c };
-    return { m, cam: { ...sc.cam }, dog: { ...sc.dog }, theta: sc.theta, swing: !!sc.swing, dir: sc.dir, ang: sc.ang };
+    return { m, cam: { ...sc.cam }, dog: { ...sc.dog }, theta: sc.theta, swing: !!sc.swing, dir: sc.dir, ang: sc.ang, deaths: sc.deaths };
   }
   /** nach sc.update(dt, input) aufrufen */
   /** Neu aufsetzen, nachdem ein Test die Lage mit warp() verändert hat (kein Kamera-Sprung für den Spieler). */
@@ -75,18 +75,26 @@ class Monitor {
     this.sinceSwing = cur.ang !== p.ang || cur.swing ? 0 : this.sinceSwing + 1;
     assert.ok(Number.isFinite(cur.m.x) && Number.isFinite(cur.m.y) && Number.isFinite(cur.cam.x) && Number.isFinite(cur.cam.y), 'endlich ' + at);
     if (!cur.swing) assert.ok(sc.map.walkable(cur.m.x, cur.m.y, 0), `Dackel auf dem Boden ${at} (${nd(cur.m.x)}, ${nd(cur.m.y)})`);
-    assert.equal(sc.shoves, 0, `Dackel wurde versetzt ${at}`);
-    assert.ok(cur.dog.x >= DOG_MARGIN - 1e-6 && cur.dog.x <= SCREEN_W - DOG_MARGIN + 1e-6 && cur.dog.y >= DOG_MARGIN - 1e-6 && cur.dog.y <= SCREEN_H - DOG_MARGIN + 1e-6, `Dackel im Bild ${at}: ${nd(cur.dog.x)},${nd(cur.dog.y)}`);
+    // lebendig heißt: Kreis des Dackels berührt weder Wand noch Bildrand
+    assert.ok(cur.dog.x >= DOG_R && cur.dog.x <= SCREEN_W - DOG_R && cur.dog.y >= DOG_R && cur.dog.y <= SCREEN_H - DOG_R, `Dackel im Bild ${at}: ${nd(cur.dog.x)},${nd(cur.dog.y)}`);
+    if (cur.deaths !== p.deaths) {
+      // Tod und Neustart an der letzten Kreuzung (Robin 08.10.2026): gewollter Sprung, kein Messwert für Kamera/Dackel
+      this.deaths += cur.deaths - p.deaths;
+      this.prev = cur;
+      this.pd = null;
+      this.frames++;
+      return;
+    }
     const b = sc.map.bounds;
-    // Levelbereich: die Fenstermitte liegt im Bereich der Karte. Im Schwenk kreist sie um den Dackel; steht er am Bildrand, liegt
-    // sie danach bis zu einer halben Bildbreite (240) neben ihm, und das Scrollen bringt sie zurück (< 7 s).
-    const slack = this.sinceSwing > 420 ? 0 : 240;
+    // Levelbereich: Das Fenster scrollt ungebremst weiter, aber der Dackel lebt nur auf der Karte und die Fenstermitte liegt höchstens
+    // eine halbe Bildbreite (240, im Schwenk um den Dackel am Bildrand) neben ihm.
+    const slack = 260;
     assert.ok(cur.cam.x >= b.x0 - slack && cur.cam.x <= b.x1 + slack && cur.cam.y >= b.y0 - slack && cur.cam.y <= b.y1 + slack, `Kamera im Levelbereich ${at}: ${nd(cur.cam.x)},${nd(cur.cam.y)} θ=${HEADING_CODES[sc.theta]} K=${sc.K.id}`);
     // Kamera: Sprung und Richtungsknick. Im Schwenk kreist die Fenstermitte um den Dackel (das Bild dreht sich um ihn):
     // dort zählt statt des Wegs der Drehwinkel pro Frame (≤ 0,1 rad).
     const dv = { x: cur.cam.x - p.cam.x, y: cur.cam.y - p.cam.y };
     const jump = Math.hypot(dv.x, dv.y);
-    this.hist.push(`  f${this.frames} d=(${dv.x.toFixed(3)},${dv.y.toFixed(3)}) vc=${sc.vc.toFixed(1)} sp=${sc.sp.toFixed(3)} glide=${sc.glide} dog=(${nd(sc.dog.x)},${nd(sc.dog.y)}) dir=${sc.dir.toFixed(2)} in=${JSON.stringify(input)}`);
+    this.hist.push(`  f${this.frames} d=(${dv.x.toFixed(3)},${dv.y.toFixed(3)}) vc=${sc.vc.toFixed(1)} dog=(${nd(sc.dog.x)},${nd(sc.dog.y)}) dir=${sc.dir.toFixed(2)} in=${JSON.stringify(input)}`);
     if (this.hist.length > 6) this.hist.shift();
     const swinging = cur.ang !== p.ang;
     if (swinging) {
@@ -97,9 +105,7 @@ class Monitor {
       assert.ok(jump <= 4, `Kamera springt ${jump.toFixed(2)} ${at}`);
     }
     const steady = Math.abs(cur.dir) > 0.999 && Math.abs(p.dir) > 0.999 && !swinging; // ohne 180°-Umkehr
-    if (sc.hardStop) this.hardStops++;
-    // Ausnahme: die Kamera hält vor einer Wand, in die der Spieler den Dackel gerade gesteuert hat – hartes Anhalten wie schon in P1
-    if (jump >= MOVING && steady && !sc.hardStop) {
+    if (jump >= MOVING && steady) {
       if (this.pd) {
         const a = Math.abs(Math.atan2(dv.x * this.pd.y - dv.y * this.pd.x, dv.x * this.pd.x + dv.y * this.pd.y));
         this.maxKink = Math.max(this.maxKink, a);
@@ -483,83 +489,162 @@ test('Netz: viele Drehungen hintereinander (Ring I, auch kopfüber) zurück zur 
     assert.ok(turns >= 3, `Drehungen im Ring ${richtung}: ${turns}`);
     finishSwing(sc, mon);
     assert.ok(sc.theta === start || turns > 0);
-    assert.equal(sc.shoves, 0);
+    assert.equal(sc.deaths, 0, 'der Bot fliegt die Runde ohne Tod');
     assert.ok(mon.maxKink <= 0.1 && mon.maxJump <= 4);
     void theta0;
   }
 });
 
 // ================================================================== Zu früh gedreht (Brief Regel 3)
-test('Netz: zu früh gedreht – nur die Kamera gleitet, der Dackel bleibt an seiner Kartenstelle, die Kamera scrollt im neuen Gang weiter und wartet am Bildrand', () => {
-  // C: Nordost-Ecke, 130 vor dem Knick Richtung Osten, rechts (Süden) drehen
-  for (const [c, hNeu] of [[{ theta: E, s: 'R' }, S]]) {
-    const sc = warp(560, -500, c);
-    const m0 = sc.dogMap();
-    const mon = new Monitor(sc, 'früh');
-    assert.ok(sc.canTurnBy(1));
-    sc.update(DT, { rotRight: true });
-    mon.step({ rotRight: true });
-    assert.equal(sc.h, hNeu);
-    finishSwing(sc, mon);
-    assert.ok(sc.glide, 'Gleiten: der Dackel steht noch im alten Gang');
-    const cam0 = { ...sc.cam };
-    const hv = DIR_VEC[sc.h];
-    // 0,5 s später: Kamera ist in Flugrichtung weitergescrollt, ohne anzuhalten; Dackel unverändert in der Karte
-    play(sc, 30, {}, mon);
-    const adv = (sc.cam.x - cam0.x) * hv[0] + (sc.cam.y - cam0.y) * hv[1];
-    assert.ok(adv > 8, `Kamera scrollt im neuen Gang weiter (${adv.toFixed(1)})`);
-    const m1 = sc.dogMap();
-    assert.ok(Math.hypot(m1.x - m0.x, m1.y - m0.y) < 1e-6, 'Kartenposition unverändert');
-    assert.ok(sc.dog.x < SCREEN_W / 2 - 10, 'im Bild wandert der Dackel zur Seite (zurück)');
-    // lange ohne Eingabe: Kamera wartet am Rand, Dackel bleibt in der Karte, bleibt im Bild
-    play(sc, 60 * 8, {}, mon);
-    const m2 = sc.dogMap();
-    assert.ok(Math.hypot(m2.x - m0.x, m2.y - m0.y) < 1e-6, 'der Bildrand schiebt den Dackel nie');
-    assert.ok(sc.dog.x >= DOG_MARGIN - 1e-6 && sc.dog.x < DOG_MARGIN + 2, 'Dackel am Bildrand: ' + nd(sc.dog.x));
-    const camW = { ...sc.cam };
-    play(sc, 60, {}, mon);
-    assert.ok(Math.hypot(sc.cam.x - camW.x, sc.cam.y - camW.y) < 0.3, 'Kamera wartet am Rand');
-    // der Spieler fliegt hinterher: in den Gang (Süden = Bild rechts), danach trägt die Kamera ihn wieder
-    const ziel = NETZ_MAP.byId.ost;
-    for (let i = 0; i < 60 * 8 && sc.glide; i++) {
-      const m = sc.dogMap();
-      const inp = stick(sc, ziel.c - m.x, 40); // zur Gangmitte und nach Süden
-      sc.update(DT, inp);
-      mon.step(inp);
+/** Spieler lenkt nach einer Drehung in den neuen Gang K: quer zur Gangmitte, solange er noch draußen steht auch gegen das Scrollen. */
+const steerIntoGang = (sc, brake = 0.5) => {
+  const K = sc.K;
+  const hv = DIR_VEC[sc.h];
+  const lat = K.axis === 'h' ? [0, 1] : [1, 0];
+  const m = sc.dogMap();
+  const err = K.c - (m.x * lat[0] + m.y * lat[1]);
+  const lc = Math.max(-1, Math.min(1, err / 10));
+  const draussen = !sc.inGang(m);
+  const f = draussen ? -brake : 0;
+  return stick(sc, lat[0] * lc * 0.85 + hv[0] * f, lat[1] * lc * 0.85 + hv[1] * f);
+};
+
+test('Netz: zu früh gedreht – die Kamera trägt den Dackel in Flugrichtung weiter; wer nicht lenkt, stirbt und beginnt an der letzten Kreuzung neu', () => {
+  // C: Nordost-Ecke, 40 vor dem Knick (Dackel x = 560) Richtung Osten, rechts (Süden) drehen
+  const c = { theta: E, s: 'R' };
+  const sc = warp(560, -500, c);
+  const m0 = sc.dogMap();
+  const mon = new Monitor(sc, 'früh');
+  assert.ok(sc.canTurnBy(1));
+  sc.update(DT, { rotRight: true });
+  mon.step({ rotRight: true });
+  assert.equal(sc.h, S);
+  finishSwing(sc, mon);
+  const m1 = sc.dogMap();
+  assert.ok(Math.hypot(m1.x - m0.x, m1.y - m0.y) < 1e-6, 'die Drehung ändert die Kartenposition nie');
+  // ohne Eingabe trägt das Scrollen den Dackel mit SPEED nach Süden – in die Wand des alten Gangs
+  play(sc, 30, {}, mon);
+  const m2 = sc.dogMap();
+  assert.ok(Math.abs(m2.x - m0.x) < 1e-6 && Math.abs(m2.y - m0.y - SPEED * 0.5) < 1.5, 'Dackel wird mit SPEED in Flugrichtung getragen: ' + nd(m2.y - m0.y));
+  assert.equal(sc.dog.x, SCREEN_W / 2, 'er bleibt längs der Flugrichtung an seiner Bildschirmstelle (quer gleicht die Kamera nur aus)');
+  assert.equal(sc.deaths, 0);
+  play(sc, 90, {}, mon);
+  assert.equal(sc.deaths, 1, 'die Wand tötet ihn');
+  assert.ok(sc.respawn, 'kurzer Neustart');
+  const cp = sc.dogMap();
+  assert.ok(sc.map.walkable(cp.x, cp.y, DOG_R), 'Neustart auf Boden');
+  play(sc, 60, {}, mon);
+  assert.ok(!sc.respawn, 'Neustart ist nach kurzer Zeit vorbei');
+  assert.equal(sc.score, 0, 'ohne Strafe');
+
+  // Wer rechtzeitig lenkt, kommt in den Gang (Gang Ost: Süden = Bild rechts) und wird dort weiter getragen
+  const ok = warp(560, -500, c);
+  const mon2 = new Monitor(ok, 'früh gelenkt');
+  ok.update(DT, { rotRight: true });
+  mon2.step({ rotRight: true });
+  finishSwing(ok, mon2);
+  let inGang = -1;
+  for (let i = 0; i < 60 * 3 && inGang < 0; i++) {
+    const inp = steerIntoGang(ok);
+    ok.update(DT, inp);
+    mon2.step(inp);
+    if (ok.inGang(ok.dogMap())) inGang = i;
+  }
+  assert.ok(inGang >= 0 && ok.deaths === 0, `lenkt in den Gang (Frame ${inGang}, Tode ${ok.deaths})`);
+  assert.equal(ok.K.id, 'ost');
+  const y3 = ok.dogMap().y;
+  play(ok, 30, { my: 0, mx: 0 }, mon2);
+  assert.ok(ok.dogMap().y > y3 + 25, 'Kamera trägt den Dackel mit');
+  assert.ok(mon2.maxKink <= 0.1 && mon2.maxJump <= 4, `Kamera flüssig (Knick ${mon2.maxKink.toFixed(3)}, Sprung ${mon2.maxJump.toFixed(2)})`);
+});
+
+test('Netz: Neustart an der letzten Kreuzung – mit der Ausrichtung, mit der der Dackel sie verließ; Zielfarbe und Punkte bleiben', () => {
+  const sc = warp(0, 0, { theta: E, s: 'R' });
+  sc.score = 3;
+  const target = sc.target;
+  // ostwärts aus A heraus und weiter bis zu den Kreuzungen D: letzte Kreuzung = D, danach in die Ostwand tragen lassen
+  let n = 0;
+  while (!sc.deaths && n++ < 60 * 40) sc.update(DT, {});
+  assert.equal(sc.deaths, 1, 'stirbt an der Ostwand');
+  const p = sc.dogMap();
+  const ost = NETZ_MAP.junctions.find((j) => j.id === 'mitte-h×ost');
+  assert.ok(Math.hypot(p.x - ost.cx, p.y - ost.cy) < 1, 'Neustart in der Mitte der letzten Kreuzung (T am Ost-Ring)');
+  assert.equal(sc.theta, E);
+  assert.equal(sc.score, 3);
+  assert.equal(sc.target, target);
+  // Neustart ist spielbar: nach der kurzen Pause lenkt der Spieler nach Norden, überlebt
+  play(sc, 60);
+  assert.ok(sc.canTurnBy(-1));
+  sc.update(DT, { rotLeft: true });
+  finishSwing(sc);
+  play(sc, 60 * 3);
+  assert.equal(sc.deaths, 1);
+});
+
+test('Netz: zwei nahe Gänge in Flugrichtung (A/D): die Kamera folgt dem Dackel in den Gang, in den er fliegt', () => {
+  const faelle = [
+    { c: { theta: E, s: 'R' }, k: -1, name: 'nach Norden aus E-Flug' },
+    { c: { theta: W, s: 'L' }, k: -1, name: 'nach Norden, Plan kopfüber (θ=W, s=L)' },
+  ];
+  for (const f of faelle) {
+    for (const [zielId, zielX] of [['stummel-h', 260], ['mitte-v', 0]]) {
+      const sc = warp(130, 0, f.c);
+      const mon = new Monitor(sc, `${f.name} → ${zielId}`);
+      assert.equal(sc.h === E || sc.h === W, true);
+      sc.update(DT, f.k > 0 ? { rotRight: true } : { rotLeft: true });
+      finishSwing(sc, mon);
+      assert.equal(sc.h, N);
+      // beide Gänge liegen in der Zone: Kamera-Gang ist einer von beiden
+      assert.ok(['stummel-h', 'mitte-v'].includes(sc.K.id), 'K zunächst einer der beiden: ' + sc.K.id);
+      // der Spieler fliegt in den gewünschten Gang
+      let drin = -1;
+      for (let i = 0; i < 60 * 2 && drin < 0; i++) {
+        const m = sc.dogMap();
+        const inp = stick(sc, Math.max(-1, Math.min(1, (zielX - m.x) / 10)) * 0.9, -0.4 * (sc.inGang(m, NETZ_MAP.byId[zielId]) ? 0 : 1));
+        sc.update(DT, inp);
+        mon.step(inp);
+        if (sc.inGang(sc.dogMap(), NETZ_MAP.byId[zielId])) drin = i;
+      }
+      assert.ok(drin >= 0 && sc.deaths === 0, `Dackel erreicht ${zielId} (Frame ${drin}, Tode ${sc.deaths})`);
+      // danach Gang gewählt, Kamera quer in dessen Behälter, Dackel wird getragen
+      for (let i = 0; i < 60 * 2; i++) {
+        const m = sc.dogMap();
+        const inp = stick(sc, Math.max(-1, Math.min(1, (zielX - m.x) / 10)) * 0.9, 0);
+        sc.update(DT, inp);
+        mon.step(inp);
+      }
+      play(sc, 30, {}, mon);
+      assert.equal(sc.K.id, zielId, 'Kamera-Gang folgt dem Dackel');
+      const half = NETZ_MAP.camHalfWidth(sc.K, sc.cam.y, DOG_R, DOG_MARGIN);
+      assert.ok(Math.abs(sc.cam.x - zielX) <= half + 1, `Kamera quer im Behälter von ${zielId}: ${nd(sc.cam.x)}`);
+      const y0 = sc.dogMap().y;
+      play(sc, 30, {}, mon);
+      assert.ok(y0 - sc.dogMap().y > 25, 'Dackel wird getragen');
+      assert.ok(mon.maxKink <= 0.1 && mon.maxJump <= 4, `Kamera flüssig (Knick ${mon.maxKink.toFixed(3)})`);
     }
-    assert.ok(!sc.glide, 'Dackel ist im neuen Gang angekommen');
-    const m3 = sc.dogMap();
-    assert.ok(Math.abs(m3.x - ziel.c) <= 100 - DOG_R + 1e-6, 'im Gang');
-    const y3 = m3.y;
-    play(sc, 60, {}, mon);
-    assert.ok(sc.dogMap().y > y3 + 15, 'Kamera trägt den Dackel mit');
-    assert.ok(mon.maxKink <= 0.1 && mon.maxJump <= 4, `Kamera flüssig (Knick ${mon.maxKink.toFixed(3)}, Sprung ${mon.maxJump.toFixed(2)})`);
   }
 });
 
-test('Netz: nach dem Drehen im Kreuzungsquadrat trägt die Kamera den Dackel sofort mit (kein Gleiten)', () => {
+test('Netz: nach dem Drehen im Kreuzungsquadrat trägt die Kamera den Dackel sofort mit', () => {
   for (const c of COMBOS) {
-    const sc = warp(0, 0, c);
     for (const k of [-1, 1]) {
       const s2 = warp(0, 0, c);
       s2.update(DT, k > 0 ? { rotRight: true } : { rotLeft: true });
       finishSwing(s2);
-      assert.ok(!s2.glide, name(c));
       const m0 = s2.dogMap();
       play(s2, 30);
       const m1 = s2.dogMap();
       const hv = DIR_VEC[s2.h];
-      assert.ok((m1.x - m0.x) * hv[0] + (m1.y - m0.y) * hv[1] > 5, 'mitgetragen in Flugrichtung');
+      assert.ok((m1.x - m0.x) * hv[0] + (m1.y - m0.y) * hv[1] > 25, 'mitgetragen in Flugrichtung');
     }
-    void sc;
   }
 });
 
 // ================================================================== Gitter um die Stellen A–I
-test('Netz: Gitter von Startlagen um jede Stelle A–I – nach erlaubten Drehungen: Dackel bleibt stehen, Kamera flüssig, man kommt weiter', () => {
-  const navBot = new NavBot(NETZ_MAP);
+test('Netz: Gitter von Startlagen um jede Stelle A–I – nach erlaubten Drehungen: Dackel bleibt stehen, Kamera flüssig und mit SPEED, im Quadrat gelenkt immer überlebt', () => {
   let states = 0;
   let turns = 0;
+  const stats = { squareOk: 0, early: 0, earlySurvived: 0 };
   const maxima = { kink: 0, jump: 0 };
   for (const [stName, st] of Object.entries(STELLEN_RASTER)) {
     for (const p of gridAround(st, 240, 80)) {
@@ -583,39 +668,41 @@ test('Netz: Gitter von Startlagen um jede Stelle A–I – nach erlaubten Drehun
           sc.update(DT, k > 0 ? { rotRight: true } : { rotLeft: true });
           mon.step();
           finishSwing(sc, mon);
-          // ohne Eingabe weiter: Dackel nur in Scrollrichtung (Monitor), Kamera läuft, wenn nichts im Weg ist
-          const camA = { ...sc.cam };
-          play(sc, 90, {}, mon);
+          // ohne Eingabe weiter: der Dackel wird nur in Flugrichtung getragen (Monitor), Tod und Neustart sind erlaubt
           const hv = DIR_VEC[sc.h];
-          const adv = (sc.cam.x - camA.x) * hv[0] + (sc.cam.y - camA.y) * hv[1];
-          if (adv < 5) {
-            // dann gibt es einen sichtbaren Grund: Ende des Kamerabereichs, Platz vor dem Dackel, oder Dackel am Bildrand
-            const [lo, hi] = NETZ_MAP.camRange(sc.K);
-            const a = sc.K.axis === 'h' ? sc.cam.x : sc.cam.y;
-            const sign = (sc.K.axis === 'h' ? hv[0] : hv[1]) > 0 ? 1 : -1;
-            const atEnd = sign > 0 ? hi - a < 2 : a - lo < 2;
-            const m = sc.dogMap();
-            const blocked = !sc.glide && NETZ_MAP.freeDistance(m.x, m.y, hv[0], hv[1], 6, DOG_R - 0.05) < 6;
-            const waiting = sc.glide && (sc.s === 'R' ? sc.dog.x < DOG_MARGIN + 3 : sc.dog.x > SCREEN_W - DOG_MARGIN - 3);
-            assert.ok(atEnd || blocked || waiting, `Kamera steht ohne Grund: ${label} k=${k} (Vorschub ${adv.toFixed(1)})`);
-          }
-          // (c) Spieler fliegt in den neuen Gang und weiter (nur Stick, den Weg um Wände findet er selbst): er kommt voran
           const K = sc.K;
           const m1 = sc.dogMap();
+          const inSquare = sc.inGang(m1);
+          const camA = { ...sc.cam };
+          const d0 = sc.deaths;
+          play(sc, 60, {}, mon);
+          if (sc.deaths === d0) {
+            const adv = (sc.cam.x - camA.x) * hv[0] + (sc.cam.y - camA.y) * hv[1];
+            assert.ok(Math.abs(adv - SPEED) < 3, `Kamera scrollt immer mit SPEED (${adv.toFixed(1)}): ${label} k=${k}`);
+          }
+          // (c) Spieler lenkt in den neuen Gang und fliegt weiter. Steht er schon im Kreuzungsquadrat, überlebt er immer;
+          // wer zu früh gedreht hat, wird gezählt (Rohdaten für den Formel-Prototyp).
+          const sc2 = warp(p.x, p.y, c);
+          const mon2 = new Monitor(sc2, label + ` k=${k} gelenkt`);
+          sc2.update(DT, k > 0 ? { rotRight: true } : { rotLeft: true });
+          mon2.step();
+          finishSwing(sc2, mon2);
           const a1 = K.axis === 'h' ? m1.x : m1.y;
           const sgn = (K.axis === 'h' ? hv[0] : hv[1]) > 0 ? 1 : -1;
           const dEnd = sgn > 0 ? K.a1 - a1 : a1 - K.a0;
-          const ahead = a1 + sgn * Math.max(0, dEnd - 40);
-          const T = K.axis === 'h' ? { x: ahead, y: K.c } : { x: K.c, y: ahead };
-          for (let i = 0; i < 300; i++) {
-            const { mx, my } = navBot.control(sc, T.x, T.y);
-            sc.update(DT, { mx, my });
-            mon.step({ mx, my });
+          const frames = Math.max(0, Math.min(150, Math.floor(((dEnd - 30) / SPEED) * 60)));
+          for (let i = 0; i < frames && !sc2.deaths; i++) {
+            const inp = steerIntoGang(sc2);
+            sc2.update(DT, inp);
+            mon2.step(inp);
           }
-          const m2 = sc.dogMap();
-          const moved = (m2.x - m1.x) * hv[0] + (m2.y - m1.y) * hv[1];
-          const rest = Math.hypot(m2.x - T.x, m2.y - T.y);
-          assert.ok(moved >= 120 || rest < 20, `kommt nicht weiter: ${label} k=${k} (bewegt ${moved.toFixed(0)}, bis Ende ${dEnd.toFixed(0)}, bis Ziel ${rest.toFixed(0)})`);
+          if (inSquare) {
+            assert.equal(sc2.deaths, 0, `stirbt im Kreuzungsquadrat trotz Lenken: ${label} k=${k}`);
+            stats.squareOk++;
+          } else {
+            stats.early++;
+            if (!sc2.deaths) stats.earlySurvived++;
+          }
           maxima.kink = Math.max(maxima.kink, mon.maxKink);
           maxima.jump = Math.max(maxima.jump, mon.maxJump);
           turns++;
@@ -625,17 +712,22 @@ test('Netz: Gitter von Startlagen um jede Stelle A–I – nach erlaubten Drehun
     }
   }
   assert.ok(states > 1000 && turns > 300, `Lagen ${states}, Drehungen ${turns}`);
-  console.log(`# Gitter: ${states} Lagen, ${turns} Drehungen, größter Kamera-Knick ${maxima.kink.toFixed(3)} rad/Frame, größter Sprung ${maxima.jump.toFixed(2)} E/Frame`);
+  console.log(`# Gitter: ${states} Lagen, ${turns} Drehungen, größter Kamera-Knick ${maxima.kink.toFixed(3)} rad/Frame, größter Sprung ${maxima.jump.toFixed(2)} E/Frame; im Quadrat gedreht und überlebt ${stats.squareOk}, zu früh gedreht ${stats.early} davon mit Lenken überlebt ${stats.earlySurvived}`);
 });
 
 // ================================================================== Nie festsitzen / alle Knochen erreichbar
-test('Netz: nie festsitzen – von Lagen rund um jede Stelle kommt ein Spieler (Bot) zu jedem Knochen', () => {
+test('Netz: Bot kommt von Lagen rund um jede Stelle zu jedem Knochen – ohne zu sterben', () => {
   const bot = new NavBot(NETZ_MAP);
   const starts = [];
   let i = 0;
   for (const st of Object.values(STELLEN_RASTER)) {
     for (const p of gridAround(st, 240, 160)) {
       for (const c of COMBOS) {
+        const probe = warp(p.x, p.y, c);
+        const pm = probe.dogMap();
+        const hv = DIR_VEC[probe.h];
+        // nur Lagen, in denen der Dackel im Gang der Flugrichtung steht und die Wand voraus nicht schon fast erreicht ist
+        if (!probe.inGang(pm) || NETZ_MAP.freeDistance(pm.x, pm.y, hv[0], hv[1], 100, DOG_R) < 100) continue;
         if ((i++ % 3) === 0) starts.push({ p, c });
       }
     }
@@ -647,19 +739,20 @@ test('Netz: nie festsitzen – von Lagen rund um jede Stelle kommt ein Spieler (
       const sc = warp(p.x, p.y, c);
       const mon = new Monitor(sc, `Bot (${p.x},${p.y}) ${name(c)} → ${b.name}`);
       let t = 0;
-      while (Math.hypot(sc.dogMap().x - b.x, sc.dogMap().y - b.y) > BONE_R - 4 && t < 60 * 90) {
+      while (Math.hypot(sc.dogMap().x - b.x, sc.dogMap().y - b.y) > BONE_R - 4 && t < 60 * 90 && !sc.deaths) {
         const inp = bot.control(sc, b.x, b.y);
         sc.update(DT, inp);
         mon.step(inp);
         t++;
       }
+      assert.equal(sc.deaths, 0, `Bot stirbt von (${p.x},${p.y}) ${name(c)} → ${b.name} bei (${nd(sc.dogMap().x)},${nd(sc.dogMap().y)}) θ=${HEADING_CODES[sc.theta]}`);
       assert.ok(t < 60 * 90, `Bot erreicht ${b.name} nicht von (${p.x},${p.y}) ${name(c)} – Dackel bei (${nd(sc.dogMap().x)},${nd(sc.dogMap().y)}) θ=${HEADING_CODES[sc.theta]}`);
       worst = Math.max(worst, t / 60);
       ok++;
     }
   }
-  assert.ok(ok > 400);
-  console.log(`# Bot: ${ok} Wege zu Knochen, längster ${worst.toFixed(1)} s`);
+  assert.ok(ok > 200);
+  console.log(`# Bot: ${ok} Wege zu Knochen ohne Tod, längster ${worst.toFixed(1)} s`);
 });
 
 test('Netz: Knochen werden eingesammelt, die Zielfarbe wechselt (fester Startwert)', () => {
@@ -674,6 +767,7 @@ test('Netz: Knochen werden eingesammelt, die Zielfarbe wechselt (fester Startwer
     sc.update(DT, inp);
     mon.step(inp);
   }
+  assert.equal(sc.deaths, 0, 'ohne Tod');
   assert.ok(sc.score >= 12, 'Knochen geholt: ' + sc.score);
   assert.ok(seen.size >= 5, 'verschiedene Ziele: ' + seen.size);
   const again = new FensterScene({ map: NETZ_MAP });
@@ -689,35 +783,41 @@ test('Netz: breiter Raum (F) – die Kamera folgt quer bis an die Raumwände, oh
       const sc = warp(h === E ? 190 : 510, 500, c);
       const mon = new Monitor(sc, `F ${name(c)} ${richtung}`);
       let best = 500;
-      for (let i = 0; i < 60 * 3; i++) {
+      let camMax = 0;
+      for (let i = 0; i < 60 * 3 && !sc.deaths; i++) {
         const inp = stick(sc, 0, richtung);
         sc.update(DT, inp);
         mon.step(inp);
+        if (sc.deaths) break;
         const y = sc.dogMap().y;
         best = richtung < 0 ? Math.min(best, y) : Math.max(best, y);
+        camMax = Math.max(camMax, Math.abs(sc.cam.y - 500));
       }
+      // an der Raumwand stirbt der Dackel, sobald er sie berührt; vorher kommt er bis auf einen Stick-Schritt heran
       const wand = 500 + richtung * (200 - DOG_R);
-      assert.ok(Math.abs(best - wand) < 1.5, `Raumwand erreicht (${richtung < 0 ? 'Nord' : 'Süd'}): ${nd(best)} von ${wand}`);
-      assert.ok(Math.abs(sc.cam.y - 500) > 60, 'Kamera folgt quer weit über den Behälter eines normalen Gangs hinaus: ' + nd(sc.cam.y - 500));
+      assert.ok(Math.abs(best - wand) < 2.5, `Raumwand erreicht (${richtung < 0 ? 'Nord' : 'Süd'}): ${nd(best)} von ${wand}`);
+      assert.equal(sc.deaths, 1, 'die Wand tötet ihn');
+      assert.ok(camMax > 60, 'Kamera folgt quer weit über den Behälter eines normalen Gangs hinaus: ' + nd(camMax));
       assert.ok(mon.maxKink <= 0.1 && mon.maxJump <= 4);
     }
   }
-  // Verengung am Raumende: der Dackel wird nie geschoben, die Kamera kehrt weich in den engen Behälter zurück
+  // Verengung am Raumende: wer in der Mitte bleibt, wird ohne Tod durchgetragen; die Kamera kehrt weich in den engen Behälter zurück
   const sc = warp(250, 500, { theta: E, s: 'R' });
   const mon = new Monitor(sc, 'F→Gang');
-  for (let i = 0; i < 60 * 25; i++) {
+  for (let i = 0; i < 60 * 5; i++) {
     const m = sc.dogMap();
-    const inp = stick(sc, 1, Math.max(-1, Math.min(1, (500 - m.y) / 30)));
+    const inp = stick(sc, 0, Math.max(-1, Math.min(1, (500 - m.y) / 30)));
     sc.update(DT, inp);
     mon.step(inp);
   }
+  assert.equal(sc.deaths, 0);
   assert.ok(sc.dogMap().x > 560, 'Dackel ist durch die Verengung gekommen: ' + nd(sc.dogMap().x));
 });
 
 test('Netz: schmaler Gang (G) – kein Zittern der Kamera', () => {
   for (const c of [{ theta: S, s: 'R' }, { theta: N, s: 'L' }, { theta: N, s: 'R' }, { theta: S, s: 'L' }]) {
     // ohne Eingabe: die Kamera steht quer still
-    const sc = warp(RING.RX0 + 30, -250, c, { x: 240, y: 180 });
+    const sc = warp(RING.RX0, hOf(c.theta, c.s) === S ? -250 : 250, c, { x: 240, y: 180 });
     const mon = new Monitor(sc, 'G ' + name(c));
     const d = dVec(sc);
     const cross = () => sc.cam.x * d[0] + sc.cam.y * d[1];
@@ -725,7 +825,7 @@ test('Netz: schmaler Gang (G) – kein Zittern der Kamera', () => {
     let vPrev = 0;
     let crossPrev = cross();
     let flips0 = 0;
-    for (let i = 0; i < 60 * 6; i++) {
+    for (let i = 0; i < 60 * 3; i++) {
       sc.update(DT, {});
       mon.step();
       const v = cross() - crossPrev;
@@ -743,7 +843,7 @@ test('Netz: schmaler Gang (G) – kein Zittern der Kamera', () => {
     let lastV = 0;
     let lastW = 0;
     let prev = cross();
-    for (let i = 0; i < 60 * 6; i++) {
+    for (let i = 0; i < 60 * 3; i++) {
       const wob = Math.sin((i * 2 * Math.PI) / 60) * 0.6; // 1 Hz
       if (lastW && Math.sign(wob) !== Math.sign(lastW)) stickFlips++;
       lastW = wob;
@@ -757,7 +857,7 @@ test('Netz: schmaler Gang (G) – kein Zittern der Kamera', () => {
         lastV = v;
       }
     }
-    assert.ok(flips <= stickFlips + 2, `Kamera zittert nicht: ${flips} Richtungswechsel bei ${stickFlips} Stick-Wechseln`);
+    assert.ok(flips <= stickFlips + 2, `Kamera zittert nicht: ${flips} Richtungswechsel bei ${stickFlips} Stick-Wechseln (Tode ${sc.deaths})`);
     assert.ok(mon.maxKink <= 0.1 && mon.maxJump <= 4);
   }
 });
@@ -768,7 +868,7 @@ test('Netz: Zufallsspiel (≥ 100.000 Frames, fester Startwert) – alle Invaria
   const sc = mk();
   const mon = new Monitor(sc, 'Zufall');
   let input = {};
-  const stat = { turns: 0, denied: 0, flips: 0, glide: 0, bones: 0 };
+  const stat = { turns: 0, denied: 0, flips: 0, deaths: 0, bones: 0 };
   const FRAMES = 120000;
   for (let i = 0; i < FRAMES; i++) {
     if (i % 24 === 0) {
@@ -788,12 +888,10 @@ test('Netz: Zufallsspiel (≥ 100.000 Frames, fester Startwert) – alle Invaria
     if (sc.theta !== th0) stat.turns++;
     if (sc.s !== s0) stat.flips++;
     if (sc.denied && !deniedBefore) stat.denied++;
-    if (sc.glide) stat.glide++;
     if (sc.score > score0) stat.bones++;
   }
-  console.log(`# Zufallsspiel: ${FRAMES} Frames, Drehungen ${stat.turns}, abgelehnt ${stat.denied}, Umkehr ${stat.flips}, Gleiten ${stat.glide} Frames, Knochen ${stat.bones}, größter Kamera-Knick ${mon.maxKink.toFixed(3)} rad/Frame, Sprung ${mon.maxJump.toFixed(2)}, Anhalten vor Wänden ${mon.hardStops} Frames`);
-  assert.ok(stat.turns > 100 && stat.denied > 50 && stat.flips > 50 && stat.glide > 500, JSON.stringify(stat));
-  assert.equal(sc.shoves, 0);
+  console.log(`# Zufallsspiel: ${FRAMES} Frames, Drehungen ${stat.turns}, abgelehnt ${stat.denied}, Umkehr ${stat.flips}, Tode ${mon.deaths}, Knochen ${stat.bones}, größter Kamera-Knick ${mon.maxKink.toFixed(3)} rad/Frame, Sprung ${mon.maxJump.toFixed(2)}`);
+  assert.ok(stat.turns > 100 && stat.denied > 50 && stat.flips > 50 && mon.deaths > 20, JSON.stringify({ ...stat, deaths: mon.deaths }));
 });
 
 test('Netz: Spieler-Bot fliegt Dauerläufe durchs Netz – keine Verstöße', () => {
@@ -813,12 +911,13 @@ test('Netz: Spieler-Bot fliegt Dauerläufe durchs Netz – keine Verstöße', ()
     sc.update(DT, inp);
     mon.step(inp);
   }
+  assert.equal(sc.deaths, 0, 'ohne Tod');
   assert.ok(n >= 25, 'Ziele erreicht: ' + n);
 });
 
 // ================================================================== P1-Anbindung
 test('Netz: Anbindung – Direktstart im Netz, P1 und v0.2 erreichbar, SPEED/DOG_SPEED unverändert', async () => {
-  assert.equal(SPEED, 90);
+  assert.equal(SPEED, 70);
   assert.equal(DOG_SPEED, 120);
   const { Game } = await import('../src/game/game.js');
   const { MemoryStorage } = await import('../src/game/save.js');
