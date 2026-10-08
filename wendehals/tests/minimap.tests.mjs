@@ -356,10 +356,12 @@ test('Minimap V3: Füllung – nach jeder Drehung und Umkehr wird sie grau, die 
   const act = (input, event) => {
     const pre = truth(sc);
     const oldK = sc.K;
+    const d0 = sc.deaths;
     step(sc, st, input);
-    if (event) {
+    const died = sc.deaths !== d0; // Tod: Neustart an der letzten Kreuzung, neue Füllung dort
+    if (event || died || sc.K !== oldK) {
       if (exp.hi - exp.lo > 0) grey[oldK.id] = [...(grey[oldK.id] || []), [exp.lo, exp.hi]];
-      const a = alongOf(sc.K, pre);
+      const a = alongOf(sc.K, died ? truth(sc) : pre);
       exp = { K: sc.K, lo: a, hi: a };
       events.push(sc.K.id);
       prevFill = null;
@@ -406,7 +408,7 @@ test('Minimap V3: Füllung – nach jeder Drehung und Umkehr wird sie grau, die 
   act({ wende: true }, true);
   assert.ok(layoutMinimap(st, sc).layers[0].grey.length >= 1);
   // d) bis zur T-Kreuzung B, rechts drehen (nach Süden): grau, neuer Gang
-  until(() => sc.canTurnBy(1), {});
+  until(() => truth(sc).x > -40 && sc.canTurnBy(1), {}); // mitten in der Kreuzung B (nicht zu früh: Tod an der Wand)
   act({ rotRight: true }, true);
   assert.equal(sc.K.id, 'mitte-v');
   let faded = layoutMinimap(st, sc);
@@ -415,7 +417,7 @@ test('Minimap V3: Füllung – nach jeder Drehung und Umkehr wird sie grau, die 
   for (let i = 0; i < 120; i++) act({}, false);
   // e) Umkehr nach Norden, zurück zum Nord-Ring, dort rechts (Osten): derselbe Gang wie am Anfang
   act({ wende: true }, true);
-  until(() => sc.canTurnBy(1), {});
+  until(() => truth(sc).y < -420 && sc.canTurnBy(1), {});
   act({ rotRight: true }, true);
   assert.equal(sc.K.id, 'nord');
   while (sc.swing) act({}, false);
@@ -591,7 +593,9 @@ test('Minimap: beim Scrollen kein Sprung > 1 px/Frame (außer der Drehung im Sch
       }
       const inp = i % 24 === 0 ? input : { mx: input.mx, my: input.my };
       const wasSwing = !!sc.swing;
+      const deaths = sc.deaths;
       step(sc, st, inp);
+      const respawned = sc.deaths !== deaths; // Tod/Neustart versetzt den Dackel (Netz-Regel) – kein Scrollen
       const key = sc.theta + sc.s + sc.K.id;
       const event = key !== prevKey; // Drehung/Umkehr: die Füllung wird grau, die neue beginnt (kein Sprung der Füllung, sondern ein Wechsel)
       prevKey = key;
@@ -608,7 +612,7 @@ test('Minimap: beim Scrollen kein Sprung > 1 px/Frame (außer der Drehung im Sch
         const corner = rot(0 - sc.cam.x, 0 - sc.cam.y, L.rot); // Kartenursprung auf der Minimap
         cur = { px: FRAME_CX + corner.x * L.k, py: FRAME_CY + corner.y * L.k, dot: L.dot, win: L.window };
       }
-      if (prev && !(wasSwing || sc.swing)) {
+      if (prev && !(wasSwing || sc.swing || respawned)) {
         if (v === 3) {
           if (prev.id === cur.id) {
             const jump = Math.abs(cur.dot - prev.dot);
