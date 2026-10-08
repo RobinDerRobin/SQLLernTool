@@ -138,3 +138,20 @@ Was gebaut ist, jede Abweichung vom Brief mit Grund (vorher gefragt, Regel 1), T
 „Mit welcher Version (1, 2, 3) hast du am wenigsten gezögert? Was hat an den anderen gestört?“ und „Stimmt die
 V3-Füllung so, wie du sie gemeint hast (grau bleibt je Gang gespeichert)?“ Antwort als nächster F-Eintrag ins
 Entscheidungsprotokoll.
+
+## 9. Stand nach dem Bau (08.10.2026, Sonnet 5.5)
+
+**Gebaut:** `src/proto/minimap.js` (Zustand je Szene in einer WeakMap, `updateMinimap`, `layoutMinimap`, `drawMinimap`; Striche statt Schrift),
+Anbindung: je eine Zeile in `fenster-draw.js` (Zeichnen) und `game.js` (Update nach `proto.update`), plus die Imports. `karte.js`, `netz-map.js`,
+`FensterScene` unverändert. `tests/minimap.tests.mjs` (19 Tests, eine Gruppe je Checklisten-Zeile, Zufallsspiel 120.000 Frames mit zufälligem M),
+`e2e/minimap.mjs` (Screenshots `e2e/screenshots/minimap-*.png`, fps je Version). Stand des Netzes: mit Paket A (`d71fca2`) gemergt.
+
+**Abweichungen / Deutungen (zur Bestätigung durch Robin):**
+- Balkenbreite V3 100 px statt ~110 (10 px je Seite für die Buchstaben der Gangenden).
+- **Gangwechsel ohne Drehung:** Das Netz wählt den Kamera-Gang jetzt laufend (`selectK`, Paket A). Wechselt dabei der Gang, blendet V3 den Balken über
+  0,5 s um und beginnt eine neue Füllung (die alte wird grau) – nicht nur bei Drehung/Umkehr.
+- **Tod/Neustart** (Paket A) versetzt den Dackel: neue Füllung am Neustartort, die alte wird grau.
+- Eine Drehung, die nur durch die Zone einer Kreuzung erlaubt ist, die nicht am aktuellen Gang liegt, leuchtet in V3 als Stummel an der Stelle der Kreuzung.
+- Dicht beieinander liegende Stummel gleicher Richtung teilen sich einen Buchstaben.
+- Rahmen und alle Zahlen sind Konstanten oben in `minimap.js`; Standardausschnitt `MINIMAP_SPAN` 1.440, je Karte `minimapSpan` (in der Beschreibung oder an der Karte).
+
