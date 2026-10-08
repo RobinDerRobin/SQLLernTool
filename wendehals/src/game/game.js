@@ -12,6 +12,7 @@ import { linksAt, directionAllowed, arrive, returnTarget } from './worldgraph.js
 import { Arena } from './arena.js';
 import { FensterScene } from '../proto/fenster.js';
 import { NETZ_MAP } from '../proto/netz-map.js';
+import { minimapFor, updateMinimap } from '../proto/minimap.js';
 import { Level } from './level.js';
 import { freshPowers, powerupsAfterDeath } from './powerups.js';
 import {
@@ -553,6 +554,7 @@ export class Game {
         if (input.pause) this.leaveProto();
         else {
           this.proto.update(dt, input);
+          updateMinimap(minimapFor(this.proto), this.proto, input, dt); // P2: liest nur die Szene
           for (const name of this.proto.sfx) this.sfx(name);
           this.proto.sfx.length = 0;
         }

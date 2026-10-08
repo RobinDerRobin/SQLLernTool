@@ -2,6 +2,7 @@
 import { SCREEN_W, SCREEN_H } from '../core/math.js';
 import { drawDackel } from '../render/sprites.js';
 import { DENY_TIME } from './fenster.js';
+import { drawMinimap, minimapFor } from './minimap.js';
 
 const FLOOR = '#6a5f55';
 const FLOOR2 = '#756a5f';
@@ -138,6 +139,7 @@ export function drawFenster(ctx, sc) {
   ctx.textAlign = 'left';
   ctx.fillText('Knochen: ' + sc.score, 30, 17);
   drawTurnIcon(ctx, sc);
+  drawMinimap(ctx, minimapFor(sc), sc); // P2 Minimap (liest nur die Szene)
   if (sc.hint > 0) {
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.fillRect(SCREEN_W / 2 - 190, SCREEN_H - 58, 380, 20);
