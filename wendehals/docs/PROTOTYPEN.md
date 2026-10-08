@@ -95,11 +95,11 @@ dürfen es als Platzhalter nutzen.
 | **P1 „Kreuzung“** | Nehme ich die Gabelung, die ich will, indem ich das Fenster drehe – beim ersten Mal, ohne nachzudenken, auch nach der 180°-Umkehr und mit dem Plan kopfüber? | **keep (07.10.2026)** – [Brief](prototypen/P1-kreuzung.md), [Retrospektive](prototypen/P1-retro.md) |
 | **P1c „Netz“** | Hält das Drehen die Checkliste 4a an T, L, überlappenden Zonen, versetzten Abzweigen, breitem/schmalem Gang, Ring? | **gebaut (07.10.2026), wartet auf Robins Spieltest (F2):** [`prototypen/P1c-netz.md`](prototypen/P1c-netz.md), Stand in Abschnitt 9 |
 | P1b | Nur falls P1 „nein“: dog-bezogen vs. bildschirmbezogen drehen, umschaltbar | wartet auf P1 |
-| P2 „Orientierung“ | Behalte ich in einer Schleife mit Landmarken die Orientierung, ohne Karte? (→ Minimap nötig?) | wartet auf P1 |
+| **P2 „Minimap“** (ersetzt „Orientierung“: Robin will sowieso eine Minimap, 08.10.2026) | Welche Minimap lässt mich im Netz am sichersten wissen, wo ich bin und wohin ich drehen muss – V1 „wie die Kamera“, V2 „Plan“ (Norden oben) oder V3 „Gang-Balken“? | **Brief validiert (08.10.2026), Bau mit Sonnet 5.5:** [`prototypen/P2-minimap.md`](prototypen/P2-minimap.md) |
 | P3 „45°“ | Passen 45°-Drehungen zur selben Aktion? (Diagonal-Arm, achteckige Kreuzung, LT/RT) | wartet auf P1 |
 | P4 „Druck“ | Funktioniert die pausierte Drehung und das Schießen von oben im Kampf, in beide Richtungen? | wartet auf P1 |
 
-Geparkt (nicht vergessen): Minimap (nach P2), Gabelungen mit Drehfähigkeiten (nach P3), sanftes
+Geparkt (nicht vergessen): große Karte (eigener Prototyp nach P2), Gabelungen mit Drehfähigkeiten (nach P3), sanftes
 Steigen, Schächte, kopfüber als Spielelement, Form der Arenen im gedrehten Fenster.
 
 ## 4a. Abnahme-Checkliste „Fenster drehen“ (aus P1, Robin 07.10.2026)
