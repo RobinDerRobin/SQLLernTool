@@ -32,6 +32,13 @@ const KEYMAP = {
   F11: 'fullscreen',
 };
 
+// Zweitbelegung: dieselbe Taste löst zusätzlich die 45°-Drehung des Prototyps „45°-Kreuzung“ aus (Robin, 10.10.2026: J/K).
+// Die v0.2-Belegung (J = Schießen, K = Power) bleibt; der Prototyp liest nur die 45°-Aktionen, v0.2 nur seine.
+const KEYMAP2 = {
+  KeyJ: 'rot45Left',
+  KeyK: 'rot45Right',
+};
+
 // Standard-Gamepad: 0=A 1=B 2=X 3=Y 8=Back/View (Karte) 9=Start/Menü 12-15=Steuerkreuz
 const PADMAP = {
   0: 'fire',
@@ -40,6 +47,8 @@ const PADMAP = {
   3: 'wende',
   4: 'rotLeft',
   5: 'espresso',
+  6: 'rot45Left', // LT (analog: value > 0,5)
+  7: 'rot45Right', // RT
   8: 'map',
   9: 'pause',
   12: 'up',
@@ -48,7 +57,7 @@ const PADMAP = {
   15: 'right',
 };
 
-const ACTIONS = ['up', 'down', 'left', 'right', 'fire', 'confirm', 'power', 'wende', 'pause', 'back', 'station', 'map', 'espresso', 'rotLeft', 'rotRight', 'fullscreen'];
+const ACTIONS = ['up', 'down', 'left', 'right', 'fire', 'confirm', 'power', 'wende', 'pause', 'back', 'station', 'map', 'espresso', 'rotLeft', 'rotRight', 'rot45Left', 'rot45Right', 'fullscreen'];
 const DEADZONE = 0.28;
 
 export class Input {
@@ -63,7 +72,10 @@ export class Input {
       const a = KEYMAP[e.code];
       if (a) {
         e.preventDefault();
-        if (!e.repeat) this.tapped.add(a);
+        if (!e.repeat) {
+          this.tapped.add(a);
+          if (KEYMAP2[e.code]) this.tapped.add(KEYMAP2[e.code]);
+        }
         this.keys.add(e.code);
         this.usingPad = false;
       }
@@ -79,7 +91,10 @@ export class Input {
     const held = {};
     // Tasten werden als Codes gemerkt: Pfeil hoch halten und W loslassen beendet "hoch" nicht.
     for (const a of ACTIONS) held[a] = this.tapped.has(a);
-    for (const code of this.keys) held[KEYMAP[code]] = true;
+    for (const code of this.keys) {
+      held[KEYMAP[code]] = true;
+      if (KEYMAP2[code]) held[KEYMAP2[code]] = true;
+    }
     // Jedes neue keydown (ohne Wiederholung) zählt als frischer Druck.
     for (const a of this.tapped) this.prev[a] = false;
     this.tapped.clear();
@@ -141,6 +156,8 @@ export class Input {
       wende: pressed('wende'),
       rotLeft: pressed('rotLeft'),
       rotRight: pressed('rotRight'),
+      rot45Left: pressed('rot45Left'),
+      rot45Right: pressed('rot45Right'),
       espressoPressed: pressed('espresso'),
       station: pressed('station'),
       map: pressed('map'),

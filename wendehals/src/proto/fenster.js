@@ -73,7 +73,10 @@ export function clampCam(x, y) {
 }
 
 const smooth = (t) => t * t * (3 - 2 * t);
-const vec = (d) => DIR_VEC[d];
+// Einheitsvektoren: gerade Richtungen unverändert, Diagonalen auf Länge 1 normiert (Tempo in allen 8 Richtungen gleich, P3).
+const UNIT = DIR_VEC.map(([x, y]) => (x && y ? [x * Math.SQRT1_2, y * Math.SQRT1_2] : [x, y]));
+const vec = (d) => UNIT[d];
+export const unitVec = vec;
 
 export class FensterScene {
   constructor({ rng = new Rng(0xf1e57e4), map = KREUZ_MAP } = {}) {
@@ -221,6 +224,11 @@ export class FensterScene {
     return true;
   }
 
+  /** Gewünschte Drehung aus der Eingabe (Vorzeichen = Seite; P3 „45°-Kreuzung“ überschreibt das mit 45°-Schritten). */
+  rotInput(input) {
+    return input.rotLeft ? -1 : input.rotRight || input.espressoPressed ? 1 : 0;
+  }
+
   /** 180°: nur s wechselt. */
   flip() {
     this.s = this.s === 'R' ? 'L' : 'R';
@@ -258,7 +266,7 @@ export class FensterScene {
       return; // kurzer Neustart: nichts bewegt sich
     }
 
-    const rotK = input.rotLeft ? -1 : input.rotRight || input.espressoPressed ? 1 : 0;
+    const rotK = this.rotInput(input);
     if (rotK && this.rotate(rotK)) return;
     if (rotK) {
       this.denied = { side: rotK < 0 ? 'L' : 'R', t: DENY_TIME };

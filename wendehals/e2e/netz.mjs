@@ -29,23 +29,23 @@ const wait = (ms) => page.waitForTimeout(ms);
 const proto = (f, arg) => page.evaluate(f, arg);
 
 // ------------------------------------------------------------ Direktstart und Zugänge
-await page.goto(url);
+await page.goto(url + '?proto=netz'); // seit P3 „45°-Kreuzung“ startet der Build ohne Parameter im Achteck
 await page.waitForFunction(() => window.__wendehals?.game.proto);
-check(await proto(() => window.__wendehals.game.screen === 'proto' && window.__wendehals.game.proto.map.def.name === 'netz'), 'Start ohne Parameter direkt im Netz');
+check(await proto(() => window.__wendehals.game.screen === 'proto' && window.__wendehals.game.proto.map.def.name === 'netz'), '?proto=netz startet das Netz');
 await page.goto(url + '?proto=fenster');
 await page.waitForFunction(() => window.__wendehals?.game.proto);
 check(await proto(() => window.__wendehals.game.proto.map.def.name === 'kreuz'), '?proto=fenster startet P1 „Kreuzung“');
 await page.goto(url + '?spiel');
 await page.waitForFunction(() => window.__wendehals?.game);
 check(await proto(() => window.__wendehals.game.screen !== 'proto'), '?spiel öffnet das v0.2-Spiel');
-await page.goto(url);
+await page.goto(url + '?proto=netz'); // seit P3 „45°-Kreuzung“ startet der Build ohne Parameter im Achteck
 await page.waitForFunction(() => window.__wendehals?.game.proto);
 await page.keyboard.press('Escape');
 await wait(200);
 check(await proto(() => window.__wendehals.game.screen === 'title'), 'Esc führt zum v0.2-Titel');
 
 // ------------------------------------------------------------ Stellen A–I
-await page.goto(url);
+await page.goto(url + '?proto=netz'); // seit P3 „45°-Kreuzung“ startet der Build ohne Parameter im Achteck
 await page.waitForFunction(() => window.__wendehals?.game.proto);
 const N = { E: 0, S: 2, W: 4, N: 6 };
 // theta/s: Ausrichtung (Kartenrichtung des rechten Fensterendes), Seite; key: Taste für die Drehung
@@ -108,7 +108,7 @@ for (const sz of SZENEN) {
 }
 
 // ------------------------------------------------------------ 60 fps nur in dieser Szene
-await page.goto(url);
+await page.goto(url + '?proto=netz'); // seit P3 „45°-Kreuzung“ startet der Build ohne Parameter im Achteck
 await page.waitForFunction(() => window.__wendehals?.game.proto);
 await proto(() => {
   const p = window.__wendehals.game.proto;

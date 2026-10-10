@@ -32,7 +32,7 @@ const N = { E: 0, S: 2, W: 4, N: 6 };
 const CROP = { x: 350, y: 0, width: 260, height: 140 };
 
 // ------------------------------------------------------------ Start, Umschalten mit M
-await page.goto(url);
+await page.goto(url + '?proto=netz'); // seit P3 „45°-Kreuzung“ startet der Build ohne Parameter im Achteck
 await page.waitForFunction(() => window.__wendehals?.game.proto);
 await wait(300);
 const a = await page.screenshot({ clip: CROP });
@@ -53,7 +53,7 @@ await wait(120);
 check(!p1.equals(await page.screenshot({ clip: CROP })), 'P1: M schaltet die Minimap ein');
 
 // ------------------------------------------------------------ Stellen
-await page.goto(url);
+await page.goto(url + '?proto=netz'); // seit P3 „45°-Kreuzung“ startet der Build ohne Parameter im Achteck
 await page.waitForFunction(() => window.__wendehals?.game.proto);
 const SZENEN = [
   { id: 'A', name: 'plus-kreuzung', x: -140, y: 0, theta: N.E, s: 'R', key: 'KeyO' },
@@ -97,7 +97,7 @@ check(schwenkChanged > 0, 'Minimap ändert sich im Schwenk (' + schwenkChanged +
 
 // ------------------------------------------------------------ 60 fps mit jeder Version
 const keysSeq = ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'];
-await page.goto(url);
+await page.goto(url + '?proto=netz'); // seit P3 „45°-Kreuzung“ startet der Build ohne Parameter im Achteck
 await page.waitForFunction(() => window.__wendehals?.game.proto);
 for (const v of [1, 2, 3]) {
   await proto(() => {

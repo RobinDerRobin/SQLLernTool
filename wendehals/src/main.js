@@ -82,9 +82,10 @@ export function boot() {
   const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true }) || canvas.getContext('2d');
   const params = new URLSearchParams(location.search);
   const game = new Game({ storage: pickStorage(), platform: makePlatform(), invincible: params.has('unverwundbar') });
-  // Prototyp-Build: Start direkt im Prototyp (P1c „Netz“). `?proto=fenster` startet P1 „Kreuzung“, `?spiel` öffnet das
-  // alte v0.2-Spiel (Titelmenü) direkt. Vor dem Übernehmen eines späteren Prototyps oder zurück zu v0.2 wird das umgestellt.
-  if (!params.has('spiel')) game.startProto(params.get('proto') === 'fenster' ? 'fenster' : 'netz');
+  // Prototyp-Build: Start direkt im Prototyp (P3 „45°-Kreuzung“). `?proto=fenster` startet P1 „Kreuzung“, `?proto=netz` P1c „Netz“
+  // (mit Minimap), `?spiel` öffnet das alte v0.2-Spiel (Titelmenü) direkt. Vor dem Übernehmen eines späteren Prototyps oder
+  // zurück zu v0.2 wird das umgestellt.
+  if (!params.has('spiel')) game.startProto({ fenster: 'fenster', netz: 'netz' }[params.get('proto')] || '45grad');
   const renderer = new Renderer(ctx);
   const input = new Input(window);
   const audio = new Audio();

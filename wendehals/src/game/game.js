@@ -12,6 +12,7 @@ import { linksAt, directionAllowed, arrive, returnTarget } from './worldgraph.js
 import { Arena } from './arena.js';
 import { FensterScene } from '../proto/fenster.js';
 import { NETZ_MAP } from '../proto/netz-map.js';
+import { AchteckScene } from '../proto/achteck.js';
 import { minimapFor, updateMinimap } from '../proto/minimap.js';
 import { Level } from './level.js';
 import { freshPowers, powerupsAfterDeath } from './powerups.js';
@@ -168,6 +169,7 @@ export class Game {
     if (fromTitle) {
       items.push({ label: 'Prototyp: Fenster', action: () => this.startProto('fenster') });
       items.push({ label: 'Prototyp: Netz', action: () => this.startProto('netz') });
+      items.push({ label: 'Prototyp: 45°-Kreuzung', action: () => this.startProto('45grad') });
     }
     items.push({ label: 'Zurück', action: back });
     this.overlay = this.menu('Optionen', items, {
@@ -346,8 +348,8 @@ export class Game {
 
   /** Wegwerf-Prototypen (src/proto/), nur vom Titel aus erreichbar. */
   startProto(name) {
-    if (name !== 'fenster' && name !== 'netz') return;
-    this.proto = name === 'netz' ? new FensterScene({ map: NETZ_MAP }) : new FensterScene();
+    if (name !== 'fenster' && name !== 'netz' && name !== '45grad') return;
+    this.proto = name === '45grad' ? new AchteckScene() : name === 'netz' ? new FensterScene({ map: NETZ_MAP }) : new FensterScene();
     this.screen = 'proto';
     this.screenTime = 0;
     this.overlay = null;
@@ -554,7 +556,7 @@ export class Game {
         if (input.pause) this.leaveProto();
         else {
           this.proto.update(dt, input);
-          updateMinimap(minimapFor(this.proto), this.proto, input, dt); // P2: liest nur die Szene
+          if (this.proto.minimap !== false) updateMinimap(minimapFor(this.proto), this.proto, input, dt); // P2: liest nur die Szene
           for (const name of this.proto.sfx) this.sfx(name);
           this.proto.sfx.length = 0;
         }
