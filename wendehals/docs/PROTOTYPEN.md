@@ -150,13 +150,13 @@ Diese zusammengeführte Liste ist der aktuelle Entwurf und wird mit Robin bespro
 | 2 | Orientierung & Karte | Prototyp | Bleibt man orientiert? Braucht es eine Minimap? | P2 | P1 |
 | 3 | Gabelungen | Prototyp | Wie nimmt man eine Gabelung mitten in der Etappe? | ein Gang mit einer Gabelung | P1 |
 | 4 | Drehen begrenzen | Prototyp | Drehorte, Drehzahl oder beides? | kleine Schleife, Stationen vs. Ladung | 1, 3 |
-| 5 | Richtung als Weltfaktor | Prototyp | Kann die Richtung fair sperren, schieben, töten? | Strömung + Einbahntür + tödliche falsche Richtung | 4, 6 |
+| ~~5~~ | ~~Richtung als Weltfaktor~~ | **gestrichen** (Robin, 10.10.2026: „Streich das.“) | ~~Kann die Richtung fair sperren, schieben, töten?~~ | ~~Strömung + Einbahntür + tödliche falsche Richtung~~ | – |
 | 6 | Tod & Neustart | Entscheidung | Wo startet man neu, mit welcher Blickrichtung? | Regel auf Papier, getestet in 5 | – |
 | 7 | Tempo & Rhythmus | Prototyp | Welche Mischung aus Gefecht/Halt/Anker/Cruise ergibt Rhythmus? | eine Etappe mit Keyframes | P4 |
 | 8 | Fenster in die Engine | Produktion | Bewährte Regeln in die echten Module übernehmen | Ansicht, Kreuzungen, gedrehte Arenen, Deck-Leistung, Löser-Türregel | 1–3 „keep“ |
 | S | Setting, Ton & Look | Entscheidung | Was ersetzt das Haus? | 2–3 einseitige Pitches | – |
-| 9 | Fähigkeiten (je drei Nutzen) | Prototyp → Produktion | Trägt jede Fähigkeit Kampf, Bewegung und Rätsel? | Leine | S, 4, 5 |
+| 9 | Fähigkeiten (je drei Nutzen) | Prototyp → Produktion | Trägt jede Fähigkeit Kampf, Bewegung und Rätsel? | Leine | S, 4 |
 | 10 | Gegner & Bosse | Produktion | Funktionieren Gegner und Bosse im drehenden Fenster? | ein Boss im Fenster | S, P4 |
-| 11 | Progression | Papier + Löser | Halten Reihenfolge, Schlösser und Sequence Breaks auf dem Grundriss? | Graph + Löserlauf | 4, 5, 9 |
+| 11 | Progression | Papier + Löser | Halten Reihenfolge, Schlösser und Sequence Breaks auf dem Grundriss? | Graph + Löserlauf | 4, 9 |
 | 12 | Welt bauen | Produktion | Gebiete, Räume, Etappen | erstes Slice | 8, 11, S |
 | Q | Querschnitt | Produktion | – | Steuerungsbudget, Telemetrie, Speicherposition, Datenformat für Begegnungen, Deck-Leistung, Löser synchron | laufend |
