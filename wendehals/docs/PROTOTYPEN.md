@@ -77,7 +77,7 @@ dürfen es als Platzhalter nutzen.
 |---|---|---|
 | E1 | Diagonal-Etappen: Bild 45° drehen oder Treppen-Terrain? | **erledigt/obsolet** – Fenster-Konzept |
 | E2 | Drehzahl: Kosten pro 45° oder feste Ladungen? | offen (Paket „Drehen begrenzen“) |
-| E3 | Steuerung zum Drehen | **neu zu fragen**: P1 nutzt LB/RB statt „B halten + Stick“ |
+| E3 | Steuerung zum Drehen | im Prototyp: LB/RB (U/O) ±90°, seit P3 „45°-Kreuzung“ LT/RT (J/K) ±45° (Robin, 10.10.2026); fürs Spiel offen |
 | E4 | Kreisel ohne Fähigkeit schubst 180° zurück? | offen; 180° ist jetzt nur Scroll-Umkehr |
 | E5 | Wendehals früh oder bei ~40 %? | ersetzt durch E8 |
 | E6 | Umfang (8 Gebiete, 4 h) | **ruht** bis das Setting steht |
@@ -96,7 +96,7 @@ dürfen es als Platzhalter nutzen.
 | **P1c „Netz“** | Hält das Drehen die Checkliste 4a an T, L, überlappenden Zonen, versetzten Abzweigen, breitem/schmalem Gang, Ring? | **gebaut (07.10.2026), wartet auf Robins Spieltest (F2):** [`prototypen/P1c-netz.md`](prototypen/P1c-netz.md), Stand in Abschnitt 9 |
 | P1b | Nur falls P1 „nein“: dog-bezogen vs. bildschirmbezogen drehen, umschaltbar | wartet auf P1 |
 | **P2 „Minimap“** (ersetzt „Orientierung“: Robin will sowieso eine Minimap, 08.10.2026) | Welche Minimap lässt mich im Netz am sichersten wissen, wo ich bin und wohin ich drehen muss – V1 „wie die Kamera“, V2 „Plan“ (Norden oben) oder V3 „Gang-Balken“? | **keep (10.10.2026, F3)** – [Brief](prototypen/P2-minimap.md), Stand in Abschnitt 9; welche Version (V1/V2/V3) bleibt, ist noch offen |
-| P3 „45°“ | Passen 45°-Drehungen zur selben Aktion? (Diagonal-Arm, achteckige Kreuzung, LT/RT) | wartet auf P1 |
+| **P3 „45°-Kreuzung“** | Nehme ich auch einen Diagonal-Gang mit derselben Aktion – die Kreuzung als Achteck mit 8 Armen, LT/RT bzw. J/K für ±45°? | **Brief von Robin validiert (10.10.2026)**, wartet auf den Bau (Sonnet 5.5): [Brief](prototypen/P3-45grad.md); ohne Minimap |
 | P4 „Druck“ | Funktioniert die pausierte Drehung und das Schießen von oben im Kampf, in beide Richtungen? | wartet auf P1 |
 
 Geparkt (nicht vergessen): große Karte (eigener Prototyp nach P2), Gabelungen mit Drehfähigkeiten (nach P3), sanftes

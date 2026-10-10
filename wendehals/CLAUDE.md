@@ -134,6 +134,8 @@ Session, für jeden Prototyp, ohne dass Robin sie wiederholen muss.
 7. **Modellwahl** laut `docs/PROTOTYPEN.md`: Deutungs- und Design-Runden Opus 5.5, Bauen und Testen Sonnet 5.5.
 8. **Alles muss auf dem Steam Deck funktionieren** (Controller und Tastatur, 60 fps, Symbole selbst gezeichnet,
    keine Abhängigkeit von Schriftarten) – gilt fürs ganze Spiel.
+9. **Prototypen immer beschreibend benennen** (Robin, 10.10.2026): nie nur „P1“ oder „P1c“, sondern z. B. „P1 „Kreuzung““,
+   „P1c „Netz““, „P2 „Minimap““, „P3 „45°-Kreuzung““ – in Gesprächen, Briefen und Commits.
 
 ## Golden Master der v0.2-Welt
 
