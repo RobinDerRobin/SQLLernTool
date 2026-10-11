@@ -1,9 +1,10 @@
 // Datenmodell des Editors: Gebiet laden/prüfen/formatieren, Geometrie von Gängen, Knoten und Formteilen.
 // Reine Daten und Geometrie – kein DOM, läuft auch unter Node (Tests). Einheiten E, x nach Osten, y nach Süden, Winkel in Grad.
 import { HEADINGS, DIR_VEC, headingAngle, HEADING_CODES, DIR_NAMES } from '../core/math.js';
-import { FORMAT, SCREEN_W, SCREEN_H, SPEED, WINKEL_SCHRITT } from './konstanten.js';
+import { FORMAT, SCREEN_W, SCREEN_H, SPEED, WINKEL_SCHRITT, VERLAUF_MAX } from './konstanten.js';
 import { KNOTENTYPEN, OBJEKTTYPEN, TILESETS } from './katalog.js';
 
+export const GEBIET_ID = /^[a-z0-9][a-z0-9_-]*$/;
 const EPS = 1e-6;
 const RAD = Math.PI / 180;
 
@@ -50,6 +51,7 @@ export function pruefeFormat(g) {
   if (!g || typeof g !== 'object' || Array.isArray(g)) return ['Die Datei enthält kein Gebiet (Objekt erwartet).'];
   if (g.format !== FORMAT) f(`Format ${JSON.stringify(g.format)} wird nicht unterstützt (erwartet: ${FORMAT}).`);
   for (const k of ['id', 'name', 'tileset']) if (typeof g[k] !== 'string' || !g[k]) f(`Feld „${k}“ fehlt oder ist kein Text.`);
+  if (typeof g.id === 'string' && g.id && !GEBIET_ID.test(g.id)) f(`Die Gebiets-ID „${g.id}“ darf nur Kleinbuchstaben, Ziffern, „-“ und „_“ enthalten (sie ist der Dateiname).`);
   for (const k of Object.keys(LISTEN)) if (!Array.isArray(g[k])) f(`Liste „${k}“ fehlt.`);
   const zahl0 = (v) => typeof v === 'number' && Number.isFinite(v);
   const b = g.bereich;
@@ -244,4 +246,49 @@ export function rahmenEcken(m, s, breite = SCREEN_W, hoehe = SCREEN_H) {
     p.x + m.ux * (i * breite) / 2 + qx * (j * hoehe) / 2,
     p.y + m.uy * (i * breite) / 2 + qy * (j * hoehe) / 2,
   ]);
+}
+
+// ------------------------------------------------------------------ Rückgängig / Wiederholen (Schnappschüsse als Text)
+
+/** Verlauf eines Gebiets: speichert den Zustand VOR jeder Änderung als Text. Rückgängig/Wiederholen stellen den Zustand exakt her. */
+export class Verlauf {
+  constructor(max = VERLAUF_MAX) {
+    this.max = max;
+    this.zurueck = [];
+    this.vor = [];
+  }
+
+  /** Vor einer Änderung aufrufen (`vorher` = Zustand als Text). Löscht die Wiederholen-Liste. */
+  merke(vorher) {
+    this.zurueck.push(vorher);
+    if (this.zurueck.length > this.max) this.zurueck.shift();
+    this.vor = [];
+  }
+
+  /** Gibt den vorigen Zustand zurück (oder null) und merkt `aktuell` zum Wiederholen. */
+  rueckgaengig(aktuell) {
+    if (!this.zurueck.length) return null;
+    this.vor.push(aktuell);
+    return this.zurueck.pop();
+  }
+
+  wiederholen(aktuell) {
+    if (!this.vor.length) return null;
+    this.zurueck.push(aktuell);
+    return this.vor.pop();
+  }
+
+  get kannZurueck() {
+    return this.zurueck.length > 0;
+  }
+
+  get kannVor() {
+    return this.vor.length > 0;
+  }
+}
+
+/** Welt-Datei (Liste der Gebiete) als Text: ein Gebiet pro Zeile. */
+export function formatiereWelt(welt) {
+  const gebiete = welt.gebiete.map((g) => '    ' + einzeilig(ordne(g, ['id', 'name', 'datei'])));
+  return `{\n  "format": ${welt.format},\n  "gebiete": [\n${gebiete.join(',\n')}\n  ]\n}\n`;
 }

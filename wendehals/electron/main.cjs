@@ -1,6 +1,7 @@
 // Desktop-Hülle (Windows / Linux / Steam Deck). Lädt das gebaute Spiel aus dist/index.html.
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('node:path');
+const fs = require('node:fs');
 
 // Linux-AppImage / Steam (Deck): Die Chromium-Prozess-Sandbox (setuid chrome-sandbox bzw.
 // User-Namespaces) lässt sich dort nicht einrichten – das Programm würde sofort beenden.
@@ -48,6 +49,28 @@ ipcMain.on('wendehals:fullscreen', (e, on) => {
   const win = BrowserWindow.fromWebContents(e.sender);
   if (win) win.setFullScreen(!!on);
 });
+
+// Level-Editor (WENDEHALS_EDITOR=1): Leveldateien lesen und schreiben – ausschließlich in wendehals/levels/ (welt.json und gebiete/<id>.json).
+// Ohne die Umgebungsvariable gibt es diese Kanäle nicht; das Spiel kann nie Dateien schreiben.
+if (process.env.WENDEHALS_EDITOR) {
+  const levelsDir = path.join(__dirname, '..', 'levels');
+  const erlaubt = (rel) => typeof rel === 'string' && /^(welt\.json|gebiete\/[a-z0-9][a-z0-9_-]*\.json)$/.test(rel);
+  ipcMain.handle('wendehals:levels-alle', () => {
+    const welt = fs.readFileSync(path.join(levelsDir, 'welt.json'), 'utf8');
+    const gebiete = {};
+    for (const g of JSON.parse(welt).gebiete) {
+      if (erlaubt(g.datei)) gebiete[g.id] = fs.readFileSync(path.join(levelsDir, g.datei), 'utf8');
+    }
+    return { welt, gebiete };
+  });
+  ipcMain.handle('wendehals:levels-schreibe', (e, rel, text) => {
+    if (!erlaubt(rel) || typeof text !== 'string' || text.length > 5e6) throw new Error('Nur welt.json und gebiete/<id>.json im Ordner levels/ dürfen geschrieben werden.');
+    const ziel = path.join(levelsDir, rel);
+    fs.mkdirSync(path.dirname(ziel), { recursive: true });
+    fs.writeFileSync(ziel + '.tmp', text); // erst daneben schreiben, dann ersetzen: eine abgebrochene Speicherung zerstört nie die alte Datei
+    fs.renameSync(ziel + '.tmp', ziel);
+  });
+}
 
 app.whenReady().then(() => {
   createWindow();

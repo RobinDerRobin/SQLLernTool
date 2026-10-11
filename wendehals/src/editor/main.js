@@ -1,22 +1,27 @@
 // Einstieg des Level-Editors (`?editor`, Electron: WENDEHALS_EDITOR=1). Baut die Oberfläche, verbindet die Module.
 // Stufe 1: Ansehen – Plan im Spielbild, Zoom/Verschieben/Drehen, Gang anklicken, Bildschirmrahmen mit Fahrt-Schieber.
+// Stufe 2a: Bauen – Werkzeuge (Auswahl, Gang, Knoten), Eigenschaften ändern, Rückgängig/Wiederholen, Speichern/Laden.
 import { HEADINGS, DIR_NAMES, E } from '../core/math.js';
 import { Ansicht } from './ansicht.js';
 import { zeichnePlan } from './zeichnen.js';
 import { WELT, GEBIETE } from './startdaten.js';
-import { kopie, knotenMap, gangMasse, gangPolygon, punktInPolygon, ausdehnung, rahmenEcken } from './daten.js';
+import { kopie, knotenMap, gangMasse, gangPolygon, knotenPolygon, punktInPolygon, ausdehnung, rahmenEcken, formatiere, formatiereWelt, ladeGebiet, pruefeFormat, Verlauf } from './daten.js';
 import { KNOTENTYPEN } from './katalog.js';
-import { KUERZEL, SCREEN_W, SPEED, ZOOM_BILDSCHIRME, PFEIL_SCHRITT_PX, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX } from './konstanten.js';
+import { KUERZEL, SCREEN_W, SPEED, ZOOM_BILDSCHIRME, PFEIL_SCHRITT_PX, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX } from './konstanten.js';
+import { gangTeilen, loesche, setze } from './befehle.js';
+import { erzeugeSpeicher } from './speicher.js';
+import { WERKZEUGE } from './werkzeuge/index.js';
 
 const fmt = (n, d = 1) => n.toFixed(d).replace('.', ',');
 const hat = (liste, code) => (Array.isArray(liste) ? liste.includes(code) : liste === code);
 
 const CSS = `
 html, body { margin: 0; height: 100%; background: #14121a; color: #e8e6ee; font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
-#editor { display: grid; grid-template-columns: 1fr 290px; grid-template-rows: auto 1fr 78px; height: 100%; }
+#editor { display: grid; grid-template-columns: 1fr 290px; grid-template-rows: auto auto 1fr 78px; height: 100%; }
 #editor > * { min-width: 0; min-height: 0; }
 .leiste { background: #221f2b; display: flex; flex-wrap: wrap; align-items: center; min-height: 44px; padding-top: 3px; padding-bottom: 3px; box-sizing: border-box; gap: 8px; padding: 0 10px; border: 0 solid #38334a; }
-#oben { grid-column: 1 / 3; border-bottom-width: 1px; }
+#oben, #werk { grid-column: 1 / 3; border-bottom-width: 1px; }
+#plan { grid-row: 3; } #rechts { grid-row: 3; grid-column: 2; }
 #unten { grid-column: 1 / 3; border-top-width: 1px; gap: 12px; }
 #plan { position: relative; overflow: hidden; background: #1c1822; }
 #plan canvas { display: block; width: 100%; height: 100%; cursor: grab; }
@@ -32,7 +37,12 @@ button:disabled { opacity: .45; cursor: default; }
 .grau { color: #a49fb8; }
 #anzeige { margin-left: auto; white-space: nowrap; }
 #fahrt { flex: 1; min-width: 120px; }
-#melden { color: #ff9a8a; }
+#melden { color: #b8e8c0; white-space: pre-line; max-height: 70px; overflow: auto; }
+#melden.fehler { color: #ff9a8a; }
+#werkhinweis { margin-left: 6px; }
+#stand.offen { color: #ffd24a; }
+input[type=text], input[type=number], #rechts select { width: 100%; box-sizing: border-box; background: #14121a; color: #e8e6ee; border: 1px solid #4b4560; border-radius: 4px; padding: 3px 6px; font: inherit; }
+#rechts .knoepfe { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 `;
 
 function el(tag, attrs = {}, kinder = []) {
@@ -62,11 +72,18 @@ export function startEditor() {
     meldung: '',
     beschriftung: true,
     echtzeit: true, // false: Zeit und Fahrt laufen nur über tick() – für deterministische Tests
+    werkzeug: WERKZEUGE[0].id,
+    knotenTyp: 'kreuzung',
+    verlauf: {}, // Gebiets-ID → Verlauf (Rückgängig/Wiederholen)
+    gespeichert: Object.fromEntries(Object.entries(GEBIETE).map(([id, g]) => [id, formatiere(g)])), // zuletzt gespeicherter/geladener Text je Gebiet
+    weltGeaendert: false, // welt.json muss mitgeschrieben werden (neues Gebiet geöffnet)
+    speicher: erzeugeSpeicher(),
   };
   const ansicht = new Ansicht();
   const perf = { zeichnenMs: [] };
   let dirty = true;
   const gebiet = () => state.gebiete[state.gebietId];
+  const werkzeug = () => WERKZEUGE.find((w) => w.id === state.werkzeug);
 
   // ---------------------------------------------------------------- Oberfläche
   const canvas = el('canvas');
@@ -91,14 +108,39 @@ export function startEditor() {
     knopf('Beschriftung', 'Knoten, Namen und Maßstab ein-/ausblenden (L)', () => beschriften(), 'b-beschriftung'),
     anzeige,
   ]);
+  const knopfW = (w) => el('button', { text: `${w.name} (${KUERZEL.werkzeug[w.id].replace('Key', '')})`, title: w.hinweis, id: 't-' + w.id, onclick: () => setzeWerkzeug(w.id) });
+  const typWahl = el('select', { id: 'knotentyp', title: 'Typ des Knotens, den das Knoten-Werkzeug setzt' }, Object.entries(KNOTENTYPEN).map(([id, t]) => el('option', { value: id, text: t.name })));
+  typWahl.value = state.knotenTyp;
+  typWahl.addEventListener('change', () => {
+    state.knotenTyp = typWahl.value;
+    typWahl.blur();
+    dirty = true;
+  });
+  const undoKnopf = knopf('Rückgängig', 'Letzte Änderung zurücknehmen (Strg+Z)', () => rueckgaengig(), 'b-undo');
+  const redoKnopf = knopf('Wiederholen', 'Zurückgenommene Änderung wiederholen (Strg+Y)', () => wiederholen(), 'b-redo');
+  const loeschKnopf = knopf('Löschen', 'Gewählten Gang oder Knoten löschen (Entf)', () => loescheAuswahl(), 'b-loeschen');
+  const werkHinweis = el('span', { class: 'grau', id: 'werkhinweis' });
+  const stand = el('span', { id: 'stand', class: 'grau' });
+  const werk = el('div', { id: 'werk', class: 'leiste' }, [
+    ...WERKZEUGE.map(knopfW),
+    typWahl,
+    undoKnopf,
+    redoKnopf,
+    loeschKnopf,
+    knopf('Speichern', 'Gebiet speichern (Strg+S)', () => speichere(), 'b-speichern'),
+    knopf('Öffnen …', 'Leveldatei öffnen (Strg+O)', () => oeffne(), 'b-oeffnen'),
+    stand,
+    werkHinweis,
+  ]);
   const rechts = el('div', { id: 'rechts' });
   const play = knopf('Fahrt', 'Rahmen mit Flugtempo durchs Level fahren lassen (Leertaste)', () => fahrtUmschalten(), 'b-fahrt');
   const schieber = el('input', { id: 'fahrt', type: 'range', min: '0', max: '1', step: '1', value: '0', title: 'Fahrt-Schieber: Stelle im Gang' });
   schieber.addEventListener('input', () => setzeFahrt(Number(schieber.value)));
   const fahrtText = el('span', { id: 'fahrt-text' });
   const melden = el('span', { id: 'melden' });
+  melden.addEventListener('click', () => melde(''));
   const unten = el('div', { id: 'unten', class: 'leiste' }, [play, schieber, fahrtText, melden]);
-  const wurzel = el('div', { id: 'editor' }, [oben, plan, rechts, unten]);
+  const wurzel = el('div', { id: 'editor' }, [oben, werk, plan, rechts, unten]);
   document.body.append(wurzel);
 
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -198,6 +240,10 @@ export function startEditor() {
     }
     const [wx, wy] = ansicht.bildZuWelt(px, py);
     const km = knotenMap(g);
+    for (const k of g.knoten) {
+      const poly = knotenPolygon(k);
+      if (poly && punktInPolygon(wx, wy, poly)) return { art: 'knoten', id: k.id };
+    }
     for (const gang of g.gaenge) {
       const p = gangPolygon(g, gang, km);
       if (p && punktInPolygon(wx, wy, p)) return { art: 'gang', id: gang.id };
@@ -205,34 +251,241 @@ export function startEditor() {
     return null;
   }
 
+
+  // ---------------------------------------------------------------- Bearbeiten (Stufe 2a)
+  function melde(text, art = 'info') {
+    state.meldung = text;
+    melden.textContent = text;
+    melden.className = art === 'fehler' ? 'fehler' : '';
+    melden.title = text ? 'Klick blendet die Meldung aus' : '';
+  }
+  function hinweis(t) {
+    werkHinweis.textContent = t || werkzeug().hinweis;
+  }
+  const verlaufVon = (id) => (state.verlauf[id] ??= new Verlauf());
+  const ungespeichert = (id = state.gebietId) => state.gebiete[id] && formatiere(state.gebiete[id]) !== state.gespeichert[id];
+
+  /** Nach Änderung, Rückgängig oder Laden: Auswahl und Fahrt gibt es vielleicht nicht mehr. */
+  function bereinige() {
+    const g = gebiet();
+    const au = state.auswahl;
+    const da = au && (au.art === 'gang' ? g.gaenge : au.art === 'knoten' ? g.knoten : []).some((o) => o.id === au.id);
+    if (au && !da) {
+      state.auswahl = null;
+      state.fahrt = null;
+    }
+    if (state.fahrt) {
+      const m = ganzMasse();
+      if (!m) state.fahrt = null;
+      else state.fahrt.s = Math.min(state.fahrt.s, m.laenge);
+    }
+  }
+
+  /**
+   * Jede Änderung an den Daten läuft hier durch: Zustand vorher merken (Rückgängig), `fn(gebiet)` ausführen, bei Fehler alles
+   * zurücksetzen. Gibt zurück, was `fn` zurückgibt. Ändert `fn` nichts, entsteht kein Verlaufseintrag.
+   */
+  function aendere(label, fn) {
+    const g = gebiet();
+    const vorher = JSON.stringify(g);
+    let erg = null;
+    try {
+      erg = fn(g);
+    } catch (e) {
+      state.gebiete[g.id] = JSON.parse(vorher);
+      melde(`„${label}“ ging schief, nichts wurde geändert: ${e.message}`, 'fehler');
+      refresh();
+      return null;
+    }
+    if (JSON.stringify(g) === vorher) return erg ?? null;
+    verlaufVon(g.id).merke(vorher);
+    state.letzteAktion = label;
+    melde('');
+    bereinige();
+    refresh();
+    return erg ?? null;
+  }
+  function nachVerlauf(text) {
+    state.gebiete[state.gebietId] = JSON.parse(text);
+    bereinige();
+    melde('');
+    refresh();
+  }
+  function rueckgaengig() {
+    const t = verlaufVon(state.gebietId).rueckgaengig(JSON.stringify(gebiet()));
+    if (t != null) nachVerlauf(t);
+  }
+  function wiederholen() {
+    const t = verlaufVon(state.gebietId).wiederholen(JSON.stringify(gebiet()));
+    if (t != null) nachVerlauf(t);
+  }
+  /** Eigenschaft im rechten Feld ändern; Fehlermeldung statt Änderung bei unzulässigen Werten. */
+  function setzeFeld(art, id, feld, wert) {
+    let fehler = null;
+    aendere('Eigenschaft ändern', (g) => {
+      fehler = setze(g, art, id, feld, wert);
+    });
+    if (fehler) melde(fehler, 'fehler');
+    refresh();
+  }
+  function loescheAuswahl() {
+    const au = state.auswahl;
+    if (!au || (au.art !== 'gang' && au.art !== 'knoten')) return;
+    aendere('Löschen', (g) => loesche(g, au.art, au.id));
+  }
+  function teileGang() {
+    const au = state.auswahl;
+    if (au?.art !== 'gang' || !state.fahrt) return;
+    const neu = aendere('Gang teilen', (g) => gangTeilen(g, au.id, Math.round(state.fahrt.s / 20) * 20));
+    if (neu) waehle({ art: 'knoten', id: neu.id });
+  }
+  function setzeWerkzeug(id) {
+    if (!WERKZEUGE.some((w) => w.id === id)) return;
+    werkzeug().abbruch?.(kontext);
+    state.werkzeug = id;
+    canvas.style.cursor = id === 'auswahl' ? 'grab' : 'crosshair';
+    hinweis('');
+    refresh();
+  }
+
+  async function speichere() {
+    const g = gebiet();
+    const fehler = pruefeFormat(g);
+    if (fehler.length) return melde('Nicht gespeichert – das Gebiet ist nicht gültig:\n- ' + fehler.join('\n- '), 'fehler');
+    const text = formatiere(g);
+    try {
+      const r = await state.speicher.sichere(`gebiete/${g.id}.json`, text);
+      if (!r) return melde('Speichern abgebrochen.');
+      state.gespeichert[g.id] = text;
+      let wo = r.wo;
+      if (state.weltGeaendert) {
+        const wr = await state.speicher.sichere('welt.json', formatiereWelt(state.welt));
+        if (wr) {
+          state.weltGeaendert = false;
+          wo += ` und ${wr.wo}`;
+        }
+      }
+      melde(`Gespeichert: ${wo}`);
+    } catch (e) {
+      melde('Nicht gespeichert: ' + e.message, 'fehler');
+    }
+    refresh();
+  }
+  /** Text einer Leveldatei als Gebiet übernehmen. Ungültig → Meldung, der bisherige Stand bleibt (nichts geht verloren). */
+  function oeffneText(text, name = 'Datei') {
+    let g;
+    try {
+      g = ladeGebiet(text);
+    } catch (e) {
+      melde(`„${name}“ wurde nicht geöffnet, der bisherige Stand bleibt unverändert.\n${e.message}`, 'fehler');
+      return false;
+    }
+    if (state.gebiete[g.id]) verlaufVon(g.id).merke(JSON.stringify(state.gebiete[g.id])); // lässt sich mit Rückgängig zurücknehmen
+    else {
+      state.welt = { ...state.welt, gebiete: [...state.welt.gebiete, { id: g.id, name: g.name, datei: `gebiete/${g.id}.json` }] };
+      state.weltGeaendert = true;
+      wahl.append(el('option', { value: g.id, text: g.name }));
+    }
+    state.gebiete[g.id] = g;
+    wechsle(g.id);
+    melde(`„${name}“ geöffnet.`);
+    return true;
+  }
+  async function oeffne() {
+    try {
+      const r = await state.speicher.lade();
+      if (r) oeffneText(r.text, r.name);
+    } catch (e) {
+      melde(e.message, 'fehler');
+    }
+  }
+  /** Alle Leveldateien frisch von der Platte übernehmen (Electron-Start): { welt: Text, gebiete: { id: Text } }. */
+  function uebernehmeAlle(alle) {
+    const probleme = [];
+    const welt = JSON.parse(alle.welt);
+    const neu = {};
+    for (const eintrag of welt.gebiete) {
+      try {
+        neu[eintrag.id] = ladeGebiet(alle.gebiete[eintrag.id]);
+      } catch (e) {
+        probleme.push(`${eintrag.id}: ${e.message}`);
+      }
+    }
+    if (!Object.keys(neu).length) throw new Error('keine gültige Gebietsdatei gefunden\n' + probleme.join('\n'));
+    state.welt = { ...welt, gebiete: welt.gebiete.filter((e) => neu[e.id]) };
+    state.gebiete = neu;
+    state.gespeichert = Object.fromEntries(Object.entries(neu).map(([id, g]) => [id, formatiere(g)]));
+    state.verlauf = {};
+    wahl.replaceChildren(...state.welt.gebiete.map((e) => el('option', { value: e.id, text: e.name })));
+    wechsle(state.welt.gebiete[0].id);
+    if (probleme.length) melde('Einige Dateien wurden übersprungen:\n' + probleme.join('\n'), 'fehler');
+  }
+
+  const kontext = {
+    state,
+    ansicht,
+    gebiet,
+    treffer,
+    waehle: (a) => waehle(a),
+    aendere,
+    hinweis,
+    tolE: () => FANG_PX / ansicht.masstab,
+    zeichnen: () => {
+      dirty = true;
+    },
+  };
+
   // ---------------------------------------------------------------- Anzeigen
   function zeile(dl, name, wert) {
     dl.append(el('dt', { text: name }), el('dd', { text: String(wert) }));
+  }
+  /** Eingabefeld in der Eigenschaftenliste; `bei(wert)` wird bei Änderung (Enter/Verlassen) aufgerufen. */
+  function feld(dl, name, id, wert, bei, art = 'number', extra = {}) {
+    const i = el('input', { type: art === 'number' ? 'number' : 'text', id, value: String(wert), ...extra });
+    i.addEventListener('change', () => bei(i.value));
+    i.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') i.blur();
+      e.stopPropagation(); // Kürzel (Q, E, F …) gelten nicht beim Tippen
+    });
+    dl.append(el('dt', { text: name }), el('dd', {}, [i]));
   }
   function eigenschaften() {
     rechts.replaceChildren();
     const g = gebiet();
     const au = state.auswahl;
     const dl = el('dl');
+    const knoepfe = el('div', { class: 'knoepfe' });
     if (au && au.art === 'gang') {
       const gang = g.gaenge.find((x) => x.id === au.id);
       const m = gang && gangMasse(g, gang);
       if (!m) return rechts.append(el('p', { text: 'Gang ohne gültige Knoten.' }));
       rechts.append(el('h2', { text: `Gang „${gang.name || gang.id}“` }), dl);
       zeile(dl, 'ID', gang.id);
+      feld(dl, 'Name', 'f-name', gang.name ?? '', (v) => setzeFeld('gang', gang.id, 'name', v), 'text');
       zeile(dl, 'Von → nach', `${gang.von} → ${gang.nach}`);
       zeile(dl, 'Länge', `${fmt(m.laenge, 0)} E`);
       zeile(dl, 'Bildschirme', fmt(m.bildschirme));
       zeile(dl, 'Flugzeit', `${fmt(m.sekunden)} s`);
-      zeile(dl, 'Breite', `${gang.breite} E`);
+      feld(dl, 'Breite (E)', 'f-breite', gang.breite, (v) => setzeFeld('gang', gang.id, 'breite', v), 'number', { step: 20 });
       zeile(dl, 'Richtung', m.richtung >= 0 ? `${m.richtungName} (${m.code})` : 'nicht im 45°-Raster');
+      knoepfe.append(knopf('Hier teilen', 'Gang an der Stelle des Bildschirmrahmens teilen (neue Kreuzung)', () => teileGang(), 'b-teilen'));
+      knoepfe.append(knopf('Löschen', 'Gang löschen (Entf)', () => loescheAuswahl(), 'b-loeschen2'));
     } else if (au && au.art === 'knoten') {
       const k = knotenMap(g).get(au.id);
       rechts.append(el('h2', { text: `Knoten ${k.id}` }), dl);
-      zeile(dl, 'Typ', KNOTENTYPEN[k.typ]?.name || k.typ);
-      zeile(dl, 'Lage', `x ${k.x}, y ${k.y}`);
-      if (k.w && k.h) zeile(dl, 'Maße', `${k.w} × ${k.h} E`);
+      const tw = el('select', { id: 'f-typ' }, Object.entries(KNOTENTYPEN).map(([id, t]) => el('option', { value: id, text: t.name })));
+      tw.value = k.typ;
+      tw.addEventListener('change', () => setzeFeld('knoten', k.id, 'typ', tw.value));
+      dl.append(el('dt', { text: 'Typ' }), el('dd', {}, [tw]));
+      feld(dl, 'x (E)', 'f-x', k.x, (v) => setzeFeld('knoten', k.id, 'x', v), 'number', { step: 100 });
+      feld(dl, 'y (E)', 'f-y', k.y, (v) => setzeFeld('knoten', k.id, 'y', v), 'number', { step: 100 });
+      if (k.w && k.h) {
+        feld(dl, 'Breite (E)', 'f-w', k.w, (v) => setzeFeld('knoten', k.id, 'w', v), 'number', { step: 20 });
+        feld(dl, 'Höhe (E)', 'f-h', k.h, (v) => setzeFeld('knoten', k.id, 'h', v), 'number', { step: 20 });
+      }
       if (k.form) zeile(dl, 'Form', `${k.form}, Seite ${k.seite} E`);
+      zeile(dl, 'Gänge', g.gaenge.filter((x) => x.von === k.id || x.nach === k.id).map((x) => x.name || x.id).join(', ') || 'keine');
+      knoepfe.append(knopf('Löschen', 'Knoten samt seinen Gängen löschen (Entf)', () => loescheAuswahl(), 'b-loeschen2'));
     } else {
       rechts.append(el('h2', { text: g.name }), dl);
       zeile(dl, 'Tileset', g.tileset);
@@ -242,7 +495,8 @@ export function startEditor() {
       zeile(dl, 'Objekte', g.objekte.length);
       zeile(dl, 'Notizen', g.notizen.length);
     }
-    rechts.append(el('p', { class: 'grau', text: 'Klick wählt, Ziehen verschiebt, Mausrad zoomt. Q/E drehen, 0 Norden, F wie im Spiel, Leertaste Fahrt.' }));
+    rechts.append(knoepfe);
+    rechts.append(el('p', { class: 'grau', text: 'V Auswahl, G Gang, K Knoten · Strg+Z/Y Rückgängig/Wiederholen · Strg+S Speichern · Q/E drehen, 0 Norden, F wie im Spiel, Leertaste Fahrt, Mausrad zoomt.' }));
   }
   function refreshFahrt() {
     const m = ganzMasse();
@@ -262,18 +516,40 @@ export function startEditor() {
     anzeige.textContent = `Blick ${DIR_NAMES[ansicht.blick]} · ${fmt(ZOOM_BILDSCHIRME[ansicht.stufe], 1)} Bildschirme`;
     eigenschaften();
     refreshFahrt();
+    const v = verlaufVon(state.gebietId);
+    undoKnopf.disabled = !v.kannZurueck;
+    redoKnopf.disabled = !v.kannVor;
+    const au = state.auswahl;
+    for (const w of WERKZEUGE) document.getElementById('t-' + w.id)?.classList.toggle('an', w.id === state.werkzeug);
+    typWahl.disabled = state.werkzeug !== 'knoten';
+    loeschKnopf.disabled = !(au && (au.art === 'gang' || au.art === 'knoten'));
+    stand.textContent = ungespeichert() ? '● ungespeichert' : '✓ gespeichert';
+    stand.className = ungespeichert() ? 'offen' : 'grau';
+    document.title = `${ungespeichert() ? '* ' : ''}Wendehals – Editor`;
+    hinweis('');
     dirty = true;
   }
 
   // ---------------------------------------------------------------- Eingabe
-  let zug = null; // laufende Mausbewegung auf dem Plan
+  let zug = null; // laufende Mausbewegung: { modus: 'werkzeug' | 'plan', x, y, bewegt }
+  const zeigerPunkt = (e) => {
+    const r = canvas.getBoundingClientRect();
+    const px = e.clientX - r.left;
+    const py = e.clientY - r.top;
+    const [x, y] = ansicht.bildZuWelt(px, py);
+    return { px, py, x, y };
+  };
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   canvas.addEventListener('pointerdown', (e) => {
     canvas.setPointerCapture(e.pointerId);
-    zug = { x: e.clientX, y: e.clientY, bewegt: false };
-    canvas.style.cursor = 'grabbing';
+    // linke Taste: Werkzeug; mittlere/rechte Taste verschiebt immer den Plan
+    const erfasst = e.button === 0 && werkzeug().down?.(kontext, zeigerPunkt(e)) === true;
+    zug = { modus: erfasst ? 'werkzeug' : 'plan', x: e.clientX, y: e.clientY, bewegt: false, taste: e.button };
+    if (!erfasst) canvas.style.cursor = 'grabbing';
   });
   canvas.addEventListener('pointermove', (e) => {
-    if (!zug) return;
+    if (!zug) return werkzeug().schweben?.(kontext, zeigerPunkt(e));
+    if (zug.modus === 'werkzeug') return werkzeug().move?.(kontext, zeigerPunkt(e));
     const dx = e.clientX - zug.x;
     const dy = e.clientY - zug.y;
     if (!zug.bewegt && Math.hypot(dx, dy) < KLICK_TOLERANZ_PX) return;
@@ -285,12 +561,12 @@ export function startEditor() {
   });
   const loslassen = (e) => {
     if (!zug) return;
-    canvas.style.cursor = 'grab';
-    if (!zug.bewegt && e.type === 'pointerup') {
-      const r = canvas.getBoundingClientRect();
-      waehle(treffer(e.clientX - r.left, e.clientY - r.top));
-    }
+    const z = zug;
     zug = null;
+    canvas.style.cursor = state.werkzeug === 'auswahl' ? 'grab' : 'crosshair';
+    if (e.type === 'pointercancel') return werkzeug().abbruch?.(kontext);
+    if (z.modus === 'werkzeug') werkzeug().up?.(kontext, zeigerPunkt(e));
+    else if (!z.bewegt && z.taste === 0) werkzeug().klick?.(kontext, zeigerPunkt(e));
   };
   canvas.addEventListener('pointerup', loslassen);
   canvas.addEventListener('pointercancel', loslassen);
@@ -305,7 +581,19 @@ export function startEditor() {
     { passive: false },
   );
   window.addEventListener('keydown', (e) => {
-    if (e.target instanceof HTMLSelectElement || e.target instanceof HTMLInputElement || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    const imFeld = e.target instanceof HTMLSelectElement || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+    if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+      const c = e.code;
+      const tippt = imFeld && !(c === KUERZEL.speichern);
+      if (tippt) return; // in Eingabefeldern gilt das eingebaute Rückgängig des Feldes
+      const fn = c === KUERZEL.rueckgaengig ? (e.shiftKey ? wiederholen : rueckgaengig) : c === KUERZEL.wiederholen ? wiederholen : c === KUERZEL.speichern ? speichere : c === KUERZEL.oeffnen ? oeffne : null;
+      if (!fn) return;
+      e.preventDefault();
+      if (imFeld) e.target.blur(); // übernimmt einen halb getippten Wert, bevor gespeichert wird
+      fn();
+      return;
+    }
+    if (imFeld || e.repeat || e.altKey) return;
     const c = e.code;
     const schritt = PFEIL_SCHRITT_PX;
     let getan = true;
@@ -324,7 +612,12 @@ export function startEditor() {
     else if (c === KUERZEL.runter) ansicht.verschieben(0, -schritt);
     else if (c === KUERZEL.beschriftung) beschriften();
     else if (c === KUERZEL.alles) alles();
-    else if (c === 'Escape') waehle(null);
+    else if (hat(KUERZEL.loeschen, c)) loescheAuswahl();
+    else if (Object.values(KUERZEL.werkzeug).includes(c)) setzeWerkzeug(Object.keys(KUERZEL.werkzeug).find((id) => KUERZEL.werkzeug[id] === c));
+    else if (c === 'Escape') {
+      werkzeug().abbruch?.(kontext);
+      waehle(null);
+    }
     else getan = false;
     if (getan) {
       e.preventDefault();
@@ -336,7 +629,7 @@ export function startEditor() {
   // ---------------------------------------------------------------- Schleife
   function zeichne() {
     const t0 = performance.now();
-    zeichnePlan(ctx, gebiet(), ansicht, { auswahl: state.auswahl, fahrt: state.fahrt, zeit: state.zeit, beschriftung: state.beschriftung }, canvas.width / ansicht.w);
+    zeichnePlan(ctx, gebiet(), ansicht, { auswahl: state.auswahl, fahrt: state.fahrt, zeit: state.zeit, beschriftung: state.beschriftung, vorschau: (c) => werkzeug().vorschau?.(c, kontext) }, canvas.width / ansicht.w);
     perf.zeichnenMs.push(performance.now() - t0);
     if (perf.zeichnenMs.length > 600) perf.zeichnenMs.shift();
     dirty = false;
@@ -353,7 +646,16 @@ export function startEditor() {
 
   groesse();
   wechsle(state.gebietId);
+  setzeWerkzeug(state.werkzeug);
   requestAnimationFrame(frame);
+  window.addEventListener('beforeunload', (e) => {
+    if (Object.keys(state.gebiete).some((id) => ungespeichert(id))) e.preventDefault(); // Rückfrage statt stillem Verlust
+  });
+  // Electron: die Leveldateien frisch von der Platte lesen (die eingebauten Stände sind nur der Rückfall)
+  state.speicher
+    .ladeAlle()
+    .then((alle) => alle && uebernehmeAlle(alle))
+    .catch((e) => melde('Die Leveldateien konnten nicht von der Platte gelesen werden, es gelten die eingebauten Stände: ' + e.message, 'fehler'));
 
   // Für automatische Tests und für Claude (Prüfen ohne Mausklicks)
   window.__editor = {
@@ -368,6 +670,19 @@ export function startEditor() {
     tick,
     zeichne,
     treffer,
+    aendere,
+    rueckgaengig,
+    wiederholen,
+    setzeFeld,
+    setzeWerkzeug,
+    loescheAuswahl,
+    speichere,
+    oeffne,
+    oeffneText,
+    uebernehmeAlle,
+    ungespeichert,
+    verlaufVon,
+    melde,
     alles,
     beschriften,
     drehen,

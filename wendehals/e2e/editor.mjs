@@ -9,6 +9,7 @@ import { NETZ_MAP } from '../src/proto/netz-map.js';
 import { ACHTECK_MAP } from '../src/proto/achteck-map.js';
 import { FLOOR, FLOOR2, WALL, FARBEN, SCREEN_W, SCREEN_H, SPEED } from '../src/editor/konstanten.js';
 import { schachbrettHell } from '../src/editor/zeichnen.js';
+import { formatiere } from '../src/editor/daten.js';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const shots = path.join(root, 'e2e/screenshots');
@@ -211,6 +212,219 @@ check(text.includes('1200 E = 2,5 Bildschirme = 17,1 s'), 'Anzeige: Gang 1200 E 
 check(text.includes('Stelle 140 E = 0,3 Bildschirme = 2,0 s'), 'Anzeige: Stelle 140 E = 0,3 Bildschirme = 2,0 s', text);
 await ed((e) => e.tick(100));
 check((await ed((e) => ({ s: e.state.fahrt.s, l: e.state.fahrt.laeuft }))).l === false, 'Fahrt: hält am Gangende an');
+
+// ------------------------------------------------------------------ Bauen (Stufe 2a): mit der Maus, auf einer frischen Seite
+const bau = await browser.newPage({ viewport: { width: 1280, height: 720 }, acceptDownloads: true });
+const bauFehler = [];
+bau.on('pageerror', (e) => bauFehler.push('pageerror: ' + e.message));
+bau.on('console', (m) => {
+  if (m.type() === 'error') bauFehler.push('console: ' + m.text());
+});
+await bau.goto(url + '?editor');
+await bau.waitForFunction(() => window.__editor);
+const b = (fn, arg) => bau.evaluate(`(${fn.toString()})(window.__editor, ${JSON.stringify(arg ?? null)})`);
+await b((e) => {
+  e.state.echtzeit = false;
+  e.state.beschriftung = false;
+  e.wechsle('beispiel');
+  e.state.auswahl = null;
+  e.state.fahrt = null;
+  e.alles();
+  e.zeichne();
+});
+const bBox = await bau.locator('#plan canvas').boundingBox();
+const bild = async ([x, y]) => {
+  const [px, py] = await b((e, p) => e.ansicht.weltZuBild(p[0], p[1]), [x, y]);
+  return [bBox.x + px, bBox.y + py];
+};
+async function zieh(von, nach, extra = {}) {
+  const [x0, y0] = await bild(von);
+  const [x1, y1] = await bild(nach);
+  await bau.mouse.move(x0, y0);
+  await bau.mouse.down(extra);
+  await bau.mouse.move((x0 + x1) / 2, (y0 + y1) / 2, { steps: 4 });
+  await bau.mouse.move(x1, y1, { steps: 4 });
+  await bau.mouse.up(extra);
+}
+async function klick(punkt) {
+  const [x, y] = await bild(punkt);
+  await bau.mouse.click(x, y);
+}
+const gebietNow = () => b((e) => e.gebiet());
+// Pixel an einer Weltstelle, ohne die abdunkelnde Rahmen-Überlagerung (der gewählte Gang zeigt sonst den Bildschirmrahmen)
+const pixelBei = ([x, y]) =>
+  b((e, q) => {
+    const fahrt = e.state.fahrt;
+    e.state.fahrt = null;
+    e.zeichne();
+    const [px, py] = e.ansicht.weltZuBild(q[0], q[1]);
+    const p = e.pixel(px, py);
+    e.state.fahrt = fahrt;
+    return p;
+  }, [x, y]);
+const boden = async (q) => {
+  const p = await pixelBei(q);
+  return gleich(p, hex(FLOOR)) || gleich(p, hex(FLOOR2));
+};
+const wand = async (q) => gleich(await pixelBei(q), hex(WALL));
+
+const g0 = await gebietNow();
+check((await b((e) => e.state.werkzeug)) === 'auswahl', 'Bauen: Start mit dem Auswahl-Werkzeug');
+await bau.click('#t-gang');
+check((await b((e) => e.state.werkzeug)) === 'gang', 'Werkzeug: Klick auf „Gang“ schaltet um');
+
+// Gang ziehen im Leeren: rastet auf 8 Richtungen und 20 E
+await zieh([203, 805], [813, 790]);
+let g1 = await gebietNow();
+const gneu = g1.gaenge[g1.gaenge.length - 1];
+const kn = (g, id) => g.knoten.find((k) => k.id === id);
+check(g1.gaenge.length === g0.gaenge.length + 1 && g1.knoten.length === g0.knoten.length + 2, 'Gang ziehen: im Leeren entstehen ein Gang und zwei Knoten');
+check(kn(g1, gneu.von).y === kn(g1, gneu.nach).y && kn(g1, gneu.nach).x > kn(g1, gneu.von).x, 'Gang ziehen: rastet auf Osten (leicht schiefe Maus, waagerechter Gang)');
+check((kn(g1, gneu.nach).x - kn(g1, gneu.von).x) % 20 === 0, 'Gang ziehen: Länge ist ein Vielfaches von 20 E');
+check(kn(g1, gneu.von).typ === 'ende' && kn(g1, gneu.nach).typ === 'ende', 'Gang ziehen: neue Knoten sind Gangenden');
+check((await b((e) => e.state.auswahl))?.id === gneu.id, 'Gang ziehen: der neue Gang ist gewählt');
+const mid = [(kn(g1, gneu.von).x + kn(g1, gneu.nach).x) / 2, kn(g1, gneu.von).y];
+check((await boden(mid)) && (await boden([mid[0], mid[1] + 60])) && (await wand([mid[0], mid[1] + 140])), 'Gang ziehen: im Bild Boden 200 E breit (Mitte und 60 E daneben Boden, 140 E daneben Wand)');
+await shot('04-gang-gezogen');
+
+// Rückgängig / Wiederholen mit Strg+Z / Strg+Y und mit den Knöpfen
+await bau.keyboard.press('Control+KeyZ');
+check(JSON.stringify(await gebietNow()) === JSON.stringify(g0), 'Rückgängig (Strg+Z): exakt der Zustand davor');
+check(await bau.locator('#b-undo').isDisabled(), 'Rückgängig: Knopf ist aus, wenn es nichts mehr zurückzunehmen gibt');
+check(!(await boden(mid)), 'Rückgängig: der Gang ist auch im Bild weg');
+await bau.keyboard.press('Control+KeyY');
+check(JSON.stringify(await gebietNow()) === JSON.stringify(g1), 'Wiederholen (Strg+Y): exakt der Zustand danach');
+await bau.click('#b-undo');
+await bau.click('#b-redo');
+check(JSON.stringify(await gebietNow()) === JSON.stringify(g1), 'Rückgängig-/Wiederholen-Knöpfe stellen den Zustand her');
+
+// Diagonale
+await zieh([813, 790], [1213, 1210]);
+g1 = await gebietNow();
+const gd = g1.gaenge[g1.gaenge.length - 1];
+check(gd.von === gneu.nach, 'Gang ziehen: Anfang auf einem vorhandenen Knoten verbindet (Gang beginnt am Gangende)');
+check(kn(g1, gd.nach).x - kn(g1, gd.von).x === kn(g1, gd.nach).y - kn(g1, gd.von).y, 'Gang ziehen: Diagonale rastet auf Südosten (45°)');
+check(kn(g1, gd.von).typ === 'kreuzung', 'Gang ziehen: Knoten mit zwei Gängen wird zur Kreuzung');
+
+// T-Kreuzung: von unten auf die „Schleuse“ ziehen
+const vorT = await gebietNow();
+await zieh([603, 420], [598, 12]);
+const nachT = await gebietNow();
+const sch = nachT.gaenge.filter((x) => x.name === 'Schleuse');
+check(nachT.gaenge.length === vorT.gaenge.length + 2 && sch.length === 2, 'T-Kreuzung: Gang geteilt (zwei „Schleuse“-Teile) und neuer Gang');
+check(sch.every((x) => x.breite === 200) && sch[0].nach === sch[1].von, 'T-Kreuzung: Name und Breite bleiben, die Teile treffen sich im neuen Knoten');
+const tk = kn(nachT, sch[0].nach);
+check(tk.x === 600 && tk.y === 0 && tk.typ === 'kreuzung', 'T-Kreuzung: neuer Knoten bei (600, 0), Typ Kreuzung');
+check((await boden([600, 200])) && (await boden([450, 0])) && (await boden([750, 0])), 'T-Kreuzung: im Bild durchgehender Boden');
+
+// Knoten-Werkzeug
+await bau.keyboard.press('KeyK');
+check((await b((e) => e.state.werkzeug)) === 'knoten', 'Werkzeug: Taste K schaltet auf Knoten');
+await bau.selectOption('#knotentyp', 'raum');
+const vorK = await gebietNow();
+await klick([2403, -795]);
+const nachK = await gebietNow();
+const raum = nachK.knoten[nachK.knoten.length - 1];
+check(nachK.knoten.length === vorK.knoten.length + 1 && raum.typ === 'raum' && raum.x === 2400 && raum.y === -800 && JSON.stringify([raum.w, raum.h]) === '[520,400]', 'Knoten setzen: Raum im Raster bei (2400, −800), 520 × 400 E');
+check(await boden([2400, -800]), 'Knoten setzen: der Raum hat im Bild Boden');
+await bau.selectOption('#knotentyp', 'speicher');
+const vorS = await gebietNow();
+await klick([1895, 6]); // mitten auf dem Ostgang
+const nachS = await gebietNow();
+check(nachS.knoten.length === vorS.knoten.length + 1 && nachS.gaenge.length === vorS.gaenge.length + 1, 'Knoten auf Gang setzen: Gang wird geteilt (T-Kreuzung)');
+check(nachS.gaenge.filter((x) => x.name === 'Ostgang').length === 2, 'Knoten auf Gang setzen: beide Teile heißen weiter „Ostgang“');
+await bau.keyboard.press('KeyV');
+
+// Eigenschaften: Breite ändern, ungültige Eingabe abweisen
+await klick([1210, -500]); // Nordgang (160 breit)
+check((await b((e) => e.state.auswahl))?.id === 'nordgang', 'Auswahl: Klick wählt wieder den Nordgang');
+await bau.fill('#f-breite', '320');
+await bau.keyboard.press('Enter');
+let ng = (await gebietNow()).gaenge.find((x) => x.id === 'nordgang');
+check(ng.breite === 320, 'Breite ändern: 320 E in den Daten');
+check(await boden([1200 + 120, -500]), 'Breite ändern: im Bild 120 E neben der Mitte jetzt Boden (vorher Wand bei Breite 160)');
+const vorFalsch = JSON.stringify(await gebietNow());
+await bau.fill('#f-breite', '30');
+await bau.keyboard.press('Enter');
+check(JSON.stringify(await gebietNow()) === vorFalsch, 'Breite 30 E wird abgewiesen: Daten unverändert');
+check((await bau.locator('#melden').textContent()).includes('mindestens 60'), 'Breite 30 E: verständliche Meldung');
+await klick([1200, -1100]); // Raum K3 (Fläche)
+check((await b((e) => e.state.auswahl))?.id === 'K3', 'Auswahl: Klick in die Raumfläche wählt den Raum');
+await bau.fill('#f-w', '700');
+await bau.keyboard.press('Enter');
+check((await gebietNow()).knoten.find((k) => k.id === 'K3').w === 700, 'Raumgröße ändern: Breite 700 E');
+check(await boden([1200 + 330, -1100]) , 'Raumgröße ändern: im Bild breiter');
+
+// Knoten verschieben (Auswahl-Werkzeug)
+const vorV = (await gebietNow()).knoten.find((k) => k.id === 'K4');
+await zieh([vorV.x, vorV.y], [vorV.x + 200, vorV.y + 100]);
+const nachV = (await gebietNow()).knoten.find((k) => k.id === 'K4');
+check(nachV.x === vorV.x + 200 && nachV.y === vorV.y + 100, 'Knoten ziehen: K4 wandert im Raster (+200, +100)');
+await bau.keyboard.press('Control+KeyZ');
+check((await gebietNow()).knoten.find((k) => k.id === 'K4').x === vorV.x, 'Knoten ziehen: Rückgängig');
+
+// Löschen
+await klick([1210, -500]);
+const vorL = await gebietNow();
+await bau.keyboard.press('Delete');
+const nachL = await gebietNow();
+check(nachL.gaenge.length === vorL.gaenge.length - 1 && !nachL.gaenge.some((x) => x.id === 'nordgang'), 'Löschen: Entf entfernt den gewählten Gang');
+check((await b((e) => e.state.auswahl)) === null, 'Löschen: danach ist nichts gewählt');
+await bau.keyboard.press('Control+KeyZ');
+check(JSON.stringify(await gebietNow()) === JSON.stringify(vorL), 'Löschen: Rückgängig bringt den Gang zurück');
+
+// Zoomen, Drehen, Verschieben ändern die Daten nicht (auch nach dem Bauen)
+const vorAnsicht = JSON.stringify(await gebietNow());
+await bau.keyboard.press('KeyE');
+await bau.keyboard.press('Minus');
+await bau.keyboard.press('ArrowLeft');
+await bau.keyboard.press('Digit0');
+check(JSON.stringify(await gebietNow()) === vorAnsicht, 'Ansicht ändert beim Bauen keine Daten und legt keinen Verlauf an');
+
+// Speichern: Download-Fallback, Byte-Vergleich mit der Formatierung
+await b((e) => e.state.speicher.setzeArt('download'));
+check((await bau.locator('#stand').textContent()).includes('ungespeichert'), 'Speichern: Anzeige „ungespeichert“ nach Änderungen');
+const [download] = await Promise.all([bau.waitForEvent('download'), bau.click('#b-speichern')]);
+const datei = path.join(shots, 'beispiel-gespeichert.json');
+await download.saveAs(datei);
+const { readFile } = await import('node:fs/promises');
+const gespeichert = await readFile(datei, 'utf8');
+const jetzt = await gebietNow();
+check(download.suggestedFilename() === 'beispiel.json', 'Speichern: Dateiname beispiel.json');
+check(gespeichert === formatiere(jetzt), 'Speichern: Dateiinhalt = formatiertes Gebiet (Byte-Vergleich)');
+check(JSON.stringify(JSON.parse(gespeichert)) === JSON.stringify(jetzt), 'Speichern: Datei enthält genau die Daten im Editor');
+check((await bau.locator('#stand').textContent()).includes('gespeichert') && !(await bau.locator('#stand').textContent()).includes('ungespeichert'), 'Speichern: Anzeige „gespeichert“');
+
+// Laden: gleiche Datei → unverändert; ungültige Datei → Meldung, nichts geht verloren
+async function ladeDatei(inhalt, name = 'x.json') {
+  const [fc] = await Promise.all([bau.waitForEvent('filechooser'), bau.click('#b-oeffnen')]);
+  await fc.setFiles({ name, mimeType: 'application/json', buffer: Buffer.from(inhalt) });
+  await bau.waitForTimeout(150);
+}
+const vorLaden = JSON.stringify(await gebietNow());
+await ladeDatei(gespeichert, 'beispiel.json');
+check(JSON.stringify(await gebietNow()) === vorLaden, 'Laden: die gespeicherte Datei laden → gleiche Daten (verlustfrei)');
+for (const [inhalt, muster, name] of [
+  ['{ kaputt', 'kein gültiges JSON', 'kaputt'],
+  [JSON.stringify({ ...JSON.parse(gespeichert), format: 2 }), 'Format 2', 'format2'],
+  [JSON.stringify({ ...JSON.parse(gespeichert), gaenge: [{ id: 'x', von: 'K1', nach: 'K99', breite: 100 }] }), 'K99', 'kaputtergang'],
+]) {
+  await ladeDatei(inhalt, name + '.json');
+  const meldung = await bau.locator('#melden').textContent();
+  check(meldung.includes(muster) && meldung.includes('bleibt unverändert'), `Laden: ungültige Datei „${name}“ → verständliche Meldung (${muster})`, meldung);
+  check(JSON.stringify(await gebietNow()) === vorLaden, `Laden: ungültige Datei „${name}“ verändert nichts`);
+}
+// Datei eines neuen Gebiets: erscheint in der Auswahl
+await ladeDatei(formatiere({ ...JSON.parse(gespeichert), id: 'neu-test', name: 'Neu Test' }), 'neu-test.json');
+check((await b((e) => e.state.gebietId)) === 'neu-test' && (await bau.locator('#gebiet option').count()) === 4, 'Laden: Datei mit neuer ID wird als Gebiet hinzugefügt');
+await bau.selectOption('#gebiet', 'beispiel');
+check(JSON.stringify(await gebietNow()) === vorLaden, 'Laden: Zurückwechseln zeigt den bearbeiteten Stand');
+// Mehrfaches Strg+Z geht alles zurück bis zum Anfangszustand
+for (let i = 0; i < 40; i++) await bau.keyboard.press('Control+KeyZ');
+check(JSON.stringify(await gebietNow()) === JSON.stringify(g0), 'Rückgängig bis zum Anfang: genau der geladene Zustand');
+await shot('05-nach-rueckgaengig');
+check(bauFehler.length === 0, 'Bauen: keine Konsolenfehler', bauFehler.join('; '));
+await bau.close();
 
 // ------------------------------------------------------------------ Leistung: 300 Objekte
 const ms = await ed((e) => {

@@ -151,6 +151,9 @@ export function zeichnePlan(ctx, g, ansicht, z = {}, dpr = 1) {
     }
   }
 
+  // Vorschau des aktiven Werkzeugs (in Weltkoordinaten)
+  z.vorschau?.(ctx);
+
   // Überlagerung in Bildschirmkoordinaten: Knoten, Beschriftung, Maßstab
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (z.beschriftung === false) return zellen;
