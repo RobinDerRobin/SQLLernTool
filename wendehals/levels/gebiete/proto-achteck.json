@@ -1,0 +1,31 @@
+{
+  "format": 1,
+  "id": "proto-achteck",
+  "name": "P3 „45°-Kreuzung“ (Prototyp-Karte)",
+  "tileset": "bad",
+  "bereich": { "x0": -1061.4213562373095, "y0": -1061.4213562373095, "x1": 1061.4213562373095, "y1": 1061.4213562373095 },
+  "knoten": [
+    { "id": "K1", "typ": "kreuzung", "form": "achteck", "x": 0, "y": 0, "seite": 200 },
+    { "id": "K2", "typ": "ende", "x": 961.421, "y": 0 },
+    { "id": "K3", "typ": "ende", "x": 679.828, "y": 679.828 },
+    { "id": "K4", "typ": "ende", "x": 0, "y": 961.421 },
+    { "id": "K5", "typ": "ende", "x": -679.828, "y": 679.828 },
+    { "id": "K6", "typ": "speicher", "x": -961.421, "y": 0 },
+    { "id": "K7", "typ": "ende", "x": -679.828, "y": -679.828 },
+    { "id": "K8", "typ": "ende", "x": 0, "y": -961.421 },
+    { "id": "K9", "typ": "ende", "x": 679.828, "y": -679.828 }
+  ],
+  "gaenge": [
+    { "id": "arm-e", "name": "Osten", "von": "K1", "nach": "K2", "breite": 200 },
+    { "id": "arm-se", "name": "Südosten", "von": "K1", "nach": "K3", "breite": 200 },
+    { "id": "arm-s", "name": "Süden", "von": "K1", "nach": "K4", "breite": 200 },
+    { "id": "arm-sw", "name": "Südwesten", "von": "K1", "nach": "K5", "breite": 200 },
+    { "id": "arm-w", "name": "Westen", "von": "K1", "nach": "K6", "breite": 200 },
+    { "id": "arm-nw", "name": "Nordwesten", "von": "K1", "nach": "K7", "breite": 200 },
+    { "id": "arm-n", "name": "Norden", "von": "K1", "nach": "K8", "breite": 200 },
+    { "id": "arm-ne", "name": "Nordosten", "von": "K1", "nach": "K9", "breite": 200 }
+  ],
+  "formteile": [],
+  "objekte": [],
+  "notizen": []
+}

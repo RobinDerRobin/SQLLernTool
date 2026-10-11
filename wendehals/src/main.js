@@ -6,6 +6,7 @@ import { Input } from './core/input.js';
 import { Audio } from './core/audio.js';
 import { MemoryStorage } from './game/save.js';
 import { SCREEN_W, SCREEN_H } from './core/math.js';
+import { startEditor } from './editor/main.js';
 
 const STEP = 1 / 60;
 // Höchstens so viele echte Pixel pro interner Einheit (480x270). Schützt vor riesigen
@@ -78,6 +79,11 @@ function makePlatform() {
 }
 
 export function boot() {
+  // Level-Editor (Paket 13): `?editor` startet statt des Spiels das Werkzeug (src/editor/).
+  if (new URLSearchParams(location.search).has('editor')) {
+    startEditor();
+    return null;
+  }
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true }) || canvas.getContext('2d');
   const params = new URLSearchParams(location.search);

@@ -5,10 +5,10 @@ import { DENY_TIME } from './fenster.js';
 import { drawMinimap, minimapFor } from './minimap.js';
 import { ARMS8, APO, END, HALF, WIDTH, STRIPE_GAP } from './achteck-map.js';
 
-const FLOOR = '#6a5f55';
-const FLOOR2 = '#756a5f';
-const WALL = '#1c1822';
-const GRID = 80;
+export const FLOOR = '#6a5f55';
+export const FLOOR2 = '#756a5f';
+export const WALL = '#1c1822';
+export const GRID = 80;
 
 function drawBone(ctx, x, y, color, t) {
   ctx.save();
