@@ -285,7 +285,7 @@ check(kn(g1, gneu.von).typ === 'ende' && kn(g1, gneu.nach).typ === 'ende', 'Gang
 check((await b((e) => e.state.auswahl))?.id === gneu.id, 'Gang ziehen: der neue Gang ist gewählt');
 const mid = [(kn(g1, gneu.von).x + kn(g1, gneu.nach).x) / 2, kn(g1, gneu.von).y];
 check((await boden(mid)) && (await boden([mid[0], mid[1] + 60])) && (await wand([mid[0], mid[1] + 140])), 'Gang ziehen: im Bild Boden 200 E breit (Mitte und 60 E daneben Boden, 140 E daneben Wand)');
-await shot('04-gang-gezogen');
+await bau.screenshot({ path: path.join(shots, 'editor-04-gang-gezogen.png') });
 
 // Rückgängig / Wiederholen mit Strg+Z / Strg+Y und mit den Knöpfen
 await bau.keyboard.press('Control+KeyZ');
@@ -422,7 +422,7 @@ check(JSON.stringify(await gebietNow()) === vorLaden, 'Laden: Zurückwechseln ze
 // Mehrfaches Strg+Z geht alles zurück bis zum Anfangszustand
 for (let i = 0; i < 40; i++) await bau.keyboard.press('Control+KeyZ');
 check(JSON.stringify(await gebietNow()) === JSON.stringify(g0), 'Rückgängig bis zum Anfang: genau der geladene Zustand');
-await shot('05-nach-rueckgaengig');
+await bau.screenshot({ path: path.join(shots, 'editor-05-nach-rueckgaengig.png') });
 check(bauFehler.length === 0, 'Bauen: keine Konsolenfehler', bauFehler.join('; '));
 await bau.close();
 
