@@ -141,6 +141,11 @@ await klickWelt(1200, 0);
 check((await ed((e) => e.state.auswahl)) ?.id === 'K2', 'Auswahl: Klick auf einen Knoten wählt den Knoten');
 await klickWelt(300, -600);
 check((await ed((e) => e.state.auswahl)) === null, 'Auswahl: Klick ins Leere hebt die Auswahl auf');
+check((await ed((e) => e.state.fahrt)) === null, 'Auswahl: ohne Auswahl gibt es keinen Rahmen und keine Fahrt');
+await ed((e) => e.waehle({ art: 'gang', id: 'schleuse' }));
+await page.keyboard.press('Space');
+await page.keyboard.press('Escape');
+check((await ed((e) => ({ a: e.state.auswahl, f: e.state.fahrt }))).f === null, 'Auswahl: Esc beendet Auswahl, Fahrt und Rahmen');
 
 // ------------------------------------------------------------------ Bildschirmrahmen und Fahrt
 await ed((e) => {

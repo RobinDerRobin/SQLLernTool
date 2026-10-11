@@ -13,10 +13,10 @@ const hat = (liste, code) => (Array.isArray(liste) ? liste.includes(code) : list
 
 const CSS = `
 html, body { margin: 0; height: 100%; background: #14121a; color: #e8e6ee; font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
-#editor { display: grid; grid-template-columns: 1fr 290px; grid-template-rows: 44px 1fr 78px; height: 100%; }
+#editor { display: grid; grid-template-columns: 1fr 290px; grid-template-rows: auto 1fr 78px; height: 100%; }
 #editor > * { min-width: 0; min-height: 0; }
-.leiste { background: #221f2b; display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 0 solid #38334a; }
-#oben { grid-column: 1 / 3; border-bottom-width: 1px; overflow: hidden; }
+.leiste { background: #221f2b; display: flex; flex-wrap: wrap; align-items: center; min-height: 44px; padding-top: 3px; padding-bottom: 3px; box-sizing: border-box; gap: 8px; padding: 0 10px; border: 0 solid #38334a; }
+#oben { grid-column: 1 / 3; border-bottom-width: 1px; }
 #unten { grid-column: 1 / 3; border-top-width: 1px; gap: 12px; }
 #plan { position: relative; overflow: hidden; background: #1c1822; }
 #plan canvas { display: block; width: 100%; height: 100%; cursor: grab; }
@@ -28,9 +28,9 @@ button, select { white-space: nowrap; background: #38334a; color: #e8e6ee; borde
 button:hover, select:hover { background: #4a4462; }
 button.an { background: #3b6b8c; }
 button:disabled { opacity: .45; cursor: default; }
-.titel { font-weight: 600; margin-right: 8px; }
+.titel { white-space: nowrap; font-weight: 600; margin-right: 8px; }
 .grau { color: #a49fb8; }
-#anzeige { margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#anzeige { margin-left: auto; white-space: nowrap; }
 #fahrt { flex: 1; min-width: 120px; }
 #melden { color: #ff9a8a; }
 `;
@@ -72,7 +72,10 @@ export function startEditor() {
   const canvas = el('canvas');
   const plan = el('div', { id: 'plan' }, [canvas]);
   const wahl = el('select', { id: 'gebiet', title: 'Gebiet' }, WELT.gebiete.map((g) => el('option', { value: g.id, text: g.name })));
-  wahl.addEventListener('change', () => wechsle(wahl.value));
+  wahl.addEventListener('change', () => {
+    wechsle(wahl.value);
+    wahl.blur(); // Kürzel sollen sofort wieder gelten
+  });
   const knopf = (text, titel, fn, id) => el('button', { text, title: titel, onclick: fn, ...(id ? { id } : {}) });
   const anzeige = el('span', { class: 'grau', id: 'anzeige' });
   const oben = el('div', { id: 'oben', class: 'leiste' }, [
@@ -130,6 +133,7 @@ export function startEditor() {
   }
   function waehle(auswahl) {
     state.auswahl = auswahl;
+    if (!auswahl) state.fahrt = null; // nichts gewählt: kein Rahmen, keine Fahrt
     if (auswahl && auswahl.art === 'gang') {
       if (!state.fahrt || state.fahrt.gang !== auswahl.id) state.fahrt = { gang: auswahl.id, s: 0, laeuft: false };
     }
@@ -213,6 +217,7 @@ export function startEditor() {
     if (au && au.art === 'gang') {
       const gang = g.gaenge.find((x) => x.id === au.id);
       const m = gang && gangMasse(g, gang);
+      if (!m) return rechts.append(el('p', { text: 'Gang ohne gültige Knoten.' }));
       rechts.append(el('h2', { text: `Gang „${gang.name || gang.id}“` }), dl);
       zeile(dl, 'ID', gang.id);
       zeile(dl, 'Von → nach', `${gang.von} → ${gang.nach}`);
@@ -294,12 +299,13 @@ export function startEditor() {
     (e) => {
       e.preventDefault();
       const r = canvas.getBoundingClientRect();
+      if (!e.deltaY) return;
       zoom(e.deltaY > 0 ? 1 : -1, e.clientX - r.left, e.clientY - r.top);
     },
     { passive: false },
   );
   window.addEventListener('keydown', (e) => {
-    if (e.target instanceof HTMLSelectElement || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.target instanceof HTMLSelectElement || e.target instanceof HTMLInputElement || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     const c = e.code;
     const schritt = PFEIL_SCHRITT_PX;
     let getan = true;
@@ -307,8 +313,8 @@ export function startEditor() {
     else if (c === KUERZEL.drehenRechts) drehen(1);
     else if (c === KUERZEL.norden) norden();
     else if (c === KUERZEL.wieImSpiel) wieImSpiel();
-    else if (hat(KUERZEL.zoomPlus, c)) zoom(-1);
-    else if (hat(KUERZEL.zoomMinus, c)) zoom(1);
+    else if (e.key === '+' || hat(KUERZEL.zoomPlus, c)) zoom(-1);
+    else if (e.key === '-' || hat(KUERZEL.zoomMinus, c)) zoom(1);
     else if (c === KUERZEL.fahrtStart) fahrtUmschalten();
     else if (c === KUERZEL.fahrtVor) setzeFahrt((state.fahrt?.s || 0) + 20);
     else if (c === KUERZEL.fahrtZurueck) setzeFahrt((state.fahrt?.s || 0) - 20);
@@ -317,6 +323,7 @@ export function startEditor() {
     else if (c === KUERZEL.hoch) ansicht.verschieben(0, schritt);
     else if (c === KUERZEL.runter) ansicht.verschieben(0, -schritt);
     else if (c === KUERZEL.beschriftung) beschriften();
+    else if (c === KUERZEL.alles) alles();
     else if (c === 'Escape') waehle(null);
     else getan = false;
     if (getan) {

@@ -101,8 +101,15 @@ export class Ansicht {
   /** Passt ein Weltrechteck ein (die stärkste Zoomstufe, in der es noch ganz sichtbar ist). */
   einpassen(r) {
     this.zentrieren((r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2);
-    const breite = Math.max(r.x1 - r.x0, 1);
-    const hoehe = Math.max(r.y1 - r.y0, 1);
+    // Ausdehnung des Rechtecks im gedrehten Bild (die Ecken drehen mit)
+    const a = -this.winkel;
+    const ecken = [[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]].map(([x, y]) => {
+      const dx = x - this.cx;
+      const dy = y - this.cy;
+      return [dx * Math.cos(a) - dy * Math.sin(a), dx * Math.sin(a) + dy * Math.cos(a)];
+    });
+    const breite = Math.max(Math.max(...ecken.map((p) => p[0])) - Math.min(...ecken.map((p) => p[0])), 1);
+    const hoehe = Math.max(Math.max(...ecken.map((p) => p[1])) - Math.min(...ecken.map((p) => p[1])), 1);
     this.stufe = ZOOM_BILDSCHIRME.length - 1;
     for (let i = 0; i < ZOOM_BILDSCHIRME.length; i++) {
       const sichtBreite = ZOOM_BILDSCHIRME[i] * SCREEN_W;

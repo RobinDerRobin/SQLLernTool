@@ -2,7 +2,7 @@
 // Reine Daten und Geometrie – kein DOM, läuft auch unter Node (Tests). Einheiten E, x nach Osten, y nach Süden, Winkel in Grad.
 import { HEADINGS, DIR_VEC, headingAngle, HEADING_CODES, DIR_NAMES } from '../core/math.js';
 import { FORMAT, SCREEN_W, SCREEN_H, SPEED, WINKEL_SCHRITT } from './konstanten.js';
-import { KNOTENTYPEN, OBJEKTTYPEN } from './katalog.js';
+import { KNOTENTYPEN, OBJEKTTYPEN, TILESETS } from './katalog.js';
 
 const EPS = 1e-6;
 const RAD = Math.PI / 180;
@@ -51,6 +51,10 @@ export function pruefeFormat(g) {
   if (g.format !== FORMAT) f(`Format ${JSON.stringify(g.format)} wird nicht unterstützt (erwartet: ${FORMAT}).`);
   for (const k of ['id', 'name', 'tileset']) if (typeof g[k] !== 'string' || !g[k]) f(`Feld „${k}“ fehlt oder ist kein Text.`);
   for (const k of Object.keys(LISTEN)) if (!Array.isArray(g[k])) f(`Liste „${k}“ fehlt.`);
+  const zahl0 = (v) => typeof v === 'number' && Number.isFinite(v);
+  const b = g.bereich;
+  if (!b || typeof b !== 'object' || !['x0', 'y0', 'x1', 'y1'].every((k) => zahl0(b[k]))) f('Feld „bereich“ braucht x0, y0, x1, y1 als Zahlen.');
+  if (typeof g.tileset === 'string' && !TILESETS[g.tileset]) f(`Unbekanntes Tileset „${g.tileset}“.`);
   if (fehler.length) return fehler;
   const zahl = (v) => typeof v === 'number' && Number.isFinite(v);
   const ids = new Set();
@@ -64,6 +68,10 @@ export function pruefeFormat(g) {
       const zahlen = { knoten: ['x', 'y'], gang: ['breite'], formteil: ['x', 'y', 'laenge', 'breite', 'winkel'], objekt: ['x', 'y'], notiz: ['x', 'y'] }[art];
       for (const k of zahlen) if (!zahl(o[k])) f(`${wo} (${o.id}): „${k}“ ist keine Zahl.`);
       if (art === 'knoten' && !KNOTENTYPEN[o.typ]) f(`${wo} (${o.id}): unbekannter Knotentyp „${o.typ}“.`);
+      if (art === 'knoten' && KNOTENTYPEN[o.typ]?.hatMasse && !(o.w > 0 && o.h > 0)) f(`${wo} (${o.id}): ${KNOTENTYPEN[o.typ].name} braucht Maße w und h (> 0).`);
+      if (art === 'knoten' && o.form === 'achteck' && !(o.seite > 0)) f(`${wo} (${o.id}): Achteck braucht „seite“ (> 0).`);
+      if (art === 'gang' && !(o.breite > 0)) f(`${wo} (${o.id}): Breite muss größer als 0 sein.`);
+      if (art === 'notiz' && typeof o.text !== 'string') f(`${wo} (${o.id}): „text“ muss Text sein.`);
       if (art === 'objekt' && !OBJEKTTYPEN[o.typ]) f(`${wo} (${o.id}): unbekannter Objekttyp „${o.typ}“.`);
       if (art === 'objekt' && OBJEKTTYPEN[o.typ]?.hatMasse) for (const k of ['laenge', 'breite', 'winkel']) if (!zahl(o[k])) f(`${wo} (${o.id}): „${k}“ ist keine Zahl.`);
       if (art === 'gang') for (const k of ['von', 'nach']) if (typeof o[k] !== 'string') f(`${wo} (${o.id}): „${k}“ fehlt.`);
@@ -73,6 +81,7 @@ export function pruefeFormat(g) {
     });
   }
   const knoten = new Set(g.knoten.map((k) => k.id));
+  for (const gg of g.gaenge) if (gg.von === gg.nach) f(`Gang ${gg.id}: Anfang und Ende sind derselbe Knoten.`);
   for (const gg of g.gaenge) for (const k of ['von', 'nach']) if (typeof gg[k] === 'string' && !knoten.has(gg[k])) f(`Gang ${gg.id}: Knoten „${gg[k]}“ gibt es nicht.`);
   return fehler;
 }

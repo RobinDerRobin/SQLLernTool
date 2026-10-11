@@ -20,6 +20,10 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const dateien = readdirSync(path.join(root, 'levels/gebiete')).filter((f) => f.endsWith('.json'));
 const lies = (f) => readFileSync(path.join(root, 'levels/gebiete', f), 'utf8');
 
+import { SPEED as PROTO_SPEED } from '../src/proto/fenster.js';
+
+test('Editor: Flugtempo ist das des Prototyps', () => assert.equal(SPEED, PROTO_SPEED));
+
 test('Editor: Konstanten – Bildschirm 480 × 270 E, Flugtempo 70 E/s, Zoomstufen aufsteigend', () => {
   assert.equal(SCREEN_W, 480);
   assert.equal(SCREEN_H, 270);
@@ -65,6 +69,13 @@ test('Editor: Format – ungültige Dateien werden mit verständlicher Meldung a
   assert.match(mit((g) => (g.gaenge[0].nach = 'K99')), /Knoten „K99“ gibt es nicht/);
   assert.match(mit((g) => (g.objekte[0].winkel = 30)), /45°-Raster/);
   assert.match(mit((g) => (g.knoten[0].x = 'a')), /„x“ ist keine Zahl/);
+  assert.match(mit((g) => (g.bereich = null)), /bereich/);
+  assert.match(mit((g) => delete g.knoten[2].w), /braucht Maße/);
+  assert.match(mit((g) => (g.knoten[0].form = 'achteck')), /seite/);
+  assert.match(mit((g) => (g.gaenge[0].breite = 0)), /Breite/);
+  assert.match(mit((g) => (g.tileset = 'gibtsnicht')), /Tileset/);
+  assert.match(mit((g) => (g.notizen[0].text = 5)), /text/);
+  assert.match(mit((g) => (g.gaenge[0].nach = g.gaenge[0].von)), /derselbe Knoten/);
   assert.match(pruefeFormat(null).join(), /kein Gebiet/);
   assert.throws(() => ladeGebiet('{ kaputt'), /kein gültiges JSON/);
   assert.throws(() => ladeGebiet('{"format":1}'), /passt nicht zum Format/);
@@ -177,6 +188,23 @@ test('Editor: Ansicht einpassen zeigt das ganze Gebiet in der stärksten passend
       b.stufe = a.stufe - 1;
       const s2 = b.sichtbar();
       assert.ok(!(s2.x0 <= r.x0 * 1.05 && s2.x1 >= r.x1 * 1.05 && s2.y0 <= r.y0 * 1.05 && s2.y1 >= r.y1 * 1.05), g.id + ': eine Stufe näher würde nicht mehr passen');
+    }
+  }
+});
+
+test('Editor: „Alles zeigen“ passt auch bei gedrehter Ansicht (alle 8 Drehungen)', () => {
+  for (const [w, h] of [[990, 600], [500, 400]]) {
+    const a = new Ansicht(w, h);
+    for (const g of Object.values(GEBIETE)) {
+      const r = ausdehnung(g);
+      for (const blick of HEADINGS) {
+        a.blick = blick;
+        a.einpassen(r);
+        for (const [x, y] of [[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]]) {
+          const [px, py] = a.weltZuBild(x, y);
+          assert.ok(px >= 0 && px <= w && py >= 0 && py <= h, `${g.id} Blick ${blick} ${w}×${h}: Ecke im Bild`);
+        }
+      }
     }
   }
 });

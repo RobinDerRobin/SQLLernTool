@@ -25,6 +25,7 @@ export const KUERZEL = {
   zoomPlus: ['Equal', 'NumpadAdd'],
   zoomMinus: ['Minus', 'NumpadSubtract'],
   beschriftung: 'KeyL',
+  alles: 'Home',
   fahrtStart: 'Space',
   fahrtVor: 'BracketRight',
   fahrtZurueck: 'BracketLeft',
