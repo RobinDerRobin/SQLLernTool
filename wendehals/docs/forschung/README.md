@@ -31,3 +31,9 @@ verdichtet in [`../WELT-DESIGN.md`](../WELT-DESIGN.md) (Zahlen mit [b] = belegt,
 Quellen, die die Agenten zitieren (u. a. Gradius V, Defender, Fantasy Zone, Darius, Super Hydorah,
 Life Force/Salamander, Axelay, Jamestown, Thunder Force IV, Track-up- vs. North-up-Kartenstudien),
 stehen jeweils am Ende der Berichte.
+
+## 11.10.2026 – Drehstufen und Tastenbelegung (P3 „45°-Kreuzung“)
+
+| Datei | Rolle | Frage |
+|---|---|---|
+| [2026-10-11-drehstufen-tastenbelegung.md](2026-10-11-drehstufen-tastenbelegung.md) | Game-Designer | Braucht es 45° und 90° als eigene Tasten? Robins Shift-Akkord (Erkennung, Fenster in Frames) und Controller-Gegenstück |
