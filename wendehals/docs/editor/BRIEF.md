@@ -135,7 +135,7 @@ tests/editor-*.tests.mjs, e2e/editor*.mjs
 
 | # | Stufe | Inhalt |
 |---|---|---|
-| 1 | Grundgerüst + Ansehen | Aufbau aus Abschnitt 3, Datenformat, Startinhalt, Ansicht (Zoom, Verschieben, Drehen, Norden oben, wie im Spiel), Spielbild, Rahmen, Fahrt |
+| 1 | Grundgerüst + Ansehen | Aufbau aus Abschnitt 3, Skript `npm run e2e:editor` (bis es existiert, entfällt es in der Prüfkette), Datenformat, Startinhalt, Ansicht (Zoom, Verschieben, Drehen, Norden oben, wie im Spiel), Spielbild, Rahmen, Fahrt |
 | 2a | Bauen I | Auswahl, Gang ziehen, Knoten setzen/teilen, Raumgröße, Breite, Speichern/Laden |
 | 2b | Bauen II | Formteile, Wand, Hindernis, Kopieren, Löschen, Drehen, Rückgängig/Wiederholen |
 | 3 | Spielen ab hier + Bezeichnung | `spielen.js`, Rückkehr mit Esc, Bezeichnung kopieren |
