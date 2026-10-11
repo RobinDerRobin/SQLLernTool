@@ -6,8 +6,10 @@
 
 ## 1. Arbeitsweise
 
-Ein Konzept nach dem anderen, in kleinen Wegwerf-Prototypen. Kein Leveldesign, solange Logik und
-Konzept nicht stehen (Level werden mehrfach neu gebaut).
+Ein Konzept nach dem anderen, in kleinen Wegwerf-Prototypen. **Kein Grundkonzept ohne Prototypentests;
+Leveldesign läuft parallel** (Robin, 11.10.2026; ersetzt „Kein Leveldesign, solange Logik und Konzept nicht
+stehen“): Level sind der Prüfstand für die Logik und werden billig umbaubar gehalten. Details:
+[`LEVELDESIGN.md`](LEVELDESIGN.md).
 
 1. **Fragekarte** (3 Zeilen): die eine Frage, woran Robin die Antwort erkennt, was bewusst fehlt.
 2. **Design-Runde** (bei neuen Konzepten): Game-Designer wägt ab, Kritiker prüft, bei Bedarf
@@ -85,6 +87,9 @@ dürfen es als Platzhalter nutzen.
 | E8 | Ist die 180°-Umkehr frei oder an eine Fähigkeit (Wendehals) gebunden? | **offen** (im P1 frei) |
 | E9 | P1-Türen: „passende Scrollrichtung“ = Kartenrichtung des Gangs oder Bildschirmseite? | offen; Standard im P1: **Kartenrichtung** (Tür offen, wenn das Fenster entlang dieses Arms scrollt, egal in welche Richtung) |
 | E10 | Gelten die Umfangsziele (4 h, ~70 Arenen) noch? | offen, zusammen mit dem Setting |
+| E11 | Leveldesign erst nach Logik/Konzept? | **erledigt (11.10.2026):** parallel; „Kein Grundkonzept ohne Prototypentests“ – [LEVELDESIGN.md](LEVELDESIGN.md) |
+| E12 | Leveldaten: Kachelraster oder Objekte? | **erledigt (11.10.2026):** Objekte mit Maßen (Lage, Länge, Breite, Winkel), Raster nur zum Einrasten; Level = Gang zwischen Knoten, Gebiet = Themengruppe |
+| E13 | Wie entstehen Level (Hand/KI)? | **erledigt (11.10.2026):** Editor nach Vorbild Lunar Magic (Paket 13) + KI (Varianten, Prüfen, Gebiete nach Regeln, Robins Stücke verbinden/extrapolieren, Regeln ableiten); KI arbeitet teilweise selbst, fragt bei großen Entscheidungen. Offen: Datei pro Gebiet, Regelwerk MUSS/SOLL, Editor am PC oder Deck, Gegner ab E1 |
 
 ## 4. Prototyp-Leiter Paket 1 „Fenster“
 
@@ -135,6 +140,7 @@ Gilt für die Übernahme ins Spiel (Paket 8) und jeden weiteren Fenster-Prototyp
 |---|---|---|---|---|---|
 | F0 | 05.10.2026 | Richtungen: Fenster-Konzept | siehe Abschnitt 2 | keep (Konzept) | P1 bauen |
 | F1 | 07.10.2026 | P1 „Kreuzung“ | „I am happy with the feature for now.“ (Änderungen nach Spieltests: Brief Abschnitt 9) | keep (Feature) | Checkliste 4a; [Retrospektive](prototypen/P1-retro.md); nächster Prototyp offen (P2 laut Leiter) |
+| F5 | 11.10.2026 | Leveldesign | „Das Leveldesign soll doch schon stattfinden. […] Stattdessen: Kein Grundkonzept ohne Prototypentests.“ – „B klingt gut.“ – „Arbeitspaket auf jeden Fall so festlegen.“ | keep (Konzept) | [LEVELDESIGN.md](LEVELDESIGN.md); Paket 13 „Editor“; Arbeitspakete-Dashboard in eigenem Chat |
 | F3 | 10.10.2026 | P2 „Minimap“ | „P2 war gut. Alle Prototypen bleiben bisher bestehen.“ | keep | Kein Prototyp wird gelöscht (auch P1, P1c bleiben im Build). Offen: welche Minimap-Version, V3-Füllung; nächster Prototyp: P3 „45°“ (erweitert die 90°-Kreuzungen um 45°-Gänge), neuer Chat |
 
 ## 6. Arbeitspakete – **Entwurf, in Validierung**
@@ -159,5 +165,6 @@ Diese zusammengeführte Liste ist der aktuelle Entwurf und wird mit Robin bespro
 | 9 | Fähigkeiten (je drei Nutzen) | Prototyp → Produktion | Trägt jede Fähigkeit Kampf, Bewegung und Rätsel? | Leine | S, 4 |
 | 10 | Gegner & Bosse | Produktion | Funktionieren Gegner und Bosse im drehenden Fenster? | ein Boss im Fenster | S, P4 |
 | 11 | Progression | Papier + Löser | Halten Reihenfolge, Schlösser und Sequence Breaks auf dem Grundriss? | Graph + Löserlauf | 4, 9 |
-| 12 | Welt bauen | Produktion | Gebiete, Räume, Etappen | erstes Slice | 8, 11, S |
+| 12 | Welt bauen | Produktion | Gebiete, Knoten, Level (Gänge) – läuft parallel zu den Prototypen (E11) | erstes kleines Gebiet im Editor | 13 (E1); fertige Welt: 8, 11, S |
+| 13 | **Editor** (festgelegt, Robin 11.10.2026) | Werkzeug | Kann Robin Welt, Gebiete und Level selbst bauen und sofort spielen; kann die KI dieselben Daten lesen und schreiben? | Stufe E1: einen Gang bearbeiten + „Spielen ab hier“; Stufen E1–E5 je nur bei echtem Bedarf – [LEVELDESIGN.md](LEVELDESIGN.md) | P1 (Kartenformat) |
 | Q | Querschnitt | Produktion | – | Steuerungsbudget, Telemetrie, Speicherposition, Datenformat für Begegnungen, Deck-Leistung, Löser synchron | laufend |
