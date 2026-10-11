@@ -130,7 +130,18 @@ Abschnitt 1). Jede Stufe wird erst gebrieft, wenn die vorige steht; Gegner, Schl
 
 Für ein erstes eigenes Gebiet reichen Stufen 1–4 (etwa 5–7 Sessions).
 
-## 2. Vorschläge (besprochen, noch nicht bestätigt)
+## 1d. Bau (Robin, 11.10.2026)
+
+- Robin: „Ich habe keine Zeit das alles zu testen. Ich möchte, dass der Editor funktioniert und dass er ohne große Mühe
+  änderbar ist, wenn mich etwas daran stört. Es darf auch 2 Wochen dauern.“ – „Mehrere Sessions pro Tag. Nachts ab 23 Uhr
+  bis 09 Uhr morgens dürfen sie stattfinden. Mach die Läufe so, dass es funktioniert und es schnell erledigt ist, ohne
+  die Qualität zu vernachlässigen.“
+- Umsetzung: Bau-Brief [`editor/BRIEF.md`](editor/BRIEF.md), Stand [`editor/STAND.md`](editor/STAND.md); Routine startet
+  nachts alle 2 Stunden (23:07, 01:07, 03:07, 05:07, 07:07) eine Sonnet-Session mit Sperre; getestet wird automatisch
+  plus Test-Agenten; Robin probiert am Ende aus.
+- Auf Vorbehalt (Robin hat nicht widersprochen, Bestätigung steht aus): Tileset = Aussehen, Form frei; v0.2-Themen als
+  Platzhalter-Tilesets; Gegner als markierte Platzhalter; Formen aus geraden Teilen.
+ (besprochen, noch nicht bestätigt)
 
 - **Quelle der Wahrheit:** eine Textdatei (JSON) pro Gebiet; Editor, KI und Prüfer lesen und schreiben dieselbe Datei.
 - **Ablauf mit der KI:** Robin baut Stücke → KI analysiert und schlägt Regeln vor → Robin bestätigt → Regelwerk
