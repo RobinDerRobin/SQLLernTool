@@ -23,8 +23,8 @@
 
 ## Fragen an Robin
 
-- Wie kommen deine Leveldateien vom PC ins Repo? (lokaler Klon/GitHub Desktop, Hochladen, Artifact mit gemeinsamem
-  Speicher …) – bis zur Antwort: Ordner öffnen/speichern und Download/Upload.
+- (keine offen) – Weg der Dateien beantwortet am 11.10.2026: lokaler Klon in einer VM mit Claude Desktop, Editor
+  speichert direkt in `wendehals/levels/` (Brief Abschnitt 4).
 
 ## Auf Vorbehalt entschieden
 

@@ -113,9 +113,11 @@ tests/editor-*.tests.mjs, e2e/editor*.mjs
 - Formatiert speichern (2 Leerzeichen, feste Schlüsselreihenfolge), damit Diffs lesbar sind.
 - Startinhalt: die Karten „Netz“ und „45°-Kreuzung“ als Gebiete `proto-netz`, `proto-achteck` (zum Ansehen) und ein
   Beispielgebiet `beispiel` wie Skizze 2.
-- **Offen (Frage an Robin):** wie Robins Dateien vom PC ins Repo kommen (lokaler Klon / GitHub Desktop, Hochladen,
-  Artifact mit gemeinsamem Speicher …). Deshalb `speicher.js` als Adapter; bis zur Antwort: Ordner öffnen/speichern
-  (File System Access) und Download/Upload.
+- **Entschieden (Robin, 11.10.2026):** „Ich will das Projekt langfristig in einer VM auf meinem PC mittels Claude
+  Desktop umsetzen.“ → Robin arbeitet mit einem **lokalen Klon** des Repos; der Editor speichert **direkt in
+  `wendehals/levels/`** dieses Klons. Hauptweg: **`npm run editor`** (Electron mit `WENDEHALS_EDITOR=1`, Speichern/Öffnen
+  über den Preload, eingeschränkt auf den Ordner `levels/`); im Browser zusätzlich File System Access, sonst
+  Download/Upload. Claude Code liest die Dateien lokal; Robin committet/pusht aus der VM. `speicher.js` bleibt ein Adapter.
 
 ## 5. Prüfregeln (Start; in `regeln.js`, Zahlen aus `konstanten.js`)
 
@@ -175,4 +177,4 @@ tests/editor-*.tests.mjs, e2e/editor*.mjs
 ## 8. Auf Vorbehalt (Robins Antworten stehen aus; Empfehlungen, denen Robin nicht widersprochen hat)
 
 - Tileset = Aussehen eines Gebiets, Form bleibt frei. · v0.2-Themen als Platzhalter-Tilesets. · Gegner als markierte
-  Platzhalter. · Formen aus geraden Teilen, unregelmäßige geparkt. · Weg der Dateien ins Repo: offen (Abschnitt 4).
+  Platzhalter. · Formen aus geraden Teilen, unregelmäßige geparkt. · Weg der Dateien ins Repo: entschieden (Abschnitt 4).
