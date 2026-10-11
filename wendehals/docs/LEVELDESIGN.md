@@ -58,7 +58,12 @@ Regeln für das Paket:
 - Der Editor ist ein Werkzeug, keine allgemeine Engine: die Engine ist das Spiel selbst; der Editor bearbeitet nur die
   Daten, die sie liest (wie Lunar Magic für Super Mario World).
 
-Editor-Skizze (Aussehen, nicht bestätigt):
+**Robin arbeitet am PC** (Maus, Tastatur); der Editor muss nicht auf dem Steam Deck laufen. Gespielt und abgenommen
+wird weiterhin auf dem Deck (Regel 8). **Klickbare Optik-Skizze gewünscht** („Ja sehr gut.“):
+[`editor-skizze.html`](editor-skizze.html), veröffentlicht unter https://claude.ai/artifact/Sp9Ncg4tAyzVZqk2jrKo1P
+(nur Optik, Prüfregeln darin sind Beispiele).
+
+Editor-Skizze als Text (Aussehen, nicht bestätigt):
 
 ```
 ┌ Welt ▸ Gebiet „Kanal“ ▸ Gang „Schleuse“ ─────────── [▶ Spielen ab hier] ┐
@@ -89,7 +94,8 @@ Editor-Skizze (Aussehen, nicht bestätigt):
 
 ## 3. Offen
 
-- Wo arbeitet Robin am Editor: PC mit Maus, auch Steam Deck?
 - Gegner/Wellen von Anfang an im Editor oder erst die Geometrie?
-- Klickbare Optik-Skizze des Editors vor dem Brief zu E1?
+- Robins Rückmeldung zur Optik-Skizze.
+- Was kommt in den Editor, solange Konzepte noch im Prototyp sind (Robin, 11.10.2026: „es ist wichtig, zuerst die
+  Konzepte durchzuprüfen, bevor man sie editieren kann“)? Vorschlag in Arbeit.
 - Bestätigung der Vorschläge in Abschnitt 2.
