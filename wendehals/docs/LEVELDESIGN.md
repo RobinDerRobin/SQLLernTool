@@ -78,6 +78,22 @@ Editor-Skizze als Text (Aussehen, nicht bestätigt):
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
+## 1b. Entschieden in Runde 2 (Robin, 11.10.2026)
+
+- **Echtes Spielbild statt Symbolen.** Robin zur ersten Skizze: „Die symbolische Darstellung ist unpraktisch. Das Level
+  fühlt sich auch viel kleiner an, als in dem eigentlichen Spiel.“ Daher: der Editor zeichnet mit der Spielzeichnung,
+  Normalansicht 1:1 mit **Bildschirmrahmen** (480 × 270 E, so viel sieht der Spieler auf einmal), Längen immer auch in
+  Bildschirmen und Sekunden Flug (Prototyp: 70 E/s → 1800 E ≈ 3,8 Bildschirme ≈ 26 s).
+- **Ein durchgehender Grundriss** statt getrennter Bildschirme für Welt/Gebiet/Gang: Gebiete sind Bereiche auf dem
+  Plan, Level (Gänge) und Knoten liegen darin; Lage und Länge ergeben sich aus dem Plan. Werkzeuge: Gang von einem
+  Knoten aus in 8 Richtungen ziehen (neuer Knoten am Ende im Leeren), Knoten setzen, Gang anklicken = T-Kreuzung.
+  Robin: „Klingt alles gut.“
+- **Ansicht:** normal Norden oben, drehen möglich.
+- **Der Editor kennt nur, was ein Prototyp bestätigt hat** (Robin: „Ja“). Erst Geometrie; Gegner, Drehen begrenzen,
+  Tempo, Schlösser kommen erst nach ihrem Prototyp bzw. Paket in den Katalog.
+- Die Stufen E1–E5 aus Abschnitt 1 werden dadurch neu zugeschnitten (E1 = Grundriss-Editor); neuer Zuschnitt folgt
+  nach Robins Bestätigung.
+
 ## 2. Vorschläge (besprochen, noch nicht bestätigt)
 
 - **Quelle der Wahrheit:** eine Textdatei (JSON) pro Gebiet; Editor, KI und Prüfer lesen und schreiben dieselbe Datei.
