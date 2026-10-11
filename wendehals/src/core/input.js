@@ -25,6 +25,7 @@ const KEYMAP = {
   KeyX: 'station',
   KeyC: 'station',
   KeyM: 'map',
+  KeyB: 'bufMode', // P3: Speicher-Modus der Drehung umschalten
   KeyE: 'espresso',
   KeyU: 'rotLeft',
   KeyO: 'rotRight',
@@ -37,7 +38,11 @@ const KEYMAP = {
 const KEYMAP2 = {
   KeyJ: 'rot45Left',
   KeyK: 'rot45Right',
+  ShiftLeft: 'shiftMod', // P3: Shift als Dreh-Modus (Akkord Shift+A/D bzw. Shift+W+A/D)
+  ShiftRight: 'shiftMod',
 };
+// Zweitbelegung Gamepad: LB zusätzlich als „Shift“ (nur der Prototyp liest es)
+const PADMAP2 = { 4: 'shiftMod' };
 
 // Standard-Gamepad: 0=A 1=B 2=X 3=Y 8=Back/View (Karte) 9=Start/Menü 12-15=Steuerkreuz
 const PADMAP = {
@@ -50,6 +55,7 @@ const PADMAP = {
   6: 'rot45Left', // LT (analog: value > 0,5)
   7: 'rot45Right', // RT
   8: 'map',
+  10: 'bufMode', // Druck auf den linken Stick
   9: 'pause',
   12: 'up',
   13: 'down',
@@ -57,7 +63,7 @@ const PADMAP = {
   15: 'right',
 };
 
-const ACTIONS = ['up', 'down', 'left', 'right', 'fire', 'confirm', 'power', 'wende', 'pause', 'back', 'station', 'map', 'espresso', 'rotLeft', 'rotRight', 'rot45Left', 'rot45Right', 'fullscreen'];
+const ACTIONS = ['up', 'down', 'left', 'right', 'fire', 'confirm', 'power', 'wende', 'pause', 'back', 'station', 'map', 'espresso', 'rotLeft', 'rotRight', 'rot45Left', 'rot45Right', 'shiftMod', 'bufMode', 'fullscreen'];
 const DEADZONE = 0.28;
 
 export class Input {
@@ -115,6 +121,7 @@ export class Input {
           held[a] = true;
           this.usingPad = true;
         }
+        if (PADMAP2[i] && (b.pressed || b.value > 0.5)) held[PADMAP2[i]] = true;
       });
       const ax = pad.axes[0] || 0;
       const ay = pad.axes[1] || 0;
@@ -158,6 +165,8 @@ export class Input {
       rotRight: pressed('rotRight'),
       rot45Left: pressed('rot45Left'),
       rot45Right: pressed('rot45Right'),
+      shift: !!held.shiftMod,
+      bufMode: pressed('bufMode'),
       espressoPressed: pressed('espresso'),
       station: pressed('station'),
       map: pressed('map'),

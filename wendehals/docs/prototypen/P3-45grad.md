@@ -176,3 +176,16 @@ Bildabstand p95 16,8 ms, 0 Hänger > 50 ms.
 **Fragen an Robin (Abschnitt 8):** (1) Wann hast du LT/RT und LB/RB verwechselt – nach einer 45°-Drehung, kopfüber, beim Linksflug?
 (2) Fühlt sich ein Diagonal-Gang anders an als ein gerader? (3) Passt der 0,5-s-Schwenk auch für 45°? Antwort als nächster F-Eintrag
 (F4) ins Entscheidungsprotokoll.
+
+## 10. Iteration 11.10.2026: Eingabe-Schemata, Akkord, Speicher (Robin, Sonnet 5.5)
+
+Auslöser: Robin verwechselt LT/RT und LB/RB oft (Wann: unbekannt; Steam Deck noch nicht getestet). Entscheidungen von Robin: Shift+A/D = 90°, Shift+W+A/D = 45°; **solange Shift gehalten wird, bewegt man die Figur nicht**; zwei Schemata zum Vergleichen („nächster Gang“ links/rechts als zweites); eine Drehung, die im Schwenk gedrückt wird, wird gespeichert wie der Eingabe-Puffer in Dark Souls (ein Speicherplatz, der letzte Druck gewinnt, gespeichert im ganzen Schwenk), in zwei Modi; der Hinweis bleibt dauerhaft sichtbar. Die Mindeststrecke und die Formel sind **zurückgestellt** (Entscheidungsregister E11).
+
+**Schemata** (M / Tab / Back wechselt, Standard Akkord): `akkord` Shift+A/D 90°, Shift+W+A/D 45° (Controller: LB halten = Shift, Stick = WASD); `gang` links/rechts zum nächsten Gang (U/O, LB/RB, J/K, LT/RT; am Achteck 45°, fehlen Gänge, wird weitergezählt); `klassisch` wie nach dem ersten Bau (dort werden Drücke im Schwenk ignoriert, die alten Tests gelten unverändert).
+**Speicher-Modi** (B / L3 wechselt, Standard getrennt): `getrennt` = gespeicherter Druck läuft nach dem Schwenk als eigener zweiter Schwenk (0,5 s + 0,5 s); `schneller` = der Druck verlängert den laufenden Schwenk, jeder weitere Druck erhöht die Drehgeschwindigkeit (`SPEEDUP` 0,7 je Druck, höchstens `OMEGA_MAX` 4 rad/s, damit die Drehrate unter 0,1 rad/Frame bleibt). Die Position des Dackels bleibt in beiden Modi fest.
+**Akkord-Erkennung:** ausgelöst nur durch den **frischen** Druck auf A/D (Halten löst nie aus); Shift darf bis `CHORD_FRAMES` = 4 Frames (≈ 67 ms, Hypothese) nach A/D kommen; W frisch bis 4 Frames vor oder nach A/D macht aus 90° ein 45° (der Schwenk startet sofort und wird umgelenkt, kein Warten).
+**Hinweis:** dauerhaft klein oben links unter dem Knochen-Zähler, selbst gezeichnet (Tastenkappen, Winkelmarken, Schema-Punkte, Speicher-Marke).
+
+**Zur Bestätigung durch Robin (Hypothesen/Deutungen):** (1) `klassisch` speichert nicht (altes Verhalten); (2) in `gang` löst ein Druck, der nicht gestartet werden darf (Zone), rote Ablehnung aus und wird nicht gespeichert; (3) das Umschalten über M/B und die Zeichen sind Entwurf; (4) bei `schneller` startet jeder Druck die Glättung neu (kurzes Anhalten zwischen den Drücken möglich).
+
+Tests: `tests/achteck.tests.mjs` (14 neue Tests: Akkord alle Kombinationen und Toleranzgrenzen, gehaltene Tasten, Shift sperrt Lenken, Gang inkl. Karte mit fehlenden Gängen, Speichern getrennt/schneller, Umschalten, Eingabe, Hinweis, Zufallsspiele in allen Schemata). Die Tests des ersten Teils laufen im Schema `klassisch` (nur der Aufbau `mk()` wurde angepasst, keine Prüfung geändert). `npm test` 299/299.
