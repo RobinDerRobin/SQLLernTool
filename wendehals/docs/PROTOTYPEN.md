@@ -77,7 +77,8 @@ dürfen es als Platzhalter nutzen.
 |---|---|---|
 | E1 | Diagonal-Etappen: Bild 45° drehen oder Treppen-Terrain? | **erledigt/obsolet** – Fenster-Konzept |
 | E2 | Drehzahl: Kosten pro 45° oder feste Ladungen? | offen (Paket „Drehen begrenzen“) |
-| E3 | Steuerung zum Drehen | im Prototyp: LB/RB (U/O) ±90°, seit P3 „45°-Kreuzung“ LT/RT (J/K) ±45° (Robin, 10.10.2026); fürs Spiel offen |
+| E3 | Steuerung zum Drehen | im Prototyp: LB/RB (U/O) ±90°, seit P3 „45°-Kreuzung“ LT/RT (J/K) ±45° (Robin, 10.10.2026); **seit 11.10.2026 drei umschaltbare Schemata** (Akkord Shift+A/D bzw. Shift+W+A/D, „nächster Gang“ links/rechts, klassisch) und zwei Speicher-Modi, siehe P3-Brief Abschnitt 10; fürs Spiel offen |
+| E11 | **Drehformel / Mindeststrecke** (Robin, 11.10.2026: „Es soll grundsätzlich so sein, dass die Formel die wir vereinbart hatten, bestimmt, wann gedreht werden kann.“) | **offen, Robin zu erinnern, sobald das Thema „Formel“ drankommt:** statt der festen Dreh-Zone 160 entscheidet die Formel (Scrollgeschwindigkeit, Dackel-Geschwindigkeit, Strecke zum Gang, Puffer). Vorschlag zur Prüfung: Drehen nur, wenn der Dackel in der neuen Flugrichtung bei Scroll-Tempo 70 ohne Lenken noch eine Mindeststrecke frei hat (Hypothese 1,5 s ≈ 105 E plus Dackelradius; `map.freeDistance` kann das). Folge: In den Armen wäre kaum Drehen erlaubt, die Zone wäre praktisch das Achteck. Gilt auch für „zu früh gedreht“ (nach innen um 45° ist heute nicht tödlich). |
 | E4 | Kreisel ohne Fähigkeit schubst 180° zurück? | offen; 180° ist jetzt nur Scroll-Umkehr |
 | E5 | Wendehals früh oder bei ~40 %? | ersetzt durch E8 |
 | E6 | Umfang (8 Gebiete, 4 h) | **ruht** bis das Setting steht |
@@ -136,6 +137,7 @@ Gilt für die Übernahme ins Spiel (Paket 8) und jeden weiteren Fenster-Prototyp
 | F0 | 05.10.2026 | Richtungen: Fenster-Konzept | siehe Abschnitt 2 | keep (Konzept) | P1 bauen |
 | F1 | 07.10.2026 | P1 „Kreuzung“ | „I am happy with the feature for now.“ (Änderungen nach Spieltests: Brief Abschnitt 9) | keep (Feature) | Checkliste 4a; [Retrospektive](prototypen/P1-retro.md); nächster Prototyp offen (P2 laut Leiter) |
 | F3 | 10.10.2026 | P2 „Minimap“ | „P2 war gut. Alle Prototypen bleiben bisher bestehen.“ | keep | Kein Prototyp wird gelöscht (auch P1, P1c bleiben im Build). Offen: welche Minimap-Version, V3-Füllung; nächster Prototyp: P3 „45°“ (erweitert die 90°-Kreuzungen um 45°-Gänge), neuer Chat |
+| F4 | 11.10.2026 | P3 „45°-Kreuzung“ | „Ein Diagonalgang fühlt sich nicht anders an. Ja das passt. [Schwenk 0,5 s] … Ich verwechsle es oft [LT/RT und LB/RB], wann weiß ich nicht. Eine bessere Tastaturbelegung wäre wünschenswert.“ Am Steam Deck noch nicht getestet („Prüfung an der echten Hardware kommt später“); Spieltest erst, wenn die ersten Level stehen. | iterate | Iteration 11.10.2026: Schemata und Speicher (Brief Abschnitt 10); Designrunde [`forschung/2026-10-11-drehstufen-tastenbelegung.md`](forschung/2026-10-11-drehstufen-tastenbelegung.md) |
 
 ## 6. Arbeitspakete – **Entwurf, in Validierung**
 

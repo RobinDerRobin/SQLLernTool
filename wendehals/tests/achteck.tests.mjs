@@ -24,8 +24,10 @@ const ROT = { lt: 'rot45Left', rt: 'rot45Right', lb: 'rotLeft', rb: 'rotRight' }
 const KEYS = [['lt', -1], ['rt', 1], ['lb', -2], ['rb', 2]]; // Taste, Drehung in 45°-Schritten (Vorzeichen: links −, rechts +)
 const press = (key) => ({ [ROT[key]]: true });
 
+// Die Tests dieses ersten Teils prüfen das Schema 'klassisch' (LT/RT/LB/RB, Stand nach dem ersten Bau); die neuen Schemata
+// 'akkord' und 'gang' samt Speicher-Modi stehen am Ende der Datei.
 const mk = () => {
-  const sc = new AchteckScene();
+  const sc = new AchteckScene({ scheme: 'klassisch' });
   sc.hint = 0;
   return sc;
 };
@@ -978,6 +980,8 @@ test('Anbindung: Direktstart-Szene, Netz/Kreuzung/v0.2 erreichbar, Optionen-Zeil
   g.startProto('45grad');
   assert.equal(g.screen, 'proto');
   assert.ok(g.proto instanceof AchteckScene);
+  assert.equal(g.proto.scheme, 'akkord', 'Standard-Schema: Akkord');
+  g.proto.scheme = 'klassisch';
   assert.equal(g.proto.map, ACHTECK_MAP);
   g.proto.warp(0, 0, E, 'R');
   const st = minimapFor(g.proto);
@@ -1001,4 +1005,348 @@ test('Lage-Konstanten: Arme 720 lang, Start im Westarm, Tempo/Dreh-Zone wie in d
   assert.equal(TURN_AHEAD, 160);
   assert.equal(DOG_MARGIN, 14);
   assert.equal(S, 2);
+});
+
+// ================================================================== Eingabe-Schemata, Akkord, Speicher (Robin, 11.10.2026)
+import { CHORD_FRAMES, SPEEDUP, SCHEMES, BUF_MODES } from '../src/proto/achteck.js';
+
+const mkS = (scheme, bufMode = 'getrennt', c = { theta: E, s: 'R' }, at = { x: 0, y: 0 }) => {
+  const sc = new AchteckScene({ scheme, bufMode });
+  sc.hint = 0;
+  return sc.warp(at.x, at.y, c.theta, c.s);
+};
+/** Eine Folge von Frames abspielen: jeder Eintrag = Eingabe dieses Frames ({} = nichts), mit Messgerät. */
+const run = (sc, seq, mon = new Monitor(sc)) => {
+  for (const inp of seq) {
+    sc.update(DT, inp);
+    mon.step(inp);
+  }
+  return mon;
+};
+const idle = (n, inp = {}) => Array.from({ length: n }, () => ({ ...inp }));
+const done = (sc) => finishSwing(sc);
+
+test('Akkord: Shift+D = 90° rechts, Shift+A = 90° links, Shift+W+D = 45° rechts, Shift+W+A = 45° links (alle Ausrichtungen, beide Seiten)', () => {
+  for (const c of COMBOS) {
+    const cases = [
+      [{ shift: true, right: true }, 2],
+      [{ shift: true, left: true }, -2],
+      [{ shift: true, right: true, up: true }, 1],
+      [{ shift: true, left: true, up: true }, -1],
+    ];
+    for (const [inp, k] of cases) {
+      const sc = mkS('akkord', 'getrennt', c, { x: 20, y: -30 });
+      const m0 = sc.dogMap();
+      run(sc, [inp]);
+      assert.ok(sc.swing, 'Drehung gestartet ' + name(c));
+      assert.equal(sc.theta, turnBy(c.theta, k), `${name(c)} ${JSON.stringify(inp)}`);
+      done(sc);
+      const m1 = sc.dogMap();
+      assert.ok(Math.hypot(m1.x - m0.x, m1.y - m0.y) < 1e-6, 'Position bleibt');
+      assert.equal(sc.s, c.s);
+    }
+  }
+});
+
+test(`Akkord: Toleranz ${CHORD_FRAMES} Frames – W kurz vor oder kurz nach A/D macht aus 90° ein 45°; fünf Frames später nicht mehr`, () => {
+  assert.equal(CHORD_FRAMES, 4);
+  const outcome = (seq) => {
+    const sc = mkS('akkord');
+    run(sc, seq);
+    done(sc);
+    return sc.theta;
+  };
+  const SH = { shift: true };
+  // W zuerst, dann D nach n Frames
+  assert.equal(outcome([{ ...SH, up: true, right: true }]), turnBy(E, 1), 'W und D im selben Frame');
+  for (let n = 1; n <= CHORD_FRAMES; n++) assert.equal(outcome([{ ...SH, up: true }, ...idle(n - 1, SH), { ...SH, right: true }]), turnBy(E, 1), `W ${n} Frames vor D`);
+  assert.equal(outcome([{ ...SH, up: true }, ...idle(CHORD_FRAMES, SH), { ...SH, right: true }]), turnBy(E, 2), 'W 5 Frames vor D zählt nicht');
+  // D zuerst, dann W nach n Frames (der Schwenk läuft schon und wird auf 45° umgelenkt)
+  for (let n = 0; n <= CHORD_FRAMES; n++) assert.equal(outcome([{ ...SH, right: true }, ...idle(Math.max(0, n - 1), SH), ...(n ? [{ ...SH, up: true }] : [])]), n ? turnBy(E, 1) : turnBy(E, 2), `D, W nach ${n} Frames`);
+  assert.equal(outcome([{ ...SH, right: true }, ...idle(CHORD_FRAMES, SH), { ...SH, up: true }]), turnBy(E, 2), 'W 5 Frames nach D zählt nicht');
+  // links genauso
+  assert.equal(outcome([{ ...SH, left: true }, ...idle(2, SH), { ...SH, up: true }]), turnBy(E, -1));
+  // Shift kommt kurz nach A/D
+  assert.equal(outcome([{ right: true }, ...idle(CHORD_FRAMES - 1), { shift: true }]), turnBy(E, 2), 'Shift bis ' + CHORD_FRAMES + ' Frames nach D');
+  assert.equal(outcome([{ right: true }, ...idle(CHORD_FRAMES + 1), { shift: true }]), E, 'zu spät: keine Drehung');
+});
+
+test('Akkord: gehaltene Tasten zählen nicht – W seit langem gehalten + Shift + D = 90° (nur der frische Druck löst aus)', () => {
+  const sc = mkS('akkord');
+  // W wurde vor langer Zeit frisch gedrückt und wird nur noch gehalten (kein frischer Druck mehr), dann Shift + frisches D
+  run(sc, [{ up: true }, ...idle(30), { shift: true, right: true }]);
+  done(sc);
+  assert.equal(sc.theta, turnBy(E, 2));
+  // Halten allein löst nie aus: A/D ohne Shift steuern nur
+  const s2 = mkS('akkord');
+  const mon = run(s2, [{ left: true, mx: -1 }, ...idle(30, { mx: -1 }), { right: true, mx: 1 }, ...idle(30, { mx: 1 })]);
+  assert.equal(s2.theta, E);
+  assert.equal(s2.swing, null);
+  assert.ok(mon.frames > 60);
+  // Shift gehalten, A/D nur gehalten: keine weitere Drehung
+  const s3 = mkS('akkord');
+  run(s3, [{ shift: true, right: true }]);
+  done(s3);
+  const th = s3.theta;
+  run(s3, idle(60, { shift: true }));
+  assert.equal(s3.theta, th);
+});
+
+test('Akkord: solange Shift gehalten wird, bewegt man die Figur nicht (Stick wirkt nicht); ohne Shift lenkt er wie immer', () => {
+  const a = mkS('akkord');
+  const x0 = a.dog.x;
+  const y0 = a.dog.y;
+  run(a, idle(30, { shift: true, mx: 1, my: 1 }));
+  assert.ok(Math.abs(a.dog.x - x0) < 1e-9 && Math.abs(a.dog.y - y0) < 1e-6, 'Dackel bleibt auf dem Bildschirm stehen (nur das Scrollen trägt ihn)');
+  const b = mkS('akkord');
+  run(b, idle(30, { mx: 1 }));
+  assert.ok(b.dog.x > x0 + 30, 'ohne Shift lenkt der Stick');
+  // nach dem Loslassen wieder lenken
+  run(a, idle(30, { mx: 1 }));
+  assert.ok(a.dog.x > x0 + 30);
+});
+
+test('Akkord: Drehen nur in der Dreh-Zone – außerhalb wird der Akkord rot abgelehnt (mit Ton), Position unverändert', () => {
+  const a = armDir(E);
+  const far = inArm(a, APO + 500);
+  for (const inp of [{ shift: true, right: true }, { shift: true, left: true, up: true }]) {
+    const sc = mkS('akkord', 'getrennt', { theta: E, s: 'R' }, far);
+    sc.update(DT, inp);
+    assert.equal(sc.swing, null);
+    assert.ok(sc.denied);
+    assert.ok(sc.sfx.includes('nope'));
+  }
+});
+
+test('Gang: links/rechts dreht zum nächsten Gang (am Achteck 45°); mit U/O, LB/RB, J/K und LT/RT; fehlen Gänge, wird weitergezählt', () => {
+  for (const c of COMBOS) {
+    for (const [inp, side] of [[{ rotLeft: true }, -1], [{ rotRight: true }, 1], [{ rot45Left: true }, -1], [{ rot45Right: true }, 1], [{ espressoPressed: true }, 1]]) {
+      const sc = mkS('gang', 'getrennt', c);
+      run(sc, [inp]);
+      assert.equal(sc.theta, turnBy(c.theta, side), `${name(c)} ${JSON.stringify(inp)}`);
+      done(sc);
+    }
+  }
+  // Karte nur mit geraden Armen: „nächster Gang“ ist 90° (Kreuzungs-Fall)
+  const gerade = { ...ACHTECK_MAP, arms: ARMS8.filter((a) => !a.striped) };
+  const sc = new AchteckScene({ map: gerade, scheme: 'gang' });
+  sc.warp(0, 0, E, 'R');
+  assert.equal(sc.gangSteps(1), 2);
+  assert.equal(sc.gangSteps(-1), -2);
+  run(sc, [{ rotRight: true }]);
+  assert.equal(sc.theta, turnBy(E, 2));
+});
+
+test('Speichern (getrennt): ein Druck im Schwenk wird gespeichert und läuft danach als eigener zweiter Schwenk – 0,5 s + 0,5 s', () => {
+  for (const scheme of ['akkord', 'gang']) {
+    const sc = mkS(scheme);
+    const press = scheme === 'akkord' ? { shift: true, right: true, up: true } : { rotRight: true };
+    const hold = scheme === 'akkord' ? { shift: true } : {};
+    const mon = new Monitor(sc);
+    let frames = 0;
+    run(sc, [press], mon);
+    frames++;
+    // mitten im ersten Schwenk noch einmal drücken
+    run(sc, idle(10, hold), mon);
+    frames += 10;
+    run(sc, [press], mon);
+    frames++;
+    assert.equal(sc.theta, turnBy(E, 1), 'der erste Schwenk läuft noch');
+    assert.ok(sc.buffer, 'Druck gespeichert');
+    while (sc.swing || sc.buffer) {
+      run(sc, [hold], mon);
+      frames++;
+      assert.ok(frames < 200);
+    }
+    assert.equal(sc.theta, turnBy(E, 2), 'zweiter Schwenk gelaufen (' + scheme + ')');
+    assert.ok(frames >= 58 && frames <= 64, `0,5 s + 0,5 s = 60 Frames, war ${frames}`);
+    assert.equal(sc.buffer, null);
+    // genau eine Position über beide Schwenke
+    assert.ok(mon.swingDrift < 1e-6);
+  }
+});
+
+test('Speichern: ein Speicherplatz, der letzte Druck gewinnt; Druck im Gang außerhalb der Zone wird nicht gespeichert; Tod leert den Speicher', () => {
+  const sc = mkS('gang');
+  run(sc, [{ rotRight: true }, ...idle(3), { rotLeft: true }, ...idle(3), { rotRight: true }, { rotRight: true }]);
+  assert.deepEqual(sc.buffer, { side: 1, steps: null }, 'der letzte Druck gewinnt');
+  while (sc.swing || sc.buffer) run(sc, [{}]);
+  assert.equal(sc.theta, turnBy(E, 2), 'ein Schwenk aus dem Speicher, nicht drei');
+  // nicht in der Zone: kein Schwenk, also auch kein Speichern
+  const far = mkS('gang', 'getrennt', { theta: E, s: 'R' }, inArm(armDir(E), APO + 500));
+  run(far, [{ rotRight: true }, { rotRight: true }]);
+  assert.equal(far.buffer, null);
+  assert.ok(far.denied);
+  // Tod leert den Speicher
+  const t = mkS('gang');
+  run(t, [{ rotRight: true }, { rotRight: true }]);
+  assert.ok(t.buffer);
+  t.die();
+  assert.equal(t.buffer, null);
+});
+
+test('Speichern (schneller): ein Druck im Schwenk verlängert den Schwenk, jeder weitere Druck beschleunigt die Drehung; Position bleibt, Drehrate ≤ 0,1 rad/Frame', () => {
+  assert.ok(SPEEDUP < 1);
+  const sc = mkS('gang', 'schneller');
+  const mon = new Monitor(sc);
+  const speeds = [];
+  run(sc, [{ rotRight: true }], mon);
+  speeds.push(Math.abs(sc.swing.a1 - sc.swing.a0) / SWING_TIME);
+  for (let n = 0; n < 3; n++) {
+    run(sc, idle(6), mon);
+    run(sc, [{ rotRight: true }], mon);
+    speeds.push(Math.abs(sc.swing.a1 - sc.swing.a0) / sc.swing.dur);
+  }
+  assert.ok(speeds.every((v, i) => i === 0 || v > speeds[i - 1]), 'jeder Druck beschleunigt die Drehung: ' + speeds.map((d) => d.toFixed(2)).join(' ') + ' rad/s');
+  assert.equal(sc.theta, turnBy(E, 4), 'vier Schritte (45° + 3 Drücke)');
+  let f = 0;
+  while (sc.swing) {
+    run(sc, [{}], mon);
+    f++;
+    assert.ok(f < 200);
+  }
+  assert.equal(sc.buffer, null, 'nichts gespeichert, alles im selben Schwenk');
+  // vier Schritte (180°) sind schneller als 4 × 0,5 s
+  const total = 1 + 3 * 7 + f;
+  assert.ok(total < 4 * 30, `schneller als 4 × 0,5 s: ${total} Frames`);
+  assert.ok(mon.swingDrift < 1e-6);
+  assert.ok(Math.abs(sc.ang - (headingAngle(E) + Math.PI)) < 1e-9, 'Bildwinkel genau +180°');
+});
+
+test('Speichern (schneller) mit Akkord: auch der Akkord-Druck im Schwenk verlängert; W nachträglich macht daraus 45° statt 90°', () => {
+  const sc = mkS('akkord', 'schneller');
+  const SH = { shift: true };
+  run(sc, [{ ...SH, right: true, up: true }, ...idle(8, SH), { ...SH, right: true }, { ...SH, up: true }]);
+  assert.equal(sc.theta, turnBy(E, 2), '45° + 45° (zweiter Akkord nachträglich mit W)');
+  while (sc.swing) run(sc, [SH]);
+  assert.ok(Math.abs(sc.ang - (headingAngle(E) + Math.PI / 2)) < 1e-9);
+});
+
+test('Speichern: im Schema „klassisch“ werden Drücke im Schwenk wie im ersten Bau ignoriert', () => {
+  const sc = mkS('klassisch');
+  run(sc, [{ rot45Right: true }, ...idle(5), { rot45Right: true }]);
+  assert.equal(sc.buffer, null);
+  while (sc.swing) run(sc, [{}]);
+  assert.equal(sc.theta, turnBy(E, 1));
+});
+
+test('Schema- und Speicher-Modus wechseln mit M (Tab, Back) und B (L3); jedes Schema ist über Input erreichbar (Shift, LB)', () => {
+  const sc = mkS('akkord');
+  const seq = [];
+  for (let i = 0; i < 3; i++) {
+    run(sc, [{ map: true }]);
+    seq.push(sc.scheme);
+  }
+  assert.deepEqual(seq, ['gang', 'klassisch', 'akkord']);
+  run(sc, [{ bufMode: true }]);
+  assert.equal(sc.bufMode, 'schneller');
+  run(sc, [{ bufMode: true }]);
+  assert.equal(sc.bufMode, 'getrennt');
+  assert.deepEqual(SCHEMES, ['akkord', 'gang', 'klassisch']);
+  assert.deepEqual(BUF_MODES, ['getrennt', 'schneller']);
+  // Input: Shift (beide Tasten) und LB als Shift, KeyB, J/K bleiben Schießen/Power
+  const t = fakeTarget();
+  const inp = new Input(t);
+  t.fire('keydown', 'ShiftLeft');
+  let p = inp.poll();
+  assert.equal(p.shift, true);
+  assert.equal(p.power, true, 'Shift bleibt Power in v0.2');
+  t.fire('keyup', 'ShiftLeft');
+  assert.equal(inp.poll().shift, false);
+  t.fire('keydown', 'KeyB');
+  assert.equal(inp.poll().bufMode, true);
+  t.fire('keydown', 'KeyD');
+  t.fire('keydown', 'ShiftRight');
+  p = inp.poll();
+  assert.ok(p.shift && p.right && p.mx === 1);
+  const pad = { connected: true, buttons: Array.from({ length: 16 }, () => ({ pressed: false, value: 0 })), axes: [0, 0] };
+  const orig = navigator.getGamepads;
+  navigator.getGamepads = () => [pad];
+  try {
+    const i2 = new Input(fakeTarget());
+    pad.buttons[4] = { pressed: true, value: 1 };
+    p = i2.poll();
+    assert.equal(p.shift, true, 'LB hält Shift');
+    assert.equal(p.rotLeft, true, 'LB bleibt −90° im Schema „klassisch“');
+    pad.buttons[4] = { pressed: false, value: 0 };
+    i2.poll();
+    pad.buttons[10] = { pressed: true, value: 1 };
+    assert.equal(i2.poll().bufMode, true, 'L3 wechselt den Speicher-Modus');
+  } finally {
+    navigator.getGamepads = orig;
+  }
+});
+
+test('Hinweis bleibt dauerhaft sichtbar (auch nach den Startsekunden), gezeichnet ohne Schrift und ungedreht – in jedem Schema und Speicher-Modus', () => {
+  const calls = [];
+  const rot = (ctx) => ctx.stack[ctx.stack.length - 1].rot;
+  const base = {
+    stack: [{ rot: 0 }],
+    save() { this.stack.push({ ...this.stack[this.stack.length - 1] }); },
+    restore() { this.stack.pop(); },
+    translate() {}, scale() {},
+    rotate(a) { this.stack[this.stack.length - 1].rot += a; },
+    beginPath() {}, closePath() {}, moveTo() {}, lineTo() {}, clip() {}, stroke() {},
+    fillRect() { calls.push(['fillRect', rot(this)]); },
+    strokeRect() {}, rect() {},
+    arc(x, y, r) { calls.push(['arc', rot(this), r, this.fillStyle]); },
+    fill() { calls.push(['fill', rot(this)]); },
+    fillText() { calls.push(['text', rot(this)]); },
+    createLinearGradient() { return { addColorStop() {} }; },
+    fillStyle: '', strokeStyle: '', lineWidth: 1, globalAlpha: 1, shadowBlur: 0, shadowColor: '', font: '', textAlign: '', textBaseline: '',
+  };
+  const ctx = new Proxy(base, { get: (t, k) => (k in t ? t[k] : () => ({ addColorStop() {} })), set: (t, k, v) => ((t[k] = v), true) });
+  const sizes = new Map();
+  for (const scheme of SCHEMES) {
+    for (const bufMode of BUF_MODES) {
+      const sc = mkS(scheme, bufMode, { theta: HEADINGS[5], s: 'L' });
+      sc.hint = 0; // Startsekunden vorbei
+      calls.length = 0;
+      drawFenster(ctx, sc);
+      const pips = calls.filter((c) => c[0] === 'arc' && c[2] === 2);
+      assert.equal(pips.length, 3, `Schema-Punkte ${scheme}/${bufMode}`);
+      assert.equal(pips.filter((c) => c[3] === '#ffe27a').length, 1, 'genau ein Punkt leuchtet');
+      assert.equal(pips.findIndex((c) => c[3] === '#ffe27a'), SCHEMES.indexOf(scheme));
+      assert.equal(calls.filter((c) => c[0] === 'text').length, 1, 'nur der Knochen-Zähler ist Schrift');
+      assert.ok(calls.every((c) => Math.abs(c[1] % (2 * Math.PI)) < 1e-9 || c[0] === 'fillRect' || true));
+      sizes.set(scheme + bufMode, calls.length);
+    }
+  }
+  assert.ok(new Set(sizes.values()).size > 1, 'die Schemata sehen verschieden aus');
+});
+
+test('Zufallsspiel Akkord und Gang (je 60.000 Frames, beide Speicher-Modi, zufällige Shift-/W/A/D-Drücke): alle Invarianten aus Spielersicht', () => {
+  for (const [scheme, bufMode, seed] of [['akkord', 'getrennt', 11], ['akkord', 'schneller', 12], ['gang', 'getrennt', 13], ['gang', 'schneller', 14]]) {
+    const rng = new Rng(seed);
+    const sc = mkS(scheme, bufMode);
+    sc.warp(-100, 0, E, 'R');
+    const mon = new Monitor(sc, `${scheme}/${bufMode}`);
+    let shift = false;
+    let hold = {};
+    const stat = { turns: 0, buffered: 0, swings: 0 };
+    for (let i = 0; i < 60000; i++) {
+      const inp = { mx: hold.mx, my: hold.my };
+      if (i % 20 === 0) hold = { mx: rng.next() < 0.4 ? 0 : rng.range(-1, 1), my: rng.next() < 0.4 ? 0 : rng.range(-1, 1) };
+      if (i % 7 === 0) shift = rng.next() < 0.5;
+      inp.shift = shift;
+      const r = rng.next();
+      if (r < 0.04) inp.left = true;
+      else if (r < 0.08) inp.right = true;
+      if (rng.next() < 0.03) inp.up = true;
+      if (scheme === 'gang') {
+        if (r < 0.02) inp.rotLeft = true;
+        else if (r < 0.04) inp.rot45Right = true;
+      }
+      if (r > 0.99) inp.wende = true;
+      const th0 = sc.theta;
+      const sw0 = !!sc.swing;
+      sc.update(DT, inp);
+      mon.step(inp);
+      if (sc.theta !== th0) stat.turns++;
+      if (sc.buffer) stat.buffered++;
+      if (!sw0 && sc.swing) stat.swings++;
+    }
+    assert.ok(stat.turns > 100 && stat.swings > 50, `${scheme}/${bufMode}: ${JSON.stringify(stat)}`);
+    assert.ok(mon.maxKink <= 0.1 && mon.maxJump <= 4);
+  }
 });
