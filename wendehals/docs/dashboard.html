@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wendehals Arbeitspakete</title>
+<style>
+/* Layout: einspaltig am Handy, Karten-Raster ab 40rem; Aufmerksamkeit (orange) nur für „wartet auf Robin“. */
+:root {
+  --bg: #f3f1ec; --surface: #fbfaf7; --ink: #23221f; --muted: #6a675f; --line: #dcd8cf;
+  --attn: #c4410c; --attn-bg: #fbe9df;
+  --ok: #1d6b45; --ok-bg: #dcefe3; --block: #8a3a3a; --block-bg: #f3dfdf;
+  --idle: #5b5a55; --idle-bg: #e7e4dc; --plan: #2b5c8f; --plan-bg: #dce8f4;
+  --opus: #5b3d96; --opus-bg: #e8e0f5; --sonnet: #1f5f8b; --sonnet-bg: #d9eaf6; --haiku: #2c6b3a; --haiku-bg: #dff0dc;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #17181a; --surface: #202225; --ink: #ecebe6; --muted: #a09d94; --line: #34363a;
+  --attn: #ff8a50; --attn-bg: #3b2519; --ok: #6fcf9a; --ok-bg: #1b3326; --block: #e99a9a; --block-bg: #3a2222;
+  --idle: #b4b2aa; --idle-bg: #2c2e32; --plan: #8bb8e8; --plan-bg: #1f2e3f;
+  --opus: #c4a9f5; --opus-bg: #2d2342; --sonnet: #8cc4ec; --sonnet-bg: #1c2f3e; --haiku: #98d6a0; --haiku-bg: #1e3321; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #17181a; --surface: #202225; --ink: #ecebe6; --muted: #a09d94; --line: #34363a;
+  --attn: #ff8a50; --attn-bg: #3b2519; --ok: #6fcf9a; --ok-bg: #1b3326; --block: #e99a9a; --block-bg: #3a2222;
+  --idle: #b4b2aa; --idle-bg: #2c2e32; --plan: #8bb8e8; --plan-bg: #1f2e3f;
+  --opus: #c4a9f5; --opus-bg: #2d2342; --sonnet: #8cc4ec; --sonnet-bg: #1c2f3e; --haiku: #98d6a0; --haiku-bg: #1e3321; color-scheme: dark; }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.45; padding-inline: 16px; }
+main { max-width: 64rem; margin-inline: auto; display: flex; flex-direction: column; gap: 2.5rem; padding-block: 1.25rem 3rem; }
+code { font-family: var(--mono); font-size: .85em; background: var(--idle-bg); padding: .05em .3em; border-radius: 3px; overflow-wrap: anywhere; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+h1 { font-size: 2rem; letter-spacing: -.01em; }
+h2 { font-size: 1.25rem; padding-bottom: .5rem; border-bottom: 2px solid var(--ink); margin-bottom: 1rem; }
+h3 { font-size: 1.05rem; flex: 1; min-width: 0; }
+p { margin: 0; }
+section { min-width: 0; }
+.eyebrow { font-family: var(--mono); font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.sub { color: var(--muted); font-size: .9rem; margin-top: .4rem; }
+nav { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+nav a { color: var(--ink); border: 1px solid var(--line); background: var(--surface); padding: .45rem .8rem; border-radius: 999px; text-decoration: none; font-size: .9rem; }
+nav a:hover, nav a:focus-visible { border-color: var(--ink); outline: 2px solid var(--ink); outline-offset: 2px; }
+.today { background: var(--surface); border: 1px solid var(--line); border-left: 6px solid var(--attn); padding: 1.1rem; border-radius: 6px; }
+.today h2 { border: 0; padding: 0; margin-bottom: .6rem; }
+.bigs { list-style: none; margin: 0 0 1rem; padding: 0; display: flex; flex-direction: column; gap: .4rem; }
+.bigs li { background: var(--attn-bg); color: var(--ink); padding: .6rem .8rem; border-radius: 4px; }
+.counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: .75rem; }
+.counts div { display: flex; gap: .6rem; align-items: center; min-width: 0; }
+.counts b { font-size: 1.9rem; font-variant-numeric: tabular-nums; min-width: 2ch; }
+.counts span { font-size: .85rem; color: var(--muted); line-height: 1.25; }
+.legend { color: var(--muted); font-size: .9rem; margin-bottom: 1rem; max-width: 65ch; }
+.grid { display: grid; grid-template-columns: 1fr; gap: .9rem; }
+@media (min-width: 40rem) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1rem; display: flex; flex-direction: column; gap: .6rem; min-width: 0; }
+.card.attn { border-color: var(--attn); box-shadow: 0 0 0 1px var(--attn); }
+.card.gone { opacity: .6; }
+.card header { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .5rem; }
+.nr { font-family: var(--mono); font-weight: 700; background: var(--ink); color: var(--bg); border-radius: 4px; padding: .1rem .45rem; font-size: .85rem; }
+.meta { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
+.muted { color: var(--muted); font-weight: 400; }
+.q { font-size: .95rem; }
+.lbl { font-family: var(--mono); font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.deps { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+.dep { font-size: .8rem; padding: .1rem .5rem; border-radius: 999px; border: 1px solid currentColor; }
+.note { font-size: .8rem; color: var(--muted); }
+.step { border-top: 1px dashed var(--line); padding-top: .6rem; display: flex; flex-direction: column; gap: .2rem; }
+.step p { font-size: .95rem; }
+.mod { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.why { font-size: .8rem; color: var(--muted); }
+.chip { font-size: .75rem; font-weight: 600; padding: .15rem .55rem; border-radius: 999px; white-space: nowrap; }
+.s-wait { color: var(--attn); background: var(--attn-bg); } .dep.s-wait { color: var(--attn); }
+.s-ok { color: var(--ok); background: var(--ok-bg); } .dep.s-ok { color: var(--ok); }
+.s-block { color: var(--block); background: var(--block-bg); } .dep.s-block { color: var(--block); }
+.s-idle { color: var(--idle); background: var(--idle-bg); } .dep.s-idle { color: var(--idle); }
+.s-plan { color: var(--plan); background: var(--plan-bg); } .dep.s-plan { color: var(--plan); }
+.s-gone { color: var(--idle); background: var(--idle-bg); text-decoration: line-through; } .dep.s-gone { color: var(--idle); }
+.dep { background: transparent !important; }
+.m-opus { color: var(--opus); background: var(--opus-bg); } .m-sonnet { color: var(--sonnet); background: var(--sonnet-bg); } .m-haiku { color: var(--haiku); background: var(--haiku-bg); }
+.list, .plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .6rem; }
+.plain { list-style: disc; padding-left: 1.2rem; gap: .35rem; }
+.dec, .stage, .log { display: flex; gap: .7rem; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: .75rem .9rem; min-width: 0; }
+.log { flex-direction: column; gap: .3rem; }
+.dec > div, .stage > div { min-width: 0; display: flex; flex-direction: column; gap: .25rem; }
+.dec.offen { border-left: 4px solid var(--attn); }
+.dec .id { font-family: var(--mono); font-weight: 700; min-width: 3ch; }
+.stage .meta { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+.sub2 { margin: 1.2rem 0 .6rem; font-size: 1rem; flex: none; }
+details { margin-top: 1rem; } summary { cursor: pointer; font-weight: 600; padding: .4rem 0; } details .list { margin-top: .5rem; }
+footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<main>
+<header class="top">
+  <p class="eyebrow">Wendehals · Projektstand</p>
+  <h1>Arbeitspakete</h1>
+  <p class="sub">Stand der Quelle: 11.10.2026. Erzeugt aus <code>docs/PROTOTYPEN.md</code> und <code>docs/LEVELDESIGN.md</code>.</p>
+  <nav aria-label="Abschnitte"><a href="#heute">Heute</a><a href="#pakete">Pakete</a><a href="#proto">Prototypen</a><a href="#entsch">Entscheidungen</a><a href="#editor">Editor</a></nav>
+</header>
+
+<section id="heute" class="today">
+  <h2>Was von dir gebraucht wird</h2>
+  <ul class="bigs"><li><strong>Spieltest:</strong> P1c „Netz“</li><li><strong>Spieltest:</strong> P3 „45°-Kreuzung“</li><li><strong>6 offene Entscheidungen</strong> im Register (E2, E3, E4, E8, E9, E10)</li></ul>
+  <div class="counts">
+    <div><b>14</b><span>Pakete aktiv<br><small>(5 gestrichen)</small></span></div>
+    <div><b>6</b><span>Prototypen<br><small>2 keep</small></span></div>
+    <div><b>2</b><span>warten auf Spieltest</span></div>
+    <div><b>6</b><span>offene Entscheidungen</span></div>
+  </div>
+</section>
+
+<section id="pakete">
+  <h2>Arbeitspakete 1–13, S, Q</h2>
+  <p class="legend">Modell-Empfehlung nach der festen Regel: Opus 5.5 für Design, Konzept, Planung und Regel-Logik; Sonnet 5.5 zum Bauen und Testen; Haiku 4.5 für Kleinkram. Kein Fable.</p>
+  <div class="grid"><article class="card attn" id="p-1">
+  <header><span class="nr">1</span><h3>Fenster</h3><span class="chip s-wait">Wartet auf Robin</span></header>
+  <p class="meta">Prototyp · <span class="std">läuft: 1 keep, 2 warten auf Spieltest</span></p>
+  <p class="q">Lässt sich das drehende Fenster (90°, 45°, Umkehr) lesen und steuern, auch unter Beschuss?</p>
+  <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-ok">nichts</span></div><div class="deps"><span class="lbl">Prototypen</span> <span class="dep s-ok">P1 „Kreuzung“</span> <span class="dep s-wait">P3 „45°-Kreuzung“</span> <span class="dep s-idle">P4 „Druck“</span> <span class="dep s-wait">P1c „Netz“</span> <span class="dep s-idle">P1b</span></div>
+  <div class="step"><span class="lbl">Nächster Schritt</span><p>Robin spielt P3 „45°-Kreuzung“ und P1c „Netz“ (~5 Min am Deck) und antwortet in 3 Zeilen. Danach Urteil keep/kill/iterate/park ins Protokoll.</p></div>
+  <div class="mod"><span class="chip m-opus">Opus 5.5</span><span class="why">Urteil, nächster Brief</span></div>
+</article>
+<article class="card attn" id="p-2">
+  <header><span class="nr">2</span><h3>Orientierung &amp; Karte</h3><span class="chip s-ok">keep</span></header>
+  <p class="meta">Prototyp · <span class="std">Prototyp keep, Details offen</span></p>
+  <p class="q">Bleibt man orientiert? Braucht es eine Minimap?</p>
+  <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-idle">P1 „Kreuzung“</span></div><div class="deps"><span class="lbl">Prototypen</span> <span class="dep s-ok">P2 „Minimap“</span></div>
+  <div class="step"><span class="lbl">Nächster Schritt</span><p>Offene Details klären (siehe Prototyp-Stand).</p></div>
+  <div class="mod"><span class="chip m-opus">Opus 5.5</span><span class="why">offene Wahl klären</span></div>
+</article>
+<article class="card" id="p-3">
+  <header><span class="nr">3</span><h3>Gabelungen</h3><span class="chip s-idle">offen</span></header>
+  <p class="meta">Prototyp · <span class="std">noch nicht begonnen</span></p>
+  <p class="q">Wie nimmt man eine Gabelung mitten in der Etappe?</p>
+  <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-idle">P1 „Kreuzung“</span></div>
+  <div class="step"><span class="lbl">Nächster Schritt</span><p>Kernfrage klären: Wie nimmt man eine Gabelung mitten in der Etappe?</p></div>
+  <div class="mod"><span class="chip m-opus">Opus 5.5</span><span class="why">Deutung und Brief, danach Sonnet 5.5 bauen</span></div>
+</article>
+<article class="card" id="p-4">
+  <header><span class="nr">4</span><h3>Drehen begrenzen</h3><span class="chip s-block">blockiert</span></header>
+  <p class="meta">Prototyp · <span class="std">wartet auf Paket 1, Paket 3</span></p>
+  <p class="q">Drehorte, Drehzahl oder beides?</p>
+  <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-wait" title="läuft: 1 keep, 2 warten auf Spieltest">Paket 1</span> <span class="dep s-idle" title="noch nicht begonnen">Paket 3</span></div>
+  <div class="step"><span class="lbl">Nächster Schritt</span><p>Erst Paket 1, Paket 3 klären.</p></div>
+  <div class="mod"><span class="chip m-opus">Opus 5.5</span><span class="why">Deutung und Brief, danach Sonnet 5.5 bauen</span></div>
+</article>
+<article class="card gone" id="p-5">
+  <header><span class="nr">5</span><h3>Richtung als Weltfaktor</h3><span class="chip s-gone">gestrichen</span></header>
+  <p class="meta">gestrichen · <span class="std">Gestrichen (Robin, 10.10.2026)</span></p>
+  
+</article>
+<article class="card" id="p-6">
+  <header><span class="nr">6</span><h3>Tod &amp; Neustart</h3><span class="chip s-idle">offen</span></header>
+  <p class="meta">Entscheidung · <span class="std">noch nicht begonnen</span></p>
+  <p class="q">Wo startet man neu, mit welcher Blickrichtung?</p>
+  <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-ok">nichts</span></div>
+  <div class="step"><span class="lbl">Nächster Schritt</span><p>Kernfrage klären: Wo startet man neu, mit welcher Blickrichtung?</p></div>
+  <div class="mod"><span class="chip m-opus">Opus 5.5</span><span class="why">Entscheidung/Planung</span></div>
+</article>
+<article class="card" id="p-7">
+  <header><span class="nr">7</span><h3>Tempo &amp; Rhythmus</h3><span class="chip s-block">blockiert</span></header>
+  <p class="meta">Prototyp · <span class="std">wartet auf P4 „Druck“</span></p>
+  <p class="q">Welche Mischung aus Gefecht/Halt/Anker/Cruise ergibt Rhythmus?</p>
+  <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-idle">P4 „Druck“</span></div>
+  <div class="step"><span class="lbl">Nächster Schritt</span><p>Erst P4 „Druck“ klären.</p></div>
+  <div class="mod"><span class="chip m-opus">Opus 5.5</span><span class="why">Deutung und Brief, danach Sonnet 5.5 bauen</span></div>
+</article>
+<article class="card" id="p-8">
+  <header><span class="nr">8</span><h3>Fenster in die Engine</h3><span class="chip s-block">blockiert</span></header>
+  <p class="meta">Produktion · <span class="std">wartet auf Paket 1, Paket 3</span></p>
+  <p class="q">Bewährte Regeln in die echten Module übernehmen</p>
+  <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-wait" title="läuft: 1 keep, 2 warten auf Spieltest">Paket 1</span> <span class="dep s-ok" title="Prototyp keep, Details offen">Paket 2</span> <span class="dep s-idle" title="noch nicht begonnen">Paket 3</span></div>
+  <div class="step"><span class="lbl">Nächster Schritt</span><p>Erst Paket 1, Paket 3 klären.</p></div>
+  <div class="mod"><span class="chip m-opus">Opus 5.5</span><span class="why">Regel-/Engine-Umbau, danach Sonnet 5.5 testen</span></div>
+</article>
+<article class="card" id="p-S">
+  <header><span class="nr">S</span><h3>Setting, Ton &amp; Look</h3><span class="chip s-idle">offen</span></header>
+  <p class="meta">Entscheidung · <span class="std">noch nicht begonnen</span></p>
+  <p class="q">Was ersetzt das Haus?</p>
+  <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-ok">nichts</span></div>
+  <div class="step"><span class="lbl">Nächster Schritt</span><p>Kernfrage klären: Was ersetzt das Haus?</p></div>
+  <div class="mod"><span class="chip m-opus">Opus 5.5</span><span class="why">Entscheidung/Planung</span></div>
+</article>
+<article class="card" id="p-9">
+  <header><span class="nr">9</span><h3>Fähigkeiten (je drei Nutzen)</h3><span class="chip s-block">blockiert</span></header>
+  <p class="meta">Prototyp → Produktion · <span class="std">wartet auf Paket S, Paket 4</span></p>
+  <p class="q">Trägt jede Fähigkeit Kampf, Bewegung und Rätsel?</p>
+  <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-idle" title="noch nicht begonnen">Paket S</span> <span class="dep s-block" title="wartet auf Paket 1, Paket 3">Paket 4</span></div>
+  <div class="step"><span class="lbl">Nächster Schritt</span><p>Erst Paket S, Paket 4 klären.</p></div>
+  <div class="mod"><span class="chip m-opus">Opus 5.5</span><span class="why">Deutung und Brief, danach Sonnet 5.5 bauen</span></div>
+</article>
+<article class="card" id="p-10">
+  <header><span class="nr">10</span><h3>Gegner &amp; Bosse</h3><span class="chip s-block">blockiert</span></header>
+  <p class="meta">Produktion · <span class="std">wartet auf Paket S, P4 „Druck“</span></p>
+  <p class="q">Funktionieren Gegner und Bosse im drehenden Fenster?</p>
+  <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-idle" title="noch nicht begonnen">Paket S</span> <span class="dep s-idle">P4 „Druck“</span></div>
+  <div class="step"><span class="lbl">Nächster Schritt</span><p>Erst Paket S, P4 „Druck“ klären.</p></div>
+  <div class="mod"><span class="chip m-opus">Opus 5.5</span><span class="why">Deutung und Brief, danach Sonnet 5.5 bauen</span></div>
+</article>
+<article class="card" id="p-11">
+  <header><span class="nr">11</span><h3>Progression</h3><span class="chip s-block">blockiert</span></header>
+  <p class="meta">Papier + Löser · <span class="std">wartet auf Paket 4, Paket 9</span></p>
+  <p class="q">Halten Reihenfolge, Schlösser und Sequence Breaks auf dem Grundriss?</p>
+  <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-block" title="wartet auf Paket 1, Paket 3">Paket 4</span> <span class="dep s-block" title="wartet auf Paket S, Paket 4">Paket 9</span></div>
+  <div class="step"><span class="lbl">Nächster Schritt</span><p>Erst Paket 4, Paket 9 klären.</p></div>
+  <div class="mod"><span class="chip m-opus">Opus 5.5</span><span class="why">Entscheidung/Planung</span></div>
+</article>
+<article class="card" id="p-12">
+  <header><span class="nr">12</span><h3>Welt bauen</h3><span class="chip s-block">blockiert</span></header>
+  <p class="meta">Produktion · <span class="std">wartet auf Paket 13</span></p>
+  <p class="q">Gebiete, Knoten, Level (Gänge) – läuft parallel zu den Prototypen (E11)</p>
+  <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-plan" title="festgelegt, noch nichts gebaut">Paket 13</span></div><div class="note">Später zusätzlich: fertige Welt: 8, 11, S</div>
+  <div class="step"><span class="lbl">Nächster Schritt</span><p>Erst Paket 13 klären.</p></div>
+  <div class="mod"><span class="chip m-opus">Opus 5.5</span><span class="why">Deutung und Brief, danach Sonnet 5.5 bauen</span></div>
+</article>
+<article class="card" id="p-13">
+  <header><span class="nr">13</span><h3>Editor (festgelegt, Robin 11.10.2026)</h3><span class="chip s-plan">festgelegt</span></header>
+  <p class="meta">Werkzeug · festgelegt (Robin, 11.10.2026) · <span class="std">festgelegt, noch nichts gebaut</span></p>
+  <p class="q">Kann Robin Welt, Gebiete und Level selbst bauen und sofort spielen; kann die KI dieselben Daten lesen und schreiben?</p>
+  <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-idle">P1 „Kreuzung“</span></div>
+  <div class="step"><span class="lbl">Nächster Schritt</span><p>Stufe E1 erst bauen, wenn Robin beim Bauen eines echten Levels etwas vermisst. Vorher: offene Fragen aus LEVELDESIGN.md Abschnitt 3.</p></div>
+  <div class="mod"><span class="chip m-sonnet">Sonnet 5.5</span><span class="why">Bau-Sessions laut LEVELDESIGN.md; Brief zu E1 zuerst mit Opus 5.5</span></div>
+</article>
+<article class="card" id="p-Q">
+  <header><span class="nr">Q</span><h3>Querschnitt</h3><span class="chip s-plan">laufend</span></header>
+  <p class="meta">Produktion · <span class="std">läuft nebenher</span></p>
+  <p class="q">–</p>
+  <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-ok">nichts</span></div>
+  <div class="step"><span class="lbl">Nächster Schritt</span><p>Je Paket mitführen, kein eigener Termin.</p></div>
+  <div class="mod"><span class="chip m-sonnet">Sonnet 5.5</span><span class="why">Bauen und Testen</span></div>
+</article></div>
+</section>
+
+<section id="proto">
+  <h2>Prototypen</h2>
+  <div class="grid"><article class="card">
+  <header><span class="nr">P1</span><h3>„Kreuzung“</h3>
+  <span class="chip s-ok">keep</span></header>
+  <p class="q">Nehme ich die Gabelung, die ich will, indem ich das Fenster drehe – beim ersten Mal, ohne nachzudenken, auch nach der 180°-Umkehr und mit dem Plan kopfüber?</p>
+  <p class="meta">keep (07.10.2026) – Brief, Retrospektive</p>
+  <p class="meta">Brief: <code>docs/prototypen/P1-kreuzung.md</code></p>
+</article>
+<article class="card attn">
+  <header><span class="nr">P1c</span><h3>„Netz“</h3>
+  <span class="chip s-wait">Wartet auf Robins Spieltest</span></header>
+  <p class="q">Hält das Drehen die Checkliste 4a an T, L, überlappenden Zonen, versetzten Abzweigen, breitem/schmalem Gang, Ring?</p>
+  <p class="meta">gebaut (07.10.2026), wartet auf Robins Spieltest (F2): prototypen/P1c-netz.md, Stand in Abschnitt 9</p>
+  <p class="meta">Brief: <code>docs/prototypen/P1c-netz.md</code></p>
+</article>
+<article class="card">
+  <header><span class="nr">P1b</span><h3><span class="muted">Name fehlt (Regel 9)</span></h3>
+  <span class="chip s-block">blockiert</span></header>
+  <p class="q">Nur falls P1 „nein“: dog-bezogen vs. bildschirmbezogen drehen, umschaltbar</p>
+  <p class="meta">wartet auf P1</p>
+  
+</article>
+<article class="card">
+  <header><span class="nr">P2</span><h3>„Minimap“</h3>
+  <span class="chip s-ok">keep</span></header>
+  <p class="q">Welche Minimap lässt mich im Netz am sichersten wissen, wo ich bin und wohin ich drehen muss – V1 „wie die Kamera“, V2 „Plan“ (Norden oben) oder V3 „Gang-Balken“?</p>
+  <p class="meta">keep (10.10.2026, F3) – Brief, Stand in Abschnitt 9; welche Version (V1/V2/V3) bleibt, ist noch offen</p>
+  <p class="meta">Brief: <code>docs/prototypen/P2-minimap.md</code></p>
+</article>
+<article class="card attn">
+  <header><span class="nr">P3</span><h3>„45°-Kreuzung“</h3>
+  <span class="chip s-wait">Wartet auf Robins Spieltest</span></header>
+  <p class="q">Nehme ich auch einen Diagonal-Gang mit derselben Aktion – die Kreuzung als Achteck mit 8 Armen, LT/RT bzw. J/K für ±45°?</p>
+  <p class="meta">gebaut (10.10.2026), wartet auf Robins Spieltest (F4): Brief, Stand und Abweichungen in Abschnitt 9; ohne Minimap</p>
+  <p class="meta">Brief: <code>docs/prototypen/P3-45grad.md</code></p>
+</article>
+<article class="card">
+  <header><span class="nr">P4</span><h3>„Druck“</h3>
+  <span class="chip s-block">blockiert</span></header>
+  <p class="q">Funktioniert die pausierte Drehung und das Schießen von oben im Kampf, in beide Richtungen?</p>
+  <p class="meta">wartet auf P1</p>
+  
+</article></div>
+  <p class="legend">Geparkt: große Karte, Gabelungen mit Drehfähigkeiten, sanftes Steigen, Schächte, kopfüber als Spielelement, Form der Arenen im gedrehten Fenster.</p>
+</section>
+
+<section id="entsch">
+  <h2>Offene Entscheidungen</h2>
+  <ul class="list"><li class="dec offen"><span class="id">E2</span><div><p>Drehzahl: Kosten pro 45° oder feste Ladungen?</p><p class="meta">offen (Paket „Drehen begrenzen“)</p></div></li>
+<li class="dec offen"><span class="id">E3</span><div><p>Steuerung zum Drehen</p><p class="meta">im Prototyp: LB/RB (U/O) ±90°, seit P3 „45°-Kreuzung“ LT/RT (J/K) ±45° (Robin, 10.10.2026); fürs Spiel offen</p></div></li>
+<li class="dec offen"><span class="id">E4</span><div><p>Kreisel ohne Fähigkeit schubst 180° zurück?</p><p class="meta">offen; 180° ist jetzt nur Scroll-Umkehr</p></div></li>
+<li class="dec offen"><span class="id">E8</span><div><p>Ist die 180°-Umkehr frei oder an eine Fähigkeit (Wendehals) gebunden?</p><p class="meta">offen (im P1 frei)</p></div></li>
+<li class="dec offen"><span class="id">E9</span><div><p>P1-Türen: „passende Scrollrichtung“ = Kartenrichtung des Gangs oder Bildschirmseite?</p><p class="meta">offen; Standard im P1: Kartenrichtung (Tür offen, wenn das Fenster entlang dieses Arms scrollt, egal in welche Richtung)</p></div></li>
+<li class="dec offen"><span class="id">E10</span><div><p>Gelten die Umfangsziele (4 h, ~70 Arenen) noch?</p><p class="meta">offen, zusammen mit dem Setting</p></div></li></ul>
+  <details><summary>Erledigt, ruhend oder ersetzt (7)</summary><ul class="list"><li class="dec erledigt"><span class="id">E1</span><div><p>Diagonal-Etappen: Bild 45° drehen oder Treppen-Terrain?</p><p class="meta">erledigt/obsolet – Fenster-Konzept</p></div></li>
+<li class="dec erledigt"><span class="id">E5</span><div><p>Wendehals früh oder bei ~40 %?</p><p class="meta">ersetzt durch E8</p></div></li>
+<li class="dec ruht"><span class="id">E6</span><div><p>Umfang (8 Gebiete, 4 h)</p><p class="meta">ruht bis das Setting steht</p></div></li>
+<li class="dec ruht"><span class="id">E7</span><div><p>Neue Gebiete und Bosse des Hauses</p><p class="meta">ruht/entfällt – Setting offen</p></div></li>
+<li class="dec erledigt"><span class="id">E11</span><div><p>Leveldesign erst nach Logik/Konzept?</p><p class="meta">erledigt (11.10.2026): parallel; „Kein Grundkonzept ohne Prototypentests“ – LEVELDESIGN.md</p></div></li>
+<li class="dec erledigt"><span class="id">E12</span><div><p>Leveldaten: Kachelraster oder Objekte?</p><p class="meta">erledigt (11.10.2026): Objekte mit Maßen (Lage, Länge, Breite, Winkel), Raster nur zum Einrasten; Level = Gang zwischen Knoten, Gebiet = Themengruppe</p></div></li>
+<li class="dec erledigt"><span class="id">E13</span><div><p>Wie entstehen Level (Hand/KI)?</p><p class="meta">erledigt (11.10.2026): Editor nach Vorbild Lunar Magic (Paket 13) + KI (Varianten, Prüfen, Gebiete nach Regeln, Robins Stücke verbinden/extrapolieren, Regeln ableiten); KI arbeitet teilweise selbst, fragt bei großen Entscheidungen. Offen: Datei pro Gebiet, Regelwerk MUSS/SOLL, Editor am PC oder Deck, Gegner ab E1</p></div></li></ul></details>
+  <details><summary>Entscheidungsprotokoll (4)</summary><ul class="list"><li class="log"><p><strong>F0</strong> · 05.10.2026 · Richtungen: Fenster-Konzept <span class="chip s-idle">keep (Konzept)</span></p>
+  <p class="meta">siehe Abschnitt 2</p><p class="meta">Nächster Schritt: P1 bauen</p></li>
+<li class="log"><p><strong>F1</strong> · 07.10.2026 · P1 „Kreuzung“ <span class="chip s-idle">keep (Feature)</span></p>
+  <p class="meta">„I am happy with the feature for now.“ (Änderungen nach Spieltests: Brief Abschnitt 9)</p><p class="meta">Nächster Schritt: Checkliste 4a; Retrospektive; nächster Prototyp offen (P2 laut Leiter)</p></li>
+<li class="log"><p><strong>F5</strong> · 11.10.2026 · Leveldesign <span class="chip s-idle">keep (Konzept)</span></p>
+  <p class="meta">„Das Leveldesign soll doch schon stattfinden. […] Stattdessen: Kein Grundkonzept ohne Prototypentests.“ – „B klingt gut.“ – „Arbeitspaket auf jeden Fall so festlegen.“</p><p class="meta">Nächster Schritt: LEVELDESIGN.md; Paket 13 „Editor“; Arbeitspakete-Dashboard in eigenem Chat</p></li>
+<li class="log"><p><strong>F3</strong> · 10.10.2026 · P2 „Minimap“ <span class="chip s-idle">keep</span></p>
+  <p class="meta">„P2 war gut. Alle Prototypen bleiben bisher bestehen.“</p><p class="meta">Nächster Schritt: Kein Prototyp wird gelöscht (auch P1, P1c bleiben im Build). Offen: welche Minimap-Version, V3-Füllung; nächster Prototyp: P3 „45°“ (erweitert die 90°-Kreuzungen um 45°-Gänge), neuer Chat</p></li></ul></details>
+</section>
+
+<section id="editor">
+  <h2>Editor, Paket 13: Stufen E1–E5</h2>
+  <p class="legend">Eine Stufe wird erst gebaut, wenn Robin sie beim Bauen eines echten Levels vermisst. Die Textdatei geht immer auch ohne Editor.</p>
+  <ol class="list stages"><li class="stage"><span class="nr">E1</span><div><p>Einen Gang bearbeiten: Objekte setzen/ziehen/löschen, Rückgängig, Speichern/Laden, „Spielen ab hier“</p>
+  <p class="meta">2–3 Sessions Sitzungen · <span class="chip m-sonnet">Sonnet 5.5</span> · noch nicht gebaut</p></div></li>
+<li class="stage"><span class="nr">E2</span><div><p>Prüfer-Meldungen im Editor</p>
+  <p class="meta">1 Sitzung · <span class="chip m-sonnet">Sonnet 5.5</span> · noch nicht gebaut</p></div></li>
+<li class="stage"><span class="nr">E3</span><div><p>Gebiet-Ebene (Knoten, Gänge, Themen)</p>
+  <p class="meta">2 Sitzungen · <span class="chip m-sonnet">Sonnet 5.5</span> · noch nicht gebaut</p></div></li>
+<li class="stage"><span class="nr">E4</span><div><p>Gegner und Wellen setzen</p>
+  <p class="meta">2–3 Sitzungen · <span class="chip m-sonnet">Sonnet 5.5</span> · noch nicht gebaut</p></div></li>
+<li class="stage"><span class="nr">E5</span><div><p>Welt-Ebene, KI-Varianten nebeneinander vergleichen</p>
+  <p class="meta">1–2 Sitzungen · <span class="chip m-sonnet">Sonnet 5.5</span> · noch nicht gebaut</p></div></li></ol>
+  <h3 class="sub2">Offene Fragen zum Editor</h3>
+  <ul class="plain"><li>Wo arbeitet Robin am Editor: PC mit Maus, auch Steam Deck?</li><li>Gegner/Wellen von Anfang an im Editor oder erst die Geometrie?</li><li>Klickbare Optik-Skizze des Editors vor dem Brief zu E1?</li><li>Bestätigung der Vorschläge in Abschnitt 2.</li></ul>
+</section>
+
+<footer>
+  <p>Nicht von Hand ändern. Nach jeder Änderung an <code>docs/PROTOTYPEN.md</code> oder <code>docs/LEVELDESIGN.md</code>: <code>node tools/gen-dashboard.mjs</code> und Artifact neu veröffentlichen.</p>
+</footer>
+</main>
+</html>

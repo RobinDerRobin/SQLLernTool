@@ -51,7 +51,7 @@ src/render/    renderer.js, sprites.js, canvas.js
 tests/         *.tests.mjs (node --test), helpers/ (Bot, Treiber, Fingerabdruck), golden/ (Golden Master)
 e2e/           smoke.mjs, perf.mjs, flash.mjs, electron.mjs (Desktop)
 tools/         build.mjs, gen-welt3.mjs, golden.mjs, pruefe-welt.mjs (Referenz-Löser v3),
-               gegenpruefung.py, make-icon.mjs
+               gegenpruefung.py, make-icon.mjs, gen-dashboard.mjs
 docs/          DESIGN.md (v0.2), PLAN-v0.2.md, PLAN-v0.3.md, WELT-DESIGN.md, welt.json
 electron/      main.cjs, preload.cjs
 ```
@@ -136,6 +136,19 @@ Session, für jeden Prototyp, ohne dass Robin sie wiederholen muss.
    keine Abhängigkeit von Schriftarten) – gilt fürs ganze Spiel.
 9. **Prototypen immer beschreibend benennen** (Robin, 10.10.2026): nie nur „P1“ oder „P1c“, sondern z. B. „P1 „Kreuzung““,
    „P1c „Netz““, „P2 „Minimap““, „P3 „45°-Kreuzung““ – in Gesprächen, Briefen und Commits.
+
+## Arbeitspakete-Dashboard (Pflege-Regel, Robin 11.10.2026)
+
+`docs/dashboard.html` zeigt Pakete (Stand, Abhängigkeiten, nächster Schritt, Modell), Prototypen, offene
+Entscheidungen und Editor-Stufen. Es wird von `tools/gen-dashboard.mjs` **aus `docs/PROTOTYPEN.md` und
+`docs/LEVELDESIGN.md` erzeugt** und ist keine eigene Quelle: nie von Hand ändern, Inhalte nur in PROTOTYPEN.md pflegen.
+
+**Nach jeder Änderung an PROTOTYPEN.md oder LEVELDESIGN.md** (Prototyp gebaut/entschieden, Register, Protokoll, Pakete):
+1. `node tools/gen-dashboard.mjs` (schreibt `docs/dashboard.html`; `--json` zeigt die gelesenen Daten) und mit committen.
+2. Artifact aktualisieren: `node tools/gen-dashboard.mjs --artifact <datei>` und dieselbe Artifact-URL neu veröffentlichen.
+3. Das Skript liest die Tabellen in PROTOTYPEN.md (Abschnitte 3, 4, 5, 6) und die Stufen-Tabelle in LEVELDESIGN.md;
+   Spaltenköpfe und Stichworte („wartet auf Robins Spieltest“, „keep“, „erledigt“) nicht umbenennen, ohne das Skript anzupassen.
+   Neue Prototypen immer mit beschreibendem Namen eintragen (Regel 9), sonst zeigt das Dashboard „Name fehlt“.
 
 ## Golden Master der v0.2-Welt
 
