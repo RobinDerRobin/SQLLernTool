@@ -166,5 +166,5 @@ Diese zusammengeführte Liste ist der aktuelle Entwurf und wird mit Robin bespro
 | 10 | Gegner & Bosse | Produktion | Funktionieren Gegner und Bosse im drehenden Fenster? | ein Boss im Fenster | S, P4 |
 | 11 | Progression | Papier + Löser | Halten Reihenfolge, Schlösser und Sequence Breaks auf dem Grundriss? | Graph + Löserlauf | 4, 9 |
 | 12 | Welt bauen | Produktion | Gebiete, Knoten, Level (Gänge) – läuft parallel zu den Prototypen (E11) | erstes kleines Gebiet im Editor | 13 (E1); fertige Welt: 8, 11, S |
-| 13 | **Editor** (festgelegt, Robin 11.10.2026) | Werkzeug | Kann Robin Welt, Gebiete und Level selbst bauen und sofort spielen; kann die KI dieselben Daten lesen und schreiben? | Stufe E1: einen Gang bearbeiten + „Spielen ab hier“; Stufen E1–E5 je nur bei echtem Bedarf – [LEVELDESIGN.md](LEVELDESIGN.md) | P1 (Kartenformat) |
+| 13 | **Editor** (festgelegt, Robin 11.10.2026) | Werkzeug | Kann Robin Welt, Gebiete und Level selbst bauen und sofort spielen; kann die KI dieselben Daten lesen und schreiben? | Reihenfolge 1–9 (Ansehen → Bauen → Spielen ab hier + Bezeichnung → Prüfer → …) in [LEVELDESIGN.md](LEVELDESIGN.md) Abschnitt 1c | P1 (Kartenformat) |
 | Q | Querschnitt | Produktion | – | Steuerungsbudget, Telemetrie, Speicherposition, Datenformat für Begegnungen, Deck-Leistung, Löser synchron | laufend |

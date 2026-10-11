@@ -94,6 +94,42 @@ Editor-Skizze als Text (Aussehen, nicht bestätigt):
 - Die Stufen E1–E5 aus Abschnitt 1 werden dadurch neu zugeschnitten (E1 = Grundriss-Editor); neuer Zuschnitt folgt
   nach Robins Bestätigung.
 
+## 1c. Entschieden in Runde 3 (Robin, 11.10.2026) und Reihenfolge der Editor-Features
+
+- **Welt metroidvania-typisch verknüpft** (Robin: „ja“): eine zusammenhängende Karte, Gebiete mit mehreren
+  Verbindungen, Schlösser, Abkürzungen, Hubs/Speicherorte, Sequence Breaks nur wo der Löser zeigt, dass niemand
+  stecken bleibt. **Wie Schlösser funktionieren, wird von Feature zu Feature bestimmt** – „Türen, Hindernisse,
+  unbesiegbare Gegner, Dunkelheit. Die Möglichkeiten sind verschiedene.“ Im Editor ist ein Schloss deshalb ein
+  allgemeiner Platz an einem Arm/Übergang; die Typen kommen aus dem Katalog, sobald ein Feature sie festlegt.
+- **Levelformen:** Level sind nicht nur Rechtecke. **Kein Prototyp „Freie Gangform“** – Robin: „die unregelmäßigen
+  Gänge möchte ich wahrscheinlich nicht bauen. Sollte dies doch auffällig sein in der Praxis, möchte ich es nochmal
+  ausgiebig prüfen, bevor ich mich für dieses Design entscheide.“ Deutung (zu bestätigen): Formen aus geraden Teilen
+  (Formteile: Nischen, Verbreiterungen, Stufen, 45°-Stücke); unregelmäßig/geschwungen ist geparkt.
+- **Testen durch Robin braucht keine KI-Vorprüfung.** Feature **„Bezeichnung kopieren“**: der Editor gibt die
+  Bezeichnung des Levels bzw. der Stelle aus, z. B. `Wendehals-Level kanal/schleuse@560` (Gebiet/Level@Stelle in E ab
+  Gang-Anfang; Knoten: `kanal/K2`), die Robin Claude Code zum Prüfen gibt.
+- **Bildschirmrahmen** im Editor: gut (Robin).
+- Skizze 2 (ein Grundriss im Spielbild, Rahmen mit Fahrt-Schieber, Formteile, Gebiete mit Übergang, Bezeichnung
+  kopieren): [`editor-skizze.html`](editor-skizze.html), gleiche Artifact-URL wie oben.
+
+**Reihenfolge der Editor-Features** (von Claude erstellt auf Robins Auftrag; ersetzt die Stufen E1–E5 in
+Abschnitt 1). Jede Stufe wird erst gebrieft, wenn die vorige steht; Gegner, Schlösser, Look erst nach ihren Paketen.
+
+| # | Stufe | Inhalt | Sessions |
+|---|---|---|---|
+| 1 | **Ansehen** | Grundriss im Spielbild, Zoom/Verschieben, Norden oben + Drehen, Bildschirmrahmen + Fahrt-Schieber (Bildschirme, Sekunden); öffnet die vorhandenen Prototyp-Karten („Netz“, „45°-Kreuzung“) | 1–2 |
+| 2 | **Bauen** | Gang ziehen (8 Richtungen), Knoten setzen/Gang teilen, Raumgröße, Breite, Wand, Hindernis, Formteile, Rückgängig, Datei speichern/laden | 2 |
+| 3 | **Spielen ab hier + Bezeichnung kopieren** | Prototyp an der Rahmenstelle starten, Esc zurück; Bezeichnung für Claude Code | 1 |
+| 4 | **Prüfer-Leiste** | Geometrie-MUSS-Regeln live (45°-Raster, passierbar, Drehzone frei …), Klick springt zur Stelle | 1–2 |
+| 5 | **Gebiete und Übergänge** | Bereiche zeichnen, Level zuordnen, Übergänge anzeigen | 1 |
+| 6 | **Testmenü auf dem Deck** | im Build jedes Level/jeden Knoten aus der Datei direkt starten | 1 |
+| 7 | **Notizen und Stempel** | Absicht an Stellen notieren; Stücke als Vorlage speichern (Material für die KI) | 1–2 |
+| 8 | **Bot-Spieltest** | ein Bot fliegt jedes Level ab | 2 |
+| 9 | **KI-Varianten nebeneinander** | Vorschläge vergleichen, übernehmen | 1–2 |
+| – | nach ihren Paketen | Schlösser (je Feature), Gegner und Wellen (Paket 10, „Druck“), Look pro Gebiet (Setting) | je 1–3 |
+
+Für ein erstes eigenes Gebiet reichen Stufen 1–4 (etwa 5–7 Sessions).
+
 ## 2. Vorschläge (besprochen, noch nicht bestätigt)
 
 - **Quelle der Wahrheit:** eine Textdatei (JSON) pro Gebiet; Editor, KI und Prüfer lesen und schreiben dieselbe Datei.

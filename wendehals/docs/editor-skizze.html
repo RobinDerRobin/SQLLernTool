@@ -2,112 +2,116 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: Werkzeugfenster wie ein Level-Editor – Kopfzeile mit Ebenen-Pfad, links Palette, Mitte Draufsicht, rechts Eigenschaften, unten Prüfer */
+/* Layout: Werkzeugfenster – Kopfzeile, links Werkzeuge, Mitte Grundriss im Spielbild mit Bildschirmrahmen und Fahrt-Schieber, rechts Eigenschaften, unten Prüfer */
 :root{
-  --bg:#e9eeed; --panel:#f7f9f8; --ink:#1b2a31; --muted:#5a6a70; --line:#c6d1d0; --grid:#d3dfde; --grid2:#bccbca;
-  --floor:#fbfdfc; --void:#c3cfce; --accent:#1d6b88; --accent-soft:#d6e8ee;
-  --turn:#c97a10; --bad:#bd3b27; --warn:#a8700f; --good:#2b7a4b; --enemy:#7246ad; --piece:#237f78; --wall:#3c4e56;
+  --bg:#e8ecee; --panel:#f7f8fa; --ink:#1d2229; --muted:#5d6670; --line:#c9d0d6; --accent:#2a6fb0; --accent-soft:#dbe7f3;
+  --good:#2b7a4b; --bad:#bd3b27; --warn:#9a6a0c;
   --ui:"Barlow Semi Condensed",system-ui,"Segoe UI",sans-serif; --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#11181b; --panel:#172126; --ink:#dde7e7; --muted:#8ea0a4; --line:#2b3a40; --grid:#1c282c; --grid2:#26363b;
-  --floor:#1a252a; --void:#080d0f; --accent:#5ab3d1; --accent-soft:#1d3640;
-  --turn:#f0a43a; --bad:#f06752; --warn:#e2b14c; --good:#5ac283; --enemy:#ad88e6; --piece:#4cc0b6; --wall:#9fb3ba; color-scheme:dark}}
+  --bg:#121519; --panel:#1a1e24; --ink:#e1e5ea; --muted:#929ba6; --line:#2d333b; --accent:#6aa8e4; --accent-soft:#1f2f40;
+  --good:#5ac283; --bad:#f06752; --warn:#e2b14c; color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#11181b; --panel:#172126; --ink:#dde7e7; --muted:#8ea0a4; --line:#2b3a40; --grid:#1c282c; --grid2:#26363b;
-  --floor:#1a252a; --void:#080d0f; --accent:#5ab3d1; --accent-soft:#1d3640;
-  --turn:#f0a43a; --bad:#f06752; --warn:#e2b14c; --good:#5ac283; --enemy:#ad88e6; --piece:#4cc0b6; --wall:#9fb3ba; color-scheme:dark}
+  --bg:#121519; --panel:#1a1e24; --ink:#e1e5ea; --muted:#929ba6; --line:#2d333b; --accent:#6aa8e4; --accent-soft:#1f2f40;
+  --good:#5ac283; --bad:#f06752; --warn:#e2b14c; color-scheme:dark}
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--ui);font-size:15px;padding-inline:16px;padding-block:12px;box-sizing:border-box}
 *{box-sizing:border-box}
-.app{display:grid;grid-template-rows:auto auto 1fr auto;gap:10px;height:100%;min-height:560px;max-width:1500px;margin:0 auto}
-header{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
-h1{font-size:18px;font-weight:700;margin:0;letter-spacing:.01em}
-h1 small{font-weight:500;color:var(--muted);font-size:13px;margin-left:6px;text-transform:uppercase;letter-spacing:.08em}
-.crumbs{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
-.crumbs button{background:none;border:0;color:var(--accent);font:inherit;font-weight:600;cursor:pointer;padding:3px 6px;border-radius:4px}
-.crumbs button[aria-current="true"]{color:var(--ink);background:var(--accent-soft)}
-.crumbs span{color:var(--muted)}
-.tools{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
-button.t{font:inherit;font-size:14px;font-weight:500;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px 10px;cursor:pointer}
+.app{display:grid;grid-template-rows:auto auto 1fr auto;gap:10px;height:100%;min-height:620px;max-width:1600px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+h1{font-size:18px;font-weight:700;margin:0}
+h1 small{font-weight:500;color:var(--muted);font-size:12px;margin-left:6px;text-transform:uppercase;letter-spacing:.09em}
+.tools{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;align-items:center}
+.sep{width:1px;height:22px;background:var(--line)}
+button.t{font:inherit;font-size:14px;font-weight:500;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px 10px;cursor:pointer;white-space:nowrap}
 button.t:hover{border-color:var(--accent)}
 button.t[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent)}
-button.play{background:var(--accent);color:var(--panel);border-color:var(--accent);font-weight:600}
+button.primary{background:var(--accent);color:var(--panel);border-color:var(--accent);font-weight:600}
+button:disabled{opacity:.45;cursor:not-allowed}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.note{font-size:13px;color:var(--muted);margin:0}
-.main{display:grid;grid-template-columns:150px minmax(0,1fr) 230px;gap:10px;min-height:0}
+.note{font-size:13px;color:var(--muted);margin:0;line-height:1.4}
+.main{display:grid;grid-template-columns:170px minmax(0,1fr) 250px;gap:10px;min-height:0}
 .pane{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px;min-width:0;overflow:auto}
 .pane h2{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 8px;font-weight:600}
-.pal{display:flex;flex-direction:column;gap:6px}
-.pal button{display:flex;align-items:center;gap:8px;text-align:left;font:inherit;background:none;border:1px solid transparent;border-radius:5px;padding:6px;color:var(--ink);cursor:pointer}
-.pal button:hover{border-color:var(--line);background:var(--bg)}
-.pal svg{flex:none}
-.plan{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden;min-height:300px}
-.plan svg{width:100%;height:100%;display:block;touch-action:none;user-select:none}
-.legend{position:absolute;left:8px;bottom:6px;font-size:12px;color:var(--muted);pointer-events:none;font-family:var(--mono)}
+.pal{display:flex;flex-direction:column;gap:3px}
+.pal button{display:flex;align-items:center;gap:8px;text-align:left;font:inherit;background:none;border:1px solid transparent;border-radius:5px;padding:5px 6px;color:var(--ink);cursor:pointer}
+.pal button:hover:not(:disabled){border-color:var(--line)}
+.pal button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent)}
+.pal kbd{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.pal .later{font-size:12px;color:var(--muted);margin-left:auto}
+.pal hr{border:0;border-top:1px solid var(--line);margin:6px 0;width:100%}
+.stage{display:grid;grid-template-rows:1fr auto;gap:8px;min-height:0}
+.plan{position:relative;background:#1c1822;border:1px solid var(--line);border-radius:6px;overflow:hidden;min-height:320px}
+.plan canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
+.hud{position:absolute;right:8px;top:8px;display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.hud button{font:inherit;font-size:13px;background:rgba(20,18,26,.82);color:#ece8f2;border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:4px 8px;cursor:pointer}
+.hud button[aria-pressed="true"]{border-color:#ffe27a;color:#ffe27a}
+.scale{position:absolute;left:8px;bottom:8px;font-family:var(--mono);font-size:12px;color:#d8d4de;background:rgba(20,18,26,.75);padding:3px 7px;border-radius:4px;pointer-events:none}
+.fahrt{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.fahrt label{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.fahrt input[type=range]{flex:1;min-width:160px;accent-color:var(--accent)}
+.fahrt .val{font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums;min-width:240px}
 .props label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px;text-transform:uppercase;letter-spacing:.06em}
 .props input,.props select{width:100%;font:inherit;font-family:var(--mono);font-size:14px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:5px 7px}
-.props .ro{font-family:var(--mono);font-size:14px;padding:5px 0}
-.props .row{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
-.props .kind{font-weight:700;font-size:16px}
+.props .kind{font-weight:700;font-size:17px}
+.props .id{font-family:var(--mono);font-size:13px;color:var(--accent);word-break:break-all}
+.props dl{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:8px 0;font-size:14px}
+.props dt{color:var(--muted)} .props dd{margin:0;font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums}
+.props .row{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
 .props p{margin:6px 0;color:var(--muted);font-size:13px;line-height:1.4}
+.copybox{margin-top:8px;font-family:var(--mono);font-size:12px;width:100%;background:var(--bg);color:var(--ink);border:1px dashed var(--accent);border-radius:4px;padding:6px;resize:none}
 footer{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:14px}
 footer b{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
-.msg{display:inline-flex;gap:5px;align-items:baseline;cursor:default}
+.msg{display:inline-flex;gap:5px;align-items:baseline}
+.msg button{font:inherit;background:none;border:0;color:inherit;cursor:pointer;padding:0;text-decoration:underline dotted}
 .msg .r{font-family:var(--mono);font-size:12px;color:var(--muted)}
 .ok{color:var(--good)} .err{color:var(--bad)} .wrn{color:var(--warn)}
-.textview{position:absolute;inset:8px;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:auto;padding:10px;font-family:var(--mono);font-size:12.5px;line-height:1.45;white-space:pre;color:var(--ink)}
-.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:6px;font-size:14px;max-width:min(92vw,560px);box-shadow:0 4px 18px rgba(0,0,0,.25)}
-/* SVG */
-.g-minor{stroke:var(--grid);stroke-width:1;vector-effect:non-scaling-stroke}
-.g-major{stroke:var(--grid2);stroke-width:1;vector-effect:non-scaling-stroke}
-.void{fill:var(--void)} .floor{fill:var(--floor)}
-.edge{stroke:var(--wall);stroke-width:2;fill:none;vector-effect:non-scaling-stroke}
-.o-wand{fill:var(--wall)} .o-hindernis{fill:var(--bad);fill-opacity:.85} .o-setpiece{fill:var(--piece);fill-opacity:.8} .o-gegner{fill:var(--enemy)}
-.sel{stroke:var(--accent);stroke-width:3;fill:none;stroke-dasharray:6 4;vector-effect:non-scaling-stroke}
-.turnzone{fill:var(--turn);fill-opacity:.12;stroke:var(--turn);stroke-dasharray:8 6;stroke-width:2;vector-effect:non-scaling-stroke}
-.node{fill:var(--panel);stroke:var(--ink);stroke-width:2.5;vector-effect:non-scaling-stroke}
-.node.save{fill:var(--accent-soft)} .node.boss{fill:var(--bad);fill-opacity:.25}
-.lbl{fill:var(--ink);font-family:var(--ui);font-weight:600}
-.lbl.m{fill:var(--muted);font-weight:500}
-.lbl.mono{font-family:var(--mono);font-weight:400}
-.hot{fill:var(--bad);fill-opacity:.25}
-.gang-line{stroke:var(--floor);stroke-linecap:butt}
-.gang-out{stroke:var(--wall);stroke-linecap:butt}
-.gang-line.bad{stroke:var(--bad);stroke-opacity:.35}
-.area{fill:var(--floor);stroke:var(--wall);stroke-width:2;vector-effect:non-scaling-stroke}
-.link{stroke:var(--wall);stroke-width:3;stroke-dasharray:10 6;vector-effect:non-scaling-stroke}
-.pick{cursor:grab} .pick:active{cursor:grabbing}
-@media (max-width:820px){
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:6px;font-size:14px;max-width:min(92vw,600px);box-shadow:0 4px 18px rgba(0,0,0,.3);z-index:5}
+@media (max-width:900px){
   .app{height:auto}
   .main{grid-template-columns:1fr}
-  .plan{height:58vh;order:-1}
+  .stage{order:-1}
+  .plan{height:60vh}
   .pal{flex-direction:row;flex-wrap:wrap}
+  .pal hr{display:none}
   .tools{margin-left:0}
+  .fahrt .val{min-width:0}
 }
-@media (prefers-reduced-motion:no-preference){.toast{transition:opacity .2s}}
 </style>
 
 <div class="app">
   <header>
-    <h1>Wendehals-Editor <small>Optik-Skizze</small></h1>
-    <nav class="crumbs" id="crumbs" aria-label="Ebenen"></nav>
+    <h1>Wendehals-Editor <small>Skizze 2 · Grundriss</small></h1>
     <div class="tools">
       <button class="t" id="undo" title="Rückgängig (Strg+Z)">↶ Rückgängig</button>
-      <button class="t" id="snap" aria-pressed="true" title="Einrasten an 20er-Raster">▦ Raster</button>
-      <button class="t" id="zout" title="Herauszoomen">−</button>
-      <button class="t" id="zin" title="Hineinzoomen">+</button>
-      <button class="t" id="text" aria-pressed="false" title="Die Datei hinter der Ansicht zeigen">{ } Als Text</button>
-      <button class="t play" id="play">▶ Spielen ab hier</button>
+      <button class="t" id="snap" aria-pressed="true" title="Einrasten: Gänge 45°, Lagen 20 E">▦ Einrasten</button>
+      <span class="sep"></span>
+      <button class="t" id="copy" title="Bezeichnung für Claude Code kopieren">⧉ Bezeichnung</button>
+      <button class="t primary" id="play" title="Im Spiel ab der Rahmenstelle starten">▶ Spielen ab hier</button>
     </div>
   </header>
-  <p class="note">Nur zum Anschauen: Nichts wird gespeichert, und die Prüfregeln sind Beispiele, nicht beschlossen. Die Gebietsnamen sind Platzhalter (Setting offen). Doppelklick öffnet eine Ebene. Ziehen verschiebt. Entf löscht, R dreht um 45°.</p>
+  <p class="note">Nur zum Anschauen: Nichts wird gespeichert. Prüfregeln und Namen sind Platzhalter (Setting offen). Der Grundriss ist im Spielbild gezeichnet, das gelbe Rechteck ist der Bildschirm (480 × 270 E). Mausrad zoomt, Ziehen im Leeren verschiebt. Entf löscht, R dreht ein Objekt um 45°.</p>
   <div class="main">
-    <aside class="pane"><h2 id="palTitle">Palette</h2><div class="pal" id="pal"></div></aside>
-    <div class="plan" id="planWrap">
-      <svg id="plan" xmlns="http://www.w3.org/2000/svg" aria-label="Draufsicht"></svg>
-      <div class="legend" id="legend"></div>
-      <div class="textview" id="textview" hidden></div>
+    <aside class="pane"><h2>Werkzeuge</h2><div class="pal" id="pal"></div></aside>
+    <div class="stage">
+      <div class="plan" id="planWrap">
+        <canvas id="cv" aria-label="Grundriss"></canvas>
+        <div class="hud">
+          <button id="rotL" title="Ansicht 45° gegen den Uhrzeigersinn">⟲ 45°</button>
+          <button id="north" title="Norden oben">N oben</button>
+          <button id="rotR" title="Ansicht 45° im Uhrzeigersinn">⟳ 45°</button>
+          <button id="flight" title="Ansicht in Flugrichtung des Levels drehen">wie im Spiel</button>
+          <button id="zout">−</button><button id="z1" title="Zoom: 2 Bildschirme breit">1:1</button><button id="zin">+</button>
+          <button id="dim" aria-pressed="false" title="Alles außerhalb des Rahmens abdunkeln">nur Rahmen</button>
+        </div>
+        <div class="scale" id="scale"></div>
+      </div>
+      <div class="fahrt">
+        <label for="fahrt">Fahrt</label>
+        <button class="t" id="fplay" title="Rahmen mit Spieltempo (70 E/s) durch das Level fahren">▶</button>
+        <input type="range" id="fahrt" min="0" max="1000" value="0" step="1">
+        <span class="val" id="fval"></span>
+      </div>
     </div>
     <aside class="pane props" id="props"></aside>
   </div>
@@ -116,314 +120,315 @@ footer b{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(-
 <div class="toast" id="toast" hidden></div>
 
 <script>
-const NS='http://www.w3.org/2000/svg';
-const KREUZ_FREI=160, MIN_DURCH=60, ENG=100;
-const TYPNAME={wand:'Wand',hindernis:'Hindernis',setpiece:'Set-Piece',gegner:'Gegnergruppe',kreuzung:'Kreuzung',raum:'Raum',speicher:'Speicherort',boss:'Boss'};
+/* ---------- Spielwerte (wie im Prototyp) ---------- */
+const SCREEN_W=480, SCREEN_H=270, SPEED=70, GRID=80, DOG_X=120, KREUZ_FREI=160, MIN_DURCH=60;
+const FLOOR='#6a5f55', FLOOR2='#756a5f', WALL='#1c1822';
 const RICHT=['O','SO','S','SW','W','NW','N','NO'];
+const TYP={kreuzung:'Kreuzung',raum:'Raum',speicher:'Speicherort',boss:'Boss',wand:'Wand',hindernis:'Hindernis',form:'Formteil'};
 
 let S={
-  ebene:'gang', gebiet:'kanal', gang:'schleuse', sel:null, raster:true, text:false, zoom:{gang:1.4,gebiet:1,welt:1}, pan:{gang:0,gebiet:0,welt:0}, panY:{gang:0,gebiet:0,welt:0},
-  welt:{gebiete:[
-    {id:'kanal',name:'Kanal',thema:'Rost, Wasser',x:180,y:200},
-    {id:'glas',name:'Gewächshaus',thema:'Glas, Ranken',x:560,y:120},
-    {id:'uhr',name:'Uhrwerk',thema:'Zahnräder',x:520,y:400}],
-    links:[['kanal','glas'],['kanal','uhr'],['glas','uhr']]},
-  kanal:{
-    knoten:[
-      {id:'K1',typ:'speicher',x:0,y:0},{id:'K2',typ:'kreuzung',x:1800,y:0},{id:'K3',typ:'raum',x:1800,y:-1000},
-      {id:'K4',typ:'kreuzung',x:2500,y:700},{id:'K5',typ:'boss',x:0,y:-1000}],
-    gaenge:[
-      {id:'schleuse',name:'Schleuse',von:'K1',nach:'K2',tempo:'Gefecht'},
-      {id:'steigrohr',name:'Steigrohr',von:'K2',nach:'K3',tempo:'Cruise'},
-      {id:'ueberlauf',name:'Überlauf',von:'K2',nach:'K4',tempo:'Gefecht'},
-      {id:'hauptrohr',name:'Hauptrohr',von:'K5',nach:'K3',tempo:'Halt'},
-      {id:'fallrohr',name:'Fallrohr',von:'K1',nach:'K5',tempo:'Cruise'}]},
-  inhalt:{
-    schleuse:{breite:200,objekte:[
-      {id:1,typ:'wand',a:420,c:-70,len:240,br:60,win:0},
-      {id:2,typ:'hindernis',a:720,c:40,len:90,br:90,win:45},
-      {id:3,typ:'gegner',a:920,c:-10,len:70,br:70,win:0,welle:'Schwarm ×5'},
-      {id:4,typ:'setpiece',a:1120,c:-50,len:200,br:90,win:0,name:'Pumpe'},
-      {id:5,typ:'wand',a:1340,c:70,len:180,br:60,win:0},
-      {id:6,typ:'gegner',a:1480,c:30,len:70,br:70,win:0,welle:'Geschütz'},
-      {id:7,typ:'wand',a:1690,c:65,len:120,br:70,win:0}]},
-    steigrohr:{breite:200,objekte:[]},ueberlauf:{breite:200,objekte:[]},hauptrohr:{breite:400,objekte:[]},fallrohr:{breite:120,objekte:[]}
-  }
+  tool:'sel', snap:true, dim:false, sel:null,
+  view:{cx:900,cy:0,s:0,rot:0},
+  frame:{gang:'schleuse',a:560},
+  gebiete:[
+    {id:'kanal',name:'Kanal',x0:-500,y0:-1600,x1:2700,y1:1200,tint:'rgba(90,170,220,0.10)',edge:'#7fc4ee'},
+    {id:'glashaus',name:'Glashaus',x0:2700,y0:-1500,x1:4600,y1:800,tint:'rgba(120,210,120,0.10)',edge:'#9be09b'}],
+  knoten:[
+    {id:'K1',typ:'speicher',x:0,y:0},{id:'K2',typ:'kreuzung',x:1800,y:0},
+    {id:'K3',typ:'raum',x:1800,y:-1100,w:520,h:400},{id:'K4',typ:'kreuzung',x:2500,y:700},
+    {id:'K6',typ:'kreuzung',x:0,y:-1100},{id:'K5',typ:'kreuzung',x:3800,y:0},
+    {id:'K7',typ:'boss',x:3800,y:-900,w:600,h:480}],
+  gaenge:[
+    {id:'schleuse',name:'Schleuse',von:'K1',nach:'K2',w:200},
+    {id:'steigrohr',name:'Steigrohr',von:'K2',nach:'K3',w:200},
+    {id:'ueberlauf',name:'Überlauf',von:'K2',nach:'K4',w:180},
+    {id:'fallrohr',name:'Fallrohr',von:'K1',nach:'K6',w:140},
+    {id:'hauptrohr',name:'Hauptrohr',von:'K6',nach:'K3',w:240},
+    {id:'pforte',name:'Pforte',von:'K2',nach:'K5',w:200},
+    {id:'rankengang',name:'Rankengang',von:'K5',nach:'K7',w:200}],
+  formteile:[
+    {id:'f1',x:900,y:160,len:260,br:120,win:0},
+    {id:'f2',x:1350,y:0,len:360,br:380,win:0}],
+  objekte:[
+    {id:'o1',typ:'wand',x:420,y:-70,len:240,br:60,win:0},
+    {id:'o2',typ:'hindernis',x:720,y:40,len:80,br:80,win:45},
+    {id:'o3',typ:'wand',x:1350,y:0,len:220,br:80,win:0},
+    {id:'o4',typ:'wand',x:1690,y:65,len:120,br:70,win:0},
+    {id:'o5',typ:'hindernis',x:2190,y:310,len:70,br:70,win:0},
+    {id:'o6',typ:'wand',x:0,y:-600,len:60,br:80,win:0}]
 };
-let hist=[], nextId=100;
+let hist=[], uid=1;
 const $=id=>document.getElementById(id);
-const svg=$('plan');
-const snap=v=>S.raster?Math.round(v/20)*20:Math.round(v);
-const knoten=id=>S.kanal.knoten.find(k=>k.id===id);
-const gangDef=id=>S.kanal.gaenge.find(g=>g.id===id);
-function gangLen(g){const a=knoten(g.von),b=knoten(g.nach);return Math.round(Math.hypot(b.x-a.x,b.y-a.y));}
-function gangDir(g){const a=knoten(g.von),b=knoten(g.nach);const ang=Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI;const k=Math.round(ang/45);return {ok:Math.abs(ang-k*45)<0.5,name:RICHT[((k%8)+8)%8],ang};}
-function save(){hist.push(JSON.stringify({kanal:S.kanal,inhalt:S.inhalt,welt:S.welt}));if(hist.length>80)hist.shift();}
-function undo(){const h=hist.pop();if(!h)return toast('Nichts mehr rückgängig zu machen.');Object.assign(S,JSON.parse(h));S.sel=null;render();}
-function el(tag,attrs={},parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
-function toast(t){const e=$('toast');e.textContent=t;e.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>e.hidden=true,3200);}
+const cv=$('cv'), ctx=cv.getContext('2d');
+const K=id=>S.knoten.find(k=>k.id===id), G=id=>S.gaenge.find(g=>g.id===id);
+const fmt=n=>n.toLocaleString('de-DE',{maximumFractionDigits:1,minimumFractionDigits:1});
+const lenInfo=L=>`${Math.round(L)} E · ${fmt(L/SCREEN_W)} Bildschirme · ${fmt(L/SPEED)} s`;
+function save(){hist.push(JSON.stringify([S.knoten,S.gaenge,S.formteile,S.objekte]));if(hist.length>100)hist.shift();}
+function undo(){const h=hist.pop();if(!h)return toast('Nichts mehr rückgängig zu machen.');[S.knoten,S.gaenge,S.formteile,S.objekte]=JSON.parse(h);S.sel=null;draw();}
+function toast(t,ms=3600){const e=$('toast');e.textContent=t;e.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>e.hidden=true,ms);}
+
+/* ---------- Geometrie ---------- */
+function geo(g){const A=K(g.von),B=K(g.nach),dx=B.x-A.x,dy=B.y-A.y,L=Math.hypot(dx,dy)||1,ux=dx/L,uy=dy/L;
+  const ang=Math.atan2(dy,dx)*180/Math.PI,k=Math.round(ang/45);
+  return {A,B,L,ux,uy,nx:-uy,ny:ux,ang,ok:Math.abs(ang-k*45)<0.5,dir:RICHT[((k%8)+8)%8]};}
+const local=(q,x,y)=>{const rx=x-q.A.x,ry=y-q.A.y;return {a:rx*q.ux+ry*q.uy,c:rx*q.nx+ry*q.ny};};
+function gebietAt(x,y){return S.gebiete.find(r=>x>=r.x0&&x<r.x1&&y>=r.y0&&y<r.y1);}
+function gangGebiet(g){const q=geo(g);const a=gebietAt(q.A.x,q.A.y),b=gebietAt(q.B.x,q.B.y);return {von:a,nach:b};}
+function levelId(g){const r=gangGebiet(g).von;return `${r?r.id:'ohne-gebiet'}/${g.id}`;}
+function nodeHalf(k){if(k.typ==='raum'||k.typ==='boss')return {hw:k.w/2,hh:k.h/2};const ws=S.gaenge.filter(g=>g.von===k.id||g.nach===k.id).map(g=>g.w);const h=Math.max(160,...ws)/2;return {hw:h,hh:h};}
+function corners(o){const r=o.win*Math.PI/180,c=Math.cos(r),s=Math.sin(r);return [[-1,-1],[1,-1],[1,1],[-1,1]].map(([i,j])=>[o.x+c*i*o.len/2-s*j*o.br/2,o.y+s*i*o.len/2+c*j*o.br/2]);}
+function owner(o){let best=null,bd=Infinity;for(const g of S.gaenge){const q=geo(g),p=local(q,o.x,o.y);if(p.a<-50||p.a>q.L+50)continue;const d=Math.abs(p.c)-g.w/2;if(d<bd){bd=d;best=g;}}return bd<300?best:null;}
 
 /* ---------- Ansicht ---------- */
-function setView(x0,y0,w,h){const z=S.zoom[S.ebene];const cx=x0+w/2+S.pan[S.ebene],cy=y0+h/2+S.panY[S.ebene];const W=w/z,H=h/z;svg.setAttribute('viewBox',`${cx-W/2} ${cy-H/2} ${W} ${H}`);svg.setAttribute('preserveAspectRatio','xMidYMid meet');}
-function grid(x0,y0,w,h,step,major){const g=el('g',{},svg);
-  for(let x=Math.floor(x0/step)*step;x<=x0+w;x+=step)el('line',{x1:x,y1:y0,x2:x,y2:y0+h,class:x%major===0?'g-major':'g-minor'},g);
-  for(let y=Math.floor(y0/step)*step;y<=y0+h;y+=step)el('line',{x1:x0,y1:y,x2:x0+w,y2:y,class:y%major===0?'g-major':'g-minor'},g);}
+let W=0,H=0,dpr=1;
+function resize(){const r=$('planWrap').getBoundingClientRect();dpr=window.devicePixelRatio||1;W=r.width;H=r.height;cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);if(!S.view.s){S.view.s=W/(SCREEN_W*2.2);const f=framePose();if(f){S.view.cx=f.x;S.view.cy=f.y;}}draw();}
+function setT(){const v=S.view;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.translate(W/2,H/2);ctx.scale(v.s,v.s);ctx.rotate(-v.rot*Math.PI/180);ctx.translate(-v.cx,-v.cy);}
+function toWorld(px,py){const v=S.view,r=v.rot*Math.PI/180;let x=(px-W/2)/v.s,y=(py-H/2)/v.s;return {x:v.cx+x*Math.cos(r)-y*Math.sin(r),y:v.cy+x*Math.sin(r)+y*Math.cos(r)};}
+function toScreen(x,y){const v=S.view,r=-v.rot*Math.PI/180;const dx=x-v.cx,dy=y-v.cy;return {x:W/2+v.s*(dx*Math.cos(r)-dy*Math.sin(r)),y:H/2+v.s*(dx*Math.sin(r)+dy*Math.cos(r))};}
+let pat=null;
+function pattern(){if(pat)return pat;const c=document.createElement('canvas');c.width=c.height=GRID*2;const g=c.getContext('2d');g.fillStyle=FLOOR;g.fillRect(0,0,GRID*2,GRID*2);g.fillStyle=FLOOR2;g.fillRect(GRID,0,GRID,GRID);g.fillRect(0,GRID,GRID,GRID);pat=ctx.createPattern(c,'repeat');return pat;}
 
-function bbox(o){const r=o.win*Math.PI/180,c=Math.abs(Math.cos(r)),s=Math.abs(Math.sin(r));return {hw:(c*o.len+s*o.br)/2,hh:(s*o.len+c*o.br)/2};}
-
-/* ---------- Gang ---------- */
-function renderGang(){
-  const g=gangDef(S.gang),inh=S.inhalt[S.gang],L=gangLen(g),w=inh.breite;
-  const pad=260,H=Math.max(700,w+420);
-  setView(-pad,-H/2,L+2*pad,H);
-  el('rect',{x:-pad-4000,y:-4000,width:L+2*pad+8000,height:8000,class:'void'},svg);
-  el('rect',{x:-w/2-40,y:-w/2,width:L+w+80,height:w,class:'floor'},svg);
-  // Kreuzungen an beiden Enden
-  for(const [k,a] of [[g.von,0],[g.nach,L]]){
-    el('rect',{x:a-w/2-(a?0:0),y:-w/2-60,width:w,height:w+120,class:'floor'},svg);
-    el('rect',{x:(a?a:a-KREUZ_FREI),y:-w/2,width:KREUZ_FREI,height:w,class:'turnzone'},svg);
-    const t=el('text',{x:a,y:-w/2-80,'text-anchor':'middle','font-size':34,class:'lbl'},svg);t.textContent=`${k} · ${TYPNAME[knoten(k).typ]}`;
-  }
-  grid(-pad-2000,-H/2-2000,L+2*pad+4000,H+4000,20,200);
-  el('line',{x1:-w/2-40,y1:-w/2,x2:L+w/2+40,y2:-w/2,class:'edge'},svg);
-  el('line',{x1:-w/2-40,y1:w/2,x2:L+w/2+40,y2:w/2,class:'edge'},svg);
-  // Engstellen markieren
-  for(const h of pruefeGang().heiss)el('rect',{x:h.a0,y:-w/2,width:Math.max(10,h.a1-h.a0),height:w,class:'hot'},svg);
-  for(const o of inh.objekte){
-    const gr=el('g',{transform:`translate(${o.a} ${o.c}) rotate(${o.win})`,class:'pick','data-id':o.id},svg);
-    if(o.typ==='gegner'){
-      for(const [dx,dy] of [[-18,-14],[16,-16],[0,8],[-20,18],[20,16]])el('circle',{cx:dx,cy:dy,r:11,class:'o-gegner'},gr);
-      el('rect',{x:-o.len/2,y:-o.br/2,width:o.len,height:o.br,fill:'transparent'},gr);
-    } else el('rect',{x:-o.len/2,y:-o.br/2,width:o.len,height:o.br,rx:o.typ==='hindernis'?8:2,class:'o-'+o.typ},gr);
-    if(S.sel===o.id)el('rect',{x:-o.len/2-8,y:-o.br/2-8,width:o.len+16,height:o.br+16,class:'sel'},gr);
-    const lab=o.typ==='setpiece'?o.name:o.typ==='gegner'?o.welle:null;
-    if(lab){const t=el('text',{x:o.a,y:o.c+bbox(o).hh+30,'text-anchor':'middle','font-size':24,class:'lbl m'},svg);t.textContent=lab;}
-  }
-  // Flugrichtung
-  const ar=el('text',{x:L/2,y:w/2+60,'text-anchor':'middle','font-size':26,class:'lbl m mono'},svg);ar.textContent=`${g.von} → ${g.nach} · ${L} E · Richtung ${gangDir(g).name} · Breite ${w}`;
-  $('legend').textContent=`Gang „${g.name}“ – Norden oben gedreht in Flugrichtung · Raster 20 / 200 E`;
+function floorPath(){
+  const p=new Path2D();
+  for(const g of S.gaenge){const q=geo(g);const m=new DOMMatrix().translate(q.A.x,q.A.y).rotate(q.ang);const r=new Path2D();r.rect(0,-g.w/2,q.L,g.w);p.addPath(r,m);}
+  for(const k of S.knoten){const h=nodeHalf(k);p.rect(k.x-h.hw,k.y-h.hh,h.hw*2,h.hh*2);}
+  for(const f of S.formteile){const m=new DOMMatrix().translate(f.x,f.y).rotate(f.win);const r=new Path2D();r.rect(-f.len/2,-f.br/2,f.len,f.br);p.addPath(r,m);}
+  return p;
 }
-function pruefeGang(){
-  const g=gangDef(S.gang),inh=S.inhalt[S.gang],L=gangLen(g),w=inh.breite;
-  const block=inh.objekte.filter(o=>o.typ!=='gegner').map(o=>({o,...bbox(o)}));
-  const msgs=[],heiss=[];let minGap=Infinity,engRun=null,engN=0,zuRun=null,zuA=null;
-  for(let a=0;a<=L;a+=10){
-    const iv=block.filter(b=>Math.abs(a-b.o.a)<=b.hw).map(b=>[Math.max(-w/2,b.o.c-b.hh),Math.min(w/2,b.o.c+b.hh)]).filter(v=>v[1]>v[0]).sort((p,q)=>p[0]-q[0]);
-    let cur=-w/2,gap=0;for(const [s,e] of iv){gap=Math.max(gap,s-cur);cur=Math.max(cur,e);}gap=Math.max(gap,w/2-cur);
-    minGap=Math.min(minGap,gap);
-    if(gap<ENG){if(!engRun){engRun={a0:a,a1:a};engN++;}engRun.a1=a;}else if(engRun){heiss.push(engRun);engRun=null;}
-    if(gap<MIN_DURCH&&zuA===null)zuA=a;
+function framePose(){const g=G(S.frame.gang);if(!g)return null;const q=geo(g);const a=Math.max(0,Math.min(q.L,S.frame.a));return {x:q.A.x+q.ux*a,y:q.A.y+q.uy*a,ang:q.ang,q,g,a};}
+
+function draw(){
+  if(!W)return;
+  const v=S.view;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle=WALL;ctx.fillRect(0,0,W,H);
+  setT();
+  const overview=v.s<0.12;
+  // Gebiete (Tönung nur in der Übersicht)
+  for(const r of S.gebiete){ if(overview){ctx.fillStyle=r.tint;ctx.fillRect(r.x0,r.y0,r.x1-r.x0,r.y1-r.y0);} }
+  // Boden mit Schachbrett wie im Spiel
+  const fp=floorPath();ctx.fillStyle=pattern();ctx.fill(fp,'nonzero');
+  // Engstellen (Prüfer)
+  const pr=pruefe();
+  ctx.fillStyle='rgba(220,50,50,0.38)';
+  for(const h of pr.heiss){const q=geo(h.g);ctx.save();ctx.translate(q.A.x,q.A.y);ctx.rotate(q.ang*Math.PI/180);ctx.fillRect(h.a0,-h.g.w/2-200,Math.max(12,h.a1-h.a0),h.g.w+400);ctx.restore();}
+  ctx.save();ctx.clip(fp);ctx.restore();
+  // Objekte (Wände in Wandfarbe, Hindernisse wie Kisten)
+  for(const o of S.objekte){ctx.save();ctx.translate(o.x,o.y);ctx.rotate(o.win*Math.PI/180);
+    ctx.fillStyle=WALL;ctx.fillRect(-o.len/2,-o.br/2,o.len,o.br);
+    if(o.typ==='hindernis'){ctx.strokeStyle='#c4553f';ctx.lineWidth=4/v.s;ctx.strokeRect(-o.len/2+6,-o.br/2+6,o.len-12,o.br-12);ctx.beginPath();ctx.moveTo(-o.len/2+6,-o.br/2+6);ctx.lineTo(o.len/2-6,o.br/2-6);ctx.moveTo(o.len/2-6,-o.br/2+6);ctx.lineTo(-o.len/2+6,o.br/2-6);ctx.stroke();}
+    ctx.restore();}
+  // Kreuzungsmarken und Drehzonen (dünn, wie im Spiel)
+  ctx.lineWidth=2/v.s;
+  for(const k of S.knoten){const h=nodeHalf(k);ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.strokeRect(k.x-h.hw,k.y-h.hh,h.hw*2,h.hh*2);
+    if(k.typ!=='raum'&&k.typ!=='boss'){ctx.strokeStyle='rgba(255,226,122,0.55)';ctx.setLineDash([12/v.s,9/v.s]);ctx.beginPath();ctx.arc(k.x,k.y,h.hw+KREUZ_FREI,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);}
+    if(k.typ==='speicher'){ctx.fillStyle='rgba(120,200,255,0.55)';ctx.beginPath();ctx.arc(k.x,k.y,26,0,Math.PI*2);ctx.fill();}
+    if(k.typ==='boss'){ctx.fillStyle='rgba(220,60,60,0.35)';ctx.beginPath();ctx.arc(k.x,k.y,60,0,Math.PI*2);ctx.fill();}}
+  // Gebietsgrenzen
+  ctx.lineWidth=3/v.s;ctx.setLineDash([24/v.s,14/v.s]);
+  for(const r of S.gebiete){ctx.strokeStyle=r.edge;ctx.globalAlpha=overview?0.9:0.5;ctx.strokeRect(r.x0,r.y0,r.x1-r.x0,r.y1-r.y0);}
+  ctx.setLineDash([]);ctx.globalAlpha=1;
+  // Auswahl
+  ctx.strokeStyle='#5fd0ff';ctx.lineWidth=3/v.s;ctx.setLineDash([10/v.s,7/v.s]);
+  const sel=selected();
+  if(sel){ if(sel.kind==='gang'){const q=geo(sel.o);ctx.save();ctx.translate(q.A.x,q.A.y);ctx.rotate(q.ang*Math.PI/180);ctx.strokeRect(0,-sel.o.w/2-8/v.s,q.L,sel.o.w+16/v.s);ctx.restore();}
+    else if(sel.kind==='knoten'){const h=nodeHalf(sel.o);ctx.strokeRect(sel.o.x-h.hw-10,sel.o.y-h.hh-10,h.hw*2+20,h.hh*2+20);}
+    else {const c=corners(sel.o);ctx.beginPath();c.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();ctx.stroke();} }
+  ctx.setLineDash([]);
+  // Gang-Werkzeug: Vorschau
+  if(drag&&drag.kind==='neu'){ctx.strokeStyle='#ffe27a';ctx.lineWidth=200;ctx.globalAlpha=.35;ctx.beginPath();ctx.moveTo(drag.A.x,drag.A.y);ctx.lineTo(drag.end.x,drag.end.y);ctx.stroke();ctx.globalAlpha=1;}
+  // Bildschirmrahmen
+  const f=framePose();
+  if(f){ctx.save();ctx.translate(f.x,f.y);ctx.rotate(f.ang*Math.PI/180);
+    if(S.dim){ctx.fillStyle='rgba(8,6,12,0.62)';ctx.beginPath();ctx.rect(-1e5,-1e5,2e5,2e5);ctx.rect(-SCREEN_W/2,-SCREEN_H/2,SCREEN_W,SCREEN_H);ctx.fill('evenodd');}
+    ctx.strokeStyle='#ffe27a';ctx.lineWidth=3/v.s;ctx.strokeRect(-SCREEN_W/2,-SCREEN_H/2,SCREEN_W,SCREEN_H);
+    // Dackel an seiner festen Bildschirmstelle
+    const dx=-SCREEN_W/2+DOG_X;ctx.fillStyle='#b5651d';ctx.beginPath();ctx.ellipse(dx,0,22,9,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(dx+22,-4,9,7,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#3a3640';ctx.fillRect(dx-12,-17,18,9);ctx.strokeStyle='#ffe27a';ctx.lineWidth=3/v.s;ctx.beginPath();ctx.moveTo(dx+42,-8);ctx.lineTo(dx+52,0);ctx.lineTo(dx+42,8);ctx.stroke();
+    ctx.restore();}
+  // Beschriftung (immer waagerecht, in Bildschirmkoordinaten)
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  const lbl=(x,y,t,col='#ece8f2',size=13,bg='rgba(20,18,26,0.78)')=>{const p=toScreen(x,y);if(p.x<-80||p.y<-30||p.x>W+80||p.y>H+30)return;ctx.font=`600 ${size}px "Barlow Semi Condensed",system-ui,sans-serif`;const w=ctx.measureText(t).width+10;ctx.fillStyle=bg;ctx.fillRect(p.x-w/2,p.y-size*0.75,w,size*1.5);ctx.fillStyle=col;ctx.fillText(t,p.x,p.y+1);};
+  for(const r of S.gebiete)lbl(r.x0+260,r.y0+90,`Gebiet ${r.name}`,r.edge,overview?16:13);
+  for(const g of S.gaenge){const q=geo(g);lbl(q.A.x+q.ux*q.L/2,q.A.y+q.uy*q.L/2,overview?g.name:`${g.name} · ${fmt(q.L/SCREEN_W)} Bs`,q.ok?'#ece8f2':'#ff8a78');
+    const gg=gangGebiet(g);if(gg.von&&gg.nach&&gg.von!==gg.nach){ // Übergang an der Grenze
+      const r=gg.von,t=(r.x1-q.A.x)/q.ux;if(isFinite(t)&&t>0&&t<q.L)lbl(q.A.x+q.ux*t,q.A.y+q.uy*t-g.w/2-60,'Übergang ⇄','#ffe27a',12);}}
+  for(const k of S.knoten)lbl(k.x,k.y,k.id+(k.typ==='kreuzung'?'':' · '+TYP[k.typ]),'#ffe27a',12);
+  // Kompass
+  ctx.save();ctx.translate(34,H-62);ctx.rotate(-S.view.rot*Math.PI/180);ctx.fillStyle='rgba(20,18,26,0.78)';ctx.beginPath();ctx.arc(0,0,20,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ffe27a';ctx.beginPath();ctx.moveTo(0,-15);ctx.lineTo(5,0);ctx.lineTo(-5,0);ctx.fill();ctx.fillStyle='#d8d4de';ctx.beginPath();ctx.moveTo(0,15);ctx.lineTo(5,0);ctx.lineTo(-5,0);ctx.fill();ctx.restore();
+  ctx.save();ctx.translate(34,H-62);ctx.fillStyle='#ffe27a';ctx.font='700 11px system-ui';const nr=-S.view.rot*Math.PI/180;ctx.fillText('N',Math.sin(-nr)*-28*-1+0*0,-Math.cos(nr)*28);ctx.restore();
+  $('scale').textContent=`Breite der Ansicht: ${fmt(W/v.s/SCREEN_W)} Bildschirme · Ansicht ${v.rot===0?'Norden oben':'gedreht '+v.rot+'°'}`;
+  renderFahrt();renderPruefer(pr);
+}
+
+/* ---------- Prüfer (Beispielregeln) ---------- */
+function pruefe(){
+  const msgs=[],heiss=[];let zu=null,dreh=null;
+  const schief=S.gaenge.filter(g=>!geo(g).ok);
+  msgs.push(schief.length?{k:'err',t:`nicht im 45°-Raster: ${schief.map(g=>g.name).join(', ')}`,r:'M1',go:schief[0]}:{k:'ok',t:'alle Gänge im 45°-Raster',r:'M1'});
+  for(const g of S.gaenge){
+    const q=geo(g);
+    const forms=S.formteile.filter(f=>owner(f)===g).map(f=>{const ps=corners(f).map(([x,y])=>local(q,x,y));return {a0:Math.min(...ps.map(p=>p.a)),a1:Math.max(...ps.map(p=>p.a)),c0:Math.min(...ps.map(p=>p.c)),c1:Math.max(...ps.map(p=>p.c))};});
+    const obs=S.objekte.filter(o=>owner(o)===g).map(o=>{const ps=corners(o).map(([x,y])=>local(q,x,y));return {o,a0:Math.min(...ps.map(p=>p.a)),a1:Math.max(...ps.map(p=>p.a)),c0:Math.min(...ps.map(p=>p.c)),c1:Math.max(...ps.map(p=>p.c))};});
+    let run=null;
+    for(let a=0;a<=q.L;a+=10){
+      let lo=-g.w/2,hi=g.w/2;for(const f of forms)if(a>=f.a0&&a<=f.a1){lo=Math.min(lo,f.c0);hi=Math.max(hi,f.c1);}
+      const iv=obs.filter(b=>a>=b.a0&&a<=b.a1).map(b=>[Math.max(lo,b.c0),Math.min(hi,b.c1)]).filter(v=>v[1]>v[0]).sort((x,y)=>x[0]-y[0]);
+      let cur=lo,gap=0;for(const [s,e] of iv){gap=Math.max(gap,s-cur);cur=Math.max(cur,e);}gap=Math.max(gap,hi-cur);
+      if(gap<MIN_DURCH){if(!run){run={g,a0:a,a1:a};if(!zu)zu={g,a};}run.a1=a;}else if(run){heiss.push(run);run=null;}
+    }
+    if(run)heiss.push(run);
+    for(const b of obs){if((b.a1>0&&b.a0<KREUZ_FREI)||(b.a1>q.L-KREUZ_FREI&&b.a0<q.L)){if(!dreh)dreh={g,o:b.o,k:b.a0<KREUZ_FREI?g.von:g.nach};}}
   }
-  if(engRun)heiss.push(engRun);
-  msgs.push(zuA===null?{k:'ok',t:'passierbar',r:'M1'}:{k:'err',t:`nicht passierbar bei ${zuA} E (frei < ${MIN_DURCH})`,r:'M1'});
-  for(const [k,lo,hi] of [[g.von,0,KREUZ_FREI],[g.nach,L-KREUZ_FREI,L]]){
-    const hit=block.find(b=>b.o.a+b.hw>lo&&b.o.a-b.hw<hi);
-    msgs.push(hit?{k:'err',t:`kein Platz vor ${k}: ${TYPNAME[hit.o.typ]} in der Drehzone (${KREUZ_FREI} E frei)`,r:'M2'}:{k:'ok',t:`Drehzone ${k} frei`,r:'M2'});
-  }
-  const out=inh.objekte.find(o=>o.a<0||o.a>L||Math.abs(o.c)>w/2);
-  if(out)msgs.push({k:'err',t:`${TYPNAME[out.typ]} liegt außerhalb des Gangs`,r:'M3'});
-  if(engN>=3)msgs.push({k:'wrn',t:`${engN} Engstellen (< ${ENG} frei) – viel Druck auf einmal?`,r:'S1'});
-  const geg=inh.objekte.filter(o=>o.typ==='gegner').length;
-  msgs.push(geg?{k:'ok',t:`${geg} Gegnergruppe${geg>1?'n':''}`,r:'S2'}:{k:'wrn',t:'keine Gegner – als Cruise gedacht?',r:'S2'});
+  msgs.push(zu?{k:'err',t:`nicht passierbar: ${zu.g.name} bei ${zu.a} E`,r:'M2',go:zu.g,a:zu.a}:{k:'ok',t:'alle Level passierbar',r:'M2'});
+  msgs.push(dreh?{k:'err',t:`Drehzone vor ${dreh.k} zugestellt (${dreh.g.name})`,r:'M3',go:dreh.g,a:dreh.k===dreh.g.von?0:geo(dreh.g).L}:{k:'ok',t:'Drehzonen frei',r:'M3'});
+  const kurz=S.gaenge.filter(g=>geo(g).L<SCREEN_W);
+  if(kurz.length)msgs.push({k:'wrn',t:`kürzer als 1 Bildschirm: ${kurz.map(g=>g.name).join(', ')}`,r:'S1',go:kurz[0]});
+  const ueb=S.gaenge.filter(g=>{const x=gangGebiet(g);return x.von&&x.nach&&x.von!==x.nach;});
+  msgs.push({k:'ok',t:`${S.gebiete.length} Gebiete · ${S.knoten.length} Knoten · ${S.gaenge.length} Level · ${ueb.length} Übergang${ueb.length===1?'':'e'}`,r:''});
   return {msgs,heiss};
 }
-
-/* ---------- Gebiet ---------- */
-function renderGebiet(){
-  const ks=S.kanal.knoten,xs=ks.map(k=>k.x),ys=ks.map(k=>k.y);
-  const x0=Math.min(...xs)-500,y0=Math.min(...ys)-450,w=Math.max(...xs)-Math.min(...xs)+1000,h=Math.max(...ys)-Math.min(...ys)+900;
-  setView(x0,y0,w,h);
-  el('rect',{x:x0-5000,y:y0-5000,width:w+10000,height:h+10000,class:'floor'},svg);
-  grid(x0-2000,y0-2000,w+4000,h+4000,100,500);
-  for(const g of S.kanal.gaenge){
-    const a=knoten(g.von),b=knoten(g.nach),br=S.inhalt[g.id].breite,ok=gangDir(g).ok;
-    const gr=el('g',{class:'pick','data-gang':g.id},svg);
-    el('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,'stroke-width':br+16,class:'gang-out'},gr);
-    el('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,'stroke-width':br,class:'gang-line'+(ok?'':' bad')},gr);
-    if(S.sel==='g:'+g.id)el('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,'stroke-width':br+60,class:'sel'},gr);
-    const t=el('text',{x:(a.x+b.x)/2,y:(a.y+b.y)/2-br/2-30,'text-anchor':'middle','font-size':64,class:'lbl'},svg);t.textContent=g.name;
-    const t2=el('text',{x:(a.x+b.x)/2,y:(a.y+b.y)/2+br/2+70,'text-anchor':'middle','font-size':48,class:'lbl m mono'},svg);t2.textContent=`${gangLen(g)} E · ${g.tempo}`;
-  }
-  for(const k of ks){
-    const gr=el('g',{class:'pick','data-knoten':k.id,transform:`translate(${k.x} ${k.y})`},svg);
-    if(k.typ==='raum'||k.typ==='boss')el('rect',{x:-180,y:-180,width:360,height:360,rx:20,class:'node '+k.typ},gr);
-    else{ el('circle',{r:KREUZ_FREI+60,class:'turnzone'},gr); el('rect',{x:-130,y:-130,width:260,height:260,transform:'rotate(45)',class:'node '+(k.typ==='speicher'?'save':'')},gr);}
-    if(S.sel==='k:'+k.id)el('circle',{r:280,class:'sel'},gr);
-    const t=el('text',{y:20,'text-anchor':'middle','font-size':64,class:'lbl'},gr);t.textContent=k.id;
-  }
-  $('legend').textContent='Gebiet „Kanal“ – Grundriss, Norden oben · Raster 100 / 500 E · Gänge nur im 45°-Raster';
-}
-function pruefeGebiet(){
-  const msgs=[];
-  const schief=S.kanal.gaenge.filter(g=>!gangDir(g).ok);
-  msgs.push(schief.length?{k:'err',t:`nicht im 45°-Raster: ${schief.map(g=>g.name).join(', ')}`,r:'M4'}:{k:'ok',t:'alle Gänge im 45°-Raster',r:'M4'});
-  const lose=S.kanal.knoten.filter(k=>!S.kanal.gaenge.some(g=>g.von===k.id||g.nach===k.id));
-  if(lose.length)msgs.push({k:'wrn',t:`ohne Gang: ${lose.map(k=>k.id).join(', ')}`,r:'M5'});
-  const sp=S.kanal.knoten.some(k=>k.typ==='speicher');
-  msgs.push(sp?{k:'ok',t:'Speicherort vorhanden',r:'M6'}:{k:'err',t:'kein Speicherort im Gebiet',r:'M6'});
-  const kurz=S.kanal.gaenge.filter(g=>gangLen(g)<600);
-  if(kurz.length)msgs.push({k:'wrn',t:`sehr kurz: ${kurz.map(g=>g.name).join(', ')}`,r:'S3'});
-  msgs.push({k:'ok',t:`${S.kanal.knoten.length} Knoten, ${S.kanal.gaenge.length} Level`,r:''});
-  return msgs;
-}
-
-/* ---------- Welt ---------- */
-function renderWelt(){
-  setView(0,0,800,560);
-  el('rect',{x:-3000,y:-3000,width:7000,height:7000,class:'floor'},svg);
-  grid(-1000,-1000,3000,3000,20,100);
-  const by=Object.fromEntries(S.welt.gebiete.map(g=>[g.id,g]));
-  for(const [a,b] of S.welt.links)el('line',{x1:by[a].x,y1:by[a].y,x2:by[b].x,y2:by[b].y,class:'link'},svg);
-  for(const g of S.welt.gebiete){
-    const gr=el('g',{class:'pick','data-gebiet':g.id,transform:`translate(${g.x} ${g.y})`},svg);
-    el('rect',{x:-90,y:-50,width:180,height:100,rx:14,class:'area'},gr);
-    if(S.sel==='w:'+g.id)el('rect',{x:-100,y:-60,width:200,height:120,rx:18,class:'sel'},gr);
-    const t=el('text',{y:-8,'text-anchor':'middle','font-size':22,class:'lbl'},gr);t.textContent=g.name;
-    const t2=el('text',{y:20,'text-anchor':'middle','font-size':14,class:'lbl m'},gr);t2.textContent=g.thema;
-    const t3=el('text',{y:38,'text-anchor':'middle','font-size':12,class:'lbl m mono'},gr);t3.textContent=g.id==='kanal'?`${S.kanal.knoten.length} Knoten · ${S.kanal.gaenge.length} Level`:'leer';
-  }
-  $('legend').textContent='Welt – Gebiete und Verbindungen (Platzhalter-Namen)';
-}
-function pruefeWelt(){return [{k:'ok',t:'alle Gebiete erreichbar',r:'W1'},{k:'wrn',t:'Gewächshaus und Uhrwerk noch leer',r:''},{k:'wrn',t:'Progression (Schlösser, Fähigkeiten) noch nicht geprüft',r:'W2'}];}
-
-/* ---------- Paneele ---------- */
-const ICON={
-  wand:'<rect x="2" y="6" width="20" height="8" fill="var(--wall)"/>',
-  hindernis:'<rect x="6" y="4" width="11" height="11" rx="2" transform="rotate(45 11.5 9.5)" fill="var(--bad)"/>',
-  setpiece:'<rect x="2" y="4" width="20" height="12" fill="var(--piece)"/>',
-  gegner:'<circle cx="7" cy="7" r="4" fill="var(--enemy)"/><circle cx="16" cy="8" r="4" fill="var(--enemy)"/><circle cx="11" cy="15" r="4" fill="var(--enemy)"/>',
-  kreuzung:'<rect x="6" y="3" width="11" height="11" transform="rotate(45 11.5 8.5)" fill="none" stroke="var(--ink)" stroke-width="2"/>',
-  raum:'<rect x="4" y="2" width="16" height="16" rx="2" fill="none" stroke="var(--ink)" stroke-width="2"/>',
-  speicher:'<rect x="6" y="3" width="11" height="11" transform="rotate(45 11.5 8.5)" fill="var(--accent-soft)" stroke="var(--ink)" stroke-width="2"/>',
-  boss:'<rect x="4" y="2" width="16" height="16" rx="2" fill="var(--bad)" fill-opacity=".3" stroke="var(--ink)" stroke-width="2"/>',
-  gebiet:'<rect x="2" y="4" width="20" height="12" rx="4" fill="none" stroke="var(--ink)" stroke-width="2"/>'
-};
-function renderPal(){
-  const list=S.ebene==='gang'?['wand','hindernis','setpiece','gegner']:S.ebene==='gebiet'?['kreuzung','raum','speicher','boss']:['gebiet'];
-  $('palTitle').textContent=S.ebene==='gang'?'Objekte':S.ebene==='gebiet'?'Knoten':'Welt';
-  $('pal').innerHTML=list.map(t=>`<button data-add="${t}"><svg width="24" height="20" viewBox="0 0 24 20">${ICON[t]}</svg>${t==='gebiet'?'Gebiet':TYPNAME[t]}</button>`).join('')+
-    (S.ebene==='gang'?'<p class="note" style="margin-top:6px">Drehorte gibt es nur an Knoten, nicht im Gang (Checkliste 4a).</p>':'')+
-    (S.ebene==='gebiet'?'<p class="note" style="margin-top:6px">Gänge ziehen: in der Skizze nicht umgesetzt.</p>':'');
-}
-function field(lbl,id,val,type='number',step=10){return `<label for="${id}">${lbl}</label><input id="${id}" type="${type}" step="${step}" value="${val}">`;}
-function sel(lbl,id,val,opts){return `<label for="${id}">${lbl}</label><select id="${id}">${opts.map(o=>`<option ${o==val?'selected':''}>${o}</option>`).join('')}</select>`;}
-function renderProps(){
-  const P=$('props');let h='<h2>Eigenschaften</h2>';
-  if(S.ebene==='gang'){
-    const inh=S.inhalt[S.gang],o=inh.objekte.find(o=>o.id===S.sel),g=gangDef(S.gang);
-    if(!o){h+=`<div class="kind">Gang „${g.name}“</div><div class="ro">${g.von} → ${g.nach} · ${gangLen(g)} E</div>${field('Breite','p-breite',inh.breite)}<p>Länge und Richtung kommen aus dem Gebiet. Ein Objekt anklicken, um es zu bearbeiten.</p>`;}
-    else{
-      h+=`<div class="kind">${TYPNAME[o.typ]}</div>`+field('Lage im Gang (a)','p-a',o.a)+field('Quer (c)','p-c',o.c)+field('Länge','p-len',o.len)+field('Breite','p-br',o.br)+sel('Winkel','p-win',o.win,[0,45,90,135]);
-      if(o.typ==='setpiece')h+=field('Name','p-name',o.name,'text');
-      if(o.typ==='gegner')h+=sel('Welle','p-welle',o.welle,['Schwarm ×5','Geschütz','Jäger ×2','Mine ×3']);
-      h+=`<div class="row"><button class="t" id="p-rot">⟳ 45°</button><button class="t" id="p-dup">Kopieren</button><button class="t" id="p-del">Löschen</button></div>`;
-    }
-  } else if(S.ebene==='gebiet'){
-    if(S.sel&&S.sel.startsWith('k:')){const k=knoten(S.sel.slice(2));h+=`<div class="kind">Knoten ${k.id}</div>`+sel('Typ','p-ktyp',TYPNAME[k.typ],['Kreuzung','Raum','Speicherort','Boss'])+field('x','p-kx',k.x,'number',100)+field('y','p-ky',k.y,'number',100)+'<p>Kreuzungen und Speicherorte sind Drehorte (gestrichelter Ring).</p>';}
-    else if(S.sel&&S.sel.startsWith('g:')){const g=gangDef(S.sel.slice(2)),d=gangDir(g);h+=`<div class="kind">Level „${g.name}“</div><div class="ro">${g.von} → ${g.nach} · ${gangLen(g)} E · ${d.ok?d.name:'schief!'}</div>`+field('Name','p-gname',g.name,'text')+sel('Tempo','p-tempo',g.tempo,['Gefecht','Cruise','Halt'])+field('Breite','p-gbr',S.inhalt[g.id].breite,'number',20)+`<div class="row"><button class="t play" id="p-open">Öffnen ▸</button></div>`;}
-    else h+='<div class="kind">Gebiet „Kanal“</div><div class="ro">Thema: Rost, Wasser</div><p>Knoten ziehen verschiebt sie; die Gänge gehen mit. Ein schiefer Gang wird rot. Doppelklick auf einen Gang öffnet das Level.</p>';
-  } else {
-    const g=S.sel&&S.sel.startsWith('w:')?S.welt.gebiete.find(x=>x.id===S.sel.slice(2)):null;
-    if(g)h+=`<div class="kind">Gebiet</div>`+field('Name','p-wname',g.name,'text')+field('Thema','p-wthema',g.thema,'text')+`<div class="row"><button class="t play" id="p-wopen">Öffnen ▸</button></div>`;
-    else h+='<div class="kind">Welt</div><p>Gebiete und ihre Verbindungen. Doppelklick auf „Kanal“ öffnet das Gebiet.</p>';
-  }
-  P.innerHTML=h;
-  const bind=(id,fn)=>{const e=$(id);if(e)e.addEventListener('change',()=>{save();fn(e.value);render();});};
-  if(S.ebene==='gang'){
-    const inh=S.inhalt[S.gang],o=inh.objekte.find(o=>o.id===S.sel);
-    bind('p-breite',v=>inh.breite=Math.max(60,+v));
-    if(o){for(const [id,k] of [['p-a','a'],['p-c','c'],['p-len','len'],['p-br','br']])bind(id,v=>o[k]=+v);
-      bind('p-win',v=>o.win=+v);bind('p-name',v=>o.name=v);bind('p-welle',v=>o.welle=v);
-      $('p-rot').onclick=rot;$('p-del').onclick=del;$('p-dup').onclick=()=>{save();const n={...o,id:nextId++,a:o.a+60};inh.objekte.push(n);S.sel=n.id;render();};}
-  } else if(S.ebene==='gebiet'){
-    if(S.sel&&S.sel.startsWith('k:')){const k=knoten(S.sel.slice(2));const inv=Object.fromEntries(Object.entries(TYPNAME).map(([a,b])=>[b,a]));
-      bind('p-ktyp',v=>k.typ=inv[v]);bind('p-kx',v=>k.x=+v);bind('p-ky',v=>k.y=+v);}
-    if(S.sel&&S.sel.startsWith('g:')){const g=gangDef(S.sel.slice(2));bind('p-gname',v=>g.name=v);bind('p-tempo',v=>g.tempo=v);bind('p-gbr',v=>S.inhalt[g.id].breite=Math.max(60,+v));$('p-open').onclick=()=>openGang(g.id);}
-  } else {const g=S.sel&&S.sel.startsWith('w:')?S.welt.gebiete.find(x=>x.id===S.sel.slice(2)):null;if(g){bind('p-wname',v=>g.name=v);bind('p-wthema',v=>g.thema=v);$('p-wopen').onclick=()=>openGebiet(g.id);}}
-}
-function renderPruefer(){
-  const m=S.ebene==='gang'?pruefeGang().msgs:S.ebene==='gebiet'?pruefeGebiet():pruefeWelt();
+function renderPruefer(pr){
   const sym={ok:'✔',err:'✘',wrn:'⚠'};
-  $('pruefer').innerHTML='<b>Prüfer</b>'+m.map(x=>`<span class="msg ${x.k}">${sym[x.k]} ${x.t}${x.r?` <span class="r">${x.r}</span>`:''}</span>`).join('');
-}
-function renderCrumbs(){
-  const g=gangDef(S.gang);
-  const items=[['welt','Welt'],['gebiet','Gebiet „Kanal“'],['gang',`Level „${g.name}“`]];
-  $('crumbs').innerHTML=items.map(([e,t],i)=>`${i?'<span>▸</span>':''}<button data-ebene="${e}" aria-current="${S.ebene===e}">${t}</button>`).join('');
-}
-function renderText(){
-  const tv=$('textview');tv.hidden=!S.text;if(!S.text)return;
-  let o;
-  if(S.ebene==='gang'){const g=gangDef(S.gang);o={level:g.id,name:g.name,von:g.von,nach:g.nach,breite:S.inhalt[g.id].breite,objekte:S.inhalt[g.id].objekte.map(({id,...r})=>r)};}
-  else if(S.ebene==='gebiet')o={gebiet:'kanal',thema:'Rost, Wasser',knoten:S.kanal.knoten,level:S.kanal.gaenge.map(g=>({...g,breite:S.inhalt[g.id].breite}))};
-  else o=S.welt;
-  tv.textContent='// So sähe die Datei aus (Quelle der Wahrheit). Editor, KI und Prüfer lesen dieselbe Datei.\n'+JSON.stringify(o,null,2).replace(/\{\n\s+([^{}\[\]]{0,140}?)\n\s+\}/g,(m,b)=>'{ '+b.replace(/\n\s+/g,' ')+' }');
-}
-function render(){svg.innerHTML='';({gang:renderGang,gebiet:renderGebiet,welt:renderWelt})[S.ebene]();renderPal();renderProps();renderPruefer();renderCrumbs();renderText();$('play').disabled=S.ebene==='welt';$('play').style.opacity=S.ebene==='welt'?.5:1;}
-
-/* ---------- Aktionen ---------- */
-function openGang(id){S.gang=id;S.ebene='gang';S.sel=null;render();}
-function openGebiet(id){if(id!=='kanal')return toast('In der Skizze ist nur „Kanal“ ausgearbeitet.');S.ebene='gebiet';S.sel=null;render();}
-function rot(){const o=S.inhalt[S.gang].objekte.find(o=>o.id===S.sel);if(!o)return;save();o.win=(o.win+45)%180;render();}
-function del(){
-  if(S.ebene==='gang'){const inh=S.inhalt[S.gang];if(S.sel==null)return;save();inh.objekte=inh.objekte.filter(o=>o.id!==S.sel);S.sel=null;render();}
-}
-function add(t){
-  save();
-  if(S.ebene==='gang'){const L=gangLen(gangDef(S.gang)),vb=svg.viewBox.baseVal;const a=snap(Math.min(L-200,Math.max(200,vb.x+vb.width/2)));
-    const base={wand:{len:160,br:60},hindernis:{len:80,br:80},setpiece:{len:200,br:90,name:'Neues Stück'},gegner:{len:70,br:70,welle:'Schwarm ×5'}}[t];
-    const o={id:nextId++,typ:t,a,c:0,win:0,...base};S.inhalt[S.gang].objekte.push(o);S.sel=o.id;}
-  else if(S.ebene==='gebiet'){const vb=svg.viewBox.baseVal;let n=6;while(knoten('K'+n))n++;const k={id:'K'+n,typ:t,x:Math.round((vb.x+vb.width/2)/100)*100,y:Math.round((vb.y+vb.height/2)/100)*100};S.kanal.knoten.push(k);S.sel='k:'+k.id;}
-  else {const id='neu'+nextId++;S.welt.gebiete.push({id,name:'Neues Gebiet',thema:'offen',x:320,y:440});S.welt.links.push(['kanal',id]);S.sel='w:'+id;}
-  render();
-}
-function play(){
-  if(S.ebene==='gang'){const o=S.inhalt[S.gang].objekte.find(o=>o.id===S.sel);const a=o?Math.max(0,o.a-300):0;toast(`Würde jetzt den Prototyp im Level „${gangDef(S.gang).name}“ bei a = ${a} E starten. Esc führt zurück in den Editor.`);}
-  else if(S.ebene==='gebiet'){const k=S.sel&&S.sel.startsWith('k:')?S.sel.slice(2):'K1';toast(`Würde jetzt den Prototyp an Knoten ${k} starten. Esc führt zurück in den Editor.`);}
+  $('pruefer').innerHTML='<b>Prüfer</b>'+pr.msgs.map((x,i)=>`<span class="msg ${x.k}">${sym[x.k]} ${x.go?`<button data-i="${i}">${x.t}</button>`:x.t}${x.r?` <span class="r">${x.r}</span>`:''}</span>`).join('');
+  $('pruefer').querySelectorAll('button[data-i]').forEach(b=>b.onclick=()=>{const m=pr.msgs[+b.dataset.i];S.sel={kind:'gang',id:m.go.id};S.frame={gang:m.go.id,a:m.a??geo(m.go).L/2};centerOnFrame();});
 }
 
-/* ---------- Zeiger ---------- */
-function pt(e){const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(svg.getScreenCTM().inverse());}
+/* ---------- Fahrt-Schieber ---------- */
+function renderFahrt(){const f=framePose();if(!f){$('fval').textContent='';return;}
+  const r=$('fahrt');r.max=Math.round(f.q.L);r.value=Math.round(f.a);
+  $('fval').textContent=`${f.g.name}: ${Math.round(f.a)} / ${Math.round(f.q.L)} E · Bildschirm ${fmt(f.a/SCREEN_W+1)} · ${fmt(f.a/SPEED)} s von ${fmt(f.q.L/SPEED)} s`;}
+let playing=null;
+function centerOnFrame(){const f=framePose();if(f){S.view.cx=f.x;S.view.cy=f.y;}draw();}
+
+/* ---------- Auswahl & Eigenschaften ---------- */
+function selected(){if(!S.sel)return null;const s=S.sel;const o=s.kind==='gang'?G(s.id):s.kind==='knoten'?K(s.id):s.kind==='form'?S.formteile.find(f=>f.id===s.id):S.objekte.find(o=>o.id===s.id);return o?{kind:s.kind,o}:null;}
+function bezeichnung(){
+  const sel=selected();const f=framePose();
+  if(sel&&sel.kind==='knoten'){const r=gebietAt(sel.o.x,sel.o.y);return `${r?r.id:'ohne-gebiet'}/${sel.o.id}`;}
+  const g=sel&&sel.kind==='gang'?sel.o:f?f.g:null;if(!g)return null;
+  const a=f&&f.g===g?Math.round(f.a):0;return `${levelId(g)}@${a}`;
+}
+function renderProps(){
+  const P=$('props');const sel=selected();let h='<h2>Eigenschaften</h2>';
+  const num=(l,id,v,step=20)=>`<label for="${id}">${l}</label><input id="${id}" type="number" step="${step}" value="${Math.round(v)}">`;
+  const opt=(l,id,v,os)=>`<label for="${id}">${l}</label><select id="${id}">${os.map(([k,t])=>`<option value="${k}" ${k==v?'selected':''}>${t}</option>`).join('')}</select>`;
+  if(!sel){h+=`<div class="kind">Welt</div><p>Ein Grundriss für alles: Gebiete sind Bereiche, Level sind Gänge zwischen Knoten. Etwas anklicken, um es zu bearbeiten.</p><p>Werkzeug <b>Gang</b>: an einem Knoten ansetzen und ziehen. Der Gang rastet auf 45° ein, im Leeren entsteht ein neuer Knoten.</p><p>Werkzeug <b>Knoten</b>: ins Leere klicken = neuer Knoten; auf einen Gang klicken = Gang teilen (T-Kreuzung).</p>`;}
+  else if(sel.kind==='gang'){const g=sel.o,q=geo(g),gg=gangGebiet(g);
+    h+=`<div class="kind">Level „${g.name}“</div><div class="id">${levelId(g)}</div><dl><dt>Weg</dt><dd>${g.von} → ${g.nach}</dd><dt>Richtung</dt><dd>${q.ok?q.dir:'schief!'}</dd><dt>Länge</dt><dd>${Math.round(q.L)} E</dd><dt></dt><dd>${fmt(q.L/SCREEN_W)} Bildschirme</dd><dt></dt><dd>${fmt(q.L/SPEED)} s Flug</dd><dt>Gebiet</dt><dd>${gg.von?gg.von.name:'–'}${gg.nach&&gg.nach!==gg.von?' → '+gg.nach.name:''}</dd></dl>`+
+      `<label for="p-name">Name</label><input id="p-name" value="${g.name}">`+num('Breite','p-w',g.w)+
+      `<div class="row"><button class="t" id="p-frame">Rahmen hierher</button><button class="t" id="p-fly">wie im Spiel</button><button class="t" id="p-del">Löschen</button></div>`;}
+  else if(sel.kind==='knoten'){const k=sel.o;const arms=S.gaenge.filter(g=>g.von===k.id||g.nach===k.id).map(g=>{const q=geo(g);const d=g.von===k.id?q.dir:RICHT[(RICHT.indexOf(q.dir)+4)%8];return `${d}: ${g.name}`;});
+    const r=gebietAt(k.x,k.y);
+    h+=`<div class="kind">Knoten ${k.id}</div><div class="id">${r?r.id:'ohne-gebiet'}/${k.id}</div>`+opt('Typ','p-typ',k.typ,[['kreuzung','Kreuzung'],['raum','Raum (Arena)'],['speicher','Speicherort'],['boss','Boss-Raum']]);
+    if(k.typ==='raum'||k.typ==='boss')h+=num('Breite','p-kw',k.w)+num('Höhe','p-kh',k.h);
+    h+=`<dl><dt>Arme</dt><dd>${arms.length}</dd>${arms.map(a=>`<dt></dt><dd>${a}</dd>`).join('')}<dt>Drehen</dt><dd>${k.typ==='raum'||k.typ==='boss'?'nein (Raum)':'ja, Zone 160 E'}</dd></dl><p>Arme entstehen aus den angeschlossenen Gängen (bis zu 8). Schlösser an Armen kommen, wenn Paket 11 sie festlegt.</p><div class="row"><button class="t" id="p-del">Löschen</button></div>`;}
+  else {const o=sel.o;h+=`<div class="kind">${TYP[o.typ||'form']}</div>`+(sel.kind==='form'?'<p>Ein Formteil erweitert den Boden: Nischen, Verbreiterungen, Stufen.</p>':'')+num('Länge','p-len',o.len)+num('Breite','p-br',o.br)+opt('Winkel','p-win',o.win,[[0,'0°'],[45,'45°'],[90,'90°'],[135,'135°']])+`<div class="row"><button class="t" id="p-rot">⟳ 45°</button><button class="t" id="p-dup">Kopieren</button><button class="t" id="p-del">Löschen</button></div>`;}
+  P.innerHTML=h;
+  const bind=(id,fn)=>{const e=$(id);if(e)e.addEventListener('change',()=>{save();fn(e.value);draw();renderProps();});};
+  if(sel){const o=sel.o;
+    bind('p-name',v=>o.name=v);bind('p-w',v=>o.w=Math.max(60,+v));bind('p-typ',v=>{o.typ=v;if((v==='raum'||v==='boss')&&!o.w){o.w=480;o.h=400;}});
+    bind('p-kw',v=>o.w=Math.max(160,+v));bind('p-kh',v=>o.h=Math.max(160,+v));
+    bind('p-len',v=>o.len=Math.max(20,+v));bind('p-br',v=>o.br=Math.max(20,+v));bind('p-win',v=>o.win=+v);
+    if($('p-frame'))$('p-frame').onclick=()=>{S.frame={gang:o.id,a:0};centerOnFrame();};
+    if($('p-fly'))$('p-fly').onclick=()=>{S.frame.gang=o.id;S.view.rot=Math.round(geo(o).ang/45)*45;centerOnFrame();};
+    if($('p-rot'))$('p-rot').onclick=rotSel;
+    if($('p-dup'))$('p-dup').onclick=()=>{save();const n={...o,id:'o'+(uid++),x:o.x+60,y:o.y+60};(sel.kind==='form'?S.formteile:S.objekte).push(n);S.sel={kind:sel.kind,id:n.id};draw();renderProps();};
+    if($('p-del'))$('p-del').onclick=del;}
+}
+
+/* ---------- Werkzeuge ---------- */
+const TOOLS=[['sel','Auswahl','V'],['gang','Gang ziehen','G'],['knoten','Knoten','K'],['form','Formteil','F'],['wand','Wand','W'],['hindernis','Hindernis','H']];
+function renderPal(){
+  $('pal').innerHTML=TOOLS.map(([id,t,k])=>`<button data-tool="${id}" aria-pressed="${S.tool===id}">${t}<kbd>${k}</kbd></button>`).join('')+
+    '<hr><button disabled>Schloss<span class="later">Paket 11</span></button><button disabled>Gegner<span class="later">Paket 10</span></button><button disabled>Notiz<span class="later">später</span></button><button disabled>Stempel<span class="later">später</span></button>';
+}
+function setTool(t){S.tool=t;renderPal();cv.style.cursor=t==='sel'?'default':'crosshair';}
+function rotSel(){const s=selected();if(!s||s.kind==='gang'||s.kind==='knoten')return;save();s.o.win=(s.o.win+45)%180;draw();renderProps();}
+function del(){const s=selected();if(!s)return;save();
+  if(s.kind==='gang')S.gaenge=S.gaenge.filter(g=>g!==s.o);
+  else if(s.kind==='knoten'){S.knoten=S.knoten.filter(k=>k!==s.o);S.gaenge=S.gaenge.filter(g=>g.von!==s.o.id&&g.nach!==s.o.id);}
+  else if(s.kind==='form')S.formteile=S.formteile.filter(f=>f!==s.o);else S.objekte=S.objekte.filter(o=>o!==s.o);
+  if(!G(S.frame.gang))S.frame.gang=S.gaenge[0]?.id;S.sel=null;draw();renderProps();}
+
+function hit(p){
+  const tol=6/S.view.s;
+  for(const arr of [['obj',S.objekte],['form',S.formteile]]){for(let i=arr[1].length-1;i>=0;i--){const o=arr[1][i],r=-o.win*Math.PI/180,dx=p.x-o.x,dy=p.y-o.y,lx=dx*Math.cos(r)-dy*Math.sin(r),ly=dx*Math.sin(r)+dy*Math.cos(r);if(Math.abs(lx)<=o.len/2+tol&&Math.abs(ly)<=o.br/2+tol)return {kind:arr[0],o};}}
+  for(const k of S.knoten){const h=nodeHalf(k);if(Math.abs(p.x-k.x)<=h.hw+tol&&Math.abs(p.y-k.y)<=h.hh+tol)return {kind:'knoten',o:k};}
+  for(const g of S.gaenge){const q=geo(g),l=local(q,p.x,p.y);if(l.a>=0&&l.a<=q.L&&Math.abs(l.c)<=g.w/2+tol)return {kind:'gang',o:g};}
+  return null;
+}
+const sn=v=>S.snap?Math.round(v/20)*20:Math.round(v);
 let drag=null;
-svg.addEventListener('pointerdown',e=>{
-  const t=e.target.closest('[data-id],[data-knoten],[data-gang],[data-gebiet]');const p=pt(e);
-  if(t&&t.dataset.id){const o=S.inhalt[S.gang].objekte.find(o=>o.id==t.dataset.id);S.sel=o.id;drag={kind:'o',o,dx:o.a-p.x,dy:o.c-p.y,moved:false,snapshot:null};}
-  else if(t&&t.dataset.knoten){const k=knoten(t.dataset.knoten);S.sel='k:'+k.id;drag={kind:'k',o:k,dx:k.x-p.x,dy:k.y-p.y,moved:false};}
-  else if(t&&t.dataset.gang){S.sel='g:'+t.dataset.gang;drag=null;}
-  else if(t&&t.dataset.gebiet){const g=S.welt.gebiete.find(x=>x.id===t.dataset.gebiet);S.sel='w:'+g.id;drag={kind:'w',o:g,dx:g.x-p.x,dy:g.y-p.y,moved:false};}
-  else {S.sel=null;drag={kind:'pan',x:e.clientX,y:e.clientY,px:S.pan[S.ebene],py:S.panY[S.ebene],moved:false};}
-  svg.setPointerCapture(e.pointerId);render();
+cv.addEventListener('pointerdown',e=>{
+  const r=cv.getBoundingClientRect(),p=toWorld(e.clientX-r.left,e.clientY-r.top),h=hit(p);cv.setPointerCapture(e.pointerId);
+  if(S.tool==='sel'){
+    if(h){S.sel={kind:h.kind,id:h.o.id};if(h.kind==='gang'){const q=geo(h.o);S.frame={gang:h.o.id,a:Math.max(0,Math.min(q.L,local(q,p.x,p.y).a))};}
+      drag=h.kind==='gang'?null:{kind:'move',o:h.o,dx:h.o.x-p.x,dy:h.o.y-p.y,moved:false,knoten:h.kind==='knoten'};}
+    else{S.sel=null;drag={kind:'pan',sx:e.clientX,sy:e.clientY,cx:S.view.cx,cy:S.view.cy};}
+    renderProps();draw();return;}
+  if(S.tool==='gang'){if(h&&h.kind==='knoten'){drag={kind:'neu',A:h.o,end:{x:h.o.x,y:h.o.y}};}else toast('Gang ziehen: an einem Knoten ansetzen.');return;}
+  if(S.tool==='knoten'){save();
+    if(h&&h.kind==='gang'){const g=h.o,q=geo(g),a=sn(Math.max(120,Math.min(q.L-120,local(q,p.x,p.y).a)));const id=newKnotenId();const nk={id,typ:'kreuzung',x:Math.round(q.A.x+q.ux*a),y:Math.round(q.A.y+q.uy*a)};S.knoten.push(nk);
+      const g2={...g,id:g.id+'-2',name:g.name+' 2',von:id};g.nach=id;S.gaenge.push(g2);S.sel={kind:'knoten',id};toast(`„${g.name}“ geteilt: neuer Knoten ${id}.`);}
+    else if(!h){const id=newKnotenId();S.knoten.push({id,typ:'kreuzung',x:sn(p.x),y:sn(p.y)});S.sel={kind:'knoten',id};}
+    renderProps();draw();return;}
+  if(S.tool==='form'||S.tool==='wand'||S.tool==='hindernis'){
+    const g=h&&h.kind==='gang'?h.o:null;const win=g?((Math.round(geo(g).ang/45)*45)%180+180)%180:0;save();
+    const base=S.tool==='form'?{len:240,br:120}:S.tool==='wand'?{len:160,br:50}:{len:70,br:70};
+    const o={id:(S.tool==='form'?'f':'o')+(uid++),x:sn(p.x),y:sn(p.y),win,...base};if(S.tool!=='form')o.typ=S.tool;
+    (S.tool==='form'?S.formteile:S.objekte).push(o);S.sel={kind:S.tool==='form'?'form':'obj',id:o.id};renderProps();draw();}
 });
-svg.addEventListener('pointermove',e=>{
-  if(!drag)return;
-  if(drag.kind==='pan'){const vb=svg.viewBox.baseVal,r=svg.getBoundingClientRect(),s=Math.max(vb.width/r.width,vb.height/r.height);S.pan[S.ebene]=drag.px-(e.clientX-drag.x)*s;S.panY[S.ebene]=drag.py-(e.clientY-drag.y)*s;drag.moved=true;render();return;}
-  const p=pt(e);if(!drag.moved){save();drag.moved=true;}
-  if(drag.kind==='o'){drag.o.a=snap(p.x+drag.dx);drag.o.c=snap(p.y+drag.dy);}
-  else if(drag.kind==='k'){drag.o.x=S.raster?Math.round((p.x+drag.dx)/100)*100:Math.round(p.x+drag.dx);drag.o.y=S.raster?Math.round((p.y+drag.dy)/100)*100:Math.round(p.y+drag.dy);}
-  else if(drag.kind==='w'){drag.o.x=snap(p.x+drag.dx);drag.o.y=snap(p.y+drag.dy);}
-  render();
+cv.addEventListener('pointermove',e=>{
+  if(!drag)return;const r=cv.getBoundingClientRect(),p=toWorld(e.clientX-r.left,e.clientY-r.top);
+  if(drag.kind==='pan'){const v=S.view,rr=v.rot*Math.PI/180,dx=(e.clientX-drag.sx)/v.s,dy=(e.clientY-drag.sy)/v.s;v.cx=drag.cx-(dx*Math.cos(rr)-dy*Math.sin(rr));v.cy=drag.cy-(dx*Math.sin(rr)+dy*Math.cos(rr));draw();return;}
+  if(drag.kind==='move'){if(!drag.moved){save();drag.moved=true;}const st=drag.knoten&&S.snap?100:20;drag.o.x=S.snap?Math.round((p.x+drag.dx)/st)*st:Math.round(p.x+drag.dx);drag.o.y=S.snap?Math.round((p.y+drag.dy)/st)*st:Math.round(p.y+drag.dy);draw();return;}
+  if(drag.kind==='neu'){let dx=p.x-drag.A.x,dy=p.y-drag.A.y;const L=Math.hypot(dx,dy);
+    if(S.snap){const k=Math.round(Math.atan2(dy,dx)/(Math.PI/4)),a=k*Math.PI/4,len=Math.round(L/20)*20;dx=Math.cos(a)*len;dy=Math.sin(a)*len;}
+    drag.end={x:Math.round(drag.A.x+dx),y:Math.round(drag.A.y+dy)};drag.target=S.knoten.find(k=>k!==drag.A&&Math.hypot(k.x-p.x,k.y-p.y)<150);
+    if(drag.target)drag.end={x:drag.target.x,y:drag.target.y};
+    draw();const Ln=Math.hypot(drag.end.x-drag.A.x,drag.end.y-drag.A.y);$('fval').textContent=`Neuer Gang: ${lenInfo(Ln)}${drag.target?' → '+drag.target.id:''}`;}
 });
-svg.addEventListener('pointerup',()=>{drag=null;});
-svg.addEventListener('dblclick',e=>{
-  const t=e.target.closest('[data-gang],[data-gebiet]');if(!t)return;
-  if(t.dataset.gang)openGang(t.dataset.gang);else openGebiet(t.dataset.gebiet);
+cv.addEventListener('pointerup',()=>{
+  if(drag&&drag.kind==='neu'){const Ln=Math.hypot(drag.end.x-drag.A.x,drag.end.y-drag.A.y);
+    if(Ln>=100){save();let B=drag.target;if(!B){B={id:newKnotenId(),typ:'kreuzung',x:drag.end.x,y:drag.end.y};S.knoten.push(B);}
+      let n=1;while(G('gang'+n))n++;const g={id:'gang'+n,name:'Neuer Gang '+n,von:drag.A.id,nach:B.id,w:200};S.gaenge.push(g);S.sel={kind:'gang',id:g.id};S.frame={gang:g.id,a:0};renderProps();}}
+  drag=null;draw();
 });
-svg.addEventListener('wheel',e=>{e.preventDefault();zoom(e.deltaY<0?1.15:1/1.15);},{passive:false});
-function zoom(f){S.zoom[S.ebene]=Math.min(6,Math.max(.4,S.zoom[S.ebene]*f));render();}
+cv.addEventListener('wheel',e=>{e.preventDefault();zoomAt(e.deltaY<0?1.15:1/1.15);},{passive:false});
+function zoomAt(f){S.view.s=Math.min(3,Math.max(0.03,S.view.s*f));draw();}
+function newKnotenId(){let n=1;while(K('K'+n))n++;return 'K'+n;}
 
-$('crumbs').addEventListener('click',e=>{const b=e.target.closest('[data-ebene]');if(!b)return;S.ebene=b.dataset.ebene;S.sel=null;render();});
-$('pal').addEventListener('click',e=>{const b=e.target.closest('[data-add]');if(b)add(b.dataset.add);});
+/* ---------- Knöpfe ---------- */
+$('pal').addEventListener('click',e=>{const b=e.target.closest('[data-tool]');if(b)setTool(b.dataset.tool);});
 $('undo').onclick=undo;
-$('snap').onclick=()=>{S.raster=!S.raster;$('snap').setAttribute('aria-pressed',S.raster);toast(S.raster?'Einrasten an. Gespeichert werden trotzdem nur Zahlen, kein Raster.':'Einrasten aus: freie Lage.');};
-$('zin').onclick=()=>zoom(1.25);$('zout').onclick=()=>zoom(1/1.25);
-$('text').onclick=()=>{S.text=!S.text;$('text').setAttribute('aria-pressed',S.text);renderText();};
-$('play').onclick=play;
+$('snap').onclick=()=>{S.snap=!S.snap;$('snap').setAttribute('aria-pressed',S.snap);toast(S.snap?'Einrasten an: Gänge in 8 Richtungen, Lagen auf 20 E.':'Einrasten aus: freie Lage. Schiefe Gänge meldet der Prüfer.');};
+$('rotL').onclick=()=>{S.view.rot=(S.view.rot-45+360)%360;draw();};
+$('rotR').onclick=()=>{S.view.rot=(S.view.rot+45)%360;draw();};
+$('north').onclick=()=>{S.view.rot=0;draw();};
+$('flight').onclick=()=>{const f=framePose();if(f){S.view.rot=((Math.round(f.ang/45)*45)%360+360)%360;centerOnFrame();}};
+$('zin').onclick=()=>zoomAt(1.25);$('zout').onclick=()=>zoomAt(1/1.25);
+$('z1').onclick=()=>{S.view.s=W/(SCREEN_W*2.2);centerOnFrame();};
+$('dim').onclick=()=>{S.dim=!S.dim;$('dim').setAttribute('aria-pressed',S.dim);draw();};
+$('fahrt').addEventListener('input',e=>{S.frame.a=+e.target.value;const f=framePose();S.view.cx=f.x;S.view.cy=f.y;draw();});
+$('fplay').onclick=()=>{if(playing){cancelAnimationFrame(playing);playing=null;$('fplay').textContent='▶';return;}
+  let t0=null;$('fplay').textContent='❚❚';const f0=framePose();if(f0&&f0.a>=f0.q.L-1)S.frame.a=0;
+  const step=t=>{if(t0==null)t0=t;const dt=(t-t0)/1000;t0=t;S.frame.a+=SPEED*dt;const f=framePose();S.view.cx=f.x;S.view.cy=f.y;draw();if(S.frame.a>=f.q.L){playing=null;$('fplay').textContent='▶';return;}playing=requestAnimationFrame(step);};
+  playing=requestAnimationFrame(step);};
+$('copy').onclick=()=>{const b=bezeichnung();if(!b)return toast('Erst ein Level oder einen Knoten wählen.');
+  const text=`Wendehals-Level ${b}`;
+  const done=()=>toast(`Kopiert: „${text}“. In Claude Code einfügen, z. B. „Prüfe ${text}“. (@ = Stelle in E ab Gang-Anfang)`,5200);
+  try{navigator.clipboard.writeText(text).then(done,()=>fallback(text));}catch(_){fallback(text);}};
+function fallback(text){const P=$('props');let ta=$('copybox');if(!ta){ta=document.createElement('textarea');ta.id='copybox';ta.className='copybox';ta.rows=2;ta.readOnly=true;P.appendChild(ta);}ta.value=text;ta.focus();ta.select();toast('Kopieren hier nicht erlaubt: Text ist markiert, bitte mit Strg+C kopieren.');}
+$('play').onclick=()=>{const f=framePose();if(!f)return;toast(`Würde das Spiel jetzt im Level ${levelId(f.g)} bei ${Math.round(f.a)} E starten (Rahmenstelle, Blick ${f.q.dir}). Esc führt zurück in den Editor.`,5000);};
 document.addEventListener('keydown',e=>{
-  if(e.target.matches('input,select'))return;
-  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();}
-  else if(e.key==='Delete'||e.key==='Backspace'){del();}
-  else if(e.key==='r'||e.key==='R'){rot();}
-  else if(e.key==='Escape'){if(S.ebene==='gang')S.ebene='gebiet';else if(S.ebene==='gebiet')S.ebene='welt';S.sel=null;render();}
+  if(e.target.matches('input,select,textarea'))return;
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();return;}
+  if(e.key==='Delete'||e.key==='Backspace'){del();return;}
+  const k=e.key.toLowerCase();
+  if(k==='r')rotSel();else{const t=TOOLS.find(t=>t[2].toLowerCase()===k);if(t)setTool(t[0]);}
 });
-S.sel=7;render();
+new ResizeObserver(resize).observe($('planWrap'));
+document.fonts&&document.fonts.ready.then(draw);
+S.sel={kind:'gang',id:'schleuse'};
+renderPal();renderProps();
 </script>
