@@ -1,5 +1,5 @@
 // Desktop-Hülle (Windows / Linux / Steam Deck). Lädt das gebaute Spiel aus dist/index.html.
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 
@@ -41,6 +41,11 @@ function createWindow() {
   // Externe Links/Navigation verhindern – das Spiel braucht kein Internet.
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (e) => e.preventDefault());
+  // Editor: beforeunload mit ungespeicherten Änderungen würde das Fenster sonst ohne Dialog festhalten.
+  win.webContents.on('will-prevent-unload', (e) => {
+    const wahl = dialog.showMessageBoxSync(win, { type: 'question', buttons: ['Zurück zum Editor', 'Ohne Speichern schließen'], defaultId: 0, cancelId: 0, message: 'Es gibt ungespeicherte Änderungen.' });
+    if (wahl === 1) e.preventDefault(); // preventDefault hebt hier das Festhalten auf
+  });
   return win;
 }
 
@@ -59,7 +64,12 @@ if (process.env.WENDEHALS_EDITOR) {
     const welt = fs.readFileSync(path.join(levelsDir, 'welt.json'), 'utf8');
     const gebiete = {};
     for (const g of JSON.parse(welt).gebiete) {
-      if (erlaubt(g.datei)) gebiete[g.id] = fs.readFileSync(path.join(levelsDir, g.datei), 'utf8');
+      if (!erlaubt(g.datei)) continue;
+      try {
+        gebiete[g.id] = fs.readFileSync(path.join(levelsDir, g.datei), 'utf8');
+      } catch {
+        // fehlende Datei: Gebiet fehlt, der Rest wird trotzdem geladen
+      }
     }
     return { welt, gebiete };
   });

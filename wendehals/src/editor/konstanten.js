@@ -17,6 +17,7 @@ export const RAUM_H = 400;
 export const MIN_RAUM = 100; // kleinste Raumseite (E)
 export const MIN_GANG_LAENGE = RASTER; // kürzere Gänge entstehen beim Ziehen nicht
 export const FANG_PX = 12; // Fangradius für Knoten und Gänge beim Ziehen/Setzen (Bildschirmpixel, wird mit dem Zoom in E umgerechnet)
+export const MAX_KOORD = 20000; // größte erlaubte Koordinate/Maßzahl (E)
 export const VERLAUF_MAX = 200; // Schritte, die Rückgängig zurückgehen kann
 
 /** Zoomstufen als „Bildschirme in der Breite des Plans“. Normalansicht ≈ 2,2 Bildschirme (Brief Abschnitt 1). */

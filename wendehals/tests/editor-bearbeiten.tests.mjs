@@ -1,12 +1,16 @@
 // Tests des Editor-Bearbeitens (Paket 13, Stufe 2a): Gang ziehen, Knoten setzen/teilen, löschen, Eigenschaften, Rückgängig, Speicher.
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { formatiere, kopie, pruefeFormat, ladeGebiet, gangMasse, richtungVon, Verlauf, formatiereWelt } from '../src/editor/daten.js';
-import { gangZiehen, gangZiel, rasterEnde, knotenSetzen, gangTeilen, loesche, setze, knotenVerschieben, neueId, anfangPunkt, knotenPunkt } from '../src/editor/befehle.js';
+import { gaengeImRaster, gangZiehen, gangZiel, rasterEnde, knotenSetzen, gangTeilen, loesche, setze, knotenVerschieben, neueId, anfangPunkt, knotenPunkt } from '../src/editor/befehle.js';
 import { erzeugeSpeicher } from '../src/editor/speicher.js';
 import { WELT, GEBIETE } from '../src/editor/startdaten.js';
 import { RASTER, KNOTENRASTER, GANG_BREITE, SCREEN_W, SPEED } from '../src/editor/konstanten.js';
 
+const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const TOL = 12;
 const leer = () => ({ format: 1, id: 'test', name: 'Test', tileset: 'bad', bereich: { x0: -500, y0: -500, x1: 500, y1: 500 }, knoten: [], gaenge: [], formteile: [], objekte: [], notizen: [] });
 const gueltig = (g) => assert.deepEqual(pruefeFormat(g), [], 'Format gültig');
@@ -208,10 +212,10 @@ test('Eigenschaften: Breite, Name, Typ, Raumgröße mit Prüfung', () => {
 test('Knoten verschieben rastet und lässt Doppelbelegung nicht zu', () => {
   const g = leer();
   gangZiehen(g, 0, 0, 400, 0, TOL);
-  assert.equal(knotenVerschieben(g, 'K2', 430, 90), true);
-  assert.deepEqual([g.knoten[1].x, g.knoten[1].y], [400, 100]);
+  assert.equal(knotenVerschieben(g, 'K2', 530, 40), true);
+  assert.deepEqual([g.knoten[1].x, g.knoten[1].y], [500, 0]);
   assert.equal(knotenVerschieben(g, 'K2', 10, 10), false, 'K1 steht schon bei (0, 0)');
-  assert.equal(knotenVerschieben(g, 'K2', 400, 100), false, 'gleiche Stelle');
+  assert.equal(knotenVerschieben(g, 'K2', 500, 0), false, 'gleiche Stelle');
 });
 
 test('Verlauf: Rückgängig/Wiederholen stellen den Zustand exakt her', () => {
@@ -256,7 +260,11 @@ test('Zufallsfolge von Bearbeitungen: immer gültig, immer im Raster, alles rüc
     else if (art < 0.65) knotenSetzen(g, ['kreuzung', 'raum', 'speicher', 'ende', 'boss'][Math.floor(zufall() * 5)], px, py, 40);
     else if (art < 0.8 && g.gaenge.length) loesche(g, 'gang', g.gaenge[Math.floor(zufall() * g.gaenge.length)].id);
     else if (art < 0.9 && g.knoten.length) loesche(g, 'knoten', g.knoten[Math.floor(zufall() * g.knoten.length)].id);
-    else if (g.gaenge.length) gangTeilen(g, g.gaenge[Math.floor(zufall() * g.gaenge.length)].id, zufall() * 800);
+    else if (art < 0.95 && g.knoten.length) {
+      const k = g.knoten[Math.floor(zufall() * g.knoten.length)];
+      if (zufall() < 0.5) knotenVerschieben(g, k.id, px, py);
+      else setze(g, 'knoten', k.id, zufall() < 0.5 ? 'x' : 'y', Math.round(px / 20) * 20);
+    } else if (g.gaenge.length) gangTeilen(g, g.gaenge[Math.floor(zufall() * g.gaenge.length)].id, zufall() * 800);
     if (JSON.stringify(g) !== vorher) v.merke(vorher);
     gueltig(g);
     alleImRaster(g);
@@ -288,12 +296,12 @@ test('Vorschau-Funktionen ändern nichts und stimmen mit den Befehlen überein',
   assert.ok(g.knoten.some((k) => k.x === 400 && k.y === 300));
 });
 
-test('Startgebiete: Bearbeiten und Rückgängig lassen die Dateien unverändert', () => {
+test('Startgebiete: Bearbeiten ändert nur die Kopie, die Ausgangsdaten bleiben unberührt', () => {
   for (const [id, g0] of Object.entries(GEBIETE)) {
     const g = kopie(g0);
     const vorher = formatiere(g);
-    const km = g.knoten[0];
-    gangZiehen(g, km.x + 3, km.y - 4, km.x + 3, km.y - 603, TOL);
+    assert.equal(setze(g, 'gang', g.gaenge[0].id, 'breite', g.gaenge[0].breite + 40), null);
+    assert.ok(loesche(g, 'gang', g.gaenge[1].id).length);
     gueltig(g);
     assert.notEqual(formatiere(g), vorher, id);
     assert.equal(formatiere(g0), vorher, 'Original unberührt');
@@ -352,4 +360,62 @@ test('Neue IDs sind frei', () => {
   gangZiehen(g, 0, 0, 400, 0, TOL);
   assert.equal(neueId(g, 'K'), 'K3');
   assert.equal(neueId(g, 'gang'), 'gang2');
+});
+
+test('Knoten verschieben / x,y setzen: Gänge bleiben im 45°-Raster, sonst wird abgelehnt (nichts geändert)', () => {
+  const g = leer();
+  gangZiehen(g, 0, 0, 400, 0, TOL);
+  const vorher = JSON.stringify(g);
+  assert.equal(knotenVerschieben(g, 'K2', 400, 100), false);
+  assert.match(setze(g, 'knoten', 'K2', 'y', 37), /45°-Raster/);
+  assert.equal(JSON.stringify(g), vorher);
+  assert.equal(setze(g, 'knoten', 'K2', 'x', 600), null, 'Verlängern entlang des Gangs geht');
+  assert.equal(knotenVerschieben(g, 'K2', 0, 0), false, 'auf K1 oder zu kurz');
+  assert.ok(gaengeImRaster(g, 'K2'));
+});
+
+test('Gang teilen auf Diagonalen rastet entlang des Gangs (glatte Koordinaten)', () => {
+  const g = leer();
+  gangZiehen(g, 100, 0, 500, 400, TOL);
+  const k = gangTeilen(g, 'gang1', 40);
+  assert.ok(Number.isInteger(k.x) && Number.isInteger(k.y), `${k.x}, ${k.y}`);
+  assert.equal(k.x % RASTER, 0);
+  gueltig(g);
+  alleImRaster(g);
+});
+
+test('Gang auf einen vorhandenen Gang legen (deckungsgleich) wird abgewiesen, Gebiet unverändert', () => {
+  const g = leer();
+  gangZiehen(g, 0, 0, 800, 0, TOL);
+  const vorher = JSON.stringify(g);
+  assert.equal(gangZiehen(g, 0, 0, 400, 0, TOL), null);
+  assert.equal(gangZiehen(g, 200, 0, 600, 0, TOL), null);
+  assert.equal(JSON.stringify(g), vorher);
+});
+
+test('Typwechsel Raum → Speicherort entfernt die Maße; Prototyp-Schlüssel sind keine Typen', () => {
+  const g = leer();
+  knotenSetzen(g, 'raum', 0, 0);
+  assert.equal(setze(g, 'knoten', 'K1', 'typ', 'speicher'), null);
+  assert.equal('w' in g.knoten[0] || 'h' in g.knoten[0], false);
+  assert.match(setze(g, 'knoten', 'K1', 'typ', 'constructor'), /Unbekannt/);
+  assert.ok(pruefeFormat({ ...g, tileset: 'constructor' }).length);
+  assert.ok(pruefeFormat({ ...g, knoten: [{ id: 'K1', typ: 'toString', x: 0, y: 0 }] }).length);
+});
+
+test('welt.json: Formatierung ist verlustfrei, auch mit weiteren Schlüsseln; Windows-Namen sind keine Gebiets-IDs', () => {
+  assert.equal(formatiereWelt(WELT), readFileSync(path.join(root, 'levels/welt.json'), 'utf8'));
+  const mit = { ...WELT, lage: { beispiel: [0, 0] } };
+  assert.deepEqual(JSON.parse(formatiereWelt(mit)), mit);
+  for (const id of ['con', 'nul', 'aux', 'com1', 'lpt9']) assert.ok(pruefeFormat({ ...leer(), id }).length, id);
+  assert.deepEqual(pruefeFormat({ ...leer(), id: 'console' }), []);
+});
+
+test('Leeres Zahlenfeld und riesige Zahlen werden abgewiesen', () => {
+  const g = leer();
+  knotenSetzen(g, 'raum', 0, 0);
+  for (const w of ['', '  ', 'abc']) assert.ok(setze(g, 'knoten', 'K1', 'x', w), `„${w}“`);
+  assert.match(setze(g, 'knoten', 'K1', 'x', 1e9), /nicht erlaubt/);
+  assert.match(setze(g, 'knoten', 'K1', 'w', 99999), /nicht erlaubt/);
+  assert.equal(g.knoten[0].x, 0);
 });

@@ -2,14 +2,14 @@
 
 > Wird von jedem Bau-Lauf gepflegt (Brief: [`BRIEF.md`](BRIEF.md), Abschnitt 7). Zeiten in Europe/Berlin.
 
-**Sperre:** belegt seit 12.10.2026 01:12, Lauf https://claude.ai/code/session_0189CMazp9chAXpeuqDHdUEA
+**Sperre:** frei
 
 ## Stufen
 
 | # | Stufe | Stand | Getestet | Notiz |
 |---|---|---|---|---|
 | 1 | Grundgerüst + Ansehen | fertig (Electron-Start ungetestet) | npm test 313, e2e, e2e:editor, beide Test-Agenten | Lauf 1 |
-| 2a | Bauen I | offen | – | – |
+| 2a | Bauen I | fertig (Electron-Speichern ungetestet; Raumgröße nur per Zahlenfeld, kein Ziehgriff) | npm test 340, e2e, e2e:editor, beide Test-Agenten | Lauf 2 |
 | 2b | Bauen II | offen | – | – |
 | 3 | Spielen ab hier + Bezeichnung | offen | – | – |
 | 4 | Prüfer | offen | – | – |
@@ -33,6 +33,17 @@
 - Zoom in 7 Stufen (0,5–32 Bildschirme), „Alles zeigen“ nimmt die stärkste passende Stufe.
 - Esc/Klick ins Leere beendet Auswahl, Fahrt und Rahmen.
 
+## Auf Vorbehalt entschieden (Stufe 2a)
+
+- Gang-Anschluss an einen Knoten nur, wenn die Richtung im 45°-Raster liegt; sonst freies Ende im Raster. Knoten verschieben/x,y ändern wird abgelehnt, wenn ein Gang das Raster verließe.
+- Neue Gangenden sind Typ `ende`, ab zwei Gängen automatisch `kreuzung`. Gang deckungsgleich auf einem Gang: abgewiesen. Koordinaten/Maße höchstens ±20000 E.
+- Neue Gebiete aus „Öffnen“ kommen erst nach ihrer Speicherung in `welt.json`. Gelöschte IDs werden wieder vergeben (kleinste freie Nummer).
+
+## Offen aus Stufe 2a (Agenten-Prüfung, Hinweise)
+
+- Gänge dürfen sich ohne Knoten kreuzen (Prüfer Stufe 4 soll es melden); `bereich` wird nicht nachgeführt (Stufe 5); beide Hälften eines geteilten Gangs heißen gleich; Namenslänge unbegrenzt; Beschriftungen können sich überlagern; Alles-zeigen-Zoomstufen grob; Raum-Ziehgriff fehlt.
+- Electron (`npm run editor`, IPC, Schließen-Dialog) in der Cloud nicht ausführbar, nur Code-Review.
+
 ## Offen aus der Agenten-Prüfung (Stufe 1)
 
 - Test „Drehen und zurück = dasselbe Bild“ vergleicht nur Zustand; echter Pixelvergleich der Drehung fehlt.
@@ -46,3 +57,4 @@
 |---|---|---|
 | 11.10.2026 22:30 | Opus 5.5 (Leveldesign-Session) | Brief und Stand angelegt |
 | 11.10.2026 23:28 | Sonnet 5.5, Lauf 1 | Stufe 1 gebaut, Agenten-Befunde (Fehler) behoben, gepusht |
+| 12.10.2026 01:08 | Sonnet 5.5, Lauf 2 | Stufe 2a gebaut, Agenten-Befunde behoben, gepusht |

@@ -40,7 +40,10 @@ export default {
     if (!e) return;
     const erg = k.aendere('Gang ziehen', (g) => gangZiehen(g, e.start.x, e.start.y, p.x, p.y, k.tolE()));
     if (erg) k.waehle({ art: 'gang', id: erg.gang.id });
-    else k.zeichnen();
+    else {
+      k.zeichnen();
+      k.hinweis('Gang nicht angelegt: zu kurz, schon vorhanden oder deckungsgleich mit einem Gang.');
+    }
   },
   abbruch(k) {
     entwurf = null;

@@ -4,7 +4,7 @@ import { HEADINGS, DIR_VEC, headingAngle, HEADING_CODES, DIR_NAMES } from '../co
 import { FORMAT, SCREEN_W, SCREEN_H, SPEED, WINKEL_SCHRITT, VERLAUF_MAX } from './konstanten.js';
 import { KNOTENTYPEN, OBJEKTTYPEN, TILESETS } from './katalog.js';
 
-export const GEBIET_ID = /^[a-z0-9][a-z0-9_-]*$/;
+export const GEBIET_ID = /^(?!(?:con|prn|aux|nul|com\d|lpt\d)$)[a-z0-9][a-z0-9_-]*$/; // gültiger Dateiname (auch unter Windows)
 const EPS = 1e-6;
 const RAD = Math.PI / 180;
 
@@ -56,7 +56,7 @@ export function pruefeFormat(g) {
   const zahl0 = (v) => typeof v === 'number' && Number.isFinite(v);
   const b = g.bereich;
   if (!b || typeof b !== 'object' || !['x0', 'y0', 'x1', 'y1'].every((k) => zahl0(b[k]))) f('Feld „bereich“ braucht x0, y0, x1, y1 als Zahlen.');
-  if (typeof g.tileset === 'string' && !TILESETS[g.tileset]) f(`Unbekanntes Tileset „${g.tileset}“.`);
+  if (typeof g.tileset === 'string' && !Object.hasOwn(TILESETS, g.tileset)) f(`Unbekanntes Tileset „${g.tileset}“.`);
   if (fehler.length) return fehler;
   const zahl = (v) => typeof v === 'number' && Number.isFinite(v);
   const ids = new Set();
@@ -69,12 +69,12 @@ export function pruefeFormat(g) {
       else ids.add(o.id);
       const zahlen = { knoten: ['x', 'y'], gang: ['breite'], formteil: ['x', 'y', 'laenge', 'breite', 'winkel'], objekt: ['x', 'y'], notiz: ['x', 'y'] }[art];
       for (const k of zahlen) if (!zahl(o[k])) f(`${wo} (${o.id}): „${k}“ ist keine Zahl.`);
-      if (art === 'knoten' && !KNOTENTYPEN[o.typ]) f(`${wo} (${o.id}): unbekannter Knotentyp „${o.typ}“.`);
+      if (art === 'knoten' && !Object.hasOwn(KNOTENTYPEN, o.typ)) f(`${wo} (${o.id}): unbekannter Knotentyp „${o.typ}“.`);
       if (art === 'knoten' && KNOTENTYPEN[o.typ]?.hatMasse && !(o.w > 0 && o.h > 0)) f(`${wo} (${o.id}): ${KNOTENTYPEN[o.typ].name} braucht Maße w und h (> 0).`);
       if (art === 'knoten' && o.form === 'achteck' && !(o.seite > 0)) f(`${wo} (${o.id}): Achteck braucht „seite“ (> 0).`);
       if (art === 'gang' && !(o.breite > 0)) f(`${wo} (${o.id}): Breite muss größer als 0 sein.`);
       if (art === 'notiz' && typeof o.text !== 'string') f(`${wo} (${o.id}): „text“ muss Text sein.`);
-      if (art === 'objekt' && !OBJEKTTYPEN[o.typ]) f(`${wo} (${o.id}): unbekannter Objekttyp „${o.typ}“.`);
+      if (art === 'objekt' && !Object.hasOwn(OBJEKTTYPEN, o.typ)) f(`${wo} (${o.id}): unbekannter Objekttyp „${o.typ}“.`);
       if (art === 'objekt' && OBJEKTTYPEN[o.typ]?.hatMasse) for (const k of ['laenge', 'breite', 'winkel']) if (!zahl(o[k])) f(`${wo} (${o.id}): „${k}“ ist keine Zahl.`);
       if (art === 'gang') for (const k of ['von', 'nach']) if (typeof o[k] !== 'string') f(`${wo} (${o.id}): „${k}“ fehlt.`);
       if ((art === 'formteil' || (art === 'objekt' && OBJEKTTYPEN[o.typ]?.hatMasse)) && zahl(o.winkel) && Math.abs(o.winkel / WINKEL_SCHRITT - Math.round(o.winkel / WINKEL_SCHRITT)) > EPS) {
@@ -290,5 +290,7 @@ export class Verlauf {
 /** Welt-Datei (Liste der Gebiete) als Text: ein Gebiet pro Zeile. */
 export function formatiereWelt(welt) {
   const gebiete = welt.gebiete.map((g) => '    ' + einzeilig(ordne(g, ['id', 'name', 'datei'])));
-  return `{\n  "format": ${welt.format},\n  "gebiete": [\n${gebiete.join(',\n')}\n  ]\n}\n`;
+  const andere = Object.keys(welt).filter((k) => k !== 'format' && k !== 'gebiete'); // weitere Schlüssel (später: Lage) gehen nicht verloren
+  const zeilen = [`  "format": ${JSON.stringify(welt.format)}`, ...andere.map((k) => `  ${JSON.stringify(k)}: ${JSON.stringify(welt[k])}`), `  "gebiete": [\n${gebiete.join(',\n')}\n  ]`];
+  return `{\n${zeilen.join(',\n')}\n}\n`;
 }

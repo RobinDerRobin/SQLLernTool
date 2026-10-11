@@ -2,7 +2,7 @@
 // übergebenen Gebiet (kein DOM, läuft auch unter Node) – Rückgängig macht main.js über den Verlauf aus daten.js.
 // Alles rastet: Gänge auf 8 Richtungen und RASTER (20 E), neue Knoten auf KNOTENRASTER (100 E).
 import { HEADINGS, DIR_VEC } from '../core/math.js';
-import { RASTER, KNOTENRASTER, GANG_BREITE, RAUM_W, RAUM_H, MIN_RAUM, MIN_QUERWEG, MIN_GANG_LAENGE } from './konstanten.js';
+import { MAX_KOORD, RASTER, KNOTENRASTER, GANG_BREITE, RAUM_W, RAUM_H, MIN_RAUM, MIN_QUERWEG, MIN_GANG_LAENGE } from './konstanten.js';
 import { KNOTENTYPEN } from './katalog.js';
 import { knotenMap, gangMasse, richtungVon } from './daten.js';
 
@@ -112,6 +112,7 @@ export function gangTeilen(g, gangId, s, typ = 'kreuzung') {
   const gang = g.gaenge.find((x) => x.id === gangId);
   const m = gang && gangMasse(g, gang);
   if (!m) return null;
+  s = rund(s, schrittEntlang(m)); // auch auf Diagonalen im Raster
   if (s < MIN_GANG_LAENGE) return g.knoten.find((k) => k.id === gang.von);
   if (s > m.laenge - MIN_GANG_LAENGE) return g.knoten.find((k) => k.id === gang.nach);
   const knoten = knotenAnlegen(g, typ, m.a.x + m.ux * s, m.a.y + m.uy * s);
@@ -179,6 +180,21 @@ export function gangZiel(g, start, x, y, tol) {
   return { x: r.x, y: r.y, richtung: r.richtung, laenge: abstand(r.x, r.y, start.x, start.y) };
 }
 
+/** Läge ein neuer Gang von a nach b deckungsgleich auf einem vorhandenen (parallel, Mitte auf dessen Mittellinie)? */
+function ueberlagert(g, a, b) {
+  const mx = (a.x + b.x) / 2;
+  const my = (a.y + b.y) / 2;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const km = knotenMap(g);
+  return g.gaenge.some((x) => {
+    const m = gangMasse(g, x, km);
+    if (!m || m.laenge < EPS || Math.abs(dx * m.uy - dy * m.ux) > 1e-6 * Math.hypot(dx, dy)) return false;
+    const t = (mx - m.a.x) * m.ux + (my - m.a.y) * m.uy;
+    return t >= -EPS && t <= m.laenge + EPS && Math.abs((mx - m.a.x) * m.uy - (my - m.a.y) * m.ux) < 1;
+  });
+}
+
 /** Stellt den Zustand `vorher` (Text) wieder her, ohne das Objekt zu ersetzen. */
 function wiederherstellen(g, vorher) {
   const alt = JSON.parse(vorher);
@@ -206,6 +222,7 @@ export function gangZiehen(g, sx, sy, ex, ey, tol, breite = GANG_BREITE) {
   } else nach = knotenAnlegen(g, 'ende', ziel.x, ziel.y);
   const doppelt = nach && g.gaenge.some((x) => (x.von === von.id && x.nach === nach.id) || (x.von === nach.id && x.nach === von.id));
   if (!nach || nach.id === von.id || doppelt || richtungVon(nach.x - von.x, nach.y - von.y) < 0) return wiederherstellen(g, vorher);
+  if (ueberlagert(g, von, nach)) return wiederherstellen(g, vorher);
   const id = neueId(g, 'gang');
   const gang = { id, name: `Gang ${id.slice(4)}`, von: von.id, nach: nach.id, breite };
   g.gaenge.push(gang);
@@ -222,9 +239,25 @@ export function knotenVerschieben(g, id, x, y) {
   const ny = rund(y, KNOTENRASTER);
   if (nx === k.x && ny === k.y) return false;
   if (g.knoten.some((n) => n !== k && n.x === nx && n.y === ny)) return false;
+  const altX = k.x;
+  const altY = k.y;
   k.x = nx;
   k.y = ny;
+  if (!gaengeImRaster(g, id)) {
+    k.x = altX;
+    k.y = altY;
+    return false;
+  }
   return true;
+}
+
+/** Liegen alle Gänge an diesem Knoten (noch) im 45°-Raster und haben Länge? */
+export function gaengeImRaster(g, knotenId) {
+  const km = knotenMap(g);
+  return g.gaenge.filter((x) => x.von === knotenId || x.nach === knotenId).every((x) => {
+    const m = gangMasse(g, x, km);
+    return m && m.richtung >= 0 && m.laenge >= MIN_GANG_LAENGE;
+  });
 }
 
 /** Löscht einen Knoten (samt seinen Gängen) oder einen Gang; Gangenden, die dadurch frei stehen, verschwinden mit. Gibt die entfernten IDs zurück. */
@@ -264,7 +297,9 @@ export function loesche(g, art, id) {
 export function setze(g, art, id, feld, wert) {
   const o = (art === 'gang' ? g.gaenge : g.knoten).find((x) => x.id === id);
   if (!o) return `${art === 'gang' ? 'Gang' : 'Knoten'} „${id}“ gibt es nicht.`;
-  const zahl = typeof wert === 'number' ? wert : Number(String(wert).replace(',', '.'));
+  const text = String(wert).trim();
+  const zahl = typeof wert === 'number' ? wert : text === '' ? NaN : Number(text.replace(',', '.')); // leeres Feld ist keine 0
+  if (feld !== 'name' && feld !== 'typ' && Number.isFinite(zahl) && Math.abs(zahl) > MAX_KOORD) return `Zahlen über ${MAX_KOORD} E sind nicht erlaubt.`;
   if (art === 'gang') {
     if (feld === 'name') {
       const t = String(wert).trim();
@@ -277,7 +312,11 @@ export function setze(g, art, id, feld, wert) {
     return null;
   }
   if (feld === 'typ') {
-    if (!KNOTENTYPEN[wert]) return `Unbekannter Knotentyp „${wert}“.`;
+    if (!Object.hasOwn(KNOTENTYPEN, wert)) return `Unbekannter Knotentyp „${wert}“.`;
+    if (KNOTENTYPEN[o.typ]?.hatMasse && !KNOTENTYPEN[wert].hatMasse && o.typ !== 'kreuzung') {
+      delete o.w; // Maße gehören nur zu Raum/Boss (und zum Kreuzungsquadrat)
+      delete o.h;
+    }
     o.typ = wert;
     if (KNOTENTYPEN[wert].hatMasse && !(o.w > 0 && o.h > 0)) {
       o.w = RAUM_W;
@@ -285,7 +324,12 @@ export function setze(g, art, id, feld, wert) {
     }
   } else if (feld === 'x' || feld === 'y') {
     if (!Number.isFinite(zahl)) return 'Bitte eine Zahl eingeben.';
+    const alt = o[feld];
     o[feld] = rund(zahl);
+    if (!gaengeImRaster(g, id)) {
+      o[feld] = alt;
+      return 'Dann läge ein Gang an diesem Knoten nicht mehr im 45°-Raster (oder wäre zu kurz). Nichts geändert.';
+    }
   } else if (feld === 'w' || feld === 'h') {
     if (!(o.w > 0 && o.h > 0)) return 'Dieser Knoten hat keine Maße (nur Räume, Bosskämpfe und Kreuzungsquadrate).';
     if (!Number.isFinite(zahl) || zahl < MIN_RAUM) return `Eine Raumseite muss mindestens ${MIN_RAUM} E lang sein.`;

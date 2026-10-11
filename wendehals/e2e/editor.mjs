@@ -214,7 +214,7 @@ await ed((e) => e.tick(100));
 check((await ed((e) => ({ s: e.state.fahrt.s, l: e.state.fahrt.laeuft }))).l === false, 'Fahrt: hält am Gangende an');
 
 // ------------------------------------------------------------------ Bauen (Stufe 2a): mit der Maus, auf einer frischen Seite
-const bau = await browser.newPage({ viewport: { width: 1280, height: 720 }, acceptDownloads: true });
+const bau = await browser.newPage({ viewport: { width: 1280, height: 860 }, acceptDownloads: true }); // höher als das Deck, damit der ganze Plan (bis y = 1500) im Bild liegt
 const bauFehler = [];
 bau.on('pageerror', (e) => bauFehler.push('pageerror: ' + e.message));
 bau.on('console', (m) => {
@@ -326,7 +326,7 @@ await klick([2403, -795]);
 const nachK = await gebietNow();
 const raum = nachK.knoten[nachK.knoten.length - 1];
 check(nachK.knoten.length === vorK.knoten.length + 1 && raum.typ === 'raum' && raum.x === 2400 && raum.y === -800 && JSON.stringify([raum.w, raum.h]) === '[520,400]', 'Knoten setzen: Raum im Raster bei (2400, −800), 520 × 400 E');
-check(await boden([2400, -800]), 'Knoten setzen: der Raum hat im Bild Boden');
+check(await boden([2400 + 150, -800 + 100]), 'Knoten setzen: der Raum hat im Bild Boden (neben dem Mittelpunkt, ausgewählt: Rand/Mitte sind markiert)', JSON.stringify(await pixelBei([2550, -700])));
 await bau.selectOption('#knotentyp', 'speicher');
 const vorS = await gebietNow();
 await klick([1895, 6]); // mitten auf dem Ostgang
@@ -357,9 +357,9 @@ check(await boden([1200 + 330, -1100]) , 'Raumgröße ändern: im Bild breiter')
 
 // Knoten verschieben (Auswahl-Werkzeug)
 const vorV = (await gebietNow()).knoten.find((k) => k.id === 'K4');
-await zieh([vorV.x, vorV.y], [vorV.x + 200, vorV.y + 100]);
+await zieh([vorV.x, vorV.y], [vorV.x + 200, vorV.y + 200]); // K4 hängt an einer Diagonalen: nur entlang ihr (Raster bleibt)
 const nachV = (await gebietNow()).knoten.find((k) => k.id === 'K4');
-check(nachV.x === vorV.x + 200 && nachV.y === vorV.y + 100, 'Knoten ziehen: K4 wandert im Raster (+200, +100)');
+check(nachV.x === vorV.x + 200 && nachV.y === vorV.y + 200, 'Knoten ziehen: K4 wandert entlang seiner Diagonalen (+200, +200)');
 await bau.keyboard.press('Control+KeyZ');
 check((await gebietNow()).knoten.find((k) => k.id === 'K4').x === vorV.x, 'Knoten ziehen: Rückgängig');
 

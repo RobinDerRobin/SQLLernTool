@@ -39,7 +39,8 @@ button:disabled { opacity: .45; cursor: default; }
 #fahrt { flex: 1; min-width: 120px; }
 #melden { color: #b8e8c0; white-space: pre-line; max-height: 70px; overflow: auto; }
 #melden.fehler { color: #ff9a8a; }
-#werkhinweis { margin-left: 6px; }
+#werkhinweis { margin-left: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+#werk, #oben { height: 44px; overflow: hidden; }
 #stand.offen { color: #ffd24a; }
 input[type=text], input[type=number], #rechts select { width: 100%; box-sizing: border-box; background: #14121a; color: #e8e6ee; border: 1px solid #4b4560; border-radius: 4px; padding: 3px 6px; font: inherit; }
 #rechts .knoepfe { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
@@ -77,6 +78,7 @@ export function startEditor() {
     verlauf: {}, // Gebiets-ID → Verlauf (Rückgängig/Wiederholen)
     gespeichert: Object.fromEntries(Object.entries(GEBIETE).map(([id, g]) => [id, formatiere(g)])), // zuletzt gespeicherter/geladener Text je Gebiet
     weltGeaendert: false, // welt.json muss mitgeschrieben werden (neues Gebiet geöffnet)
+    neueGebiete: new Set(), // geöffnete Gebiete, deren Datei noch nicht gespeichert ist (kommen erst danach in welt.json)
     speicher: erzeugeSpeicher(),
   };
   const ansicht = new Ansicht();
@@ -176,6 +178,7 @@ export function startEditor() {
   function waehle(auswahl) {
     state.auswahl = auswahl;
     if (!auswahl) state.fahrt = null; // nichts gewählt: kein Rahmen, keine Fahrt
+    if (auswahl && auswahl.art === 'knoten') state.fahrt = null; // der Rahmen gehört zu Gängen
     if (auswahl && auswahl.art === 'gang') {
       if (!state.fahrt || state.fahrt.gang !== auswahl.id) state.fahrt = { gang: auswahl.id, s: 0, laeuft: false };
     }
@@ -336,7 +339,7 @@ export function startEditor() {
   function teileGang() {
     const au = state.auswahl;
     if (au?.art !== 'gang' || !state.fahrt) return;
-    const neu = aendere('Gang teilen', (g) => gangTeilen(g, au.id, Math.round(state.fahrt.s / 20) * 20));
+    const neu = aendere('Gang teilen', (g) => gangTeilen(g, au.id, state.fahrt.s));
     if (neu) waehle({ art: 'knoten', id: neu.id });
   }
   function setzeWerkzeug(id) {
@@ -357,11 +360,14 @@ export function startEditor() {
       const r = await state.speicher.sichere(`gebiete/${g.id}.json`, text);
       if (!r) return melde('Speichern abgebrochen.');
       state.gespeichert[g.id] = text;
+      state.neueGebiete.delete(g.id);
       let wo = r.wo;
       if (state.weltGeaendert) {
-        const wr = await state.speicher.sichere('welt.json', formatiereWelt(state.welt));
+        // nur Gebiete eintragen, deren Datei es gibt – sonst findet der nächste Start eine Datei nicht
+        const weltText = formatiereWelt({ ...state.welt, gebiete: state.welt.gebiete.filter((e) => !state.neueGebiete.has(e.id)) });
+        const wr = await state.speicher.sichere('welt.json', weltText);
         if (wr) {
-          state.weltGeaendert = false;
+          state.weltGeaendert = state.neueGebiete.size > 0;
           wo += ` und ${wr.wo}`;
         }
       }
@@ -384,6 +390,7 @@ export function startEditor() {
     else {
       state.welt = { ...state.welt, gebiete: [...state.welt.gebiete, { id: g.id, name: g.name, datei: `gebiete/${g.id}.json` }] };
       state.weltGeaendert = true;
+      state.neueGebiete.add(g.id);
       wahl.append(el('option', { value: g.id, text: g.name }));
     }
     state.gebiete[g.id] = g;
@@ -412,12 +419,14 @@ export function startEditor() {
       }
     }
     if (!Object.keys(neu).length) throw new Error('keine gültige Gebietsdatei gefunden\n' + probleme.join('\n'));
-    state.welt = { ...welt, gebiete: welt.gebiete.filter((e) => neu[e.id]) };
+    state.welt = welt; // ungeladene Einträge bleiben in welt.json erhalten
+    state.neueGebiete = new Set();
     state.gebiete = neu;
     state.gespeichert = Object.fromEntries(Object.entries(neu).map(([id, g]) => [id, formatiere(g)]));
     state.verlauf = {};
-    wahl.replaceChildren(...state.welt.gebiete.map((e) => el('option', { value: e.id, text: e.name })));
-    wechsle(state.welt.gebiete[0].id);
+    const geladen = welt.gebiete.filter((e) => neu[e.id]);
+    wahl.replaceChildren(...geladen.map((e) => el('option', { value: e.id, text: e.name })));
+    wechsle(geladen[0].id);
     if (probleme.length) melde('Einige Dateien wurden übersprungen:\n' + probleme.join('\n'), 'fehler');
   }
 

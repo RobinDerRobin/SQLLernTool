@@ -29,7 +29,8 @@ export default {
     zug = null;
     if (!z) return;
     if (!z.bewegt) return k.waehle({ art: 'knoten', id: z.id });
-    k.aendere('Knoten verschieben', (g) => knotenVerschieben(g, z.id, z.x, z.y));
+    const ok = k.aendere('Knoten verschieben', (g) => knotenVerschieben(g, z.id, z.x, z.y));
+    if (!ok) k.hinweis('Dorthin geht der Knoten nicht: seine Gänge würden aus dem 45°-Raster fallen, zu kurz werden, oder dort steht schon ein Knoten.');
     k.waehle({ art: 'knoten', id: z.id });
   },
   /** Klick ohne Zug auf nichts oder einen Gang (main.js ruft das, wenn `down` nicht erfasst hat). */
