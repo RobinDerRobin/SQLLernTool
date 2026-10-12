@@ -1164,7 +1164,10 @@ export function startEditor() {
     else if (c === 'Enter' && state.ansichtArt === 'welt') weltOeffneAuswahl();
     else if (c === 'Escape') {
       aktiv().abbruch?.(kontext);
-      if (state.ansichtArt === 'welt') weltWaehle(null);
+      if (state.ansichtArt === 'welt') {
+        if (state.weltAuswahl) weltWaehle(null);
+        else zuGebiet();
+      }
       else waehle(null);
     }
     else getan = false;

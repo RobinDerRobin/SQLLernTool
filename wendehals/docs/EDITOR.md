@@ -13,7 +13,7 @@
 
 ## Bedienung (Stufe 1)
 
-Klick wählt Gang oder Knoten, Ziehen verschiebt, Mausrad zoomt (7 Stufen, Normalansicht 2,2 Bildschirme breit).
+Klick wählt Gang oder Knoten, Ziehen verschiebt, Mausrad zoomt (9 Stufen, Normalansicht 2,2 Bildschirme breit).
 `Q`/`E` drehen in 45°-Schritten, `0` Norden oben, `F` „wie im Spiel“ (Flugrichtung des gewählten Gangs nach rechts),
 `L` Beschriftung aus/an, Pfeiltasten verschieben, `+`/`−` zoomen. Der **gelbe Rahmen** ist der Bildschirm (480 × 270 E) mit
 dem Dackel; der Fahrt-Schieber unten (oder Leertaste) fährt ihn mit 70 E/s durch den Gang. Angezeigt werden Länge in E,

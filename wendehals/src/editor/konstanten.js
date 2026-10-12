@@ -29,7 +29,7 @@ export const MAX_KOORD = 20000; // größte erlaubte Koordinate/Maßzahl (E)
 export const VERLAUF_MAX = 200; // Schritte, die Rückgängig zurückgehen kann
 
 /** Zoomstufen als „Bildschirme in der Breite des Plans“. Normalansicht ≈ 2,2 Bildschirme (Brief Abschnitt 1). */
-export const ZOOM_BILDSCHIRME = [0.5, 1, 2.2, 4, 8, 16, 32];
+export const ZOOM_BILDSCHIRME = [0.5, 1, 2.2, 4, 8, 16, 32, 64, 128];
 export const ZOOM_START = 2;
 
 /** Tastenkürzel (KeyboardEvent.code). */

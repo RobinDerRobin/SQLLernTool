@@ -2,7 +2,7 @@
 
 > Wird von jedem Bau-Lauf gepflegt (Brief: [`BRIEF.md`](BRIEF.md), Abschnitt 7). Zeiten in Europe/Berlin.
 
-**Sperre:** belegt seit 12.10.2026 06:35, Lauf https://claude.ai/code/session_01USdbRq4mPurJPMkCKpGRm3
+**Sperre:** frei
 
 ## Stufen
 
@@ -13,7 +13,7 @@
 | 2b | Bauen II | fertig (Electron ungetestet; Teile ohne Spielgrafik, Hindernis = Platzhalterbild) | npm test 357, e2e, e2e:editor, beide Test-Agenten | Lauf 3 |
 | 3 | Spielen ab hier + Bezeichnung | fertig (nur Ost/West/Nord/Süd-Gänge spielbar; Electron ungetestet) | npm test 369, e2e, e2e:editor, beide Test-Agenten | Lauf 4 |
 | 4 | Prüfer | fertig (Electron ungetestet; Marken nur bei offener Liste) | npm test 384, e2e, e2e:editor, beide Test-Agenten | Lauf 5 |
-| 5 | Gebiete und Übergänge | offen | – | – |
+| 5 | Gebiete und Übergänge | fertig (Electron ungetestet; „Level zuordnen“ = Gebietsdatei, kein Verschieben von Gängen zwischen Gebieten) | npm test 401, e2e, e2e:editor, beide Test-Agenten | Lauf 6 |
 | 6 | Tilesets und Spielgrafik | offen | – | – |
 | 7 | Testmenü am Deck | offen | – | – |
 | 8 | Notizen und Stempel | offen | – | – |
@@ -54,6 +54,16 @@
 
 - Prüfer-Knopf unten zeigt die Zählung (rot/gelb/grün); Liste und Marken im Plan erscheinen erst nach Klick (damit Pixeltests der Spielbilder unberührt bleiben). M7 = `spielbarkeit().probleme`. M4 prüft Mittelpunkt + 4 um 2 E eingezogene Ecken; M3 misst ab Knotenmitte, nur Knoten vom Typ `kreuzung`. M2 tastet alle 20 E längs und 10 E quer ab.
 
+## Auf Vorbehalt entschieden (Stufe 5)
+
+- `welt.json` additiv erweitert: je Gebiet optional `lage {x,y}` (nur Versatz im Welt-Plan), Liste `uebergaenge [{id, von:"gebiet/K", nach:"gebiet/K"}]`. Ohne `lage` ordnet `weltLagen` automatisch an; beim ersten Verschieben werden alle Lagen festgeschrieben.
+- Neue Ansicht „Welt“ (Taste T), Werkzeug „Bereich“ (A). Welt-Prüfer W1 MUSS (Übergänge gültig), W2/W3/W4 SOLL (Überlappung, Zusammenhang, Inhalt im Bereich) in `welt.js`, nicht in `regeln.js` (Gebiets-Prüfer unverändert). Zoomstufen um 64 und 128 Bildschirme ergänzt.
+- Löscht man einen Knoten mit Übergang, bleibt der Übergang stehen (W1 meldet); Knoten-IDs mit Übergang werden nicht neu vergeben. Welt-Rückgängig setzt nur Lage und Übergänge zurück, nicht die Gebietsliste.
+
+## Offen aus Stufe 5 (Agenten-Prüfung, Hinweise)
+
+- Layout bei 1024×600: Werkzeugleiste schneidet Löschen/Speichern/Öffnen ab (alt, jetzt etwas besser oben); „Übergang anlegen“ liegt dort unter dem Sichtbereich. Beschriftungen in der Welt-Ansicht überlagern sich (Übergangstexte, Gebietsnamen, gedreht schlimmer); Linie eines verwaisten Übergangs wird nicht gezeichnet. Strg+S in der Welt schreibt welt.json auch bei offenen W1-Fehlern; Anzeige „gespeichert“ in der Welt zeigt nur welt.json. Lage wird bei Überlauf still begrenzt. Bereichsfelder nur sichtbar, wenn nichts gewählt ist. Gebiets-Prüfer zählt Inhalt außerhalb des Bereichs nicht (nur W4). Gebietsname „Beispiel „Kanal““ hat doppelte Anführungszeichen (Daten). Einmal trat im Smoke-Test (v0.2, Drehscheibe) ein Fehler auf, Wiederholung grün (bekannter Flake, nichts am Spiel geändert).
+
 ## Offen aus Stufe 4 (Agenten-Prüfung, Hinweise)
 
 - Layout bei 1024×600: Werkzeugleiste schneidet „Speichern/Öffnen“ ab (nicht neu, Stufe 2a/2b). Liste (440 px) verdeckt Plan und fängt Klicks; Schließen nur über den Knopf. Rahmen bleibt nach Objektwahl am früheren Gang. `teilSetzen` rundet bei Klick exakt auf Zellenmitte falsch (20×60). M7/M5-„kein Speicherort“/M6 ohne Ort (Klick springt nicht). M2 übersieht Wände < 20 E Dicke und rundet bis 10 E großzügig; M4 übersieht schmale Wand über Lücke; Gegner auf der Gangkante asymmetrisch; Zahlen der Marken in zeichnen.js. M2 braucht bei 300 Objekten/10 Gängen ca. 180 ms je Änderung.
@@ -88,3 +98,4 @@
 | 12.10.2026 03:10 | Sonnet 5.5, Lauf 3 | Stufe 2b gebaut, Agenten-Befunde (Fehler) behoben, gepusht |
 | 12.10.2026 05:12 | Sonnet 5.5, Lauf 4 | Stufe 3 gebaut, Agenten-Befunde (Fehler) behoben, gepusht |
 | 12.10.2026 05:57 | Sonnet 5.5, Lauf 5 | Stufe 4 gebaut, Agenten-Befund (Leistung M2) behoben, gepusht |
+| 12.10.2026 06:35 | Sonnet 5.5, Lauf 6 | Stufe 5 gebaut, Agenten-Befunde (Fehler) behoben, gepusht |

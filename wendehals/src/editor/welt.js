@@ -353,7 +353,7 @@ export function pruefeWelt(welt, gebiete) {
   }
   for (const e of geladen) {
     const d = ausserhalb(gebiete[e.id]);
-    if (d.length) melde('W4', 'SOLL', `Im Gebiet „${e.name}“ liegt ${d.length === 1 ? `${d[0].art} ${d[0].id}` : `${d.length} Dinge (z. B. ${d[0].art} ${d[0].id})`} außerhalb des Bereichs („Bereich an Inhalt anpassen“).`, { art: 'gebiet', id: e.id });
+    if (d.length) melde('W4', 'SOLL', `Im Gebiet „${e.name}“ ${d.length === 1 ? `liegt ${d[0].art} ${d[0].id}` : `liegen ${d.length} Dinge (z. B. ${d[0].art} ${d[0].id})`} außerhalb des Bereichs („Bereich an Inhalt anpassen“).`, { art: 'gebiet', id: e.id });
   }
   if (geladen.length > 1) {
     const nachbarn = new Map(geladen.map((e) => [e.id, new Set()]));
