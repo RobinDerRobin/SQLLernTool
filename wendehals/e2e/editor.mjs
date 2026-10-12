@@ -247,10 +247,11 @@ async function zieh(von, nach, extra = {}) {
   await bau.mouse.move(x1, y1, { steps: 4 });
   await bau.mouse.up(extra);
 }
-async function klick(punkt) {
+async function klick(punkt, extra = {}) {
   const [x, y] = await bild(punkt);
-  await bau.mouse.click(x, y);
+  await bau.mouse.click(x, y, extra);
 }
+const RECHTS = { button: 'right' }; // Rechtsklick setzt das aktuelle Element (A1), Linksklick wählt nur
 const gebietNow = () => b((e) => e.gebiet());
 // Pixel an einer Weltstelle, ohne die abdunkelnde Rahmen-Überlagerung (der gewählte Gang zeigt sonst den Bildschirmrahmen)
 const pixelBei = ([x, y]) =>
@@ -275,7 +276,7 @@ await bau.click('#t-gang');
 check((await b((e) => e.state.werkzeug)) === 'gang', 'Werkzeug: Klick auf „Gang“ schaltet um');
 
 // Gang ziehen im Leeren: rastet auf 8 Richtungen und 20 E
-await zieh([203, 805], [813, 790]);
+await zieh([203, 805], [813, 790], RECHTS);
 let g1 = await gebietNow();
 const gneu = g1.gaenge[g1.gaenge.length - 1];
 const kn = (g, id) => g.knoten.find((k) => k.id === id);
@@ -300,7 +301,7 @@ await bau.click('#b-redo');
 check(JSON.stringify(await gebietNow()) === JSON.stringify(g1), 'Rückgängig-/Wiederholen-Knöpfe stellen den Zustand her');
 
 // Diagonale
-await zieh([813, 790], [1213, 1210]);
+await zieh([813, 790], [1213, 1210], RECHTS);
 g1 = await gebietNow();
 const gd = g1.gaenge[g1.gaenge.length - 1];
 check(gd.von === gneu.nach, 'Gang ziehen: Anfang auf einem vorhandenen Knoten verbindet (Gang beginnt am Gangende)');
@@ -309,7 +310,7 @@ check(kn(g1, gd.von).typ === 'kreuzung', 'Gang ziehen: Knoten mit zwei Gängen w
 
 // T-Kreuzung: von unten auf die „Schleuse“ ziehen
 const vorT = await gebietNow();
-await zieh([603, 420], [598, 12]);
+await zieh([603, 420], [598, 12], RECHTS);
 const nachT = await gebietNow();
 const sch = nachT.gaenge.filter((x) => x.name === 'Schleuse');
 check(nachT.gaenge.length === vorT.gaenge.length + 2 && sch.length === 2, 'T-Kreuzung: Gang geteilt (zwei „Schleuse“-Teile) und neuer Gang');
@@ -323,14 +324,14 @@ await bau.keyboard.press('KeyK');
 check((await b((e) => e.state.werkzeug)) === 'knoten', 'Werkzeug: Taste K schaltet auf Knoten');
 await bau.selectOption('#knotentyp', 'raum');
 const vorK = await gebietNow();
-await klick([2403, -795]);
+await klick([2403, -795], RECHTS);
 const nachK = await gebietNow();
 const raum = nachK.knoten[nachK.knoten.length - 1];
 check(nachK.knoten.length === vorK.knoten.length + 1 && raum.typ === 'raum' && raum.x === 2400 && raum.y === -800 && JSON.stringify([raum.w, raum.h]) === '[520,400]', 'Knoten setzen: Raum im Raster bei (2400, −800), 520 × 400 E');
 check(await boden([2400 + 150, -800 + 100]), 'Knoten setzen: der Raum hat im Bild Boden (neben dem Mittelpunkt, ausgewählt: Rand/Mitte sind markiert)', JSON.stringify(await pixelBei([2550, -700])));
 await bau.selectOption('#knotentyp', 'speicher');
 const vorS = await gebietNow();
-await klick([1895, 6]); // mitten auf dem Ostgang
+await klick([1895, 6], RECHTS); // mitten auf dem Ostgang
 const nachS = await gebietNow();
 check(nachS.knoten.length === vorS.knoten.length + 1 && nachS.gaenge.length === vorS.gaenge.length + 1, 'Knoten auf Gang setzen: Gang wird geteilt (T-Kreuzung)');
 check(nachS.gaenge.filter((x) => x.name === 'Ostgang').length === 2, 'Knoten auf Gang setzen: beide Teile heißen weiter „Ostgang“');
@@ -452,18 +453,18 @@ const tBild = async ([x, y]) => {
   const [px, py] = await t2((e, p) => e.ansicht.weltZuBild(p[0], p[1]), [x, y]);
   return [tBox.x + px, tBox.y + py];
 };
-async function tZieh(von, nach) {
+async function tZieh(von, nach, extra = {}) {
   const [x0, y0] = await tBild(von);
   const [x1, y1] = await tBild(nach);
   await teil.mouse.move(x0, y0);
-  await teil.mouse.down();
+  await teil.mouse.down(extra);
   await teil.mouse.move((x0 + x1) / 2, (y0 + y1) / 2, { steps: 4 });
   await teil.mouse.move(x1, y1, { steps: 4 });
-  await teil.mouse.up();
+  await teil.mouse.up(extra);
 }
-async function tKlick(punkt) {
+async function tKlick(punkt, extra = {}) {
   const [x, y] = await tBild(punkt);
-  await teil.mouse.click(x, y);
+  await teil.mouse.click(x, y, extra);
 }
 const tDaten = () => t2((e) => e.gebiet());
 const tPixel = ([x, y]) =>
@@ -504,7 +505,7 @@ for (const [id, kuerzel] of [['formteil', 'KeyB'], ['wand', 'KeyW'], ['hindernis
 // Formteil ziehen: Boden 120 E breit im leeren Gebiet
 await teil.keyboard.press('KeyB');
 check(!(await tBoden([410, 710])), 'Formteil: vorher dort kein Boden'); // Messpunkte abseits der Schachbrettlinien (Vielfache von 80 E)
-await tZieh([203, 703], [607, 690]);
+await tZieh([203, 703], [607, 690], RECHTS);
 let d1 = await tDaten();
 const f = d1.formteile[d1.formteile.length - 1];
 check(d1.formteile.length === 2 && f.id === 'f2' && f.winkel === 0 && f.laenge === 400 && f.x === 400 && f.y === 700 && f.breite === 120, 'Formteil ziehen: 400 E lang, Mitte (400, 700), Winkel 0, Breite 120', JSON.stringify(f));
@@ -515,7 +516,7 @@ check((await teil.locator('#f-laenge').inputValue()) === '400', 'Formteil: Eigen
 // Wand quer über den Gang Schleuse (Boden → Wand)
 await teil.keyboard.press('KeyW');
 check(await tBoden([310, 10]), 'Wand: vorher ist dort Gangboden');
-await tZieh([300, -80], [300, 80]);
+await tZieh([300, -80], [300, 80], RECHTS);
 d1 = await tDaten();
 const w = d1.objekte[d1.objekte.length - 1];
 check(w.typ === 'wand' && w.winkel === 90 && w.laenge === 160 && w.x === 300 && w.y === 0, 'Wand ziehen: nach Süden gezogen = 160 E lang, Winkel 90, Mitte (300, 0)', JSON.stringify(w));
@@ -524,7 +525,7 @@ await teil.screenshot({ path: path.join(shots, 'editor-06-teile-gesetzt.png') })
 
 // Hindernis per Klick: Standardgröße, Platzhalterbild
 await teil.keyboard.press('KeyH');
-await tKlick([700, -300]);
+await tKlick([700, -300], RECHTS);
 d1 = await tDaten();
 const h = d1.objekte[d1.objekte.length - 1];
 check(h.typ === 'hindernis' && h.x === 700 && h.y === -300 && h.laenge === 60 && h.breite === 60, 'Hindernis setzen: Klick = 60 × 60 E im Raster', JSON.stringify(h));
@@ -616,7 +617,7 @@ check(JSON.stringify((await tDaten()).objekte.find((o) => o.id === 'o2')) === JS
 for (let i = 0; i < 40; i++) await teil.keyboard.press('Control+KeyZ');
 check(JSON.stringify(await tDaten()) === T0, 'Rückgängig bis zum Anfang: genau der geladene Zustand (Teile eingeschlossen)');
 await teil.keyboard.press('KeyB');
-await tZieh([203, 703], [607, 703]);
+await tZieh([203, 703], [607, 703], RECHTS);
 await teil.keyboard.press('KeyV');
 const teilText = formatiere(await tDaten());
 const geladen = await t2((e, t) => e.oeffneText(t, 'test.json'), teilText);
@@ -822,14 +823,14 @@ const wBild = async (x, y) => {
   const [px, py] = await wa((e, p) => e.ansicht.weltZuBild(p[0], p[1]), [x, y]);
   return [wBox.x + px, wBox.y + py];
 };
-const wZieh = async (von, nach) => {
+const wZieh = async (von, nach, extra = {}) => {
   const [x0, y0] = await wBild(...von);
   const [x1, y1] = await wBild(...nach);
   await wp.mouse.move(x0, y0);
-  await wp.mouse.down();
+  await wp.mouse.down(extra);
   await wp.mouse.move((x0 + x1) / 2, (y0 + y1) / 2, { steps: 4 });
   await wp.mouse.move(x1, y1, { steps: 4 });
-  await wp.mouse.up();
+  await wp.mouse.up(extra);
 };
 // Pixel an einer Stelle eines Gebiets (Gebietskoordinaten) im Welt-Plan – Lage wird eingerechnet
 const gebietPixel = (id, x, y) =>
@@ -879,12 +880,12 @@ check((await rahmenPixel('beispiel')) > 40, 'Bereich: der Rahmen des Gebiets ist
 const bVorher = await wa((e) => JSON.stringify(e.gebiet()));
 await wp.keyboard.press('a');
 check((await wa((e) => e.state.werkzeug)) === 'bereich', 'Bereich: Taste A wählt das Bereich-Werkzeug');
-await wZieh([-300, -300], [510, 405]);
+await wZieh([-300, -300], [510, 405], { button: 'right' });
 const bNachher = await wa((e) => e.gebiet().bereich);
 check(JSON.stringify(bNachher) === JSON.stringify({ x0: -300, y0: -300, x1: 500, y1: 400 }), 'Bereich: Ziehen setzt den Bereich, gerastert auf 100 E', JSON.stringify(bNachher));
 check((await rahmenPixel('beispiel')) > 40, 'Bereich: der Rahmen steht im Bild an der neuen Stelle');
 const bUngueltig = await wa((e) => JSON.stringify(e.gebiet().bereich));
-await wZieh([0, 0], [100, 100]);
+await wZieh([0, 0], [100, 100], { button: 'right' });
 check((await wa((e) => JSON.stringify(e.gebiet().bereich))) === bUngueltig && /mindestens/.test(await wa((e) => e.state.meldung)), 'Bereich: zu kleiner Bereich wird mit Meldung abgelehnt, nichts ändert sich');
 await wp.keyboard.press('Control+z');
 check((await wa((e) => JSON.stringify(e.gebiet()))) === bVorher, 'Bereich: Rückgängig stellt exakt den Zustand davor her');
@@ -1193,7 +1194,7 @@ check((await tp.locator('#p-gegner-seife.aktiv').count()) === 1 && (await tp.loc
 const vorGegner = JSON.stringify(await ta((e) => e.gebiet()));
 const zielGegner = [1220, 100];
 const [tgx, tgy] = await tsBild(zielGegner);
-await tp.mouse.click(tgx, tgy);
+await tp.mouse.click(tgx, tgy, { button: 'right' });
 const tgd = await ta((e) => e.gebiet());
 const tgn = tgd.objekte[tgd.objekte.length - 1];
 check(tgn.typ === 'gegner' && tgn.art === 'seife' && tgn.platzhalter === true && tgn.x === 1220 && tgn.y === 100, 'Gegner setzen: Klick legt einen Platzhalter „seife“ im Raster ab', JSON.stringify(tgn));

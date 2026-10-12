@@ -4,7 +4,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Ansicht, radFaktor } from '../src/editor/ansicht.js';
 import { ZOOM_MIN, ZOOM_MAX, ZOOM_RAD_FAKTOR } from '../src/editor/konstanten.js';
-import { ausdehnung } from '../src/editor/daten.js';
+import { ausdehnung, Verlauf } from '../src/editor/daten.js';
+import { ebeneVon, EBENEN, WERKZEUG_EBENEN } from '../src/editor/ebenen.js';
+import { teilBei } from '../src/editor/teile.js';
+import { WERKZEUGE } from '../src/editor/werkzeuge/index.js';
 import { spielbarkeit, erzeugeSzene } from '../src/editor/spielen.js';
 import { levelInhalt, spielGebiet } from '../src/editor/level.js';
 import { GEBIETE } from '../src/editor/startdaten.js';
@@ -118,4 +121,50 @@ test('A3 Levelinhalt: nur der Gang, seine zwei Knoten und die Teile, die ihn ber
   // unbekannter Gang: leer
   const leer = levelInhalt(g, 'gibtsnicht');
   assert.deepEqual([leer.knoten.length, leer.gaenge.length], [0, 0]);
+});
+
+// ------------------------------------------------------------------ A5 Rückgängig mit Namen, gesperrte Ebenen
+test('A5 Verlauf: jeder Schritt hat einen Namen, Rückgängig und Wiederholen zeigen ihn', () => {
+  const v = new Verlauf();
+  assert.equal(v.letzteAktion, null);
+  assert.equal(v.naechsteAktion, null);
+  v.merke('a', 'Wand setzen');
+  v.merke('b', 'Knoten verschieben');
+  assert.equal(v.letzteAktion, 'Knoten verschieben');
+  assert.equal(v.rueckgaengig('c'), 'b');
+  assert.equal(v.letzteAktion, 'Wand setzen');
+  assert.equal(v.naechsteAktion, 'Knoten verschieben');
+  assert.equal(v.rueckgaengig('b'), 'a');
+  assert.equal(v.letzteAktion, null);
+  assert.equal(v.wiederholen('a'), 'b');
+  assert.equal(v.letzteAktion, 'Wand setzen');
+  assert.equal(v.naechsteAktion, 'Knoten verschieben');
+  v.merke('x', 'Löschen');
+  assert.equal(v.naechsteAktion, null, 'eine neue Aktion leert die Wiederholen-Liste samt Namen');
+  const klein = new Verlauf(2);
+  klein.merke('1', 'eins');
+  klein.merke('2', 'zwei');
+  klein.merke('3', 'drei');
+  assert.deepEqual([klein.zurueck.length, klein.letzteAktion], [2, 'drei']);
+  assert.equal(klein.rueckgaengig('4'), '3');
+  assert.equal(klein.rueckgaengig('3'), '2');
+  assert.equal(klein.rueckgaengig('2'), null, 'der älteste Schritt ist verfallen');
+});
+
+test('A5 Ebenen: jedes Ding gehört zu einer Ebene, jedes Werkzeug schreibt in bekannte Ebenen, gesperrte Teile sind nicht zu treffen', () => {
+  const namen = EBENEN.map((e) => e.id);
+  assert.equal(ebeneVon('knoten'), 'knoten');
+  assert.equal(ebeneVon('gang'), 'gaenge');
+  assert.equal(ebeneVon('formteil'), 'formteile');
+  assert.equal(ebeneVon('objekt', { typ: 'wand' }), 'waende');
+  assert.equal(ebeneVon('objekt', { typ: 'hindernis' }), 'waende');
+  assert.equal(ebeneVon('objekt', { typ: 'gegner' }), 'gegner');
+  for (const w of WERKZEUGE.filter((x) => x.id !== 'auswahl')) {
+    assert.ok(w.id in WERKZEUG_EBENEN, 'Werkzeug ' + w.id + ' ist einer Ebene zugeordnet');
+    for (const eb of WERKZEUG_EBENEN[w.id]) assert.ok(namen.includes(eb));
+  }
+  const g = GEBIETE.beispiel;
+  const gegner = g.objekte.find((o) => o.typ === 'gegner');
+  assert.deepEqual(teilBei(g, gegner.x, gegner.y, 0), { art: 'objekt', id: gegner.id });
+  assert.equal(teilBei(g, gegner.x, gegner.y, 0, (art, o) => ebeneVon(art, o) !== 'gegner'), null, 'gesperrter Gegner ist nicht zu treffen');
 });

@@ -258,25 +258,34 @@ export class Verlauf {
     this.max = max;
     this.zurueck = [];
     this.vor = [];
+    this.namenZurueck = []; // Name der Aktion zu jedem Eintrag in `zurueck` (für „Rückgängig: Wand setzen“)
+    this.namenVor = [];
   }
 
-  /** Vor einer Änderung aufrufen (`vorher` = Zustand als Text). Löscht die Wiederholen-Liste. */
-  merke(vorher) {
+  /** Vor einer Änderung aufrufen (`vorher` = Zustand als Text, `name` = was geändert wird). Löscht die Wiederholen-Liste. */
+  merke(vorher, name = 'Änderung') {
     this.zurueck.push(vorher);
-    if (this.zurueck.length > this.max) this.zurueck.shift();
+    this.namenZurueck.push(name);
+    if (this.zurueck.length > this.max) {
+      this.zurueck.shift();
+      this.namenZurueck.shift();
+    }
     this.vor = [];
+    this.namenVor = [];
   }
 
   /** Gibt den vorigen Zustand zurück (oder null) und merkt `aktuell` zum Wiederholen. */
   rueckgaengig(aktuell) {
     if (!this.zurueck.length) return null;
     this.vor.push(aktuell);
+    this.namenVor.push(this.namenZurueck.pop());
     return this.zurueck.pop();
   }
 
   wiederholen(aktuell) {
     if (!this.vor.length) return null;
     this.zurueck.push(aktuell);
+    this.namenZurueck.push(this.namenVor.pop());
     return this.vor.pop();
   }
 
@@ -286,6 +295,16 @@ export class Verlauf {
 
   get kannVor() {
     return this.vor.length > 0;
+  }
+
+  /** Name der Aktion, die Rückgängig zurücknimmt (oder null). */
+  get letzteAktion() {
+    return this.namenZurueck.at(-1) ?? null;
+  }
+
+  /** Name der Aktion, die Wiederholen wieder ausführt (oder null). */
+  get naechsteAktion() {
+    return this.namenVor.at(-1) ?? null;
   }
 }
 

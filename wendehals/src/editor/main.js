@@ -9,7 +9,7 @@ import { WELT, GEBIETE } from './startdaten.js';
 import { kopie, bezeichnung, knotenMap, gangMasse, gangPolygon, knotenPolygon, punktInPolygon, ausdehnung, rahmenEcken, formatiere, ladeGebiet, pruefeFormat, Verlauf } from './daten.js';
 import { formatiereWelt, ladeWelt, pruefeWelt, weltLagen, weltAusdehnung, lageSetzen, bereichFeld, bereichAnpassen, bereichMasse, uebergangAnlegen, uebergangLoeschen, uebergaengeVon, uebergaengeAn, andereSeite, teileEnde, ausserhalb } from './welt.js';
 import { KNOTENTYPEN, TILESETS, GEGNER, gegnerFuer, tilesetFarben } from './katalog.js';
-import { KUERZEL, WINKEL_SCHRITT, SCREEN_W, SCREEN_H, SPEED, ZOOM_TASTE_FAKTOR, ZOOM_FESTWERTE, PFEIL_SCHRITT_PX, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX, FLOOR, FLOOR2, WALL, FARBEN, PALETTE_PX } from './konstanten.js';
+import { KUERZEL, MAUS, WINKEL_SCHRITT, SCREEN_W, SCREEN_H, SPEED, ZOOM_TASTE_FAKTOR, ZOOM_FESTWERTE, PFEIL_SCHRITT_PX, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX, FLOOR, FLOOR2, WALL, FARBEN, PALETTE_PX } from './konstanten.js';
 import { gangTeilen, loesche, setze, gesperrteIds } from './befehle.js';
 import { teilBei, teilFinden, teilDrehen, teilMerken, teilEinfuegen, loescheTeil, setzeTeil, istTeilArt, hatMasse, teilName, liste as teilListe } from './teile.js';
 import { erzeugeSpeicher } from './speicher.js';
@@ -17,6 +17,8 @@ import { spielbarkeit, erzeugeSzene } from './spielen.js';
 import { pruefeGebiet, zusammenfassung } from './pruefer.js';
 import { SpielModus } from './spielmodus.js';
 import { WERKZEUGE } from './werkzeuge/index.js';
+import auswahlWerkzeug from './werkzeuge/auswahl.js';
+import { EBENEN, ebeneVon, WERKZEUG_EBENEN } from './ebenen.js';
 import weltWerkzeug, { weltTreffer } from './werkzeuge/welt-ansicht.js';
 import { zeichneWelt } from './zeichnen-welt.js';
 
@@ -98,7 +100,8 @@ export function startEditor() {
     look: 'proto', // 'proto' (Farben des Fenster-Prototyps) oder 'tileset' (Farben des Tilesets des Gebiets)
     gegnerArt: null, // Art, die das Gegner-Werkzeug setzt (null = erste der Liste)
     echtzeit: true, // false: Zeit und Fahrt laufen nur über tick() – für deterministische Tests
-    werkzeug: WERKZEUGE[0].id,
+    werkzeug: WERKZEUGE[0].id, // das aktuelle Element: das, was ein Rechtsklick setzt ('auswahl' = keines)
+    gesperrt: new Set(), // gesperrte Ebenen (ebenen.js): nicht wählbar, nicht verschiebbar, nicht bestückbar
     knotenTyp: 'kreuzung',
     prueferOffen: false, // Liste der Prüfer-Meldungen sichtbar (und Marken im Plan)
     spielen: null, // laufender SpielModus (Stufe 3) oder null
@@ -115,7 +118,15 @@ export function startEditor() {
   let dirty = true;
   const gebiet = () => state.gebiete[state.gebietId];
   const werkzeug = () => WERKZEUGE.find((w) => w.id === state.werkzeug);
-  const aktiv = () => (state.ansichtArt === 'welt' ? weltWerkzeug : werkzeug()); // was die Maus gerade bedient
+  const aktiv = () => (state.ansichtArt === 'welt' ? weltWerkzeug : werkzeug()); // dessen Hinweis zeigt die Hinweiszeile
+  /** Werkzeug der linken Maustaste: in der Welt-Ansicht die Welt, sonst immer das Auswählen/Ziehen (Linksklick setzt nie etwas, A1). */
+  const linksWerkzeug = () => (state.ansichtArt === 'welt' ? weltWerkzeug : auswahlWerkzeug);
+  /** Werkzeug der rechten Maustaste: das aktuelle Element ('auswahl' = keines, in der Welt-Ansicht gibt es nichts zu setzen). */
+  const rechtsWerkzeug = () => (state.ansichtArt === 'welt' || state.werkzeug === 'auswahl' ? null : werkzeug());
+  const abbrechen = () => {
+    zug = null;
+    for (const w of new Set([auswahlWerkzeug, werkzeug(), weltWerkzeug])) w.abbruch?.(kontext);
+  };
   const kamera = () => ({ cx: ansicht.cx, cy: ansicht.cy, bildschirme: ansicht.bildschirme, blick: ansicht.blick });
 
   // ---------------------------------------------------------------- Oberfläche
@@ -171,6 +182,8 @@ export function startEditor() {
     undoKnopf,
     redoKnopf,
     loeschKnopf,
+    el('span', { class: 'grau', text: 'Sperren:' }),
+    ...EBENEN.map((eb) => knopf(eb.name, `Ebene „${eb.name}“ sperren: nicht mehr wählbar, nicht verschiebbar, nicht bestückbar (nochmal klicken entsperrt)`, () => sperreUmschalten(eb.id), 'l-' + eb.id)),
     knopf('Speichern', 'Gebiet speichern (Strg+S)', () => speichere(), 'b-speichern'),
     knopf('Öffnen …', 'Leveldatei öffnen (Strg+O)', () => oeffne(), 'b-oeffnen'),
     stand,
@@ -226,7 +239,7 @@ export function startEditor() {
     state.auswahl = null;
     state.fahrt = null;
     state.zeiger = null;
-    werkzeug().abbruch?.(kontext);
+    abbrechen();
     const g = gebiet();
     if (g.gaenge.length) waehle({ art: 'gang', id: g.gaenge[0].id });
     alles();
@@ -315,18 +328,24 @@ export function startEditor() {
   /** Was liegt unter dem Bildschirmpunkt? Knoten vor Gang. */
   function treffer(px, py) {
     const g = gebiet();
-    for (const k of g.knoten) {
-      const [kx, ky] = ansicht.weltZuBild(k.x, k.y);
-      if (Math.hypot(px - kx, py - ky) <= KNOTEN_RADIUS_PX + 3) return { art: 'knoten', id: k.id };
+    const gesp = state.gesperrt;
+    if (!gesp.has('knoten')) {
+      for (const k of g.knoten) {
+        const [kx, ky] = ansicht.weltZuBild(k.x, k.y);
+        if (Math.hypot(px - kx, py - ky) <= KNOTEN_RADIUS_PX + 3) return { art: 'knoten', id: k.id };
+      }
     }
     const [wx, wy] = ansicht.bildZuWelt(px, py);
-    const teil = teilBei(g, wx, wy, 3 / ansicht.masstab);
+    const teil = teilBei(g, wx, wy, 3 / ansicht.masstab, (art, o) => !gesp.has(ebeneVon(art, o)));
     if (teil) return teil;
     const km = knotenMap(g);
-    for (const k of g.knoten) {
-      const poly = knotenPolygon(k);
-      if (poly && punktInPolygon(wx, wy, poly)) return { art: 'knoten', id: k.id };
+    if (!gesp.has('knoten')) {
+      for (const k of g.knoten) {
+        const poly = knotenPolygon(k);
+        if (poly && punktInPolygon(wx, wy, poly)) return { art: 'knoten', id: k.id };
+      }
     }
+    if (gesp.has('gaenge')) return null;
     for (const gang of g.gaenge) {
       const p = gangPolygon(g, gang, km);
       if (p && punktInPolygon(wx, wy, p)) return { art: 'gang', id: gang.id };
@@ -351,7 +370,7 @@ export function startEditor() {
       return melde(e.message, 'fehler');
     }
     state.fahrt.laeuft = false;
-    werkzeug().abbruch?.(kontext);
+    abbrechen();
     zug = null;
     state.spielen = new SpielModus(szene, document.body, () => {
       melde(hinweise.length ? 'Zurück im Editor. ' + hinweise.join(' ') : 'Zurück im Editor.');
@@ -478,7 +497,7 @@ export function startEditor() {
       return null;
     }
     if (JSON.stringify(g) === vorher) return erg ?? null;
-    verlaufVon(g.id).merke(vorher);
+    verlaufVon(g.id).merke(vorher, label);
     state.letzteAktion = label;
     melde('');
     bereinige();
@@ -564,12 +583,24 @@ export function startEditor() {
     const neu = aendere('Gang teilen', (g) => gangTeilen(g, au.id, state.fahrt.s));
     if (neu) waehle({ art: 'knoten', id: neu.id });
   }
+  /** Ebene sperren oder entsperren (A5). Was in einer gesperrten Ebene gewählt war, wird abgewählt. */
+  function sperreUmschalten(id) {
+    if (state.gesperrt.has(id)) state.gesperrt.delete(id);
+    else state.gesperrt.add(id);
+    const au = state.auswahl;
+    if (au && state.gesperrt.has(ebeneVon(au.art, au.art === 'objekt' ? teilFinden(gebiet(), 'objekt', au.id) : null))) waehle(null);
+    refresh();
+  }
+  /** Zeiger im Plan: normaler Pfeil, mit einem Element für den Rechtsklick das Fadenkreuz. */
+  function cursorSetzen() {
+    canvas.style.cursor = state.werkzeug === 'auswahl' || state.ansichtArt === 'welt' ? '' : 'crosshair';
+  }
   function setzeWerkzeug(id) {
     if (!WERKZEUGE.some((w) => w.id === id)) return;
     if (state.ansichtArt === 'welt') zuGebiet();
-    werkzeug().abbruch?.(kontext);
+    abbrechen();
     state.werkzeug = id;
-    canvas.style.cursor = id === 'auswahl' ? 'grab' : 'crosshair';
+    cursorSetzen();
     hinweis('');
     refresh();
   }
@@ -610,7 +641,7 @@ export function startEditor() {
       melde(`„${name}“ wurde nicht geöffnet, der bisherige Stand bleibt unverändert.\n${e.message}`, 'fehler');
       return false;
     }
-    if (state.gebiete[g.id]) verlaufVon(g.id).merke(JSON.stringify(state.gebiete[g.id])); // lässt sich mit Rückgängig zurücknehmen
+    if (state.gebiete[g.id]) verlaufVon(g.id).merke(JSON.stringify(state.gebiete[g.id]), 'Datei öffnen'); // lässt sich mit Rückgängig zurücknehmen
     else {
       state.welt = { ...state.welt, gebiete: [...state.welt.gebiete, { id: g.id, name: g.name, datei: `gebiete/${g.id}.json` }] };
       state.neueGebiete.add(g.id);
@@ -699,7 +730,7 @@ export function startEditor() {
       return null;
     }
     if (JSON.stringify(w) === vorher) return erg ?? null;
-    state.weltVerlauf.merke(vorher);
+    state.weltVerlauf.merke(vorher, label);
     state.letzteAktion = label;
     state.welt = w;
     melde('');
@@ -732,7 +763,7 @@ export function startEditor() {
   }
   function zuWelt() {
     if (state.ansichtArt === 'welt') return;
-    werkzeug().abbruch?.(kontext);
+    abbrechen();
     state.kameras.gebiet = kamera();
     state.ansichtArt = 'welt';
     state.auswahl = null;
@@ -746,7 +777,7 @@ export function startEditor() {
   /** Zurück in die Gebiet-Ansicht; `id` = Gebiet, das geöffnet wird (sonst das zuletzt offene). */
   function zuGebiet(id = state.gebietId) {
     if (state.ansichtArt !== 'welt') return;
-    weltWerkzeug.abbruch?.(kontext);
+    abbrechen();
     state.kameras.welt = kamera();
     state.ansichtArt = 'gebiet';
     if (id !== state.gebietId || !state.kameras.gebiet) wechsle(id);
@@ -851,7 +882,7 @@ export function startEditor() {
     },
     weltFertig: (vorher, label) => {
       if (JSON.stringify(state.welt) !== vorher) {
-        state.weltVerlauf.merke(vorher);
+        state.weltVerlauf.merke(vorher, label);
         state.letzteAktion = label;
       }
       refresh();
@@ -1117,12 +1148,15 @@ export function startEditor() {
     const v = inWelt ? state.weltVerlauf : verlaufVon(state.gebietId);
     undoKnopf.disabled = !v.kannZurueck;
     redoKnopf.disabled = !v.kannVor;
+    undoKnopf.textContent = v.kannZurueck ? `Rückgängig: ${v.letzteAktion}` : 'Rückgängig';
+    redoKnopf.textContent = v.kannVor ? `Wiederholen: ${v.naechsteAktion}` : 'Wiederholen';
     const au = state.auswahl;
     spielKnopf.disabled = inWelt || !(au?.art === 'gang' && state.fahrt);
     bezKnopf.disabled = inWelt || !(au?.art === 'gang' || au?.art === 'knoten');
     for (const w of WERKZEUGE) document.getElementById('t-' + w.id)?.classList.toggle('an', !inWelt && w.id === state.werkzeug);
     document.getElementById('b-welt')?.classList.toggle('an', inWelt);
     typWahl.disabled = state.werkzeug !== 'knoten';
+    for (const eb of EBENEN) document.getElementById('l-' + eb.id)?.classList.toggle('an', state.gesperrt.has(eb.id));
     prueferZeigen();
     loeschKnopf.disabled = inWelt ? state.weltAuswahl?.art !== 'uebergang' : !(au && (au.art === 'gang' || au.art === 'knoten' || istTeilArt(au.art)));
     const offen = inWelt ? weltUngespeichert() : ungespeichert() || weltUngespeichert();
@@ -1134,7 +1168,8 @@ export function startEditor() {
   }
 
   // ---------------------------------------------------------------- Eingabe
-  let zug = null; // laufende Mausbewegung: { modus: 'werkzeug' | 'plan', x, y, bewegt }
+  /** Laufende Mausbewegung: { modus: 'plan' | 'links' | 'leer' | 'rechts', werkzeug, erfasst, x, y (Bildschirm), bewegt, taste }. */
+  let zug = null;
   const zeigerPunkt = (e) => {
     const r = canvas.getBoundingClientRect();
     const px = e.clientX - r.left;
@@ -1142,23 +1177,46 @@ export function startEditor() {
     const [x, y] = ansicht.bildZuWelt(px, py);
     return { px, py, x, y };
   };
-  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  /** Ist eine Ebene, in die das Werkzeug schreibt, gesperrt? Dann Meldung und true. */
+  function gesperrtFuer(werkzeugId) {
+    const zu = (WERKZEUG_EBENEN[werkzeugId] ?? []).find((id) => state.gesperrt.has(id));
+    if (!zu) return false;
+    melde(`Die Ebene „${EBENEN.find((x) => x.id === zu).name}“ ist gesperrt – erst entsperren (Leiste oben), dann kann hier etwas gesetzt werden.`, 'fehler');
+    return true;
+  }
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // Rechtsklick gehört dem Setzen, kein Browsermenü (A1)
   canvas.addEventListener('pointerdown', (e) => {
+    if (zug) return; // eine zweite Taste mitten im Zug stört nicht
+    const p = zeigerPunkt(e);
+    const planVerschieben = e.button === MAUS.verschieben || (e.button === MAUS.waehlen && e.shiftKey);
+    if (e.button !== MAUS.waehlen && e.button !== MAUS.verschieben && e.button !== MAUS.setzen) return;
     canvas.setPointerCapture(e.pointerId);
-    // linke Taste: Werkzeug; mittlere/rechte Taste verschiebt immer den Plan
-    const erfasst = e.button === 0 && aktiv().down?.(kontext, zeigerPunkt(e)) === true;
-    zug = { modus: erfasst ? 'werkzeug' : 'plan', x: e.clientX, y: e.clientY, bewegt: false, taste: e.button };
-    if (!erfasst) canvas.style.cursor = 'grabbing';
+    if (planVerschieben) {
+      zug = { modus: 'plan', x: e.clientX, y: e.clientY, bewegt: false, taste: e.button };
+      canvas.style.cursor = 'grabbing';
+    } else if (e.button === MAUS.setzen) {
+      const w = rechtsWerkzeug();
+      if (!w) {
+        if (state.ansichtArt !== 'welt') melde('Rechtsklick setzt das aktuelle Element – erst eines wählen (Leiste oder Palette: Gang, Knoten, Formteil, Wand, Hindernis, Gegner, Bereich).');
+        return;
+      }
+      if (gesperrtFuer(w.id)) return;
+      zug = { modus: 'rechts', werkzeug: w, erfasst: w.down?.(kontext, p) === true, x: e.clientX, y: e.clientY, bewegt: false, taste: e.button };
+    } else {
+      const w = linksWerkzeug();
+      const erfasst = w.down?.(kontext, p) === true;
+      zug = { modus: erfasst ? 'links' : 'leer', werkzeug: w, erfasst, x: e.clientX, y: e.clientY, bewegt: false, taste: e.button };
+    }
   });
   canvas.addEventListener('pointermove', (e) => {
     state.zeiger = zeigerPunkt(e);
-    if (!zug) return aktiv().schweben?.(kontext, state.zeiger);
-    if (zug.modus === 'werkzeug') return aktiv().move?.(kontext, zeigerPunkt(e));
+    if (!zug) return rechtsWerkzeug()?.schweben?.(kontext, state.zeiger);
     const dx = e.clientX - zug.x;
     const dy = e.clientY - zug.y;
-    if (!zug.bewegt && Math.hypot(dx, dy) < KLICK_TOLERANZ_PX) return;
-    zug.bewegt = true;
-    ansicht.verschieben(dx, dy);
+    if (!zug.bewegt && Math.hypot(dx, dy) >= KLICK_TOLERANZ_PX) zug.bewegt = true;
+    if (zug.erfasst) return zug.werkzeug.move?.(kontext, zeigerPunkt(e));
+    if (zug.modus === 'rechts' || !zug.bewegt) return;
+    ansicht.verschieben(dx, dy); // Plan mitziehen: mittlere Taste, Shift+links oder (vorerst) links im Leeren
     zug.x = e.clientX;
     zug.y = e.clientY;
     dirty = true;
@@ -1167,15 +1225,17 @@ export function startEditor() {
     if (!zug) return;
     const z = zug;
     zug = null;
-    canvas.style.cursor = state.werkzeug === 'auswahl' ? 'grab' : 'crosshair';
-    if (e.type === 'pointercancel') return aktiv().abbruch?.(kontext);
-    if (z.modus === 'werkzeug') aktiv().up?.(kontext, zeigerPunkt(e));
-    else if (!z.bewegt && z.taste === 0) aktiv().klick?.(kontext, zeigerPunkt(e));
+    cursorSetzen();
+    if (e.type === 'pointercancel') return abbrechen();
+    const p = zeigerPunkt(e);
+    if (z.modus === 'plan') return;
+    if (z.erfasst) return z.werkzeug.up?.(kontext, p);
+    if (!z.bewegt) z.werkzeug.klick?.(kontext, p); // Klick (links: wählen; rechts: Knoten und Gegner setzen)
   };
   canvas.addEventListener('pointerleave', () => {
     if (zug) return;
     state.zeiger = null;
-    aktiv().abbruch?.(kontext);
+    abbrechen();
   });
   canvas.addEventListener('dblclick', (e) => {
     if (state.ansichtArt !== 'welt') return;
@@ -1201,11 +1261,12 @@ export function startEditor() {
   );
   window.addEventListener('keydown', (e) => {
     if (state.spielen?.aktiv) return; // im Spielmodus gehören die Tasten dem Spiel
-    const imFeld = e.target instanceof HTMLSelectElement || (e.target instanceof HTMLInputElement && e.target.type !== 'range' && !e.target.readOnly) || e.target instanceof HTMLTextAreaElement; // Schieber und das schreibgeschützte Bezeichnungsfeld nehmen keine Kürzel weg
+    const textFeld = (e.target instanceof HTMLInputElement && !['range', 'checkbox', 'button'].includes(e.target.type) && !e.target.readOnly) || e.target instanceof HTMLTextAreaElement;
+    const imFeld = e.target instanceof HTMLSelectElement || textFeld; // Schieber, Knöpfe und das schreibgeschützte Bezeichnungsfeld nehmen keine Kürzel weg
     if ((e.ctrlKey || e.metaKey) && !e.altKey) {
       const c = e.code;
-      const tippt = imFeld && !(c === KUERZEL.speichern);
-      if (tippt) return; // in Eingabefeldern gilt das eingebaute Rückgängig des Feldes
+      const tippt = textFeld && !(c === KUERZEL.speichern);
+      if (tippt) return; // im Textfeld gilt das eingebaute Rückgängig des Feldes; sonst (auch mit Fokus auf Auswahlliste oder Schieber) das des Editors (A5)
       const fn =
         c === KUERZEL.rueckgaengig ? (e.shiftKey ? wiederholen : rueckgaengig)
         : c === KUERZEL.wiederholen ? wiederholen
@@ -1251,7 +1312,7 @@ export function startEditor() {
     else if (c === KUERZEL.welt) weltUmschalten();
     else if (c === 'Enter' && state.ansichtArt === 'welt') weltOeffneAuswahl();
     else if (c === 'Escape') {
-      aktiv().abbruch?.(kontext);
+      abbrechen(); // ein laufender Zug (Ziehen, Aufziehen) wird verworfen, nichts ändert sich
       if (state.ansichtArt === 'welt') {
         if (state.weltAuswahl) weltWaehle(null);
         else zuGebiet();

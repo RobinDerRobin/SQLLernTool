@@ -57,7 +57,7 @@ export const KUERZEL = {
   kopieren: 'KeyC', // mit Strg/Cmd
   einfuegen: 'KeyV', // mit Strg/Cmd
   duplizieren: 'KeyD', // mit Strg/Cmd
-  loeschen: ['Delete', 'Backspace'],
+  loeschen: ['Delete'], // nur Entf (Backspace löscht nicht mehr, A5)
   rueckgaengig: 'KeyZ', // mit Strg/Cmd; mit Umschalt = Wiederholen
   wiederholen: 'KeyY', // mit Strg/Cmd
   speichern: 'KeyS', // mit Strg/Cmd
@@ -73,7 +73,9 @@ export const KUERZEL = {
   runter: 'ArrowDown',
 };
 export const PFEIL_SCHRITT_PX = 60; // Verschieben mit Pfeiltasten (Bildschirmpixel)
-export const KLICK_TOLERANZ_PX = 5; // Bewegung unter dieser Strecke gilt als Klick, darüber als Verschieben
+export const KLICK_TOLERANZ_PX = 8; // Bewegung unter dieser Strecke gilt als Klick, erst darüber beginnt ein Ziehen (A5)
+/** Maustasten (MouseEvent.button): links wählt und zieht, rechts setzt das aktuelle Element, Mitte (und Shift+links) verschiebt den Plan (A1). */
+export const MAUS = { waehlen: 0, verschieben: 1, setzen: 2 };
 
 /** Farben der Bedienelemente im Plan (das Spielbild selbst nutzt FLOOR/FLOOR2/WALL des Prototyps). */
 export const FARBEN = {

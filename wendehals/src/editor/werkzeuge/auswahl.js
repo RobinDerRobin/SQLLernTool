@@ -11,7 +11,7 @@ const gerastert = (v) => Math.round(v / KNOTENRASTER) * KNOTENRASTER + 0;
 export default {
   id: 'auswahl',
   name: 'Auswahl',
-  hinweis: 'Klick wählt, Knoten und Teile ziehen verschiebt sie, Ziehen im Leeren (oder mit der mittleren/rechten Maustaste) verschiebt den Plan. Entf löscht.',
+  hinweis: 'Linksklick wählt, Ziehen (ab 8 px) verschiebt Knoten und Teile, Ziehen im Leeren oder mit der mittleren Taste (Shift+Ziehen) verschiebt den Plan. Rechtsklick setzt das aktuelle Element – erst eins wählen (G K B W H X A). Entf löscht.',
   down(k, p) {
     const t = k.treffer(p.px, p.py);
     if (t?.art === 'knoten') {

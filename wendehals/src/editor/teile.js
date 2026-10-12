@@ -35,17 +35,19 @@ export const teilEcken = (o) => rechteck(o.x, o.y, o.laenge, o.breite, o.winkel)
 
 /**
  * Oberstes Teil unter dem Weltpunkt (x, y), `tol` E Zuschlag rundum (für dünne Wände). Objekte liegen über Formteilen, später
- * Gesetztes über früher Gesetztem. Gibt { art, id } oder null.
+ * Gesetztes über früher Gesetztem. `erlaubt(art, o)` kann Teile ausschließen (gesperrte Ebenen). Gibt { art, id } oder null.
  */
-export function teilBei(g, x, y, tol = 0) {
+export function teilBei(g, x, y, tol = 0, erlaubt = null) {
   for (let i = g.objekte.length - 1; i >= 0; i--) {
     const o = g.objekte[i];
+    if (erlaubt && !erlaubt('objekt', o)) continue;
     if (hatMasse('objekt', o)) {
       if (punktInPolygon(x, y, rechteck(o.x, o.y, o.laenge + 2 * tol, o.breite + 2 * tol, o.winkel))) return { art: 'objekt', id: o.id };
     } else if (Math.hypot(x - o.x, y - o.y) <= GEGNER_RADIUS + tol) return { art: 'objekt', id: o.id };
   }
   for (let i = g.formteile.length - 1; i >= 0; i--) {
     const f = g.formteile[i];
+    if (erlaubt && !erlaubt('formteil', f)) continue;
     if (punktInPolygon(x, y, rechteck(f.x, f.y, f.laenge, f.breite, f.winkel))) return { art: 'formteil', id: f.id };
   }
   return null;
