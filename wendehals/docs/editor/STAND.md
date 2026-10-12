@@ -2,7 +2,7 @@
 
 > Wird von jedem Bau-Lauf gepflegt (Brief: [`BRIEF.md`](BRIEF.md), Abschnitt 7). Zeiten in Europe/Berlin.
 
-**Sperre:** belegt seit 12.10.2026 18:34, Lauf Stufe 7b (https://claude.ai/code/session_01TJNuYEtLMNihWS1VRQHw43)
+**Sperre:** frei
 
 ## Stufen
 
@@ -16,7 +16,7 @@
 | 5 | Gebiete und Übergänge | fertig (Electron ungetestet; „Level zuordnen“ = Gebietsdatei, kein Verschieben von Gängen zwischen Gebieten) | npm test 401, e2e, e2e:editor, beide Test-Agenten | Lauf 6 |
 | 6 | Tilesets und Spielgrafik | fertig (Electron ungetestet; Tileset-Look nur im Editor, „Spielen ab hier“ nutzt weiter Prototyp-Farben) | npm test 406, e2e, e2e:editor, beide Test-Agenten | Lauf 7 |
 | 7 | Testmenü am Deck | fertig (`?testmenue` / `WENDEHALS_TESTMENUE=1`; Electron und echtes Gamepad ungetestet) | npm test 410, e2e, e2e:editor, beide Test-Agenten | Lauf 8 |
-| 7b | Bedienung (Brief: BRIEF-7b-bedienung.md) | offen | – | A1–A6, Fehler „Spielen ab hier“ |
+| 7b | Bedienung (Brief: BRIEF-7b-bedienung.md) | fertig: A0–A8 und Fehler „Spielen ab hier“ erfüllt (Electron ungetestet; obere Leisten bei 1280 px scrollen waagerecht) | npm test 422, e2e, e2e:editor (neu: e2e/editor-bedienung.mjs), beide Test-Agenten | Lauf 9 |
 | 8 | Notizen und Stempel | offen | – | – |
 | 9 | Bot-Spieltest | offen | – | – |
 | 10 | KI-Varianten nebeneinander | offen | – | – |
@@ -123,3 +123,28 @@ umsetzen** (höchste Priorität), danach weiter mit den Stufen. **Fehler zuerst 
 | 12.10.2026 06:35 | Sonnet 5.5, Lauf 6 | Stufe 5 gebaut, Agenten-Befunde (Fehler) behoben, gepusht |
 | 12.10.2026 07:06 | Sonnet 5.5, Lauf 7 | Stufe 6 gebaut, Agenten-Befund (Leisten abgeschnitten) behoben, gepusht |
 | 12.10.2026 07:42 | Lauf 8 (Sonnet 5.5) | Stufe 7 fertig, grün |
+| 12.10.2026 18:34 | Lauf 9 (Sonnet 5.5, Bau-Session 7b) | Stufe 7b gebaut (A0–A8), Agenten-Befunde behoben, gepusht |
+
+## Auf Vorbehalt entschieden (Stufe 7b)
+
+- Maus: Die linke Taste ist immer „Auswählen/Ziehen“; die Werkzeugknöpfe und -tasten wählen das „aktuelle Element“ für den Rechtsklick (`Auswahl (V)` = keines). In der Welt-Ansicht setzt Rechtsklick nichts (links ziehen im Leeren verschiebt dort weiter den Plan). Ziehschwelle 8 px für alles.
+- Zoom: ×1,15 je Rasten (deltaY 100), Strg+Rad ×4, Tasten +/− ×1,25, `1` = 1 Bildschirm, `2` = 2,2, Pos1 = alles (5 % Rand), Bereich 0,25–160; waagerechtes Rad schiebt seitlich.
+- Esc: erst Auswahl aufheben, dann eine Ebene hoch (Level → Karte → Welt); in der Levelansicht zählt das Level selbst als „nichts gewählt“; in der Welt gibt es keine höhere Ebene (früher führte Esc dort ins Gebiet). Bild↑/↓ wechselt das Level.
+- Level = Gang + zwei Knoten + Teile, die diese Flächen berühren (aus der Geometrie, `level.js`); das Gewählte bleibt sichtbar; im Level ist das Level immer gewählt. Die Rechtsklick-Werkzeuge arbeiten dort auf dem ganzen Gebiet (können an unsichtbare Knoten/Gänge anschließen).
+- Feld `ansicht` am Gang: Richtung (`E`…`NE`), die im Plan nach rechts zeigt; `E` = Norden oben = Standard, wird nicht gespeichert. Auswahlfeld und „Ansicht merken“ rechts.
+- Ebenen (5): Knoten, Gänge, Formteile, Wände/Hindernisse, Gegner. Gesperrt = nicht wählbar, nicht per Rahmen/Strg+A, und Setzen/Kopieren/Einfügen dorthin wird abgelehnt (Meldung). Gang-/Knoten-Werkzeug brauchen beide Ebenen.
+- A7: Kopie bei gewählten Teilen/Knoten (auch gemischt mit Gängen); ein Gang allein (und das Level in der Levelansicht) zählt nicht → Palettenelement. Ein Element wählen (Taste, Palette, Tileset-Fenster, Knotentyp-Liste) hebt die Auswahl auf; V behält sie. Rechts ziehen bei Auswahl setzt nichts (Meldung).
+- Mehrfach: Gruppe verschiebt im Raster (100 E mit Knoten/Gängen, sonst 20 E), ein einzelnes Ding rastet absolut wie bisher; Gang ziehen = seine zwei Knoten. Pfeile: nächste Kartenachse zur Bildschirmrichtung, Umschalt ×5; bei nur einem Gang oder ohne Auswahl wandert der Plan. Duplizieren +40 E (mit Knoten +100 E). Kollision mit vorhandenem Knoten lehnt die ganze Aktion ab. Rahmen: ganz drin, Alt = berührend, Strg ergänzt. Drehen mehrerer: jedes um die eigene Mitte.
+- Tileset-Fenster (Taste I, anfangs aus, in der Welt-Ansicht aus): Aufbau (Gang, Knotentypen), Boden/Wand/Hindernis, Gegner (Tileset zuerst). Die Palette rechts bleibt.
+- „Spielen ab hier“ und Testmenü prüfen die Karte um den gewählten Gang (`spielbarkeit(g, gangId)`); der Prüfer M7 prüft weiter das ganze Gebiet.
+- Speichern/Öffnen stehen jetzt vorn in der zweiten Leiste (waren abgeschnitten).
+
+## Offen aus Stufe 7b (Agenten-Prüfung, Hinweise)
+
+- Obere Leisten bei 1280 px noch breiter als das Fenster (scrollen); Hinweiszeile abgeschnitten; Beschriftungen überlappen („Ostgang“/Notiz); Wände im Leeren unsichtbar (Wandfarbe = Hintergrund). UX-Vorschläge S1–S7, K1–K5 nicht umgesetzt.
+- Drehen mit Q/E passt den Zoom nicht an; jeder Pfeildruck ist ein eigener Rückgängig-Schritt; Eigenschaftenfelder x/y nehmen Werte abseits des 20-E-Rasters an (A6 gilt für Maus, Pfeile, Einfügen); „Hier teilen“ und Prüfer-Sprung umgehen die Ebenen-Sperre; `state.zeiger` ist nach Tastenzoom veraltet (Strg+V an alter Stelle); Esc hält eine laufende Fahrt nicht an; Strg+C nach „Bezeichnung kopieren“ wird abgefangen (schon vor 7b); Mehrfachauswahl zeigt rechts nur Anzahlen, keine gemeinsamen Felder.
+- Electron und echtes Speichern-Dialog-Verhalten nicht ausführbar getestet.
+
+## Fragen an Robin (7b)
+
+- (keine neuen)

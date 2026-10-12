@@ -132,7 +132,7 @@ export function startEditor() {
   /** Was der Plan zeigt: in der Levelansicht nur das Level (Gang, zwei Knoten, berührende Teile; das Gewählte bleibt sichtbar), sonst das Gebiet. */
   function sicht() {
     if (!state.levelGang || state.ansichtArt === 'welt') return gebiet();
-    sichtMerk ??= levelInhalt(gebiet(), state.levelGang, state.auswahl ? [state.auswahl.id] : []);
+    sichtMerk ??= levelInhalt(gebiet(), state.levelGang, state.auswahl ? [state.auswahl, ...state.mehrfach].map((d) => d.id) : []);
     return sichtMerk;
   }
   /** Ebene der Ansicht: 'welt' (alle Gebiete), 'karte' (ein Gebiet) oder 'level' (ein Gang). */
@@ -724,8 +724,9 @@ export function startEditor() {
   function sperreUmschalten(id) {
     if (state.gesperrt.has(id)) state.gesperrt.delete(id);
     else state.gesperrt.add(id);
-    const au = state.auswahl;
-    if (au && state.gesperrt.has(ebeneVon(au.art, au.art === 'objekt' ? teilFinden(gebiet(), 'objekt', au.id) : null))) waehle(null);
+    const gesperrtDing = (d) => state.gesperrt.has(ebeneVon(d.art, d.art === 'objekt' ? teilFinden(gebiet(), 'objekt', d.id) : null));
+    const liste = auswahlListe();
+    if (liste.some(gesperrtDing)) setzeAuswahl(liste.filter((d) => !gesperrtDing(d))); // gesperrte Dinge verlassen die ganze Auswahl, nicht nur die Hauptwahl
     refresh();
   }
   /** Zeiger im Plan: normaler Pfeil, mit einem Element für den Rechtsklick das Fadenkreuz. */
@@ -1379,7 +1380,10 @@ export function startEditor() {
       rechts.append(el('h2', { text: `Knoten ${k.id}` }), dl);
       const tw = el('select', { id: 'f-typ' }, Object.entries(KNOTENTYPEN).map(([id, t]) => el('option', { value: id, text: t.name })));
       tw.value = k.typ;
-      tw.addEventListener('change', () => setzeFeld('knoten', k.id, 'typ', tw.value));
+      tw.addEventListener('change', () => {
+        setzeFeld('knoten', k.id, 'typ', tw.value);
+        tw.blur(); // Kürzel gelten sofort wieder
+      });
       dl.append(el('dt', { text: 'Typ' }), el('dd', {}, [tw]));
       feld(dl, 'x (E)', 'f-x', k.x, (v) => setzeFeld('knoten', k.id, 'x', v), 'number', { step: 100 });
       feld(dl, 'y (E)', 'f-y', k.y, (v) => setzeFeld('knoten', k.id, 'y', v), 'number', { step: 100 });
@@ -1430,6 +1434,7 @@ export function startEditor() {
         aendere('Tileset ändern', (gg) => {
           gg.tileset = wert;
         });
+        ts.blur();
       });
       dl.append(el('dt', { text: 'Tileset' }), el('dd', {}, [ts]));
       const bm = bereichMasse(g.bereich);

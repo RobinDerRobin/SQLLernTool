@@ -1019,6 +1019,31 @@ const zufall = () => (rng = (rng * 1103515245 + 12345) % 2147483648) / 214748364
   await b((e) => e.setzeWerkzeug('auswahl'));
 }
 
+
+// ------------------------------------------------------------------ Befunde des Software-Testers (Mehrfachauswahl und Sperre, Levelansicht)
+{
+  await b((e) => {
+    while (e.verlaufVon(e.state.gebietId).kannZurueck) e.rueckgaengig();
+    e.setzeWerkzeug('auswahl');
+    e.wechsle('beispiel');
+    e.setzeAuswahl([{ art: 'knoten', id: 'K1' }, { art: 'objekt', id: 'o1' }]);
+  });
+  const d0 = await daten();
+  await bau.click('#l-knoten');
+  check((await b((e) => e.auswahlListe().map((d) => d.id).join())) === 'o1', 'Sperre: gesperrte Dinge verlassen auch die Mehrfachauswahl (nicht nur die Hauptwahl)');
+  await bau.keyboard.press('Delete');
+  check((await b((e) => e.gebiet().knoten.some((k) => k.id === 'K1'))), 'Sperre: Entf löscht den gesperrten Knoten nicht');
+  await bau.click('#l-knoten');
+  await b((e) => { e.oeffneLevel('ostgang'); e.setzeAuswahl(e.sicht().knoten.map((k) => ({ art: 'knoten', id: k.id }))); });
+  await bau.keyboard.press('Control+KeyC');
+  await b((e) => { e.state.zeiger = { x: 1500, y: 900 }; });
+  await bau.keyboard.press('Control+KeyV');
+  check((await b((e) => e.sicht().knoten.length)) === 4, 'Levelansicht: eingefügte Dinge bleiben sichtbar, solange sie gewählt sind (alle gewählten, nicht nur die Hauptwahl)');
+  await b((e) => { e.zuKarte(); });
+  while ((await schritte()) > 0) await bau.keyboard.press('Control+KeyZ');
+  check((await daten()) === d0, 'Befunde: alles rückgängig = Ausgangszustand');
+}
+
 check(bauFehler.length === 0, 'Bedienung (Bauen): keine Konsolenfehler', bauFehler.join('; '));
 
 check(errors.length === 0, 'Bedienung: keine Konsolenfehler', errors.join('; '));
