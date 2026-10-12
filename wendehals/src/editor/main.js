@@ -6,9 +6,10 @@ import { HEADINGS, DIR_NAMES, E } from '../core/math.js';
 import { Ansicht } from './ansicht.js';
 import { zeichnePlan } from './zeichnen.js';
 import { WELT, GEBIETE } from './startdaten.js';
-import { kopie, bezeichnung, knotenMap, gangMasse, gangPolygon, knotenPolygon, punktInPolygon, ausdehnung, rahmenEcken, formatiere, formatiereWelt, ladeGebiet, pruefeFormat, Verlauf } from './daten.js';
+import { kopie, bezeichnung, knotenMap, gangMasse, gangPolygon, knotenPolygon, punktInPolygon, ausdehnung, rahmenEcken, formatiere, ladeGebiet, pruefeFormat, Verlauf } from './daten.js';
+import { formatiereWelt, ladeWelt, pruefeWelt, weltLagen, weltAusdehnung, lageSetzen, bereichFeld, bereichAnpassen, bereichMasse, uebergangAnlegen, uebergangLoeschen, uebergaengeVon, uebergaengeAn, andereSeite, teileEnde, ausserhalb } from './welt.js';
 import { KNOTENTYPEN } from './katalog.js';
-import { KUERZEL, WINKEL_SCHRITT, SCREEN_W, SPEED, ZOOM_BILDSCHIRME, PFEIL_SCHRITT_PX, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX } from './konstanten.js';
+import { KUERZEL, WINKEL_SCHRITT, SCREEN_W, SCREEN_H, SPEED, ZOOM_BILDSCHIRME, PFEIL_SCHRITT_PX, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX } from './konstanten.js';
 import { gangTeilen, loesche, setze } from './befehle.js';
 import { teilBei, teilFinden, teilDrehen, teilMerken, teilEinfuegen, loescheTeil, setzeTeil, istTeilArt, hatMasse, teilName, liste as teilListe } from './teile.js';
 import { erzeugeSpeicher } from './speicher.js';
@@ -16,6 +17,8 @@ import { spielbarkeit, erzeugeSzene } from './spielen.js';
 import { pruefeGebiet, zusammenfassung } from './pruefer.js';
 import { SpielModus } from './spielmodus.js';
 import { WERKZEUGE } from './werkzeuge/index.js';
+import weltWerkzeug, { weltTreffer } from './werkzeuge/welt-ansicht.js';
+import { zeichneWelt } from './zeichnen-welt.js';
 
 const fmt = (n, d = 1) => n.toFixed(d).replace('.', ',');
 const hat = (liste, code) => (Array.isArray(liste) ? liste.includes(code) : liste === code);
@@ -74,7 +77,13 @@ export function startEditor() {
   if (altesCanvas) altesCanvas.remove();
 
   const state = {
-    welt: WELT,
+    welt: kopie(WELT), // eine Arbeitskopie: der eingebaute Stand bleibt unverändert
+    ansichtArt: 'gebiet', // 'gebiet' (ein Gebiet bearbeiten) oder 'welt' (Welt-Plan: Bereiche, Lage, Übergänge)
+    weltAuswahl: null, // in der Welt-Ansicht: { art: 'gebiet'|'uebergang', id }
+    weltVerlauf: new Verlauf(), // Rückgängig/Wiederholen für welt.json (Lage, Übergänge)
+    weltGespeichert: formatiereWelt(WELT), // zuletzt gespeicherter/geladener Text von welt.json
+    kameras: {}, // gemerkte Kamera je Ansicht-Art
+    entwurf: null, // vorbelegter Anfang eines neuen Übergangs: { gebiet, knoten }
     gebiete: Object.fromEntries(Object.entries(GEBIETE).map(([id, g]) => [id, kopie(g)])),
     gebietId: WELT.gebiete[0].id,
     auswahl: null, // { art: 'gang'|'knoten', id }
@@ -92,7 +101,6 @@ export function startEditor() {
     zeiger: null, // letzte Mausstelle im Plan (Welt), Zielstelle für Einfügen
     verlauf: {}, // Gebiets-ID → Verlauf (Rückgängig/Wiederholen)
     gespeichert: Object.fromEntries(Object.entries(GEBIETE).map(([id, g]) => [id, formatiere(g)])), // zuletzt gespeicherter/geladener Text je Gebiet
-    weltGeaendert: false, // welt.json muss mitgeschrieben werden (neues Gebiet geöffnet)
     neueGebiete: new Set(), // geöffnete Gebiete, deren Datei noch nicht gespeichert ist (kommen erst danach in welt.json)
     speicher: erzeugeSpeicher(),
   };
@@ -101,6 +109,8 @@ export function startEditor() {
   let dirty = true;
   const gebiet = () => state.gebiete[state.gebietId];
   const werkzeug = () => WERKZEUGE.find((w) => w.id === state.werkzeug);
+  const aktiv = () => (state.ansichtArt === 'welt' ? weltWerkzeug : werkzeug()); // was die Maus gerade bedient
+  const kamera = () => ({ cx: ansicht.cx, cy: ansicht.cy, stufe: ansicht.stufe, blick: ansicht.blick });
 
   // ---------------------------------------------------------------- Oberfläche
   const canvas = el('canvas');
@@ -115,13 +125,14 @@ export function startEditor() {
   const oben = el('div', { id: 'oben', class: 'leiste' }, [
     el('span', { class: 'titel', text: 'Editor' }),
     wahl,
-    knopf('Links drehen', 'Ansicht 45° links drehen (Q)', () => drehen(-1), 'b-links'),
-    knopf('Rechts drehen', 'Ansicht 45° rechts drehen (E)', () => drehen(1), 'b-rechts'),
-    knopf('Norden oben', 'Norden nach oben (0)', () => norden(), 'b-norden'),
+    knopf('Welt', 'Welt-Plan: alle Gebiete, ihre Bereiche, Lage und Übergänge (T)', () => weltUmschalten(), 'b-welt'),
+    knopf('Drehen ⟲', 'Ansicht 45° links drehen (Q)', () => drehen(-1), 'b-links'),
+    knopf('Drehen ⟳', 'Ansicht 45° rechts drehen (E)', () => drehen(1), 'b-rechts'),
+    knopf('Norden', 'Norden nach oben (0)', () => norden(), 'b-norden'),
     knopf('Wie im Spiel', 'In Flugrichtung des gewählten Gangs drehen (F)', () => wieImSpiel(), 'b-spiel'),
     knopf('Zoom −', 'Herauszoomen (−)', () => zoom(1), 'b-minus'),
     knopf('Zoom +', 'Hineinzoomen (+)', () => zoom(-1), 'b-plus'),
-    knopf('Alles zeigen', 'Ganzes Gebiet einpassen', () => alles(), 'b-alles'),
+    knopf('Alles', 'Ganzes Gebiet einpassen', () => alles(), 'b-alles'),
     knopf('Beschriftung', 'Knoten, Namen und Maßstab ein-/ausblenden (L)', () => beschriften(), 'b-beschriftung'),
     anzeige,
   ]);
@@ -189,6 +200,10 @@ export function startEditor() {
   }
   function wechsle(id) {
     if (!state.gebiete[id]) return;
+    if (state.ansichtArt === 'welt') {
+      state.kameras.welt = kamera();
+      state.ansichtArt = 'gebiet';
+    }
     bezFeld.style.display = 'none'; // die kopierte Bezeichnung gehörte zum alten Gebiet
     melde('');
     state.gebietId = id;
@@ -259,7 +274,7 @@ export function startEditor() {
     refresh();
   }
   function alles() {
-    ansicht.einpassen(ausdehnung(gebiet()));
+    ansicht.einpassen(state.ansichtArt === 'welt' ? weltAusdehnung(state.welt, state.gebiete) : ausdehnung(gebiet()));
     refresh();
   }
 
@@ -351,6 +366,14 @@ export function startEditor() {
   function springe(m) {
     const o = m.ort;
     if (!o) return;
+    if (state.ansichtArt === 'welt') {
+      weltWaehle(o);
+      const r = o.art === 'gebiet' ? state.gebiete[o.id]?.bereich : null;
+      const l = o.art === 'gebiet' ? weltLagen(state.welt, state.gebiete).get(o.id) : null;
+      if (r && l) ansicht.zentrieren((r.x0 + r.x1) / 2 + l.x, (r.y0 + r.y1) / 2 + l.y);
+      refresh();
+      return;
+    }
     const g = gebiet();
     const da = o.art === 'gang' ? g.gaenge : o.art === 'knoten' ? g.knoten : o.art === 'formteil' ? g.formteile : g.objekte;
     if (da.some((x) => x.id === o.id)) waehle({ art: o.art, id: o.id });
@@ -360,13 +383,13 @@ export function startEditor() {
   }
   function prueferZeigen() {
     prueferKnopf.classList.remove('muss', 'soll', 'gut');
-    const r = pruefer();
+    const r = state.ansichtArt === 'welt' ? weltPruefer() : pruefer();
     prueferKnopf.textContent = zusammenfassung(r);
     prueferKnopf.classList.add(r.muss ? 'muss' : r.soll ? 'soll' : 'gut');
     prueferFeld.style.display = state.prueferOffen ? '' : 'none';
     if (!state.prueferOffen) return;
     prueferFeld.replaceChildren(
-      el('h3', { text: r.meldungen.length ? 'Prüfer – Klick springt zur Stelle' : 'Prüfer – alles in Ordnung' }),
+      el('h3', { text: (state.ansichtArt === 'welt' ? 'Welt-Prüfer' : 'Prüfer') + (r.meldungen.length ? ' – Klick springt zur Stelle' : ' – alles in Ordnung') }),
       ...r.meldungen.map((m) => {
         const b = el('button', { class: 'pm ' + m.art, title: m.ort ? 'Zur Stelle springen' : 'Betrifft das ganze Gebiet', text: `${m.regel} ${m.art}: ${m.text}` });
         b.addEventListener('click', () => springe(m));
@@ -383,7 +406,7 @@ export function startEditor() {
     melden.title = text ? 'Klick blendet die Meldung aus' : '';
   }
   function hinweis(t) {
-    werkHinweis.textContent = t || werkzeug().hinweis;
+    werkHinweis.textContent = t || aktiv().hinweis;
   }
   const verlaufVon = (id) => (state.verlauf[id] ??= new Verlauf());
   const ungespeichert = (id = state.gebietId) => state.gebiete[id] && formatiere(state.gebiete[id]) !== state.gespeichert[id];
@@ -435,10 +458,12 @@ export function startEditor() {
     refresh();
   }
   function rueckgaengig() {
+    if (state.ansichtArt === 'welt') return weltRueck(true);
     const t = verlaufVon(state.gebietId).rueckgaengig(JSON.stringify(gebiet()));
     if (t != null) nachVerlauf(t);
   }
   function wiederholen() {
+    if (state.ansichtArt === 'welt') return weltRueck(false);
     const t = verlaufVon(state.gebietId).wiederholen(JSON.stringify(gebiet()));
     if (t != null) nachVerlauf(t);
   }
@@ -452,9 +477,12 @@ export function startEditor() {
     refresh();
   }
   function loescheAuswahl() {
+    if (state.ansichtArt === 'welt') return loescheUebergang();
     const au = state.auswahl;
     if (!au || (au.art !== 'gang' && au.art !== 'knoten' && !istTeilArt(au.art))) return;
+    const offen = au.art === 'knoten' ? uebergaengeAn(state.welt, state.gebietId, au.id).length : 0;
     aendere('Löschen', (g) => (istTeilArt(au.art) ? loescheTeil(g, au.art, au.id) : loesche(g, au.art, au.id)));
+    if (offen) melde(`${offen === 1 ? 'Ein Übergang zeigt' : offen + ' Übergänge zeigen'} jetzt ins Leere – der Welt-Prüfer (Taste T) meldet es (W1).`, 'fehler');
   }
   /** Gewähltes Teil (Formteil, Wand, Hindernis) oder null. */
   const gewaehltesTeil = () => {
@@ -496,6 +524,7 @@ export function startEditor() {
   }
   function setzeWerkzeug(id) {
     if (!WERKZEUGE.some((w) => w.id === id)) return;
+    if (state.ansichtArt === 'welt') zuGebiet();
     werkzeug().abbruch?.(kontext);
     state.werkzeug = id;
     canvas.style.cursor = id === 'auswahl' ? 'grab' : 'crosshair';
@@ -504,6 +533,7 @@ export function startEditor() {
   }
 
   async function speichere() {
+    if (state.ansichtArt === 'welt') return speichereWelt();
     const g = gebiet();
     const fehler = pruefeFormat(g);
     if (fehler.length) return melde('Nicht gespeichert – das Gebiet ist nicht gültig:\n- ' + fehler.join('\n- '), 'fehler');
@@ -514,12 +544,12 @@ export function startEditor() {
       state.gespeichert[g.id] = text;
       state.neueGebiete.delete(g.id);
       let wo = r.wo;
-      if (state.weltGeaendert) {
-        // nur Gebiete eintragen, deren Datei es gibt – sonst findet der nächste Start eine Datei nicht
-        const weltText = formatiereWelt({ ...state.welt, gebiete: state.welt.gebiete.filter((e) => !state.neueGebiete.has(e.id)) });
+      if (weltUngespeichert()) {
+        // nur Gebiete eintragen, deren Datei es gibt – sonst findet der nächste Start eine Datei nicht (weltDateiText lässt neue aus)
+        const weltText = weltDateiText();
         const wr = await state.speicher.sichere('welt.json', weltText);
         if (wr) {
-          state.weltGeaendert = state.neueGebiete.size > 0;
+          state.weltGespeichert = weltText;
           wo += ` und ${wr.wo}`;
         }
       }
@@ -541,7 +571,6 @@ export function startEditor() {
     if (state.gebiete[g.id]) verlaufVon(g.id).merke(JSON.stringify(state.gebiete[g.id])); // lässt sich mit Rückgängig zurücknehmen
     else {
       state.welt = { ...state.welt, gebiete: [...state.welt.gebiete, { id: g.id, name: g.name, datei: `gebiete/${g.id}.json` }] };
-      state.weltGeaendert = true;
       state.neueGebiete.add(g.id);
       wahl.append(el('option', { value: g.id, text: g.name }));
     }
@@ -561,7 +590,7 @@ export function startEditor() {
   /** Alle Leveldateien frisch von der Platte übernehmen (Electron-Start): { welt: Text, gebiete: { id: Text } }. */
   function uebernehmeAlle(alle) {
     const probleme = [];
-    const welt = JSON.parse(alle.welt);
+    const welt = ladeWelt(alle.welt);
     const neu = {};
     for (const eintrag of welt.gebiete) {
       try {
@@ -572,6 +601,10 @@ export function startEditor() {
     }
     if (!Object.keys(neu).length) throw new Error('keine gültige Gebietsdatei gefunden\n' + probleme.join('\n'));
     state.welt = welt; // ungeladene Einträge bleiben in welt.json erhalten
+    state.weltGespeichert = formatiereWelt(welt);
+    state.weltVerlauf = new Verlauf();
+    state.weltAuswahl = null;
+    state.entwurf = null;
     state.neueGebiete = new Set();
     state.gebiete = neu;
     state.gespeichert = Object.fromEntries(Object.entries(neu).map(([id, g]) => [id, formatiere(g)]));
@@ -582,6 +615,176 @@ export function startEditor() {
     if (probleme.length) melde('Einige Dateien wurden übersprungen:\n' + probleme.join('\n'), 'fehler');
   }
 
+  // ---------------------------------------------------------------- Gebiete und Übergänge (Stufe 5)
+  /** Text von welt.json, wie er gespeichert würde: Gebiete ohne Datei (und Übergänge dorthin) bleiben draußen. */
+  function weltDateiText() {
+    const neu = state.neueGebiete;
+    const w = { ...state.welt, gebiete: state.welt.gebiete.filter((e) => !neu.has(e.id)) };
+    const ue = (state.welt.uebergaenge ?? []).filter((u) => ![u.von, u.nach].some((t) => neu.has(t.split('/')[0])));
+    if (ue.length) w.uebergaenge = ue;
+    else delete w.uebergaenge;
+    return formatiereWelt(w);
+  }
+  const weltUngespeichert = () => weltDateiText() !== state.weltGespeichert;
+  const weltPruefer = () => pruefeWelt(state.welt, state.gebiete);
+  /** Übergänge, die an Knoten des offenen Gebiets enden: [{ knoten, text }] (für die Ringe im Plan). */
+  function uebergangsMarken() {
+    const out = [];
+    for (const u of uebergaengeVon(state.welt)) {
+      for (const [hier, dort] of [[u.von, u.nach], [u.nach, u.von]]) {
+        const e = teileEnde(hier);
+        if (e?.gebiet === state.gebietId) out.push({ knoten: e.knoten, text: '→ ' + dort });
+      }
+    }
+    return out;
+  }
+  function weltBereinige() {
+    const au = state.weltAuswahl;
+    if (!au) return;
+    const da = au.art === 'gebiet' ? state.welt.gebiete.some((e) => e.id === au.id) : uebergaengeVon(state.welt).some((u) => u.id === au.id);
+    if (!da) state.weltAuswahl = null;
+  }
+  /** Jede Änderung an welt.json läuft hier durch (wie `aendere` für Gebiete): Zustand vorher merken, bei Fehler nichts ändern. */
+  function weltAendere(label, fn) {
+    const vorher = JSON.stringify(state.welt);
+    const w = JSON.parse(vorher);
+    let erg = null;
+    try {
+      erg = fn(w);
+    } catch (e) {
+      melde(`„${label}“ ging schief, nichts wurde geändert: ${e.message}`, 'fehler');
+      refresh();
+      return null;
+    }
+    if (JSON.stringify(w) === vorher) return erg ?? null;
+    state.weltVerlauf.merke(vorher);
+    state.letzteAktion = label;
+    state.welt = w;
+    melde('');
+    weltBereinige();
+    refresh();
+    return erg ?? null;
+  }
+  function weltRueck(zurueck) {
+    const jetzt = JSON.stringify(state.welt);
+    const t = zurueck ? state.weltVerlauf.rueckgaengig(jetzt) : state.weltVerlauf.wiederholen(jetzt);
+    if (t == null) return;
+    state.welt = JSON.parse(t);
+    weltBereinige();
+    melde('');
+    refresh();
+  }
+  function weltWaehle(a) {
+    state.weltAuswahl = a;
+    if (/^(Zum Kopieren|Zum Spielen)/.test(state.meldung)) melde('');
+    refresh();
+  }
+  function zuWelt() {
+    if (state.ansichtArt === 'welt') return;
+    werkzeug().abbruch?.(kontext);
+    state.kameras.gebiet = kamera();
+    state.ansichtArt = 'welt';
+    state.auswahl = null;
+    state.fahrt = null;
+    bezFeld.style.display = 'none';
+    state.weltAuswahl = { art: 'gebiet', id: state.gebietId };
+    if (state.kameras.welt) Object.assign(ansicht, state.kameras.welt);
+    else alles();
+    refresh();
+  }
+  /** Zurück in die Gebiet-Ansicht; `id` = Gebiet, das geöffnet wird (sonst das zuletzt offene). */
+  function zuGebiet(id = state.gebietId) {
+    if (state.ansichtArt !== 'welt') return;
+    weltWerkzeug.abbruch?.(kontext);
+    state.kameras.welt = kamera();
+    state.ansichtArt = 'gebiet';
+    if (id !== state.gebietId || !state.kameras.gebiet) wechsle(id);
+    else {
+      Object.assign(ansicht, state.kameras.gebiet);
+      refresh();
+    }
+  }
+  function weltUmschalten() {
+    if (state.ansichtArt === 'welt') zuGebiet(state.weltAuswahl?.art === 'gebiet' && state.gebiete[state.weltAuswahl.id] ? state.weltAuswahl.id : state.gebietId);
+    else zuWelt();
+  }
+  function weltOeffneAuswahl() {
+    const au = state.weltAuswahl;
+    if (au?.art === 'gebiet' && state.gebiete[au.id]) zuGebiet(au.id);
+  }
+  /** Springt zu einem Knoten „gebiet/K1“ (öffnet das Gebiet, wählt den Knoten, zentriert den Plan). */
+  function springeZuKnoten(text) {
+    const t = teileEnde(text);
+    if (!t || !state.gebiete[t.gebiet]) return melde(`Das Gebiet „${t?.gebiet ?? text}“ ist nicht geladen.`, 'fehler');
+    if (state.ansichtArt === 'welt') zuGebiet(t.gebiet);
+    else if (t.gebiet !== state.gebietId) wechsle(t.gebiet);
+    const k = knotenMap(gebiet()).get(t.knoten);
+    if (!k) return melde(`Den Knoten „${t.knoten}“ gibt es nicht mehr.`, 'fehler');
+    waehle({ art: 'knoten', id: k.id });
+    ansicht.zentrieren(k.x, k.y);
+    refresh();
+  }
+  const zahlVon = (v) => (typeof v === 'number' ? v : String(v).trim() === '' ? NaN : Number(String(v).trim().replace(',', '.')));
+  function setzeLage(id, achse, wert) {
+    weltAendere('Lage ändern', (w) => {
+      const z = zahlVon(wert);
+      if (!Number.isFinite(z)) throw new Error('Bitte eine Zahl eingeben.');
+      const l = weltLagen(w, state.gebiete).get(id);
+      if (!l) throw new Error(`Gebiet „${id}“ ist nicht geladen.`);
+      lageSetzen(w, id, achse === 'x' ? z : l.x, achse === 'y' ? z : l.y, state.gebiete);
+    });
+  }
+  function setzeBereich(feldName, wert) {
+    let fehler = null;
+    aendere('Bereich ändern', (g) => {
+      fehler = bereichFeld(g, feldName, wert);
+    });
+    if (fehler) melde(fehler, 'fehler');
+    refresh();
+  }
+  function bereichAnInhaltAnwenden() {
+    let geaendert = false;
+    aendere('Bereich anpassen', (g) => {
+      geaendert = bereichAnpassen(g);
+    });
+    if (!geaendert) melde('Der Bereich umschließt den Inhalt schon.');
+  }
+  function anlegenUebergang(vonGebiet, vonKnoten, nachGebiet, nachKnoten) {
+    let fehler = null;
+    const neu = weltAendere('Übergang anlegen', (w) => {
+      const r = uebergangAnlegen(w, state.gebiete, { gebiet: vonGebiet, knoten: vonKnoten }, { gebiet: nachGebiet, knoten: nachKnoten });
+      if (r.fehler) {
+        fehler = r.fehler;
+        return null;
+      }
+      return r.uebergang;
+    });
+    if (fehler) return melde(fehler, 'fehler');
+    if (neu) {
+      state.entwurf = null;
+      weltWaehle({ art: 'uebergang', id: neu.id });
+      melde(`Übergang ${neu.id} angelegt: ${neu.von} ↔ ${neu.nach}. Mit Strg+S wird welt.json gespeichert.`);
+    }
+    return neu;
+  }
+  function loescheUebergang() {
+    const au = state.weltAuswahl;
+    if (au?.art !== 'uebergang') return;
+    weltAendere('Übergang löschen', (w) => uebergangLoeschen(w, au.id));
+  }
+  async function speichereWelt() {
+    const text = weltDateiText();
+    try {
+      const r = await state.speicher.sichere('welt.json', text);
+      if (!r) return melde('Speichern abgebrochen.');
+      state.weltGespeichert = text;
+      melde(`Gespeichert: ${r.wo}`);
+    } catch (e) {
+      melde('Nicht gespeichert: ' + e.message, 'fehler');
+    }
+    refresh();
+  }
+
   const kontext = {
     state,
     ansicht,
@@ -590,6 +793,23 @@ export function startEditor() {
     waehle: (a) => waehle(a),
     aendere,
     hinweis,
+    melde: (t, art) => melde(t, art),
+    weltLive: (id, x, y) => {
+      lageSetzen(state.welt, id, x, y, state.gebiete);
+      dirty = true;
+    },
+    weltFertig: (vorher, label) => {
+      if (JSON.stringify(state.welt) !== vorher) {
+        state.weltVerlauf.merke(vorher);
+        state.letzteAktion = label;
+      }
+      refresh();
+    },
+    weltZurueck: (vorher) => {
+      state.welt = JSON.parse(vorher);
+      refresh();
+    },
+    weltWaehle: (a) => weltWaehle(a),
     tolE: () => FANG_PX / ansicht.masstab,
     zeichnen: () => {
       dirty = true;
@@ -610,7 +830,81 @@ export function startEditor() {
     });
     dl.append(el('dt', { text: name }), el('dd', {}, [i]));
   }
+  /** Rechtes Feld der Welt-Ansicht: Welt, Gebiet (Lage, Bereich, Übergang anlegen) oder Übergang. */
+  function weltEigenschaften() {
+    rechts.replaceChildren();
+    const w = state.welt;
+    const au = state.weltAuswahl;
+    const lagen = weltLagen(w, state.gebiete);
+    const dl = el('dl');
+    const knoepfe = el('div', { class: 'knoepfe' });
+    const u = au?.art === 'uebergang' ? uebergaengeVon(w).find((x) => x.id === au.id) : null;
+    const e = au?.art === 'gebiet' ? w.gebiete.find((x) => x.id === au.id) : null;
+    if (u) {
+      rechts.append(el('h2', { text: `Übergang ${u.id}` }), dl);
+      zeile(dl, 'Von', u.von);
+      zeile(dl, 'Nach', u.nach);
+      knoepfe.append(
+        knopf(`Zu ${u.von}`, 'Gebiet öffnen und den Knoten wählen', () => springeZuKnoten(u.von), 'b-ue-von'),
+        knopf(`Zu ${u.nach}`, 'Gebiet öffnen und den Knoten wählen', () => springeZuKnoten(u.nach), 'b-ue-nach'),
+        knopf('Löschen', 'Übergang löschen (Entf)', () => loescheUebergang(), 'b-loeschen2'),
+      );
+    } else if (e) {
+      const g = state.gebiete[e.id];
+      rechts.append(el('h2', { text: `Gebiet „${e.name}“` }), dl);
+      zeile(dl, 'ID', e.id);
+      if (!g) {
+        zeile(dl, 'Datei', 'nicht geladen');
+      } else {
+        const l = lagen.get(e.id);
+        const m = bereichMasse(g.bereich);
+        zeile(dl, 'Tileset', g.tileset);
+        zeile(dl, 'Bereich', `${fmt(m.w, 0)} × ${fmt(m.h, 0)} E = ${fmt(m.w / SCREEN_W)} × ${fmt(m.h / SCREEN_H)} Bildschirme`);
+        feld(dl, 'Lage x (E)', 'f-lx', l.x, (v) => setzeLage(e.id, 'x', v), 'number', { step: 100 });
+        feld(dl, 'Lage y (E)', 'f-ly', l.y, (v) => setzeLage(e.id, 'y', v), 'number', { step: 100 });
+        if (l.auto) zeile(dl, 'Anordnung', 'automatisch (beim ersten Verschieben werden alle Lagen gespeichert)');
+        zeile(dl, 'Knoten', g.knoten.length);
+        zeile(dl, 'Gänge', g.gaenge.length);
+        knoepfe.append(knopf('Gebiet öffnen', 'Dieses Gebiet bearbeiten (Doppelklick oder Enter)', () => zuGebiet(e.id), 'b-welt-oeffnen'));
+        rechts.append(dl, knoepfe);
+        const eigene = uebergaengeVon(w).filter((x) => x.von.startsWith(e.id + '/') || x.nach.startsWith(e.id + '/'));
+        rechts.append(el('h2', { text: 'Übergänge' }));
+        if (eigene.length) {
+          const liste = el('div', { class: 'knoepfe' });
+          for (const x of eigene) liste.append(knopf(`${x.id}: ${x.von} ↔ ${x.nach}`, 'Übergang wählen', () => weltWaehle({ art: 'uebergang', id: x.id }), 'b-uw-' + x.id));
+          rechts.append(liste);
+        } else rechts.append(el('p', { class: 'grau', text: 'Noch keiner.' }));
+        const andere = w.gebiete.filter((x) => x.id !== e.id && state.gebiete[x.id]);
+        if (!andere.length) rechts.append(el('p', { class: 'grau', text: 'Für einen Übergang braucht es ein zweites geladenes Gebiet.' }));
+        else {
+          const opt = (k) => el('option', { value: k.id, text: `${k.id} (${KNOTENTYPEN[k.typ]?.name ?? k.typ})` });
+          const meinKnoten = el('select', { id: 'f-u-knoten', title: 'Knoten in diesem Gebiet' }, g.knoten.map(opt));
+          if (state.entwurf?.gebiet === e.id && g.knoten.some((k) => k.id === state.entwurf.knoten)) meinKnoten.value = state.entwurf.knoten;
+          const zielGebiet = el('select', { id: 'f-u-gebiet', title: 'Zielgebiet' }, andere.map((x) => el('option', { value: x.id, text: x.name })));
+          const zielKnoten = el('select', { id: 'f-u-ziel', title: 'Knoten im Zielgebiet' });
+          const fuelle = () => zielKnoten.replaceChildren(...state.gebiete[zielGebiet.value].knoten.map(opt));
+          zielGebiet.addEventListener('change', fuelle);
+          fuelle();
+          const f = el('dl');
+          f.append(el('dt', { text: 'Von Knoten' }), el('dd', {}, [meinKnoten]), el('dt', { text: 'Nach Gebiet' }), el('dd', {}, [zielGebiet]), el('dt', { text: 'Nach Knoten' }), el('dd', {}, [zielKnoten]));
+          const neu = el('div', { class: 'knoepfe' }, [knopf('Übergang anlegen', 'Verbindet die beiden Knoten (nach Strg+S in welt.json)', () => anlegenUebergang(e.id, meinKnoten.value, zielGebiet.value, zielKnoten.value), 'b-u-anlegen')]);
+          rechts.append(f, neu);
+        }
+        rechts.append(el('p', { class: 'grau', text: 'Welt-Ansicht: Klick wählt, Ziehen verschiebt ein Gebiet (100 E), Doppelklick/Enter öffnet es, T geht zurück, Entf löscht einen Übergang, Strg+Z/Y/S wirken auf welt.json.' }));
+        return;
+      }
+    } else {
+      rechts.append(el('h2', { text: 'Welt' }), dl);
+      zeile(dl, 'Gebiete', w.gebiete.length);
+      zeile(dl, 'Übergänge', uebergaengeVon(w).length);
+      const liste = el('div', { class: 'knoepfe' });
+      for (const x of w.gebiete) liste.append(knopf(x.name, 'Gebiet wählen', () => weltWaehle({ art: 'gebiet', id: x.id }), 'b-wg-' + x.id));
+      rechts.append(el('p', { class: 'grau', text: 'Gebiet anklicken oder hier wählen.' }), liste);
+    }
+    rechts.append(knoepfe);
+  }
   function eigenschaften() {
+    if (state.ansichtArt === 'welt') return weltEigenschaften();
     rechts.replaceChildren();
     const g = gebiet();
     const au = state.auswahl;
@@ -646,6 +940,14 @@ export function startEditor() {
       }
       if (k.form) zeile(dl, 'Form', `${k.form}, Seite ${k.seite} E`);
       zeile(dl, 'Gänge', g.gaenge.filter((x) => x.von === k.id || x.nach === k.id).map((x) => x.name || x.id).join(', ') || 'keine');
+      for (const x of uebergaengeAn(state.welt, g.id, k.id)) {
+        const dort = andereSeite(x, g.id, k.id);
+        dl.append(el('dt', { text: `Übergang ${x.id}` }), el('dd', {}, [knopf(`→ ${dort.gebiet}/${dort.knoten}`, 'Zum anderen Ende springen', () => springeZuKnoten(`${dort.gebiet}/${dort.knoten}`), 'b-ue-' + x.id)]));
+      }
+      knoepfe.append(knopf('Übergang anlegen …', 'Welt-Ansicht öffnen und von diesem Knoten aus einen Übergang in ein anderes Gebiet anlegen', () => {
+        state.entwurf = { gebiet: g.id, knoten: k.id };
+        zuWelt();
+      }, 'b-ue-neu'));
       knoepfe.append(knopf('Löschen', 'Knoten samt seinen Gängen löschen (Entf)', () => loescheAuswahl(), 'b-loeschen2'));
     } else if (au && istTeilArt(au.art)) {
       const o = teilFinden(g, au.art, au.id);
@@ -673,6 +975,12 @@ export function startEditor() {
     } else {
       rechts.append(el('h2', { text: g.name }), dl);
       zeile(dl, 'Tileset', g.tileset);
+      const bm = bereichMasse(g.bereich);
+      zeile(dl, 'Bereich', `${fmt(bm.w, 0)} × ${fmt(bm.h, 0)} E = ${fmt(bm.w / SCREEN_W)} × ${fmt(bm.h / SCREEN_H)} Bildschirme`);
+      for (const f of ['x0', 'y0', 'x1', 'y1']) feld(dl, `Bereich ${f} (E)`, 'f-b' + f, g.bereich[f], (v) => setzeBereich(f, v), 'number', { step: 100 });
+      const draussen = ausserhalb(g);
+      if (draussen.length) zeile(dl, 'Außerhalb', `${draussen.length} Ding${draussen.length === 1 ? '' : 'e'} außerhalb des Bereichs`);
+      knoepfe.append(knopf('Bereich an Inhalt anpassen', 'Bereich so setzen, dass er alles umschließt (mit Rand)', () => bereichAnInhaltAnwenden(), 'b-bereich-anpassen'));
       zeile(dl, 'Knoten', g.knoten.length);
       zeile(dl, 'Gänge', g.gaenge.length);
       zeile(dl, 'Formteile', g.formteile.length);
@@ -680,9 +988,14 @@ export function startEditor() {
       zeile(dl, 'Notizen', g.notizen.length);
     }
     rechts.append(knoepfe);
-    rechts.append(el('p', { class: 'grau', text: 'V Auswahl, G Gang, K Knoten, B Formteil, W Wand, H Hindernis · R dreht ein Teil (Umschalt: links), Strg+C/V/D kopieren, einfügen, duplizieren · Strg+Z/Y Rückgängig/Wiederholen · Strg+S Speichern · P Spielen ab hier (Esc zurück), N Bezeichnung kopieren · Q/E drehen, 0 Norden, F wie im Spiel, Leertaste Fahrt, Mausrad zoomt.' }));
+    rechts.append(el('p', { class: 'grau', text: 'V Auswahl, G Gang, K Knoten, B Formteil, W Wand, H Hindernis, A Bereich, T Welt-Ansicht · R dreht ein Teil (Umschalt: links), Strg+C/V/D kopieren, einfügen, duplizieren · Strg+Z/Y Rückgängig/Wiederholen · Strg+S Speichern · P Spielen ab hier (Esc zurück), N Bezeichnung kopieren · Q/E drehen, 0 Norden, F wie im Spiel, Leertaste Fahrt, Mausrad zoomt.' }));
   }
   function refreshFahrt() {
+    if (state.ansichtArt === 'welt') {
+      schieber.disabled = play.disabled = true;
+      fahrtText.textContent = 'Welt-Plan: Gebiete im Plan verschieben, Übergänge anlegen. Der Bildschirmrahmen gehört zu den Gängen (Gebiet öffnen).';
+      return;
+    }
     const m = ganzMasse();
     schieber.disabled = play.disabled = !m;
     if (!m) {
@@ -697,22 +1010,25 @@ export function startEditor() {
       `Stelle ${fmt(s, 0)} E = ${fmt(s / SCREEN_W)} Bildschirme = ${fmt(s / SPEED)} s  ·  Gang ${fmt(m.laenge, 0)} E = ${fmt(m.bildschirme)} Bildschirme = ${fmt(m.sekunden)} s`;
   }
   function refresh() {
-    anzeige.textContent = `${DIR_NAMES[ansicht.blick]} · ${fmt(ZOOM_BILDSCHIRME[ansicht.stufe], 1)} Bildschirme`;
+    const inWelt = state.ansichtArt === 'welt';
+    anzeige.textContent = `${inWelt ? 'Welt · ' : ''}${DIR_NAMES[ansicht.blick]} · ${fmt(ZOOM_BILDSCHIRME[ansicht.stufe], 1)} Bildschirme`;
     eigenschaften();
     refreshFahrt();
-    const v = verlaufVon(state.gebietId);
+    const v = inWelt ? state.weltVerlauf : verlaufVon(state.gebietId);
     undoKnopf.disabled = !v.kannZurueck;
     redoKnopf.disabled = !v.kannVor;
     const au = state.auswahl;
-    spielKnopf.disabled = !(au?.art === 'gang' && state.fahrt);
-    bezKnopf.disabled = !(au?.art === 'gang' || au?.art === 'knoten');
-    for (const w of WERKZEUGE) document.getElementById('t-' + w.id)?.classList.toggle('an', w.id === state.werkzeug);
+    spielKnopf.disabled = inWelt || !(au?.art === 'gang' && state.fahrt);
+    bezKnopf.disabled = inWelt || !(au?.art === 'gang' || au?.art === 'knoten');
+    for (const w of WERKZEUGE) document.getElementById('t-' + w.id)?.classList.toggle('an', !inWelt && w.id === state.werkzeug);
+    document.getElementById('b-welt')?.classList.toggle('an', inWelt);
     typWahl.disabled = state.werkzeug !== 'knoten';
     prueferZeigen();
-    loeschKnopf.disabled = !(au && (au.art === 'gang' || au.art === 'knoten' || istTeilArt(au.art)));
-    stand.textContent = ungespeichert() ? '● ungespeichert' : '✓ gespeichert';
-    stand.className = ungespeichert() ? 'offen' : 'grau';
-    document.title = `${ungespeichert() ? '* ' : ''}Wendehals – Editor`;
+    loeschKnopf.disabled = inWelt ? state.weltAuswahl?.art !== 'uebergang' : !(au && (au.art === 'gang' || au.art === 'knoten' || istTeilArt(au.art)));
+    const offen = inWelt ? weltUngespeichert() : ungespeichert() || weltUngespeichert();
+    stand.textContent = offen ? '● ungespeichert' : '✓ gespeichert';
+    stand.className = offen ? 'offen' : 'grau';
+    document.title = `${offen ? '* ' : ''}Wendehals – Editor`;
     hinweis('');
     dirty = true;
   }
@@ -730,14 +1046,14 @@ export function startEditor() {
   canvas.addEventListener('pointerdown', (e) => {
     canvas.setPointerCapture(e.pointerId);
     // linke Taste: Werkzeug; mittlere/rechte Taste verschiebt immer den Plan
-    const erfasst = e.button === 0 && werkzeug().down?.(kontext, zeigerPunkt(e)) === true;
+    const erfasst = e.button === 0 && aktiv().down?.(kontext, zeigerPunkt(e)) === true;
     zug = { modus: erfasst ? 'werkzeug' : 'plan', x: e.clientX, y: e.clientY, bewegt: false, taste: e.button };
     if (!erfasst) canvas.style.cursor = 'grabbing';
   });
   canvas.addEventListener('pointermove', (e) => {
     state.zeiger = zeigerPunkt(e);
-    if (!zug) return werkzeug().schweben?.(kontext, state.zeiger);
-    if (zug.modus === 'werkzeug') return werkzeug().move?.(kontext, zeigerPunkt(e));
+    if (!zug) return aktiv().schweben?.(kontext, state.zeiger);
+    if (zug.modus === 'werkzeug') return aktiv().move?.(kontext, zeigerPunkt(e));
     const dx = e.clientX - zug.x;
     const dy = e.clientY - zug.y;
     if (!zug.bewegt && Math.hypot(dx, dy) < KLICK_TOLERANZ_PX) return;
@@ -752,14 +1068,20 @@ export function startEditor() {
     const z = zug;
     zug = null;
     canvas.style.cursor = state.werkzeug === 'auswahl' ? 'grab' : 'crosshair';
-    if (e.type === 'pointercancel') return werkzeug().abbruch?.(kontext);
-    if (z.modus === 'werkzeug') werkzeug().up?.(kontext, zeigerPunkt(e));
-    else if (!z.bewegt && z.taste === 0) werkzeug().klick?.(kontext, zeigerPunkt(e));
+    if (e.type === 'pointercancel') return aktiv().abbruch?.(kontext);
+    if (z.modus === 'werkzeug') aktiv().up?.(kontext, zeigerPunkt(e));
+    else if (!z.bewegt && z.taste === 0) aktiv().klick?.(kontext, zeigerPunkt(e));
   };
   canvas.addEventListener('pointerleave', () => {
     if (zug) return;
     state.zeiger = null;
-    werkzeug().abbruch?.(kontext);
+    aktiv().abbruch?.(kontext);
+  });
+  canvas.addEventListener('dblclick', (e) => {
+    if (state.ansichtArt !== 'welt') return;
+    const p = zeigerPunkt(e);
+    const t = weltTreffer(kontext, p.px, p.py);
+    if (t?.art === 'gebiet') zuGebiet(t.id);
   });
   canvas.addEventListener('pointerup', loslassen);
   canvas.addEventListener('pointercancel', loslassen);
@@ -819,9 +1141,12 @@ export function startEditor() {
     else if (c === KUERZEL.alles) alles();
     else if (hat(KUERZEL.loeschen, c)) loescheAuswahl();
     else if (Object.values(KUERZEL.werkzeug).includes(c)) setzeWerkzeug(Object.keys(KUERZEL.werkzeug).find((id) => KUERZEL.werkzeug[id] === c));
+    else if (c === KUERZEL.welt) weltUmschalten();
+    else if (c === 'Enter' && state.ansichtArt === 'welt') weltOeffneAuswahl();
     else if (c === 'Escape') {
-      werkzeug().abbruch?.(kontext);
-      waehle(null);
+      aktiv().abbruch?.(kontext);
+      if (state.ansichtArt === 'welt') weltWaehle(null);
+      else waehle(null);
     }
     else getan = false;
     if (getan) {
@@ -834,7 +1159,8 @@ export function startEditor() {
   // ---------------------------------------------------------------- Schleife
   function zeichne() {
     const t0 = performance.now();
-    zeichnePlan(ctx, gebiet(), ansicht, { auswahl: state.auswahl, fahrt: state.fahrt, zeit: state.zeit, beschriftung: state.beschriftung, marken: state.prueferOffen ? pruefer().meldungen : null, vorschau: (c) => werkzeug().vorschau?.(c, kontext) }, canvas.width / ansicht.w);
+    if (state.ansichtArt === 'welt') zeichneWelt(ctx, { welt: state.welt, gebiete: state.gebiete, auswahl: state.weltAuswahl, aktuell: state.gebietId, marken: state.prueferOffen ? weltPruefer().meldungen : null, beschriftung: state.beschriftung }, ansicht, canvas.width / ansicht.w);
+    else zeichnePlan(ctx, gebiet(), ansicht, { auswahl: state.auswahl, fahrt: state.fahrt, zeit: state.zeit, beschriftung: state.beschriftung, marken: state.prueferOffen ? pruefer().meldungen : null, uebergaenge: uebergangsMarken(), vorschau: (c) => werkzeug().vorschau?.(c, kontext) }, canvas.width / ansicht.w);
     perf.zeichnenMs.push(performance.now() - t0);
     if (perf.zeichnenMs.length > 600) perf.zeichnenMs.shift();
     dirty = false;
@@ -854,7 +1180,7 @@ export function startEditor() {
   setzeWerkzeug(state.werkzeug);
   requestAnimationFrame(frame);
   window.addEventListener('beforeunload', (e) => {
-    if (Object.keys(state.gebiete).some((id) => ungespeichert(id))) e.preventDefault(); // Rückfrage statt stillem Verlust
+    if (Object.keys(state.gebiete).some((id) => ungespeichert(id)) || weltUngespeichert()) e.preventDefault(); // Rückfrage statt stillem Verlust
   });
   // Electron: die Leveldateien frisch von der Platte lesen (die eingebauten Stände sind nur der Rückfall)
   state.speicher
@@ -892,6 +1218,23 @@ export function startEditor() {
     fuegeEin,
     dupliziere,
     speichere,
+    speichereWelt,
+    weltUngespeichert,
+    weltDateiText,
+    weltPruefer,
+    lagen: () => Object.fromEntries(weltLagen(state.welt, state.gebiete)),
+    weltAendere,
+    weltWaehle,
+    weltUmschalten,
+    zuWelt,
+    zuGebiet,
+    weltOeffneAuswahl,
+    springeZuKnoten,
+    setzeLage,
+    setzeBereich,
+    bereichAnInhaltAnwenden,
+    anlegenUebergang,
+    loescheUebergang,
     oeffne,
     oeffneText,
     uebernehmeAlle,

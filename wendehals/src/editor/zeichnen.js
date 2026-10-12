@@ -34,7 +34,7 @@ function text(ctx, t, x, y, farbe = '#fff', ausrichtung = 'center') {
 }
 
 /**
- * z: { auswahl: {art:'gang'|'knoten'|'objekt'|'notiz'|'formteil', id} | null, fahrt: {gang, s} | null, zeit, beschriftung }
+ * z: { uebergaenge: [{ knoten, text }] (Ringe an Knoten mit Übergang), auswahl: {art:'gang'|'knoten'|'objekt'|'notiz'|'formteil', id} | null, fahrt: {gang, s} | null, zeit, beschriftung }
  * (beschriftung: false blendet Knoten, Namen, Notizen und Maßstab aus – dann sieht man nur das Spielbild)
  * Gibt zurück, wie viele Schachbrettfelder gezeichnet wurden (für Tests).
  */
@@ -212,6 +212,23 @@ export function zeichnePlan(ctx, g, ansicht, z = {}, dpr = 1) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (z.beschriftung === false) return zellen;
   const sichtbarPx = (px, py) => px > -40 && py > -40 && px < ansicht.w + 40 && py < ansicht.h + 40;
+  // Bereich des Gebiets: gestrichelter Rahmen mit Namen (er sagt, wo das Gebiet auf dem Plan liegt)
+  if (g.bereich) {
+    const b = g.bereich;
+    const ecken = [[b.x0, b.y0], [b.x1, b.y0], [b.x1, b.y1], [b.x0, b.y1]].map(([x, y]) => ansicht.weltZuBild(x, y));
+    ctx.save();
+    ctx.setLineDash([10, 6]);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = FARBEN.bereich;
+    ctx.beginPath();
+    ctx.moveTo(ecken[0][0], ecken[0][1]);
+    for (let i = 1; i < 4; i++) ctx.lineTo(ecken[i][0], ecken[i][1]);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+    const [lx, ly] = ecken.reduce((best, e) => (e[1] < best[1] || (e[1] === best[1] && e[0] < best[0]) ? e : best), ecken[0]);
+    if (sichtbarPx(lx, ly)) text(ctx, `Bereich „${g.name}“`, lx + 8, ly + 12, FARBEN.bereich, 'left');
+  }
   for (const gang of g.gaenge) {
     const m = gangMasse(g, gang, km);
     if (!m) continue;
@@ -230,6 +247,18 @@ export function zeichnePlan(ctx, g, ansicht, z = {}, dpr = 1) {
     ctx.strokeStyle = z.auswahl?.art === 'knoten' && z.auswahl.id === k.id ? FARBEN.auswahl : '#000';
     ctx.stroke();
     text(ctx, k.id, px, py - KNOTEN_RADIUS_PX - 8);
+  }
+  for (const m of z.uebergaenge || []) {
+    const k = km.get(m.knoten);
+    if (!k) continue;
+    const [px, py] = ansicht.weltZuBild(k.x, k.y);
+    if (!sichtbarPx(px, py)) continue;
+    ctx.beginPath();
+    ctx.arc(px, py, KNOTEN_RADIUS_PX + 5, 0, Math.PI * 2);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = FARBEN.uebergang;
+    ctx.stroke();
+    text(ctx, m.text, px, py + KNOTEN_RADIUS_PX + 16, FARBEN.uebergang);
   }
   for (const o of g.objekte) {
     if (o.typ !== 'gegner') continue;

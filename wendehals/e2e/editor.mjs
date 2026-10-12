@@ -797,6 +797,289 @@ const ms = await ed((e) => {
 });
 check(ms < 16, `Leistung: Zeichnen bei 300 Objekten p90 ${ms.toFixed(1)} ms (< 16 ms)`);
 
+// ------------------------------------------------------------------ Stufe 5: Gebiete und Übergänge
+const wp = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+const wFehler = [];
+wp.on('pageerror', (e) => wFehler.push('pageerror: ' + e.message));
+wp.on('console', (m) => {
+  if (m.type() === 'error') wFehler.push('console: ' + m.text());
+});
+await wp.goto(url + '?editor');
+await wp.waitForFunction(() => window.__editor);
+const wa = (fn, arg) => wp.evaluate(`(${fn.toString()})(window.__editor, ${JSON.stringify(arg ?? null)})`);
+await wa((e) => {
+  e.state.echtzeit = false;
+  window.__gesichert = [];
+  e.state.speicher.sichere = async (pfad, text) => {
+    window.__gesichert.push([pfad, text]);
+    return { wo: pfad };
+  };
+});
+const wBox = await wp.locator('#plan canvas').boundingBox();
+const wBild = async (x, y) => {
+  const [px, py] = await wa((e, p) => e.ansicht.weltZuBild(p[0], p[1]), [x, y]);
+  return [wBox.x + px, wBox.y + py];
+};
+const wZieh = async (von, nach) => {
+  const [x0, y0] = await wBild(...von);
+  const [x1, y1] = await wBild(...nach);
+  await wp.mouse.move(x0, y0);
+  await wp.mouse.down();
+  await wp.mouse.move((x0 + x1) / 2, (y0 + y1) / 2, { steps: 4 });
+  await wp.mouse.move(x1, y1, { steps: 4 });
+  await wp.mouse.up();
+};
+// Pixel an einer Stelle eines Gebiets (Gebietskoordinaten) im Welt-Plan – Lage wird eingerechnet
+const gebietPixel = (id, x, y) =>
+  wa((e, q) => {
+    e.state.beschriftung = false; // Namen und Übergangstexte würden Pixel überdecken
+    e.zeichne();
+    const l = e.lagen()[q.id];
+    const [px, py] = e.ansicht.weltZuBild(q.x + l.x, q.y + l.y);
+    return e.pixel(px, py);
+  }, { id, x, y });
+const istBodenWelt = async (id, x, y) => {
+  const p = await gebietPixel(id, x, y);
+  return gleich(p, hex(FLOOR)) || gleich(p, hex(FLOOR2));
+};
+
+// Gebiet-Ansicht: Bereich wird als Rahmen gezeichnet
+await wa((e) => {
+  e.wechsle('beispiel');
+  e.state.auswahl = null;
+  e.state.fahrt = null;
+  e.state.beschriftung = true;
+  e.alles();
+  e.zeichne();
+});
+const rahmenPixel = async (gebietId) => {
+  // zählt Bildpunkte in der Farbe des Bereichsrahmens entlang der linken Kante des Bereichs
+  return wa((e, id) => {
+    e.zeichne();
+    const b = e.gebiet().bereich;
+    let n = 0;
+    const [ax, ay] = e.ansicht.weltZuBild(b.x0, b.y0);
+    const [bx, by] = e.ansicht.weltZuBild(b.x0, b.y1);
+    const hexZu = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+    const ziel = hexZu('#7fb3ff');
+    for (let t = 0; t <= 1; t += 1 / 300) {
+      for (let d = -2; d <= 2; d++) {
+        const p = e.pixel(Math.round(ax + (bx - ax) * t) + d, Math.round(ay + (by - ay) * t));
+        if (p && Math.abs(p[0] - ziel[0]) < 50 && Math.abs(p[1] - ziel[1]) < 50 && Math.abs(p[2] - ziel[2]) < 50) n++;
+      }
+    }
+    return n;
+  }, gebietId);
+};
+check((await rahmenPixel('beispiel')) > 40, 'Bereich: der Rahmen des Gebiets ist im Plan sichtbar (gestrichelte Linie in der Bereichsfarbe)');
+
+// Bereich-Werkzeug (A): Rechteck aufziehen
+const bVorher = await wa((e) => JSON.stringify(e.gebiet()));
+await wp.keyboard.press('a');
+check((await wa((e) => e.state.werkzeug)) === 'bereich', 'Bereich: Taste A wählt das Bereich-Werkzeug');
+await wZieh([-300, -300], [510, 405]);
+const bNachher = await wa((e) => e.gebiet().bereich);
+check(JSON.stringify(bNachher) === JSON.stringify({ x0: -300, y0: -300, x1: 500, y1: 400 }), 'Bereich: Ziehen setzt den Bereich, gerastert auf 100 E', JSON.stringify(bNachher));
+check((await rahmenPixel('beispiel')) > 40, 'Bereich: der Rahmen steht im Bild an der neuen Stelle');
+const bUngueltig = await wa((e) => JSON.stringify(e.gebiet().bereich));
+await wZieh([0, 0], [100, 100]);
+check((await wa((e) => JSON.stringify(e.gebiet().bereich))) === bUngueltig && /mindestens/.test(await wa((e) => e.state.meldung)), 'Bereich: zu kleiner Bereich wird mit Meldung abgelehnt, nichts ändert sich');
+await wp.keyboard.press('Control+z');
+check((await wa((e) => JSON.stringify(e.gebiet()))) === bVorher, 'Bereich: Rückgängig stellt exakt den Zustand davor her');
+await wp.keyboard.press('Control+y');
+check((await wa((e) => JSON.stringify(e.gebiet().bereich))) === bUngueltig, 'Bereich: Wiederholen stellt den Zustand danach her');
+await wp.keyboard.press('v');
+await wa((e) => e.state.auswahl && e.waehle(null));
+check((await wp.locator('#f-bx0').inputValue()) === '-300' && (await wp.locator('#f-by1').inputValue()) === '400', 'Bereich: das rechte Feld zeigt die vier Seiten');
+await wp.fill('#f-bx1', '2000');
+await wp.keyboard.press('Enter');
+check((await wa((e) => e.gebiet().bereich.x1)) === 2000, 'Bereich: Eingabefeld ändert die Seite');
+await wp.click('#b-bereich-anpassen');
+const angepasst = await wa((e) => ({ b: e.gebiet().bereich, aus: e.pruefer && e.weltPruefer().meldungen.filter((m) => m.regel === 'W4').length }));
+check(angepasst.b.x0 <= -200 && angepasst.b.x1 >= 3000 && angepasst.b.y0 <= -1300 && angepasst.aus === 0, '„An Inhalt anpassen“: Bereich umschließt wieder alles, Welt-Prüfer W4 schweigt', JSON.stringify(angepasst));
+await wa((e) => {
+  e.rueckgaengig();
+  e.rueckgaengig();
+  e.rueckgaengig();
+});
+check((await wa((e) => JSON.stringify(e.gebiet()))) === bVorher, 'Bereich: drei Mal Rückgängig führt zum Ausgangszustand zurück');
+
+// Welt-Ansicht: umschalten, ansehen
+await wp.keyboard.press('t');
+const wAnsicht = await wa((e) => ({ art: e.state.ansichtArt, lagen: e.lagen(), sel: e.state.weltAuswahl }));
+check(wAnsicht.art === 'welt' && wAnsicht.sel?.id === 'beispiel', 'Welt-Ansicht: Taste T öffnet sie, das offene Gebiet ist gewählt');
+check((await wp.locator('#rechts h2').first().textContent()).includes('Beispiel'), 'Welt-Ansicht: rechtes Feld zeigt das Gebiet');
+await shot('welt-01');
+check((await istBodenWelt('beispiel', 300, 40)) && (await istBodenWelt('proto-netz', -450, -500)) && (await istBodenWelt('proto-achteck', 300, 0)), 'Welt-Ansicht: alle drei Gebiete zeigen ihren Boden im Spielbild-Farbton (Pixel)');
+check(!(await istBodenWelt('beispiel', 300, 600)), 'Welt-Ansicht: neben dem Gang ist kein Boden');
+const lagen0 = wAnsicht.lagen;
+const bereichs = await wa((e) => Object.fromEntries(Object.entries(e.state.gebiete).map(([id, g]) => [id, [g.bereich.x0 + e.lagen()[id].x, g.bereich.x1 + e.lagen()[id].x]])));
+check(bereichs.beispiel[1] < bereichs['proto-netz'][0] && bereichs['proto-netz'][1] < bereichs['proto-achteck'][0], 'Welt-Ansicht: die Gebiete liegen nebeneinander, ohne sich zu überlappen');
+const wData0 = await wa((e) => JSON.stringify(e.state.gebiete));
+await wp.keyboard.press('t');
+check((await wa((e) => e.state.ansichtArt)) === 'gebiet', 'Welt-Ansicht: T geht zurück ins Gebiet');
+check((await wa((e) => JSON.stringify(e.state.gebiete))) === wData0, 'Welt-Ansicht: Hin- und Herschalten ändert keine Gebietsdaten');
+await wp.keyboard.press('t');
+
+// Gebiet verschieben
+const welt0 = await wa((e) => JSON.stringify(e.state.welt));
+const netzMitte = [lagen0['proto-netz'].x - 450, lagen0['proto-netz'].y - 500]; // auf dem Boden von „Netz“ (Gebietskoordinaten −450 | −500)
+await wZieh(netzMitte, [netzMitte[0] - 3040, netzMitte[1] + 260]); // nach links in den Bereich von „Beispiel“
+const lage1 = await wa((e) => e.state.welt.gebiete.find((g) => g.id === 'proto-netz').lage);
+check(lage1.x === lagen0['proto-netz'].x - 3000 && lage1.y === lagen0['proto-netz'].y + 300, 'Gebiet verschieben: Ziehen setzt die Lage, gerastert auf 100 E', JSON.stringify(lage1));
+check(await istBodenWelt('proto-netz', -450, -500), 'Gebiet verschieben: der Boden liegt im Bild an der neuen Stelle');
+check((await wa((e) => e.weltPruefer().meldungen.filter((m) => m.regel === 'W2').length)) === 1, 'Gebiet verschieben: Welt-Prüfer meldet überlappende Bereiche (W2)');
+check((await wp.locator('#f-lx').inputValue()) === String(lage1.x), 'Gebiet verschieben: das Feld „Lage x“ zeigt die neue Lage');
+check(await wa((e) => e.weltUngespeichert()), 'Gebiet verschieben: welt.json gilt als ungespeichert');
+await wp.keyboard.press('Control+z');
+check((await wa((e) => JSON.stringify(e.state.welt))) === welt0, 'Gebiet verschieben: Rückgängig stellt welt.json exakt wieder her');
+check(!(await wa((e) => e.weltUngespeichert())), 'Gebiet verschieben: nach Rückgängig ist wieder alles gespeichert');
+await wp.keyboard.press('Control+y');
+check((await wa((e) => e.state.welt.gebiete.find((g) => g.id === 'proto-netz').lage.x)) === lage1.x, 'Gebiet verschieben: Wiederholen');
+await wp.fill('#f-lx', '5100');
+await wp.keyboard.press('Enter');
+check((await wa((e) => e.state.welt.gebiete.find((g) => g.id === 'proto-netz').lage.x)) === 5100, 'Gebiet verschieben: Eingabefeld „Lage x“ setzt die Lage');
+check((await wa((e) => e.weltPruefer().meldungen.filter((m) => m.regel === 'W2').length)) === 0, 'Gebiet verschieben: ohne Überlappung schweigt W2');
+
+// Übergänge: anlegen (Formular), im Bild, löschen
+await wa((e) => e.weltAendere('Test', (x) => {
+  x.uebergaenge = [];
+}));
+await wa((e) => e.weltWaehle({ art: 'gebiet', id: 'beispiel' }));
+check((await wa((e) => e.weltPruefer().meldungen.filter((m) => m.regel === 'W3').length)) === 2, 'Übergang: ohne Übergänge meldet W3 zwei lose Gebiete');
+await wp.selectOption('#f-u-knoten', 'K5');
+await wp.selectOption('#f-u-gebiet', 'proto-netz');
+await wp.selectOption('#f-u-ziel', 'K1');
+await wp.click('#b-u-anlegen');
+const ue1 = await wa((e) => ({ liste: e.state.welt.uebergaenge, sel: e.state.weltAuswahl }));
+check(ue1.liste.length === 1 && ue1.liste[0].von === 'beispiel/K5' && ue1.liste[0].nach === 'proto-netz/K1' && ue1.sel.art === 'uebergang', 'Übergang anlegen: Formular legt beispiel/K5 ↔ proto-netz/K1 an und wählt ihn');
+const mitteUe = await wa((e) => {
+  const l = e.lagen();
+  const a = [2600 + l.beispiel.x, 0 + l.beispiel.y];
+  const b = [-900 + l['proto-netz'].x, -500 + l['proto-netz'].y];
+  return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+});
+await wa((e) => e.weltWaehle(null));
+const linienPixel = await wa((e, m) => {
+  e.zeichne();
+  const [px, py] = e.ansicht.weltZuBild(m[0], m[1]);
+  return e.pixel(px, py + 0);
+}, mitteUe);
+check(gleich(linienPixel, hex(FARBEN.uebergang), 12) || gleich(await wa((e, m) => { const [px, py] = e.ansicht.weltZuBild(m[0], m[1]); return e.pixel(px + 3, py); }, mitteUe), hex(FARBEN.uebergang), 12), 'Übergang anlegen: die Linie ist im Bild in der Übergangsfarbe zu sehen (Pixel)', JSON.stringify(linienPixel));
+check((await wa((e) => e.weltPruefer().meldungen.filter((m) => m.regel === 'W3').length)) === 1, 'Übergang anlegen: W3 meldet nur noch das letzte lose Gebiet');
+// Klick auf die Linie wählt den Übergang
+const [lx, ly] = await wBild(...mitteUe);
+await wp.mouse.click(lx, ly);
+check((await wa((e) => e.state.weltAuswahl))?.art === 'uebergang', 'Übergang: Klick auf die Linie wählt den Übergang');
+check((await wp.locator('#rechts h2').first().textContent()).includes('Übergang u1'), 'Übergang: rechtes Feld zeigt ihn');
+await wp.keyboard.press('Delete');
+check((await wa((e) => e.state.welt.uebergaenge ?? [])).length === 0, 'Übergang: Entf löscht ihn');
+await wp.keyboard.press('Control+z');
+check((await wa((e) => e.state.welt.uebergaenge.length)) === 1, 'Übergang: Rückgängig bringt ihn zurück');
+// doppelter und ungültiger Übergang
+await wa((e) => e.weltWaehle({ art: 'gebiet', id: 'proto-netz' }));
+await wp.selectOption('#f-u-knoten', 'K1');
+await wp.selectOption('#f-u-gebiet', 'beispiel');
+await wp.selectOption('#f-u-ziel', 'K5');
+await wp.click('#b-u-anlegen');
+check(/schon verbunden/.test(await wa((e) => e.state.meldung)) && (await wa((e) => e.state.welt.uebergaenge.length)) === 1, 'Übergang anlegen: zweiter gleicher Übergang wird mit Meldung abgelehnt');
+// zweiter Übergang proto-netz/K6 ↔ proto-achteck/K6
+await wp.selectOption('#f-u-knoten', 'K6');
+await wp.selectOption('#f-u-gebiet', 'proto-achteck');
+await wp.selectOption('#f-u-ziel', 'K6');
+await wp.click('#b-u-anlegen');
+check((await wa((e) => e.weltPruefer())).meldungen.length === 0, 'Übergang anlegen: mit zwei Übergängen ist die Welt verbunden, Welt-Prüfer ohne Meldung');
+await shot('welt-02-uebergaenge');
+
+// Übergang sichtbar im Gebiet (Ring + Beschriftung) und Sprung
+await wa((e) => e.wechsle('beispiel'));
+await wa((e) => e.waehle({ art: 'knoten', id: 'K5' }));
+check((await wp.locator('#b-ue-u1').count()) === 1 && (await wp.locator('#b-ue-u1').textContent()).includes('proto-netz/K1'), 'Übergang im Gebiet: der Knoten zeigt „→ proto-netz/K1“ im rechten Feld');
+const ring = await wa((e) => {
+  e.state.beschriftung = true;
+  e.state.auswahl = null;
+  e.state.fahrt = null;
+  e.alles();
+  e.zeichne();
+  const k = e.gebiet().knoten.find((n) => n.id === 'K5');
+  const [px, py] = e.ansicht.weltZuBild(k.x, k.y);
+  let n = 0;
+  for (let a = 0; a < 360; a += 5) {
+    const p = e.pixel(Math.round(px + 12 * Math.cos((a * Math.PI) / 180)), Math.round(py + 12 * Math.sin((a * Math.PI) / 180)));
+    if (p && p[0] > 200 && p[1] < 190 && p[2] > 180) n++;
+  }
+  return n;
+});
+check(ring > 30, 'Übergang im Gebiet: ein Ring in der Übergangsfarbe liegt um den Knoten (Pixel)', String(ring));
+await wa((e) => e.waehle({ art: 'knoten', id: 'K5' }));
+await wp.click('#b-ue-u1');
+const gesprungen = await wa((e) => ({ g: e.state.gebietId, a: e.state.auswahl }));
+check(gesprungen.g === 'proto-netz' && gesprungen.a?.id === 'K1', 'Übergang im Gebiet: Klick springt ins andere Gebiet zum Knoten K1');
+// „Übergang anlegen …“ am Knoten öffnet die Welt-Ansicht mit vorbelegtem Knoten
+await wa((e) => e.waehle({ art: 'knoten', id: 'K3' }));
+await wp.click('#b-ue-neu');
+check((await wa((e) => e.state.ansichtArt)) === 'welt' && (await wp.locator('#f-u-knoten').inputValue()) === 'K3', 'Übergang im Gebiet: „Übergang anlegen …“ öffnet die Welt mit vorbelegtem Knoten');
+// Doppelklick öffnet das Gebiet
+const [dx, dy] = await wBild(lagen0['proto-achteck'].x + 200, lagen0['proto-achteck'].y + 900);
+await wp.mouse.dblclick(dx, dy);
+check((await wa((e) => ({ g: e.state.gebietId, a: e.state.ansichtArt }))).g === 'proto-achteck' && (await wa((e) => e.state.ansichtArt)) === 'gebiet', 'Welt-Ansicht: Doppelklick auf ein Gebiet öffnet es');
+await wp.keyboard.press('t');
+await wa((e) => e.weltWaehle({ art: 'gebiet', id: 'beispiel' }));
+await wp.keyboard.press('Enter');
+check((await wa((e) => e.state.gebietId)) === 'beispiel' && (await wa((e) => e.state.ansichtArt)) === 'gebiet', 'Welt-Ansicht: Enter öffnet das gewählte Gebiet');
+
+// Prüfer der Welt: ungültiger Übergang, Sprung zur Meldung
+await wp.keyboard.press('t');
+await wa((e) => e.weltAendere('Test', (x) => {
+  x.uebergaenge.push({ id: 'u9', von: 'beispiel/K9', nach: 'proto-netz/K1' });
+}));
+check(/1 MUSS/.test(await wp.locator('#b-pruefer').textContent()), 'Welt-Prüfer: der Knopf zählt die MUSS-Meldung (W1)', await wp.locator('#b-pruefer').textContent());
+await wp.click('#b-pruefer');
+check((await wp.locator('#prueferfeld .pm', { hasText: 'Knoten „K9“' }).count()) === 1, 'Welt-Prüfer: die Liste nennt den fehlenden Knoten K9');
+await wp.locator('#prueferfeld .pm', { hasText: 'Knoten „K9“' }).click();
+check((await wa((e) => e.state.weltAuswahl))?.id === 'u9', 'Welt-Prüfer: Klick auf die Meldung wählt den Übergang');
+await wp.click('#b-pruefer');
+await wa((e) => e.rueckgaengig());
+
+// Speichern: Strg+S in der Welt-Ansicht schreibt nur welt.json (verlustfrei)
+await wp.keyboard.press('Control+s');
+await wp.waitForTimeout(100);
+const gesichert = await wa(() => window.__gesichert);
+check(gesichert.length === 1 && gesichert[0][0] === 'welt.json', 'Speichern: Strg+S in der Welt-Ansicht schreibt genau welt.json', JSON.stringify(gesichert.map((g) => g[0])));
+const geschrieben = JSON.parse(gesichert[0][1]);
+const imEditor = await wa((e) => e.state.welt);
+check(JSON.stringify(geschrieben) === JSON.stringify(imEditor) && geschrieben.uebergaenge.length === 2 && geschrieben.gebiete.find((g) => g.id === 'proto-netz').lage.x === 5100, 'Speichern: welt.json enthält Lage und Übergänge wie im Editor');
+check(gesichert[0][1].endsWith('\n') && gesichert[0][1].includes('"lage": { "x": 5100,'), 'Speichern: formatiert (ein Gebiet je Zeile, Lage in einer Zeile)');
+check(!(await wa((e) => e.weltUngespeichert())) && (await wp.locator('#stand').textContent()).includes('gespeichert'), 'Speichern: danach „gespeichert“');
+// Laden: dieselbe Datei wieder einlesen, Bild und Daten gleich
+const hashVorher = await wa((e) => e.hash());
+await wa((e, t) => {
+  e.state.welt = JSON.parse(t);
+  e.refresh();
+}, gesichert[0][1]);
+check((await wa((e) => e.hash())) === hashVorher, 'Laden: die gespeicherte welt.json ergibt dasselbe Bild');
+
+// Leistung der Welt-Ansicht
+const wMs = await wa((e) => {
+  e.alles();
+  const z = [];
+  for (let i = 0; i < 30; i++) {
+    const t = performance.now();
+    e.zeichne();
+    z.push(performance.now() - t);
+  }
+  z.sort((a, b) => a - b);
+  return z[Math.floor(z.length * 0.9)];
+});
+check(wMs < 16, `Leistung: Welt-Ansicht zeichnet p90 ${wMs.toFixed(1)} ms (< 16 ms)`);
+check((await wa((e) => e.state.ansichtArt)) === 'welt', 'Welt-Ansicht: bleibt nach allem in der Welt (Schalter funktioniert über die Knöpfe)');
+await wp.click('#b-welt');
+check((await wa((e) => e.state.ansichtArt)) === 'gebiet', 'Welt-Ansicht: der Knopf „Welt“ schaltet zurück');
+await wp.click('#t-gang');
+check((await wa((e) => e.state.werkzeug)) === 'gang', 'Welt-Ansicht: ein Werkzeugknopf funktioniert weiter');
+check(wFehler.length === 0, 'Stufe 5: keine Konsolenfehler', wFehler.join('; '));
+await wp.close();
+
 // ------------------------------------------------------------------ Spiel und Prototyp unberührt
 const page2 = await browser.newPage({ viewport: { width: 960, height: 540 } });
 const fehler2 = [];

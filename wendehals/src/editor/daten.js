@@ -56,6 +56,7 @@ export function pruefeFormat(g) {
   const zahl0 = (v) => typeof v === 'number' && Number.isFinite(v);
   const b = g.bereich;
   if (!b || typeof b !== 'object' || !['x0', 'y0', 'x1', 'y1'].every((k) => zahl0(b[k]))) f('Feld „bereich“ braucht x0, y0, x1, y1 als Zahlen.');
+  if (b && zahl0(b.x0) && zahl0(b.x1) && zahl0(b.y0) && zahl0(b.y1) && !(b.x1 > b.x0 && b.y1 > b.y0)) f('Der Bereich ist leer (x1 muss größer als x0 sein, y1 größer als y0).');
   if (typeof g.tileset === 'string' && !Object.hasOwn(TILESETS, g.tileset)) f(`Unbekanntes Tileset „${g.tileset}“.`);
   if (fehler.length) return fehler;
   const zahl = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -287,10 +288,4 @@ export class Verlauf {
   }
 }
 
-/** Welt-Datei (Liste der Gebiete) als Text: ein Gebiet pro Zeile. */
-export function formatiereWelt(welt) {
-  const gebiete = welt.gebiete.map((g) => '    ' + einzeilig(ordne(g, ['id', 'name', 'datei'])));
-  const andere = Object.keys(welt).filter((k) => k !== 'format' && k !== 'gebiete'); // weitere Schlüssel (später: Lage) gehen nicht verloren
-  const zeilen = [`  "format": ${JSON.stringify(welt.format)}`, ...andere.map((k) => `  ${JSON.stringify(k)}: ${JSON.stringify(welt[k])}`), `  "gebiete": [\n${gebiete.join(',\n')}\n  ]`];
-  return `{\n${zeilen.join(',\n')}\n}\n`;
-}
+export { formatiereWelt } from './welt.js'; // die Welt-Datei lebt in welt.js (Stufe 5); der alte Importweg bleibt gültig

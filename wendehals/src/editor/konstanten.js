@@ -42,7 +42,8 @@ export const KUERZEL = {
   zoomMinus: ['Minus', 'NumpadSubtract'],
   beschriftung: 'KeyL',
   alles: 'Home',
-  werkzeug: { auswahl: 'KeyV', gang: 'KeyG', knoten: 'KeyK', formteil: 'KeyB', wand: 'KeyW', hindernis: 'KeyH' },
+  werkzeug: { auswahl: 'KeyV', gang: 'KeyG', knoten: 'KeyK', formteil: 'KeyB', wand: 'KeyW', hindernis: 'KeyH', bereich: 'KeyA' },
+  welt: 'KeyT', // zwischen Gebiet- und Welt-Ansicht umschalten
   teilDrehen: 'KeyR', // ohne Umschalt 45° rechtsherum, mit Umschalt linksherum
   kopieren: 'KeyC', // mit Strg/Cmd
   einfuegen: 'KeyV', // mit Strg/Cmd
@@ -79,6 +80,8 @@ export const FARBEN = {
   massstab: '#ffffff',
   pruefMuss: '#ff3b2e', // Marken des Prüfers im Plan
   pruefSoll: '#ffc830',
+  bereich: '#7fb3ff', // Rahmen des Gebiets-Bereichs im Plan
+  uebergang: '#ff8ad8', // Übergang zwischen Gebieten
 };
 export const KNOTEN_RADIUS_PX = 7; // Knotenmarke (Bildschirmpixel, unabhängig vom Zoom)
 
@@ -87,3 +90,11 @@ export const PRUEF_SCHRITT = 20; // Abstand der Messstellen entlang eines Gangs 
 export const PRUEF_QUER = 10; // Abstand der Messpunkte quer zum Gang (E)
 export const PRUEF_RAND = 2; // Toleranz am Rand des Bodens (E): Ecken dürfen so weit danebenliegen (Rundung, Raster)
 export const MIN_GANG_SOLL = SCREEN_W; // Regel S1: kürzere Gänge lassen die Drehzonen überlappen (E)
+
+// Gebiete und Übergänge (Stufe 5)
+export const BEREICH_RASTER = 100; // Bereiche rasten auf diese Größe ein (E)
+export const MIN_BEREICH_W = SCREEN_W; // kleinster Bereich: ein Bildschirm (E)
+export const MIN_BEREICH_H = SCREEN_H;
+export const BEREICH_RAND = 200; // Rand um den Inhalt bei „An Inhalt anpassen“ (E)
+export const WELT_LUECKE = 400; // Abstand beim automatischen Anordnen von Gebieten ohne Lage (E)
+export const LAGE_RASTER = 100; // Gebiete rasten in der Welt auf diese Schrittweite ein (E)
