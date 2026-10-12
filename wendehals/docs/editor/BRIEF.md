@@ -173,6 +173,10 @@ tests/editor-*.tests.mjs, e2e/editor*.mjs
    „Auf Vorbehalt entschieden“ eintragen. **Groß** (Robins Regeln, Bauform, Datenformat-Grundsatz, Änderungen am Spiel
    oder Prototyp-Verhalten) → unter „Fragen an Robin“ eintragen, an anderer Stufe weiterarbeiten.
 9. Sind alle Stufen fertig: nur „fertig“ melden, nichts ändern.
+10. **Projektregeln gelten für jeden Lauf** (Robin, 12.10.2026): `wendehals/CLAUDE.md` „Regeln für jede Prototyp-Arbeit“
+    1–9, vor allem Regel 1 „Erst validieren, dann bauen“. Steht in STAND.md eine **offene Rückmeldung von Robin**,
+    wird nichts gebaut, was sie berührt, bis Robin die Deutung und den Lösungsansatz bestätigt hat; nur Arbeit, die sie
+    nicht berührt.
 
 ## 8. Auf Vorbehalt (Robins Antworten stehen aus; Empfehlungen, denen Robin nicht widersprochen hat)
 
