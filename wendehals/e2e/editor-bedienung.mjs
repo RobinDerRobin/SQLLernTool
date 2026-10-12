@@ -8,6 +8,7 @@ import path from 'node:path';
 import { FLOOR, FLOOR2, WALL, SCREEN_W } from '../src/editor/konstanten.js';
 import { ausdehnung, bodenPolygone, istBoden, formatiere } from '../src/editor/daten.js';
 import { levelInhalt } from '../src/editor/level.js';
+import { TILESETS, GEGNER, KNOTENTYPEN, gegnerFuer } from '../src/editor/katalog.js';
 import { GEBIETE } from '../src/editor/startdaten.js';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -34,6 +35,7 @@ const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), pa
 const gleich = (p, rgb, tol = 2) => p && Math.abs(p[0] - rgb[0]) <= tol && Math.abs(p[1] - rgb[1]) <= tol && Math.abs(p[2] - rgb[2]) <= tol;
 const ed = (fn, arg) => page.evaluate(`(${fn.toString()})(window.__editor, ${JSON.stringify(arg ?? null)})`);
 const shot = (name) => page.screenshot({ path: path.join(shots, `editor-bedienung-${name}.png`) });
+const bauShot = (name) => bau.screenshot({ path: path.join(shots, `editor-bedienung-${name}.png`) });
 
 await page.goto(url + '?editor');
 await page.waitForFunction(() => window.__editor);
@@ -571,7 +573,7 @@ const zufall = () => (rng = (rng * 1103515245 + 12345) % 2147483648) / 214748364
   }
   const px1 = await pixelProbe('ostgang');
   check(px1.aussen > 100 && px1.innen > 20 && px1.falsch === 0, `A3: Levelansicht „Ostgang“ – außerhalb des Levels nur Wandfarbe, darin Gangboden (${px1.aussen} außen, ${px1.innen} innen, ${px1.falsch} falsch)`);
-  await shot('a3-level-ostgang');
+  await bauShot('a3-level-ostgang');
   // Nicht wählbar: Klick auf die ausgeblendete Schleuse, den Nordgang, den Raum
   for (const [name, p] of [['Schleuse', [600, 0]], ['Nordgang', [1200, -500]], ['Raum K3', [1200, -1100]], ['Diagonale', [1500, 300]], ['Gegner o2', [900, 0]]]) {
     await klick(p);
@@ -646,7 +648,7 @@ const zufall = () => (rng = (rng * 1103515245 + 12345) % 2147483648) / 214748364
   check((await b((e) => e.ansicht.blick)) === 2, 'A3: beim Öffnen wird die Ausgangsansicht angewendet (Süden nach rechts)');
   const lage = await b((e) => [e.ansicht.weltZuBild(1200, 0), e.ansicht.weltZuBild(2600, 0)]);
   check(Math.abs(lage[1][1] - lage[0][1]) > 5 * Math.abs(lage[1][0] - lage[0][0]), 'A3: im Bild verläuft der Ostgang jetzt senkrecht (gedreht)');
-  await shot('a3-ausgangsansicht');
+  await bauShot('a3-ausgangsansicht');
   await bau.keyboard.press('Control+KeyZ');
   check(!(await b((e) => 'ansicht' in e.gebiet().gaenge.find((x) => x.id === 'ostgang'))), 'A3: Strg+Z nimmt die Ausgangsansicht zurück');
   await bau.keyboard.press('Control+KeyY');
@@ -924,6 +926,97 @@ const zufall = () => (rng = (rng * 1103515245 + 12345) % 2147483648) / 214748364
   await b((e) => { e.state.gesperrt.delete('waende'); e.melde(''); });
   while ((await schritte()) > s0) await bau.keyboard.press('Control+KeyZ');
   check((await daten()) === daten0, 'A7: alles rückgängig = Ausgangszustand');
+}
+
+
+// ------------------------------------------------------------------ A8 Tileset-Fenster
+{
+  await b((e) => {
+    while (e.verlaufVon(e.state.gebietId).kannZurueck) e.rueckgaengig();
+    e.setzeWerkzeug('auswahl');
+    e.wechsle('beispiel');
+    e.waehle(null);
+    e.alles();
+    e.setzeZoom(8);
+  });
+  const daten0 = await daten();
+  const fenster = bau.locator('#tilesetfenster');
+  check(!(await fenster.isVisible()), 'A8: das Tileset-Fenster ist zu Beginn ausgeblendet');
+  await bau.keyboard.press('KeyI');
+  check(await fenster.isVisible(), 'A8: die Taste I blendet das Tileset-Fenster ein');
+  const ts = await b((e) => e.gebiet().tileset);
+  check((await bau.locator('#tf-titel').textContent()).includes(TILESETS[ts].name), `A8: der Titel nennt das Tileset des Gebiets („${await bau.locator('#tf-titel').textContent()}“)`);
+  // alle Teile des Tilesets als Bilder: Gang, 5 Knotentypen, Formteil, Wand, Hindernis, alle Gegner
+  const ids = await bau.locator('#tilesetfenster canvas').evaluateAll((l) => l.map((c) => c.id));
+  const erwartet = ['tf-gang', ...Object.keys(KNOTENTYPEN).map((k) => 'tf-knoten-' + k), 'tf-formteil', 'tf-wand', 'tf-hindernis', ...gegnerFuer(ts).map((a) => 'tf-gegner-' + a)];
+  check(JSON.stringify(ids) === JSON.stringify(erwartet), `A8: das Fenster zeigt alle ${erwartet.length} Elemente des Tilesets (Gegner des Tilesets zuerst)`, ids.join(','));
+  const bunt = await bau.locator('#tilesetfenster canvas').evaluateAll((l) =>
+    l.map((c) => {
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      const farben = new Set();
+      for (let i = 0; i < d.length; i += 4 * 7) farben.add(d[i] + ',' + d[i + 1] + ',' + d[i + 2]);
+      return farben.size;
+    }),
+  );
+  check(bunt.every((n) => n >= 2) && bunt.length === erwartet.length, `A8: jedes Element ist ein gezeichnetes Bild (mindestens zwei Farben, kleinster Wert ${Math.min(...bunt)})`);
+  await bauShot('a8-tilesetfenster');
+  // Klick wählt das aktuelle Element
+  await bau.click('#tf-hindernis');
+  check((await b((e) => e.state.werkzeug)) === 'hindernis' && (await bau.locator('#tf-hindernis.aktiv').count()) === 1, 'A8: Klick auf „Hindernis“ wählt es als aktuelles Element (markiert)');
+  await klick([1900, -700], RECHTS);
+  check((await b((e) => e.gebiet().objekte.at(-1).typ)) === 'hindernis', 'A8: der Rechtsklick im Plan setzt das gewählte Element');
+  await bau.click('#tf-gegner-seife');
+  check((await b((e) => [e.state.werkzeug, e.state.gegnerArt].join())) === 'gegner,seife' && (await bau.locator('#tf-gegner-seife.aktiv').count()) === 1 && (await bau.locator('#tf-hindernis.aktiv').count()) === 0, 'A8: Klick auf einen Gegner (Seife) wählt Werkzeug und Art; nur dieses Bild ist markiert');
+  await klick([2100, -300], RECHTS);
+  check((await b((e) => e.gebiet().objekte.at(-1).art)) === 'seife', 'A8: der Rechtsklick setzt die Seife');
+  await bau.click('#tf-knoten-boss');
+  await klick([2000, 900], RECHTS);
+  check((await b((e) => e.gebiet().knoten.at(-1).typ)) === 'boss' && (await b((e) => e.state.knotenTyp)) === 'boss', 'A8: Klick auf den Knoten „Boss“ stellt den Knotentyp ein – der Rechtsklick setzt einen Boss-Knoten');
+  await bau.click('#tf-gang');
+  check((await b((e) => e.state.werkzeug)) === 'gang', 'A8: Klick auf „Gang“ wählt das Gang-Werkzeug');
+  // Rechtsklick auf das Fenster selbst setzt nichts im Plan darunter
+  const vor = await daten();
+  const fb = await fenster.boundingBox();
+  await bau.mouse.click(fb.x + 100, fb.y + 120, RECHTS);
+  await bau.mouse.click(fb.x + 100, fb.y + 120);
+  check((await daten()) === vor, 'A8: Klicks auf das Fenster erreichen den Plan darunter nicht');
+  // verschiebbar am Titel
+  const kopf = await bau.locator('#tf-kopf').boundingBox();
+  await bau.mouse.move(kopf.x + 40, kopf.y + 10);
+  await bau.mouse.down();
+  await bau.mouse.move(kopf.x + 40 + 150, kopf.y + 10 + 80, { steps: 5 });
+  await bau.mouse.up();
+  const fb2 = await fenster.boundingBox();
+  check(Math.abs(fb2.x - fb.x - 150) <= 1 && Math.abs(fb2.y - fb.y - 80) <= 1, `A8: das Fenster lässt sich am Titel verschieben (+150 | +80: ${(fb2.x - fb.x).toFixed(0)} | ${(fb2.y - fb.y).toFixed(0)})`);
+  await bau.mouse.move(fb2.x + 40, fb2.y + 10);
+  await bau.mouse.down();
+  await bau.mouse.move(5000, 5000, { steps: 4 });
+  await bau.mouse.up();
+  const fb3 = await fenster.boundingBox();
+  check(fb3.x + fb3.width <= bBox.x + bBox.width + 1 && fb3.y < bBox.y + bBox.height, 'A8: es bleibt im Plan, auch wenn man es weit hinauszieht');
+  check((await daten()) === vor, 'A8: Verschieben des Fensters ändert keine Daten');
+  // Tileset des Gebiets wechseln: Titel und Gegner-Reihenfolge folgen
+  const anderes = Object.keys(TILESETS).find((t) => t !== ts && JSON.stringify(gegnerFuer(t)) !== JSON.stringify(gegnerFuer(ts)));
+  await b((e) => e.waehle(null));
+  await bau.selectOption('#f-tileset', anderes);
+  const ids2 = await bau.locator('#tilesetfenster canvas').evaluateAll((l) => l.map((c) => c.id));
+  check((await bau.locator('#tf-titel').textContent()).includes(TILESETS[anderes].name) && ids2.join() === ['tf-gang', ...Object.keys(KNOTENTYPEN).map((k) => 'tf-knoten-' + k), 'tf-formteil', 'tf-wand', 'tf-hindernis', ...gegnerFuer(anderes).map((a) => 'tf-gegner-' + a)].join(), `A8: ein anderes Tileset („${TILESETS[anderes].name}“) ändert Titel und Gegnerreihenfolge`);
+  await bau.keyboard.press('Control+KeyZ'); // Tileset zurück
+  // Welt-Ansicht: ausgeblendet; zurück: wieder da
+  await b((e) => e.zuWelt());
+  check(!(await fenster.isVisible()), 'A8: in der Welt-Ansicht ist das Fenster ausgeblendet');
+  await b((e) => e.zuGebiet());
+  check(await fenster.isVisible(), 'A8: zurück im Gebiet ist es wieder da');
+  // Taste und Knopf blenden aus
+  await bau.keyboard.press('KeyI');
+  check(!(await fenster.isVisible()), 'A8: die Taste I blendet es wieder aus');
+  await bau.click('#b-tileset');
+  check(await fenster.isVisible(), 'A8: der Knopf „Tileset“ blendet es ein');
+  await bau.click('#tf-zu');
+  check(!(await fenster.isVisible()), 'A8: das Schließen-Kreuz blendet es aus');
+  while ((await schritte()) > 0) await bau.keyboard.press('Control+KeyZ');
+  check((await daten()) === daten0, 'A8: alles rückgängig = Ausgangszustand');
+  await b((e) => e.setzeWerkzeug('auswahl'));
 }
 
 check(bauFehler.length === 0, 'Bedienung (Bauen): keine Konsolenfehler', bauFehler.join('; '));

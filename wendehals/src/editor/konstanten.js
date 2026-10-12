@@ -51,6 +51,7 @@ export const KUERZEL = {
   beschriftung: 'KeyL',
   alles: 'Home',
   werkzeug: { auswahl: 'KeyV', gang: 'KeyG', knoten: 'KeyK', formteil: 'KeyB', wand: 'KeyW', hindernis: 'KeyH', gegner: 'KeyX', bereich: 'KeyA' },
+  tilesetFenster: 'KeyI', // Tileset-Fenster (A8) ein-/ausblenden
   look: 'KeyJ', // Look umschalten: Prototyp-Farben ↔ Tileset des Gebiets
   welt: 'KeyT', // zwischen Gebiet- und Welt-Ansicht umschalten
   teilDrehen: 'KeyR', // ohne Umschalt 45° rechtsherum, mit Umschalt linksherum

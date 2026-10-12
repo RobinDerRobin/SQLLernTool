@@ -41,6 +41,11 @@ html, body { margin: 0; height: 100%; background: #14121a; color: #e8e6ee; font:
 #plan { position: relative; overflow: hidden; background: #1c1822; }
 #plan canvas { display: block; width: 100%; height: 100%; cursor: grab; }
 #prueferfeld { position: absolute; top: 8px; right: 8px; width: 440px; max-width: calc(100% - 16px); max-height: 45%; overflow: auto; background: rgba(34,31,43,.96); border: 1px solid #4b4560; border-radius: 6px; padding: 6px 8px; box-sizing: border-box; }
+#tilesetfenster { position: absolute; top: 8px; left: 8px; width: 330px; max-height: calc(100% - 16px); overflow: hidden; display: flex; flex-direction: column; background: rgba(34,31,43,.97); border: 1px solid #4b4560; border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,.5); z-index: 5; }
+#tf-kopf { display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; background: #38334a; cursor: move; font-weight: 600; user-select: none; touch-action: none; }
+#tf-zu { padding: 0 7px; line-height: 18px; }
+#tf-inhalt { overflow: auto; padding: 6px 8px 8px; }
+#tf-inhalt .palette-titel { font-size: 13px; margin: 6px 0 4px; }
 #prueferfeld h3 { font-size: 13px; margin: 0 0 4px; }
 #prueferfeld .pm { display: block; width: 100%; text-align: left; white-space: normal; margin: 2px 0; }
 #prueferfeld .pm.MUSS { border-color: #ff6a5a; } #prueferfeld .pm.SOLL { border-color: #d9b43a; }
@@ -108,6 +113,7 @@ export function startEditor() {
     werkzeug: WERKZEUGE[0].id, // das aktuelle Element: das, was ein Rechtsklick setzt ('auswahl' = keines)
     gesperrt: new Set(), // gesperrte Ebenen (ebenen.js): nicht wählbar, nicht verschiebbar, nicht bestückbar
     knotenTyp: 'kreuzung',
+    tilesetFenster: false, // Tileset-Fenster (A8) sichtbar
     prueferOffen: false, // Liste der Prüfer-Meldungen sichtbar (und Marken im Plan)
     spielen: null, // laufender SpielModus (Stufe 3) oder null
     bezeichnung: '', // zuletzt kopierte Bezeichnung
@@ -175,6 +181,7 @@ export function startEditor() {
     knopf('Alles', 'Ganzes Gebiet einpassen (Pos1)', () => alles(), 'b-alles'),
     knopf('Beschriftung', 'Knoten, Namen und Maßstab ein-/ausblenden (L)', () => beschriften(), 'b-beschriftung'),
     knopf('Look', 'Farben umschalten: Prototyp ↔ Tileset des Gebiets (J)', () => lookUmschalten(), 'b-look'),
+    knopf('Tileset', 'Tileset-Fenster ein-/ausblenden: alle Elemente des Gebiets als Bilder, Klick wählt das Element für den Rechtsklick (I)', () => tilesetFensterUmschalten(), 'b-tileset'),
     anzeige,
   ]);
   const knopfW = (w) => el('button', { text: `${w.name} (${KUERZEL.werkzeug[w.id].replace('Key', '')})`, title: w.hinweis, id: 't-' + w.id, onclick: () => setzeWerkzeug(w.id) });
@@ -216,6 +223,32 @@ export function startEditor() {
   const bezFeld = el('input', { id: 'bezeichnung', type: 'text', readonly: 'readonly', title: 'Bezeichnung zum Markieren und Kopieren', size: '34' });
   bezFeld.style.display = 'none';
   const prueferKnopf = knopf('Prüfer', 'Regeln prüfen: Liste der Meldungen zeigen/verbergen (Klick auf eine Meldung springt zur Stelle)', () => prueferUmschalten(), 'b-pruefer');
+  let tfSchluessel = null;
+  const tfTitel = el('span', { id: 'tf-titel' });
+  const tfInhalt = el('div', { id: 'tf-inhalt' });
+  const tfZu = el('button', { id: 'tf-zu', text: '×', title: 'Fenster schließen (Taste I)', onclick: () => tilesetFensterUmschalten() });
+  const tfKopf = el('div', { id: 'tf-kopf', title: 'Am Titel ziehen verschiebt das Fenster' }, [tfTitel, tfZu]);
+  const tfFenster = el('div', { id: 'tilesetfenster' }, [tfKopf, tfInhalt]);
+  tfFenster.style.display = 'none';
+  plan.append(tfFenster);
+  // Fenster am Titel verschieben (bleibt im Plan)
+  let tfZug = null;
+  tfKopf.addEventListener('pointerdown', (e) => {
+    if (e.target === tfZu) return;
+    tfKopf.setPointerCapture(e.pointerId);
+    tfZug = { dx: e.clientX - tfFenster.offsetLeft, dy: e.clientY - tfFenster.offsetTop };
+  });
+  tfKopf.addEventListener('pointermove', (e) => {
+    if (!tfZug) return;
+    const x = Math.max(0, Math.min(plan.clientWidth - tfFenster.offsetWidth, e.clientX - tfZug.dx));
+    const y = Math.max(0, Math.min(plan.clientHeight - 30, e.clientY - tfZug.dy));
+    tfFenster.style.left = x + 'px';
+    tfFenster.style.top = y + 'px';
+    tfFenster.style.right = 'auto';
+  });
+  const tfLos = () => { tfZug = null; };
+  tfKopf.addEventListener('pointerup', tfLos);
+  tfKopf.addEventListener('pointercancel', tfLos);
   const prueferFeld = el('div', { id: 'prueferfeld' });
   prueferFeld.style.display = 'none';
   plan.append(prueferFeld);
@@ -1172,43 +1205,115 @@ export function startEditor() {
     }
     rechts.append(knoepfe);
   }
-  /** Palette mit Bildern: Boden/Wand-Farben des Tilesets, Formteil, Wand, Hindernis und die Gegner (zuerst die des Tilesets). Klick wählt das Werkzeug. */
-  function paletteFeld() {
+  /** Farben für die Bilder der Palette und des Tileset-Fensters (Tileset-Look oder Prototyp-Farben). */
+  const kachelFarben = () => ({ boden: FLOOR, boden2: FLOOR2, wand: WALL, hindernis: FARBEN.hindernis, ...(lookFarben() || {}) });
+  /** Ein Palettenbild (Canvas mit Klick): `def` = { id, titel, zeichne(x, farben), aktiv, bei }. */
+  function kachelBild(praefix, def, farben) {
+    const c = el('canvas', { width: String(PALETTE_PX * 2), height: String(PALETTE_PX * 2), title: def.titel, id: praefix + def.id, class: def.aktiv ? 'aktiv' : '' });
+    c.style.width = c.style.height = PALETTE_PX + 'px';
+    const x = c.getContext('2d');
+    x.scale(2, 2);
+    x.fillStyle = farben.wand;
+    x.fillRect(0, 0, PALETTE_PX, PALETTE_PX);
+    def.zeichne(x, farben);
+    c.addEventListener('click', def.bei);
+    return c;
+  }
+  const kachelBoden = (x, farben, r = [4, 4, PALETTE_PX - 8, PALETTE_PX - 8]) => {
+    x.fillStyle = farben.boden;
+    x.fillRect(...r);
+    x.fillStyle = farben.boden2;
+    x.fillRect(r[0], r[1], r[2] / 2, r[3] / 2);
+    x.fillRect(r[0] + r[2] / 2, r[1] + r[3] / 2, r[2] / 2, r[3] / 2);
+  };
+  /** Die Elemente des Tilesets, die ein Rechtsklick setzen kann: Boden/Wand/Hindernis und die Gegner (zuerst die des Tilesets). */
+  function teileKacheln() {
     const g = gebiet();
-    const farben = { boden: FLOOR, boden2: FLOOR2, wand: WALL, hindernis: FARBEN.hindernis, ...(lookFarben() || {}) };
-    const feldDiv = el('div', { id: 'palette' }, [el('div', { class: 'palette-titel', text: 'Palette' })]);
-    const raster = el('div', { class: 'palette-raster' });
-    const kachel = (id, titel, zeichneFn, aktivIst, bei) => {
-      const c = el('canvas', { width: String(PALETTE_PX * 2), height: String(PALETTE_PX * 2), title: titel, id: 'p-' + id, class: aktivIst ? 'aktiv' : '' });
-      c.style.width = c.style.height = PALETTE_PX + 'px';
-      const x = c.getContext('2d');
-      x.scale(2, 2);
-      x.fillStyle = farben.wand;
-      x.fillRect(0, 0, PALETTE_PX, PALETTE_PX);
-      zeichneFn(x);
-      c.addEventListener('click', bei);
-      raster.append(c);
-    };
-    const boden = (x, r = [4, 4, PALETTE_PX - 8, PALETTE_PX - 8]) => {
-      x.fillStyle = farben.boden;
-      x.fillRect(...r);
-      x.fillStyle = farben.boden2;
-      x.fillRect(r[0], r[1], r[2] / 2, r[3] / 2);
-      x.fillRect(r[0] + r[2] / 2, r[1] + r[3] / 2, r[2] / 2, r[3] / 2);
-    };
-    kachel('formteil', 'Formteil (B): erweitert den Boden', (x) => boden(x), state.werkzeug === 'formteil', () => setzeWerkzeug('formteil'));
-    kachel('wand', 'Wand (W): schneidet den Boden aus', (x) => { boden(x, [0, 0, PALETTE_PX, PALETTE_PX]); x.fillStyle = farben.wand; x.fillRect(14, 4, 28, PALETTE_PX - 8); }, state.werkzeug === 'wand', () => setzeWerkzeug('wand'));
-    kachel('hindernis', 'Hindernis (H)', (x) => { boden(x, [0, 0, PALETTE_PX, PALETTE_PX]); x.fillStyle = farben.hindernis; x.fillRect(16, 16, 24, 24); x.strokeStyle = '#000'; x.lineWidth = 1.5; x.strokeRect(16, 16, 24, 24); }, state.werkzeug === 'hindernis', () => setzeWerkzeug('hindernis'));
+    const voll = [0, 0, PALETTE_PX, PALETTE_PX];
+    const out = [
+      { gruppe: 'teile', id: 'formteil', titel: 'Formteil (B): erweitert den Boden', zeichne: (x, f) => kachelBoden(x, f), aktiv: state.werkzeug === 'formteil', bei: () => setzeWerkzeug('formteil') },
+      { gruppe: 'teile', id: 'wand', titel: 'Wand (W): schneidet den Boden aus', zeichne: (x, f) => { kachelBoden(x, f, voll); x.fillStyle = f.wand; x.fillRect(14, 4, 28, PALETTE_PX - 8); }, aktiv: state.werkzeug === 'wand', bei: () => setzeWerkzeug('wand') },
+      { gruppe: 'teile', id: 'hindernis', titel: 'Hindernis (H)', zeichne: (x, f) => { kachelBoden(x, f, voll); x.fillStyle = f.hindernis; x.fillRect(16, 16, 24, 24); x.strokeStyle = '#000'; x.lineWidth = 1.5; x.strokeRect(16, 16, 24, 24); }, aktiv: state.werkzeug === 'hindernis', bei: () => setzeWerkzeug('hindernis') },
+    ];
     const art = GEGNER.includes(state.gegnerArt) ? state.gegnerArt : null;
+    const pool = TILESETS[g.tileset]?.pool ?? [];
     for (const a of gegnerFuer(g.tileset)) {
-      kachel('gegner-' + a, `Gegner „${a}“ (X) – Platzhalter`, (x) => { boden(x, [0, 0, PALETTE_PX, PALETTE_PX]); zeichneGegner(x, a, PALETTE_PX / 2, PALETTE_PX / 2, 0, 1.4); }, state.werkzeug === 'gegner' && (art ?? GEGNER[0]) === a, () => {
-        state.gegnerArt = a;
-        setzeWerkzeug('gegner');
+      out.push({
+        gruppe: pool.includes(a) ? 'gegner' : 'gegner2', id: 'gegner-' + a, titel: `Gegner „${a}“ (X) – Platzhalter`,
+        zeichne: (x, f) => { kachelBoden(x, f, voll); zeichneGegner(x, a, PALETTE_PX / 2, PALETTE_PX / 2, 0, 1.4); },
+        aktiv: state.werkzeug === 'gegner' && (art ?? GEGNER[0]) === a,
+        bei: () => { state.gegnerArt = a; setzeWerkzeug('gegner'); },
       });
     }
-    feldDiv.append(raster, el('p', { class: 'grau', text: 'Bild anklicken = Werkzeug wählen. Gegner sind Platzhalter (Verhalten im Fenster ungeprüft); zuerst die Gegner des Tilesets.' }));
+    return out;
+  }
+  /** Palette mit Bildern: Boden/Wand-Farben des Tilesets, Formteil, Wand, Hindernis und die Gegner (zuerst die des Tilesets). Klick wählt das Werkzeug. */
+  function paletteFeld() {
+    const farben = kachelFarben();
+    const feldDiv = el('div', { id: 'palette' }, [el('div', { class: 'palette-titel', text: 'Palette' })]);
+    const raster = el('div', { class: 'palette-raster' });
+    for (const d of teileKacheln()) raster.append(kachelBild('p-', d, farben));
+    feldDiv.append(raster, el('p', { class: 'grau', text: 'Bild anklicken = Element wählen (Rechtsklick setzt es). Gegner sind Platzhalter (Verhalten im Fenster ungeprüft); zuerst die Gegner des Tilesets. Das Tileset-Fenster (Taste I) zeigt alles in einem Fenster.' }));
     return feldDiv;
   }
+
+  // ---------------------------------------------------------------- Tileset-Fenster (A8, Vorbild „Add Objects“ in Lunar Magic)
+  /** Alle Elemente, die sich in diesem Gebiet setzen lassen, als Bilder in einem verschiebbaren Fenster: Aufbau (Gang, Knoten), Boden/Wand/Hindernis, Gegner. */
+  function tilesetFensterFuellen() {
+    const g = gebiet();
+    const farben = kachelFarben();
+    const ts = TILESETS[g.tileset];
+    const art = GEGNER.includes(state.gegnerArt) ? state.gegnerArt : null;
+    const schluessel = [g.tileset, state.look, state.werkzeug, state.knotenTyp, art, state.ansichtArt].join('|');
+    if (schluessel === tfSchluessel) return;
+    tfSchluessel = schluessel;
+    tfTitel.textContent = `Tileset „${ts?.name ?? g.tileset}“`;
+    const aufbau = [
+      { id: 'gang', titel: 'Gang (G): rechts ziehen zeichnet einen Gang', aktiv: state.werkzeug === 'gang', bei: () => setzeWerkzeug('gang'), zeichne: (x, f) => { x.fillStyle = f.boden; x.fillRect(0, 18, PALETTE_PX, 20); x.fillStyle = f.boden2; x.fillRect(0, 18, 14, 10); x.fillRect(14, 28, 14, 10); x.fillRect(28, 18, 14, 10); x.fillRect(42, 28, 14, 10); } },
+      ...Object.entries(KNOTENTYPEN).map(([id, t]) => ({
+        id: 'knoten-' + id, titel: `Knoten „${t.name}“ (K): Rechtsklick setzt ihn`, aktiv: state.werkzeug === 'knoten' && state.knotenTyp === id,
+        bei: () => {
+          state.knotenTyp = id;
+          typWahl.value = id;
+          setzeWerkzeug('knoten');
+        },
+        zeichne: (x, f) => {
+          if (t.hatMasse) { kachelBoden(x, f, [6, 10, PALETTE_PX - 12, PALETTE_PX - 20]); }
+          x.beginPath();
+          x.arc(PALETTE_PX / 2, PALETTE_PX / 2, 8, 0, Math.PI * 2);
+          x.fillStyle = FARBEN.knoten[id];
+          x.fill();
+          x.lineWidth = 1.5;
+          x.strokeStyle = '#000';
+          x.stroke();
+        },
+      })),
+    ];
+    const gruppen = [
+      ['Aufbau', aufbau],
+      ['Boden, Wand, Hindernis', teileKacheln().filter((d) => d.gruppe === 'teile')],
+      [`Gegner des Tilesets (Platzhalter)`, teileKacheln().filter((d) => d.gruppe === 'gegner')],
+      ['Weitere Gegner (Platzhalter)', teileKacheln().filter((d) => d.gruppe === 'gegner2')],
+    ];
+    tfInhalt.replaceChildren(
+      ...gruppen.filter(([, liste]) => liste.length).flatMap(([name, liste]) => [
+        el('div', { class: 'palette-titel', text: name }),
+        el('div', { class: 'palette-raster' }, liste.map((d) => kachelBild('tf-', d, farben))),
+      ]),
+      el('p', { class: 'grau', text: 'Bild anklicken = Element wählen; Rechtsklick im Plan setzt es. Fenster am Titel ziehen, Taste I blendet es ein und aus.' }),
+    );
+  }
+  function tilesetFensterZeigen() {
+    const zeigen = state.tilesetFenster && state.ansichtArt !== 'welt'; // in der Welt-Ansicht gibt es nichts zu setzen
+    tfFenster.style.display = zeigen ? '' : 'none';
+    document.getElementById('b-tileset')?.classList.toggle('an', !!state.tilesetFenster);
+    if (zeigen) tilesetFensterFuellen();
+  }
+  function tilesetFensterUmschalten() {
+    state.tilesetFenster = !state.tilesetFenster;
+    refresh();
+  }
+
   /** Rechtes Feld bei mehreren gewählten Dingen: Anzahl je Art und die Befehle für alle zusammen. */
   function mehrfachEigenschaften(liste) {
     rechts.replaceChildren();
@@ -1381,6 +1486,7 @@ export function startEditor() {
     typWahl.disabled = state.werkzeug !== 'knoten';
     for (const eb of EBENEN) document.getElementById('l-' + eb.id)?.classList.toggle('an', state.gesperrt.has(eb.id));
     prueferZeigen();
+    tilesetFensterZeigen();
     loeschKnopf.disabled = inWelt ? state.weltAuswahl?.art !== 'uebergang' : !(au && (au.art === 'gang' || au.art === 'knoten' || istTeilArt(au.art)));
     const offen = inWelt ? weltUngespeichert() : ungespeichert() || weltUngespeichert();
     stand.textContent = offen ? '● ungespeichert' : '✓ gespeichert';
@@ -1544,6 +1650,7 @@ export function startEditor() {
     else if (c === KUERZEL.teilDrehen) dreheTeil(e.shiftKey ? -1 : 1);
     else if (c === KUERZEL.beschriftung) beschriften();
     else if (c === KUERZEL.look) lookUmschalten();
+    else if (c === KUERZEL.tilesetFenster) tilesetFensterUmschalten();
     else if (c === KUERZEL.alles) alles();
     else if (hat(KUERZEL.loeschen, c)) loescheAuswahl();
     else if (Object.values(KUERZEL.werkzeug).includes(c)) setzeWerkzeug(Object.keys(KUERZEL.werkzeug).find((id) => KUERZEL.werkzeug[id] === c));
@@ -1683,6 +1790,7 @@ export function startEditor() {
     wieImSpiel,
     zoom,
     setzeZoom,
+    tilesetFensterUmschalten,
     ebene,
     sicht,
     oeffneLevel,
