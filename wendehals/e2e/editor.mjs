@@ -1059,6 +1059,32 @@ await wa((e, t) => {
 }, gesichert[0][1]);
 check((await wa((e) => e.hash())) === hashVorher, 'Laden: die gespeicherte welt.json ergibt dasselbe Bild');
 
+// Befunde der Agenten-Prüfung: Welt-Rückgängig behält neu geöffnete Gebiete, Gebiet-Kürzel wirken nicht in der Welt, Knoten-IDs mit Übergang werden nicht neu vergeben
+await wa((e) => {
+  e.setzeLage('beispiel', 'x', 700);
+  const g = JSON.parse(JSON.stringify(e.state.gebiete.beispiel));
+  g.id = 'neu1';
+  g.name = 'Neu 1';
+  e.oeffneText(JSON.stringify(g), 'neu1.json');
+  e.zuWelt();
+});
+await wp.keyboard.press('Control+z');
+check(await wa((e) => e.state.welt.gebiete.some((x) => x.id === 'neu1')), 'Welt-Rückgängig: ein seitdem geöffnetes Gebiet bleibt in welt.json-Liste');
+const teile0 = await wa((e) => e.state.gebiete.beispiel.objekte.length + e.state.gebiete.beispiel.formteile.length);
+await wa((e) => {
+  e.wechsle('beispiel');
+  e.waehle({ art: 'objekt', id: 'o1' });
+  e.kopiere();
+  e.zuWelt();
+});
+await wp.keyboard.press('Control+v');
+check((await wa((e) => e.state.gebiete.beispiel.objekte.length + e.state.gebiete.beispiel.formteile.length)) === teile0, 'Welt-Ansicht: Strg+V fügt nichts ins Gebiet ein');
+await wa((e) => {
+  e.zuGebiet('beispiel');
+  e.waehle({ art: 'knoten', id: 'K5' });
+  e.loescheAuswahl();
+});
+check(/ins Leere/.test(await wa((e) => e.state.meldung)), 'Knoten löschen: Hinweis auf den verwaisten Übergang');
 // Leistung der Welt-Ansicht
 const wMs = await wa((e) => {
   e.alles();

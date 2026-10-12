@@ -12,8 +12,12 @@ const sauber = (v) => Math.round(v * 1000) / 1000 + 0; // Rundungsrauschen aus S
 const abstand = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
 /** Kleinste freie Nummer: `K1`, `K2` … (IDs sind im ganzen Gebiet eindeutig, Brief Abschnitt 4). */
+/** IDs, die nicht neu vergeben werden (main.js trägt hier die Knoten ein, auf die ein Übergang zeigt – sonst bände er sich still an einen neuen Knoten). */
+export const gesperrteIds = new Set();
+
 export function neueId(g, praefix) {
   const belegt = new Set([...g.knoten, ...g.gaenge, ...g.formteile, ...g.objekte, ...g.notizen].map((o) => o.id));
+  for (const id of gesperrteIds) belegt.add(id);
   for (let n = 1; ; n++) if (!belegt.has(praefix + n)) return praefix + n;
 }
 

@@ -10,7 +10,7 @@ import { kopie, bezeichnung, knotenMap, gangMasse, gangPolygon, knotenPolygon, p
 import { formatiereWelt, ladeWelt, pruefeWelt, weltLagen, weltAusdehnung, lageSetzen, bereichFeld, bereichAnpassen, bereichMasse, uebergangAnlegen, uebergangLoeschen, uebergaengeVon, uebergaengeAn, andereSeite, teileEnde, ausserhalb } from './welt.js';
 import { KNOTENTYPEN } from './katalog.js';
 import { KUERZEL, WINKEL_SCHRITT, SCREEN_W, SCREEN_H, SPEED, ZOOM_BILDSCHIRME, PFEIL_SCHRITT_PX, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX } from './konstanten.js';
-import { gangTeilen, loesche, setze } from './befehle.js';
+import { gangTeilen, loesche, setze, gesperrteIds } from './befehle.js';
 import { teilBei, teilFinden, teilDrehen, teilMerken, teilEinfuegen, loescheTeil, setzeTeil, istTeilArt, hatMasse, teilName, liste as teilListe } from './teile.js';
 import { erzeugeSpeicher } from './speicher.js';
 import { spielbarkeit, erzeugeSzene } from './spielen.js';
@@ -480,8 +480,11 @@ export function startEditor() {
     if (state.ansichtArt === 'welt') return loescheUebergang();
     const au = state.auswahl;
     if (!au || (au.art !== 'gang' && au.art !== 'knoten' && !istTeilArt(au.art))) return;
-    const offen = au.art === 'knoten' ? uebergaengeAn(state.welt, state.gebietId, au.id).length : 0;
+    const hatKnoten = (g) => new Set(g.knoten.map((k) => k.id));
+    const vorher = hatKnoten(gebiet());
     aendere('Löschen', (g) => (istTeilArt(au.art) ? loescheTeil(g, au.art, au.id) : loesche(g, au.art, au.id)));
+    const weg = [...vorher].filter((id) => !hatKnoten(gebiet()).has(id));
+    const offen = weg.reduce((n, id) => n + uebergaengeAn(state.welt, state.gebietId, id).length, 0);
     if (offen) melde(`${offen === 1 ? 'Ein Übergang zeigt' : offen + ' Übergänge zeigen'} jetzt ins Leere – der Welt-Prüfer (Taste T) meldet es (W1).`, 'fehler');
   }
   /** Gewähltes Teil (Formteil, Wand, Hindernis) oder null. */
@@ -490,6 +493,7 @@ export function startEditor() {
     return au && istTeilArt(au.art) ? teilFinden(gebiet(), au.art, au.id) ?? null : null;
   };
   function dreheTeil(k) {
+    if (state.ansichtArt === 'welt') return; // Gebiet-Befehle gelten nur in der Gebiet-Ansicht
     const au = state.auswahl;
     const o = gewaehltesTeil();
     if (!o) return;
@@ -497,6 +501,7 @@ export function startEditor() {
     aendere(`${teilName(au.art, o)} drehen`, (g) => teilDrehen(g, au.art, au.id, k));
   }
   function kopiere() {
+    if (state.ansichtArt === 'welt') return; // Gebiet-Befehle gelten nur in der Gebiet-Ansicht
     const au = state.auswahl;
     if (!gewaehltesTeil()) return melde('Zum Kopieren erst ein Formteil, eine Wand oder ein Hindernis wählen.', 'fehler');
     state.zwischen = teilMerken(gebiet(), au.art, au.id);
@@ -504,12 +509,14 @@ export function startEditor() {
     refresh();
   }
   function fuegeEin() {
+    if (state.ansichtArt === 'welt') return; // Gebiet-Befehle gelten nur in der Gebiet-Ansicht
     if (!state.zwischen) return melde('Nichts kopiert – erst ein Teil wählen und Strg+C drücken.', 'fehler');
     const z = state.zeiger ?? { x: ansicht.cx, y: ansicht.cy }; // ohne Mausstelle: Mitte der Ansicht
     const neu = aendere('Einfügen', (g) => teilEinfuegen(g, state.zwischen, z.x, z.y));
     if (neu) waehle(neu);
   }
   function dupliziere() {
+    if (state.ansichtArt === 'welt') return; // Gebiet-Befehle gelten nur in der Gebiet-Ansicht
     const au = state.auswahl;
     if (!gewaehltesTeil()) return melde('Zum Duplizieren erst ein Formteil, eine Wand oder ein Hindernis wählen.', 'fehler');
     const gemerkt = teilMerken(gebiet(), au.art, au.id);
@@ -517,6 +524,7 @@ export function startEditor() {
     if (neu) waehle(neu);
   }
   function teileGang() {
+    if (state.ansichtArt === 'welt') return; // Gebiet-Befehle gelten nur in der Gebiet-Ansicht
     const au = state.auswahl;
     if (au?.art !== 'gang' || !state.fahrt) return;
     const neu = aendere('Gang teilen', (g) => gangTeilen(g, au.id, state.fahrt.s));
@@ -669,7 +677,16 @@ export function startEditor() {
     const jetzt = JSON.stringify(state.welt);
     const t = zurueck ? state.weltVerlauf.rueckgaengig(jetzt) : state.weltVerlauf.wiederholen(jetzt);
     if (t == null) return;
-    state.welt = JSON.parse(t);
+    const alt = JSON.parse(t);
+    // nur Lage und Übergänge gehen zurück; Gebiete, die seitdem geöffnet wurden, bleiben in der Liste
+    alt.gebiete = state.welt.gebiete.map((e) => {
+      const n = { ...e };
+      const vor = alt.gebiete.find((x) => x.id === e.id);
+      if (vor?.lage) n.lage = vor.lage;
+      else delete n.lage;
+      return n;
+    });
+    state.welt = alt;
     weltBereinige();
     melde('');
     refresh();
@@ -1010,6 +1027,8 @@ export function startEditor() {
       `Stelle ${fmt(s, 0)} E = ${fmt(s / SCREEN_W)} Bildschirme = ${fmt(s / SPEED)} s  ·  Gang ${fmt(m.laenge, 0)} E = ${fmt(m.bildschirme)} Bildschirme = ${fmt(m.sekunden)} s`;
   }
   function refresh() {
+    gesperrteIds.clear();
+    for (const m of uebergangsMarken()) gesperrteIds.add(m.knoten);
     const inWelt = state.ansichtArt === 'welt';
     anzeige.textContent = `${inWelt ? 'Welt · ' : ''}${DIR_NAMES[ansicht.blick]} · ${fmt(ZOOM_BILDSCHIRME[ansicht.stufe], 1)} Bildschirme`;
     eigenschaften();

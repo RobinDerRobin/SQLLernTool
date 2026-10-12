@@ -240,3 +240,14 @@ test('Lage: beim ersten Verschieben werden die automatischen Lagen festgeschrieb
   assert.ok(frisch.gebiete.every((e) => e.lage), 'alle haben eine Lage');
   assert.equal(lageSetzen(frisch, 'a', frisch.gebiete[0].lage.x, frisch.gebiete[0].lage.y, zwei()), false, 'gleiche Lage, schon festgeschrieben: nichts geändert');
 });
+
+test('Knoten-IDs, auf die ein Übergang zeigt, werden nicht neu vergeben', async () => {
+  const { neueId, gesperrteIds } = await import('../src/editor/befehle.js');
+  const g = gebiet();
+  assert.equal(neueId(g, 'K'), 'K3');
+  g.knoten.pop(); // K2 weg
+  assert.equal(neueId(g, 'K'), 'K2');
+  gesperrteIds.add('K2');
+  assert.equal(neueId(g, 'K'), 'K3', 'K2 ist durch einen Übergang gesperrt');
+  gesperrteIds.clear();
+});
