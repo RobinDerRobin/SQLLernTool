@@ -47,6 +47,31 @@ export function spielbarkeit(g) {
     else if (!recht90(o.winkel)) probleme.push(`${o.typ === 'wand' ? 'Wand' : 'Hindernis'} ${o.id} steht im Winkel ${o.winkel}°; nur 0° und 90° sind spielbar.`);
   }
   if (!g.gaenge.length) probleme.push('Das Gebiet hat keinen Gang.');
+  if (!probleme.length) {
+    // Gänge, die sich kreuzen oder berühren, ohne einen gemeinsamen Knoten zu teilen: der Prototyp würde dort eine Kreuzung
+    // spielen, der Editor kennt keine Verbindung
+    const ms = g.gaenge.map((gang) => ({ gang, m: gangMasse(g, gang, km) }));
+    for (const p of ms) {
+      for (const q of ms) {
+        if (p === q || !isHorizontal(p.m.richtung) || isHorizontal(q.m.richtung)) continue;
+        if ([p.gang.von, p.gang.nach].some((k) => k === q.gang.von || k === q.gang.nach)) continue;
+        const [x0, x1] = [Math.min(p.m.a.x, p.m.b.x), Math.max(p.m.a.x, p.m.b.x)];
+        const [y0, y1] = [Math.min(q.m.a.y, q.m.b.y), Math.max(q.m.a.y, q.m.b.y)];
+        const cy = p.m.a.y;
+        const cx = q.m.a.x;
+        const hw = (p.gang.breite + q.gang.breite) / 2;
+        if (cx >= x0 - p.gang.breite / 2 && cx <= x1 + p.gang.breite / 2 && cy >= y0 - q.gang.breite / 2 && cy <= y1 + q.gang.breite / 2 && hw > 0) {
+          probleme.push(`Gang „${p.gang.name || p.gang.id}“ und Gang „${q.gang.name || q.gang.id}“ kreuzen sich ohne gemeinsamen Knoten; im Prototyp wäre dort eine Kreuzung.`);
+        }
+      }
+    }
+    // zusammenhängend? Sonst liegt der Knochen (das Ziel) vielleicht in einem Teil, den man nie erreicht
+    const teil = new Map(g.knoten.map((k) => [k.id, k.id]));
+    const wurzel = (id) => (teil.get(id) === id ? id : wurzel(teil.get(id)));
+    for (const gang of g.gaenge) teil.set(wurzel(gang.von), wurzel(gang.nach));
+    const gruppen = new Set(g.gaenge.map((gang) => wurzel(gang.von)));
+    if (gruppen.size > 1) probleme.push(`Die Gänge hängen nicht zusammen (${gruppen.size} getrennte Teile); der Prototyp kann nicht von einem Teil in den anderen fliegen.`);
+  }
   return { probleme, hinweise };
 }
 
@@ -59,7 +84,17 @@ function gangRechtecke(g) {
     const waagrecht = isHorizontal(m.richtung);
     const a = km.get(gang.von);
     const b = km.get(gang.nach);
-    const reicht = (k) => (k.w && k.h ? (waagrecht ? k.w : k.h) / 2 : 0);
+    // Ende reicht bis an den Rand der Knotenfläche; ohne Maße (Ecke, T) um die halbe Breite der querenden Gänge, damit eine ganze Kreuzung entsteht
+    const reicht = (k) => {
+      if (k.w && k.h) return (waagrecht ? k.w : k.h) / 2;
+      let r = 0;
+      for (const o of g.gaenge) {
+        if (o === gang || (o.von !== k.id && o.nach !== k.id)) continue;
+        const mo = gangMasse(g, o, km);
+        if (isHorizontal(mo.richtung) !== waagrecht) r = Math.max(r, o.breite / 2);
+      }
+      return r;
+    };
     const [pa, pb] = waagrecht ? [a.x, b.x] : [a.y, b.y];
     const lo = Math.min(pa - reicht(a), pb - reicht(b));
     const hi = Math.max(pa + reicht(a), pb + reicht(b));

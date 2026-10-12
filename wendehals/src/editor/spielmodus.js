@@ -34,7 +34,7 @@ export class SpielModus {
     this.canvas.style.cssText = 'display:block;image-rendering:auto';
     const hinweis = document.createElement('div');
     hinweis.id = 'spiel-hinweis';
-    hinweis.textContent = 'Esc / Start: zurück zum Editor';
+    hinweis.textContent = 'Esc / P / Start: zurück zum Editor';
     hinweis.style.cssText = 'position:absolute;left:0;right:0;bottom:6px;text-align:center;color:#c9c6d4;font:13px system-ui,sans-serif;pointer-events:none';
     this.deckel.append(this.canvas, hinweis);
     host.append(this.deckel);

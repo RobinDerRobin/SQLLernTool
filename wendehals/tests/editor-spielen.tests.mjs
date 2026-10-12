@@ -174,3 +174,40 @@ test('Szene verändert das Gebiet nicht', () => {
   assert.ok(sc instanceof FensterScene && sc.rng instanceof Rng);
   assert.ok(SCREEN_W === 480 && SCREEN_H === 270);
 });
+
+test('Ecke und T ohne Knotenmaße: volle Kreuzung, Drehen auf der Gangmitte möglich', () => {
+  const g = leer();
+  g.knoten = [{ id: 'A', typ: 'speicher', x: 0, y: 0 }, { id: 'B', typ: 'kreuzung', x: 1000, y: 0 }, { id: 'C', typ: 'ende', x: 1000, y: 800 }];
+  g.gaenge = [{ id: 'a', name: 'a', von: 'A', nach: 'B', breite: 200 }, { id: 'b', name: 'b', von: 'B', nach: 'C', breite: 200 }];
+  const k = baueKarte(g);
+  assert.equal(k.junctions.length, 1);
+  assert.deepEqual([k.junctions[0].x0, k.junctions[0].x1, k.junctions[0].y0, k.junctions[0].y1], [900, 1100, -100, 100], 'ganzes Quadrat');
+  const sc = erzeugeSzene(g, 'a', 700);
+  sc.warp(1000, 0, E, 'R', { x: 240, y: 135 });
+  assert.equal(sc.canTurnBy(1), true, 'Süden von der Gangmitte aus');
+  // T-Stück
+  g.knoten.push({ id: 'D', typ: 'ende', x: 2000, y: 0 });
+  g.gaenge.push({ id: 'c', name: 'c', von: 'B', nach: 'D', breite: 200 });
+  const t = erzeugeSzene(g, 'a', 700);
+  t.warp(1000, 0, E, 'R', { x: 240, y: 135 });
+  assert.equal(t.canTurnBy(1), true, 'T: nach Süden auf der Mitte');
+});
+
+test('Spielbarkeit: Gänge ohne gemeinsamen Knoten, die sich kreuzen, und getrennte Teile werden gemeldet', () => {
+  const g = leer();
+  g.knoten = [
+    { id: 'A', typ: 'speicher', x: 0, y: 0 }, { id: 'B', typ: 'ende', x: 2000, y: 0 },
+    { id: 'C', typ: 'ende', x: 1000, y: -500 }, { id: 'D', typ: 'ende', x: 1000, y: 500 },
+  ];
+  g.gaenge = [{ id: 'a', name: 'a', von: 'A', nach: 'B', breite: 200 }, { id: 'b', name: 'b', von: 'C', nach: 'D', breite: 200 }];
+  const p = spielbarkeit(g).probleme.join('|');
+  assert.match(p, /kreuzen sich ohne gemeinsamen Knoten/);
+  assert.match(p, /nicht zusammen/);
+  g.knoten[3].y = 500;
+  g.knoten[2].x = 5000;
+  g.knoten[3].x = 5000; // getrennt, aber ohne Kreuzung
+  const q = spielbarkeit(g).probleme.join('|');
+  assert.doesNotMatch(q, /kreuzen/);
+  assert.match(q, /2 getrennte Teile/);
+  assert.deepEqual(spielbarkeit(ell()).probleme, []);
+});
