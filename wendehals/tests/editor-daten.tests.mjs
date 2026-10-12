@@ -8,7 +8,7 @@ import {
   formatiere, kopie, pruefeFormat, ladeGebiet, richtungVon, gangMasse, rechteck, achteck, bodenPolygone, istBoden, punktInPolygon, rahmenEcken, bezeichnung, ausdehnung,
 } from '../src/editor/daten.js';
 import { Ansicht } from '../src/editor/ansicht.js';
-import { SCREEN_W, SCREEN_H, SPEED, ZOOM_BILDSCHIRME, FLOOR, FLOOR2, WALL } from '../src/editor/konstanten.js';
+import { SCREEN_W, SCREEN_H, SPEED, ZOOM_MIN, ZOOM_MAX, ZOOM_START, FLOOR, FLOOR2, WALL } from '../src/editor/konstanten.js';
 import { KNOTENTYPEN, OBJEKTTYPEN, TILESETS } from '../src/editor/katalog.js';
 import { WELT, GEBIETE } from '../src/editor/startdaten.js';
 import { NETZ_MAP } from '../src/proto/netz-map.js';
@@ -24,12 +24,12 @@ import { SPEED as PROTO_SPEED } from '../src/proto/fenster.js';
 
 test('Editor: Flugtempo ist das des Prototyps', () => assert.equal(SPEED, PROTO_SPEED));
 
-test('Editor: Konstanten – Bildschirm 480 × 270 E, Flugtempo 70 E/s, Zoomstufen aufsteigend', () => {
+test('Editor: Konstanten – Bildschirm 480 × 270 E, Flugtempo 70 E/s, Zoom stufenlos mit Normalansicht 2,2', () => {
   assert.equal(SCREEN_W, 480);
   assert.equal(SCREEN_H, 270);
   assert.equal(SPEED, 70);
-  assert.deepEqual([...ZOOM_BILDSCHIRME].sort((a, b) => a - b), ZOOM_BILDSCHIRME);
-  assert.ok(ZOOM_BILDSCHIRME.includes(2.2), 'Normalansicht ≈ 2,2 Bildschirme');
+  assert.ok(ZOOM_MIN < 1 && ZOOM_MAX > 128, 'Zoombereich reicht von unter einem Bildschirm bis zur ganzen Welt');
+  assert.equal(ZOOM_START, 2.2, 'Normalansicht ≈ 2,2 Bildschirme');
   assert.deepEqual([FLOOR, FLOOR2, WALL], ['#6a5f55', '#756a5f', '#1c1822'], 'Farben wie im Prototyp');
 });
 
@@ -167,28 +167,23 @@ test('Editor: Ansicht – Drehen in 45°-Schritten, Hin- und Rückrechnung, Zoom
   a.zoomen(2, 300, 200);
   const nach = a.bildZuWelt(300, 200);
   assert.ok(Math.abs(vor[0] - nach[0]) < 1e-9 && Math.abs(vor[1] - nach[1]) < 1e-9, 'Ankerpunkt bleibt');
-  a.zoomen(100);
-  assert.equal(a.stufe, ZOOM_BILDSCHIRME.length - 1);
-  a.zoomen(-100);
-  assert.equal(a.stufe, 0);
-  a.stufe = 2;
+  a.zoomen(1e9);
+  assert.equal(a.bildschirme, ZOOM_MIN);
+  a.zoomen(1e-9);
+  assert.equal(a.bildschirme, ZOOM_MAX);
+  a.bildschirme = 2.2;
   assert.ok(Math.abs(a.masstab * 2.2 * SCREEN_W - a.w) < 1e-9, 'Normalansicht: 2,2 Bildschirme breit');
 });
 
-test('Editor: Ansicht einpassen zeigt das ganze Gebiet in der stärksten passenden Zoomstufe', () => {
+test('Editor: Ansicht einpassen zeigt das ganze Gebiet, ohne Stufen (≥ 90 % der Breite oder Höhe genutzt)', () => {
   const a = new Ansicht(990, 600);
   for (const g of Object.values(GEBIETE)) {
     const r = ausdehnung(g);
     a.einpassen(r);
     const sicht = a.sichtbar();
     assert.ok(sicht.x0 <= r.x0 && sicht.x1 >= r.x1 && sicht.y0 <= r.y0 && sicht.y1 >= r.y1, g.id + ' vollständig sichtbar');
-    if (a.stufe > 0) {
-      const b = new Ansicht(990, 600);
-      b.zentrieren(a.cx, a.cy);
-      b.stufe = a.stufe - 1;
-      const s2 = b.sichtbar();
-      assert.ok(!(s2.x0 <= r.x0 * 1.05 && s2.x1 >= r.x1 * 1.05 && s2.y0 <= r.y0 * 1.05 && s2.y1 >= r.y1 * 1.05), g.id + ': eine Stufe näher würde nicht mehr passen');
-    }
+    const genutzt = Math.max((r.x1 - r.x0) / (sicht.x1 - sicht.x0), (r.y1 - r.y0) / (sicht.y1 - sicht.y0));
+    assert.ok(genutzt >= 0.9, `${g.id}: ${(genutzt * 100).toFixed(0)} % genutzt`);
   }
 });
 

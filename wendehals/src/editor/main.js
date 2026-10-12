@@ -3,13 +3,13 @@
 // Stufe 2a: Bauen – Werkzeuge (Auswahl, Gang, Knoten), Eigenschaften ändern, Rückgängig/Wiederholen, Speichern/Laden.
 // Stufe 2b: Formteile, Wände, Hindernisse – setzen, verschieben, drehen, kopieren, löschen, Eigenschaften.
 import { HEADINGS, DIR_NAMES, E } from '../core/math.js';
-import { Ansicht } from './ansicht.js';
+import { Ansicht, radFaktor } from './ansicht.js';
 import { zeichnePlan, zeichneGegner } from './zeichnen.js';
 import { WELT, GEBIETE } from './startdaten.js';
 import { kopie, bezeichnung, knotenMap, gangMasse, gangPolygon, knotenPolygon, punktInPolygon, ausdehnung, rahmenEcken, formatiere, ladeGebiet, pruefeFormat, Verlauf } from './daten.js';
 import { formatiereWelt, ladeWelt, pruefeWelt, weltLagen, weltAusdehnung, lageSetzen, bereichFeld, bereichAnpassen, bereichMasse, uebergangAnlegen, uebergangLoeschen, uebergaengeVon, uebergaengeAn, andereSeite, teileEnde, ausserhalb } from './welt.js';
 import { KNOTENTYPEN, TILESETS, GEGNER, gegnerFuer, tilesetFarben } from './katalog.js';
-import { KUERZEL, WINKEL_SCHRITT, SCREEN_W, SCREEN_H, SPEED, ZOOM_BILDSCHIRME, PFEIL_SCHRITT_PX, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX, FLOOR, FLOOR2, WALL, FARBEN, PALETTE_PX } from './konstanten.js';
+import { KUERZEL, WINKEL_SCHRITT, SCREEN_W, SCREEN_H, SPEED, ZOOM_TASTE_FAKTOR, ZOOM_FESTWERTE, PFEIL_SCHRITT_PX, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX, FLOOR, FLOOR2, WALL, FARBEN, PALETTE_PX } from './konstanten.js';
 import { gangTeilen, loesche, setze, gesperrteIds } from './befehle.js';
 import { teilBei, teilFinden, teilDrehen, teilMerken, teilEinfuegen, loescheTeil, setzeTeil, istTeilArt, hatMasse, teilName, liste as teilListe } from './teile.js';
 import { erzeugeSpeicher } from './speicher.js';
@@ -21,6 +21,8 @@ import weltWerkzeug, { weltTreffer } from './werkzeuge/welt-ansicht.js';
 import { zeichneWelt } from './zeichnen-welt.js';
 
 const fmt = (n, d = 1) => n.toFixed(d).replace('.', ',');
+/** Zoom-Anzeige: zwei Stellen bei kleinen, eine bei großen Werten, Komma als Dezimalzeichen. */
+const fmtZoom = (b) => String(b >= 20 ? Math.round(b * 10) / 10 : Math.round(b * 100) / 100).replace('.', ',');
 const hat = (liste, code) => (Array.isArray(liste) ? liste.includes(code) : liste === code);
 
 const CSS = `
@@ -55,6 +57,7 @@ button:disabled { opacity: .45; cursor: default; }
 #melden.fehler { color: #ff9a8a; }
 #werkhinweis { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
 #stand.offen { color: #ffd24a; }
+#zoomfeld { width: 54px; flex: none; text-align: right; }
 input[type=text], input[type=number], #rechts select { width: 100%; box-sizing: border-box; background: #14121a; color: #e8e6ee; border: 1px solid #4b4560; border-radius: 4px; padding: 3px 6px; font: inherit; }
 #rechts .knoepfe { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 #palette { margin-top: 14px; } .palette-titel { font-size: 14px; font-weight: bold; margin-bottom: 6px; } .palette-raster { display: flex; flex-wrap: wrap; gap: 6px; } .palette-raster canvas { border: 2px solid #4b4560; border-radius: 4px; cursor: pointer; } .palette-raster canvas.aktiv { border-color: #4ad0ff; }
@@ -113,7 +116,7 @@ export function startEditor() {
   const gebiet = () => state.gebiete[state.gebietId];
   const werkzeug = () => WERKZEUGE.find((w) => w.id === state.werkzeug);
   const aktiv = () => (state.ansichtArt === 'welt' ? weltWerkzeug : werkzeug()); // was die Maus gerade bedient
-  const kamera = () => ({ cx: ansicht.cx, cy: ansicht.cy, stufe: ansicht.stufe, blick: ansicht.blick });
+  const kamera = () => ({ cx: ansicht.cx, cy: ansicht.cy, bildschirme: ansicht.bildschirme, blick: ansicht.blick });
 
   // ---------------------------------------------------------------- Oberfläche
   const canvas = el('canvas');
@@ -125,6 +128,12 @@ export function startEditor() {
   });
   const knopf = (text, titel, fn, id) => el('button', { text, title: titel, onclick: fn, ...(id ? { id } : {}) });
   const anzeige = el('span', { class: 'grau', id: 'anzeige' });
+  const zoomFeld = el('input', { id: 'zoomfeld', type: 'text', size: '5', title: 'Zoom in Bildschirmen (480 E) Breite – Zahl eintippen und Enter (1 = so groß wie im Spiel, 2,2 = Normalansicht)' });
+  zoomFeld.addEventListener('change', () => setzeZoom(zahlVon(zoomFeld.value)));
+  zoomFeld.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') zoomFeld.blur();
+    if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); // Kürzel gelten nicht beim Tippen
+  });
   const oben = el('div', { id: 'oben', class: 'leiste' }, [
     el('span', { class: 'titel', text: 'Editor' }),
     wahl,
@@ -133,9 +142,11 @@ export function startEditor() {
     knopf('Drehen ⟳', 'Ansicht 45° rechts drehen (E)', () => drehen(1), 'b-rechts'),
     knopf('Norden', 'Norden nach oben (0)', () => norden(), 'b-norden'),
     knopf('Wie im Spiel', 'In Flugrichtung des gewählten Gangs drehen (F)', () => wieImSpiel(), 'b-spiel'),
-    knopf('Zoom −', 'Herauszoomen (−)', () => zoom(1), 'b-minus'),
-    knopf('Zoom +', 'Hineinzoomen (+)', () => zoom(-1), 'b-plus'),
-    knopf('Alles', 'Ganzes Gebiet einpassen', () => alles(), 'b-alles'),
+    knopf('Zoom −', 'Herauszoomen (−; Mausrad: 15 % je Raste)', () => zoom(1 / ZOOM_TASTE_FAKTOR), 'b-minus'),
+    zoomFeld,
+    el('span', { class: 'grau', text: 'Bildschirme' }),
+    knopf('Zoom +', 'Hineinzoomen (+)', () => zoom(ZOOM_TASTE_FAKTOR), 'b-plus'),
+    knopf('Alles', 'Ganzes Gebiet einpassen (Pos1)', () => alles(), 'b-alles'),
     knopf('Beschriftung', 'Knoten, Namen und Maßstab ein-/ausblenden (L)', () => beschriften(), 'b-beschriftung'),
     knopf('Look', 'Farben umschalten: Prototyp ↔ Tileset des Gebiets (J)', () => lookUmschalten(), 'b-look'),
     anzeige,
@@ -269,10 +280,20 @@ export function startEditor() {
     if (m && m.richtung >= 0) ansicht.wieImSpiel(m.richtung);
     refresh();
   }
-  const zoom = (k, px, py) => {
-    ansicht.zoomen(k, px, py);
+  /** Um `faktor` hineinzoomen (> 1) oder heraus (< 1), um den Punkt (px, py) des Plans (sonst die Mitte). */
+  const zoom = (faktor, px, py) => {
+    ansicht.zoomen(faktor, px, py);
     refresh();
   };
+  /** Zoom auf eine Zahl Bildschirme Breite setzen (Eingabefeld, Tasten 1 und 2). */
+  function setzeZoom(b) {
+    if (!Number.isFinite(b) || b <= 0) {
+      melde('Bitte den Zoom als Zahl in Bildschirmen eingeben, z. B. 2,2.', 'fehler');
+      return refresh();
+    }
+    ansicht.setzeBildschirme(b);
+    refresh();
+  }
   function lookFarben() {
     return state.look === 'tileset' ? tilesetFarben(gebiet().tileset) : null;
   }
@@ -321,7 +342,7 @@ export function startEditor() {
     const au = state.auswahl;
     if (!au || au.art !== 'gang' || !state.fahrt) return melde('Zum Spielen erst einen Gang anklicken und den Rahmen an die Stelle fahren.', 'fehler');
     const g = gebiet();
-    const { probleme, hinweise } = spielbarkeit(g);
+    const { probleme, hinweise } = spielbarkeit(g, au.id);
     if (probleme.length) return melde('Noch nicht spielbar: ' + probleme.join(' · '), 'fehler');
     let szene;
     try {
@@ -1089,7 +1110,8 @@ export function startEditor() {
     gesperrteIds.clear();
     for (const m of uebergangsMarken()) gesperrteIds.add(m.knoten);
     const inWelt = state.ansichtArt === 'welt';
-    anzeige.textContent = `${inWelt ? 'Welt · ' : ''}${DIR_NAMES[ansicht.blick]} · ${fmt(ZOOM_BILDSCHIRME[ansicht.stufe], 1)} Bildschirme`;
+    anzeige.textContent = `${inWelt ? 'Welt · ' : ''}${DIR_NAMES[ansicht.blick]}`;
+    if (document.activeElement !== zoomFeld) zoomFeld.value = fmtZoom(ansicht.bildschirme);
     eigenschaften();
     refreshFahrt();
     const v = inWelt ? state.weltVerlauf : verlaufVon(state.gebietId);
@@ -1168,8 +1190,12 @@ export function startEditor() {
     (e) => {
       e.preventDefault();
       const r = canvas.getBoundingClientRect();
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        ansicht.verschieben(-e.deltaX, 0); // waagerechtes Rad / Shift+Rad: Plan seitlich schieben
+        return refresh();
+      }
       if (!e.deltaY) return;
-      zoom(e.deltaY > 0 ? 1 : -1, e.clientX - r.left, e.clientY - r.top);
+      zoom(radFaktor(e.deltaY, e.deltaMode, e.ctrlKey), e.clientX - r.left, e.clientY - r.top);
     },
     { passive: false },
   );
@@ -1203,8 +1229,10 @@ export function startEditor() {
     else if (c === KUERZEL.drehenRechts) drehen(1);
     else if (c === KUERZEL.norden) norden();
     else if (c === KUERZEL.wieImSpiel) wieImSpiel();
-    else if (e.key === '+' || hat(KUERZEL.zoomPlus, c)) zoom(-1);
-    else if (e.key === '-' || hat(KUERZEL.zoomMinus, c)) zoom(1);
+    else if (e.key === '+' || hat(KUERZEL.zoomPlus, c)) zoom(ZOOM_TASTE_FAKTOR);
+    else if (e.key === '-' || hat(KUERZEL.zoomMinus, c)) zoom(1 / ZOOM_TASTE_FAKTOR);
+    else if (c === KUERZEL.zoomEins) setzeZoom(ZOOM_FESTWERTE.eins);
+    else if (c === KUERZEL.zoomNormal) setzeZoom(ZOOM_FESTWERTE.normal);
     else if (c === KUERZEL.spielen) spielenAb();
     else if (c === KUERZEL.bezeichnung) kopiereBezeichnung();
     else if (c === KUERZEL.fahrtStart) fahrtUmschalten();
@@ -1330,6 +1358,7 @@ export function startEditor() {
     norden,
     wieImSpiel,
     zoom,
+    setzeZoom,
     rahmenEcken: () => {
       const m = ganzMasse();
       return m ? rahmenEcken(m, state.fahrt.s) : null;

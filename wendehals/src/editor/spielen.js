@@ -7,6 +7,7 @@ import { compileEditorMap } from '../proto/editor-karte.js';
 import { WALL } from '../proto/fenster-draw.js';
 import { knotenMap, gangMasse, gangPunkt } from './daten.js';
 import { FARBEN, SCREEN_W, SCREEN_H } from './konstanten.js';
+import { spielGebiet } from './level.js';
 
 const EPS = 1e-6;
 const KNOCHEN_FARBEN = ['#e0443a', '#3f7be0', '#3fb04a', '#e8c63a', '#b060e0', '#f08a30'];
@@ -29,8 +30,19 @@ function teilRechteck(t) {
  * Was der Fenster-Prototyp in diesem Gebiet (noch) nicht spielen kann – leer = spielbar. `hinweise` sind Dinge, die der Prototyp
  * zwar spielt, aber anders als gezeichnet (Gegner). Der Prüfer (Regel M7) ruft dasselbe auf. Texte beginnen nicht mit
  * „noch nicht spielbar“; das setzt die Oberfläche davor.
+ *
+ * Mit `gangId`: nur für „Spielen ab hier“ an diesem Gang. Ist das ganze Gebiet spielbar, gilt das wie bisher; sonst zählt nur die
+ * Karte, die um diesen Gang spielbar ist (`spielGebiet`: der Gang und alles, was über gerade Gänge an ihm hängt). Ein diagonaler
+ * Gang woanders im Gebiet verhindert dann das Spielen eines geraden Gangs nicht mehr; er steht als Hinweis dabei.
  */
-export function spielbarkeit(g) {
+export function spielbarkeit(g, gangId = null) {
+  if (gangId != null) {
+    if (!spielbarkeit(g).probleme.length) return spielbarkeit(g);
+    const { gebiet, ausgelassen } = spielGebiet(g, gangId);
+    const r = spielbarkeit(gebiet);
+    if (ausgelassen.length && !r.probleme.length) r.hinweise.push(`Nicht in der gespielten Karte: ${ausgelassen.map((x) => `Gang „${x.name || x.id}“`).join(', ')} (hängt nur über Diagonalen oder gar nicht am Start-Gang).`);
+    return r;
+  }
   const probleme = [];
   const hinweise = [];
   const km = knotenMap(g);
@@ -169,11 +181,11 @@ export function startLage(g, gangId, s) {
 
 /** Szene für den Fenster-Prototyp an der Rahmenstelle des Gangs (Fehler als Error mit verständlichem Text). */
 export function erzeugeSzene(g, gangId, s) {
-  const { probleme } = spielbarkeit(g);
+  if (!g.gaenge.some((x) => x.id === gangId)) throw new Error(`Gang ${gangId} gibt es nicht.`);
+  const { probleme } = spielbarkeit(g, gangId);
   if (probleme.length) throw new Error('noch nicht spielbar: ' + probleme.join(' · '));
   const lage = startLage(g, gangId, s);
-  if (!lage) throw new Error(`Gang ${gangId} gibt es nicht.`);
-  const karte = baueKarte(g);
+  const karte = baueKarte(spielbarkeit(g).probleme.length ? spielGebiet(g, gangId).gebiet : g);
   const sc = new FensterScene({ map: karte });
   sc.minimap = false; // Minimap (P2) gehört nicht zu dieser Szene
   sc.hint = 0;

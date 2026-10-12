@@ -112,7 +112,7 @@ await page.keyboard.press('Digit0');
 check((await ed((e) => e.ansicht.blick)) === 0, 'Ansicht: 0 stellt Norden oben wieder her');
 
 const canvasBox = await page.locator('#plan canvas').boundingBox();
-const vorher = await ed((e) => ({ cx: e.ansicht.cx, cy: e.ansicht.cy, stufe: e.ansicht.stufe }));
+const vorher = await ed((e) => ({ cx: e.ansicht.cx, cy: e.ansicht.cy, bildschirme: e.ansicht.bildschirme }));
 await page.mouse.move(canvasBox.x + 300, canvasBox.y + 200);
 await page.mouse.down();
 await page.mouse.move(canvasBox.x + 380, canvasBox.y + 240, { steps: 5 });
@@ -122,8 +122,8 @@ check(Math.hypot(nachZug.cx - vorher.cx, nachZug.cy - vorher.cy) > 10, 'Ansicht:
 await page.mouse.move(canvasBox.x + 400, canvasBox.y + 300);
 await page.mouse.wheel(0, 100);
 await page.waitForTimeout(50);
-const nachZoom = await ed((e) => e.ansicht.stufe);
-check(nachZoom === vorher.stufe + 1, 'Ansicht: Mausrad zoomt stufenweise');
+const nachZoom = await ed((e) => e.ansicht.bildschirme);
+check(Math.abs(nachZoom / vorher.bildschirme - 1.15) < 1e-6, 'Ansicht: eine Mausrad-Raste zoomt um 15 % heraus');
 check((await ed((e) => JSON.stringify(e.gebiet()))) === daten0, 'Ansicht: Zoomen, Verschieben und Drehen ändern keine Daten');
 
 // ------------------------------------------------------------------ Auswahl per Klick
@@ -151,7 +151,7 @@ check((await ed((e) => ({ a: e.state.auswahl, f: e.state.fahrt }))).f === null, 
 // ------------------------------------------------------------------ Bildschirmrahmen und Fahrt
 await ed((e) => {
   e.waehle({ art: 'gang', id: 'diagonale' });
-  e.ansicht.stufe = 2;
+  e.ansicht.bildschirme = 2.2;
   e.setzeFahrt(300);
 });
 await page.keyboard.press('KeyF');
@@ -230,6 +230,7 @@ await b((e) => {
   e.state.auswahl = null;
   e.state.fahrt = null;
   e.alles();
+  e.setzeZoom(8); // Platz um das Gebiet herum, damit Gänge im Leeren gezogen werden können (vorher ließ die Zoomstufe diesen Rand)
   e.zeichne();
 });
 const bBox = await bau.locator('#plan canvas').boundingBox();
@@ -443,6 +444,7 @@ await t2((e) => {
   e.state.auswahl = null;
   e.state.fahrt = null;
   e.alles();
+  e.setzeZoom(8); // wie bisher: Rand um das Gebiet (vorher ließ die Zoomstufe diesen Platz)
   e.zeichne();
 });
 const tBox = await teil.locator('#plan canvas').boundingBox();
@@ -632,7 +634,7 @@ await ed((e) => {
   e.setzeFahrt(300);
 });
 const datenVorSpiel = await ed((e) => JSON.stringify(e.gebiet()));
-const stateVorSpiel = await ed((e) => JSON.stringify({ a: e.state.auswahl, f: e.state.fahrt, g: e.state.gebietId, w: e.state.werkzeug, z: e.ansicht.cx + ',' + e.ansicht.cy + ',' + e.ansicht.stufe + ',' + e.ansicht.blick }));
+const stateVorSpiel = await ed((e) => JSON.stringify({ a: e.state.auswahl, f: e.state.fahrt, g: e.state.gebietId, w: e.state.werkzeug, z: e.ansicht.cx + ',' + e.ansicht.cy + ',' + e.ansicht.bildschirme + ',' + e.ansicht.blick }));
 check(await page.locator('#b-spielen').isEnabled(), 'Spielen: Knopf „Spielen ab hier“ ist mit gewähltem Gang bedienbar');
 await page.keyboard.press('KeyP');
 await page.waitForSelector('#spiel-canvas');
@@ -674,9 +676,9 @@ await page.waitForSelector('#spiel-canvas', { state: 'detached' });
 check(!(await ed((e) => e.state.spielen.aktiv)), 'Spielen: Esc führt zurück in den Editor');
 check((await ed((e) => JSON.stringify(e.gebiet()))) === datenVorSpiel, 'Spielen: Daten nach der Rückkehr unverändert');
 check(
-  (await ed((e) => JSON.stringify({ a: e.state.auswahl, f: e.state.fahrt, g: e.state.gebietId, w: e.state.werkzeug, z: e.ansicht.cx + ',' + e.ansicht.cy + ',' + e.ansicht.stufe + ',' + e.ansicht.blick }))) === stateVorSpiel,
+  (await ed((e) => JSON.stringify({ a: e.state.auswahl, f: e.state.fahrt, g: e.state.gebietId, w: e.state.werkzeug, z: e.ansicht.cx + ',' + e.ansicht.cy + ',' + e.ansicht.bildschirme + ',' + e.ansicht.blick }))) === stateVorSpiel,
   'Spielen: Auswahl, Rahmenstelle und Ansicht nach der Rückkehr unverändert',
-  stateVorSpiel + ' ≠ ' + (await ed((e) => JSON.stringify({ a: e.state.auswahl, f: e.state.fahrt, g: e.state.gebietId, w: e.state.werkzeug, z: e.ansicht.cx + ',' + e.ansicht.cy + ',' + e.ansicht.stufe + ',' + e.ansicht.blick }))),
+  stateVorSpiel + ' ≠ ' + (await ed((e) => JSON.stringify({ a: e.state.auswahl, f: e.state.fahrt, g: e.state.gebietId, w: e.state.werkzeug, z: e.ansicht.cx + ',' + e.ansicht.cy + ',' + e.ansicht.bildschirme + ',' + e.ansicht.blick }))),
 );
 await page.keyboard.press('KeyG');
 check((await ed((e) => e.state.werkzeug)) === 'gang', 'Spielen: nach der Rückkehr gelten die Editor-Tasten wieder');
@@ -685,12 +687,12 @@ await page.keyboard.press('KeyV');
 // Was der Prototyp nicht spielen kann, wird vorher gemeldet – nichts startet still falsch
 await ed((e) => {
   e.wechsle('beispiel');
-  e.waehle({ art: 'gang', id: 'schleuse' });
+  e.waehle({ art: 'gang', id: 'diagonale' });
   e.setzeFahrt(400);
 });
 await page.click('#b-spielen');
 const meldung = await page.locator('#melden').textContent();
-check(/Noch nicht spielbar/.test(meldung) && /Diagonale/.test(meldung), 'Spielen: Diagonale im Gebiet → Meldung „Noch nicht spielbar“ mit Grund', meldung);
+check(/Noch nicht spielbar/.test(meldung) && /Diagonale/.test(meldung), 'Spielen: der diagonale Gang selbst → Meldung „Noch nicht spielbar“ mit Grund', meldung);
 check((await page.locator('#spiel-canvas').count()) === 0, 'Spielen: bei nicht spielbarem Gebiet startet nichts');
 await ed((e) => e.melde(''));
 
@@ -745,7 +747,7 @@ check((await page.locator('#b-pruefer').getAttribute('class')).includes('muss') 
 await ed((e) => {
   e.waehle(null);
   e.ansicht.zentrieren(-450, -500);
-  e.ansicht.stufe = 2;
+  e.ansicht.bildschirme = 2.2;
   e.refresh();
 });
 const hashOhne = await ed((e) => e.hash());
@@ -1200,7 +1202,7 @@ check((await ta((e) => e.state.auswahl))?.id === tgn.id, 'Gegner setzen: der neu
 await ta((e) => {
   e.state.auswahl = null;
   e.state.beschriftung = false;
-  e.ansicht.stufe = 0;
+  e.ansicht.bildschirme = 0.5;
   e.ansicht.cx = 1220;
   e.ansicht.cy = 100;
   e.ansicht.blick = 0;

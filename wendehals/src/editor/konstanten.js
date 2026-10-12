@@ -28,9 +28,15 @@ export const FANG_PX = 12; // Fangradius für Knoten und Gänge beim Ziehen/Setz
 export const MAX_KOORD = 20000; // größte erlaubte Koordinate/Maßzahl (E)
 export const VERLAUF_MAX = 200; // Schritte, die Rückgängig zurückgehen kann
 
-/** Zoomstufen als „Bildschirme in der Breite des Plans“. Normalansicht ≈ 2,2 Bildschirme (Brief Abschnitt 1). */
-export const ZOOM_BILDSCHIRME = [0.5, 1, 2.2, 4, 8, 16, 32, 64, 128];
-export const ZOOM_START = 2;
+/** Zoom stufenlos, gemessen in „Bildschirmen in der Breite des Plans“. Normalansicht ≈ 2,2 Bildschirme (Brief Abschnitt 1). */
+export const ZOOM_MIN = 0.25;
+export const ZOOM_MAX = 160;
+export const ZOOM_START = 2.2;
+export const ZOOM_RAD_FAKTOR = 1.15; // eine Mausrad-Raste (deltaY 100) ändert den Maßstab um diesen Faktor (A2: ca. 15 %)
+export const ZOOM_RAD_MAX = 400; // größte Wirkung eines einzelnen Radereignisses (deltaY), schützt vor Sprüngen
+export const ZOOM_TASTE_FAKTOR = 1.25; // Tasten + und − (und die Knöpfe)
+export const ZOOM_FESTWERTE = { eins: 1, normal: 2.2 }; // Tasten 1 und 2
+export const EINPASS_RAND = 1.05; // „Alles“ lässt rundum 5 % Rand
 
 /** Tastenkürzel (KeyboardEvent.code). */
 export const KUERZEL = {
@@ -40,6 +46,8 @@ export const KUERZEL = {
   wieImSpiel: 'KeyF',
   zoomPlus: ['Equal', 'NumpadAdd'],
   zoomMinus: ['Minus', 'NumpadSubtract'],
+  zoomEins: 'Digit1', // 1 Bildschirm (so groß wie im Spiel)
+  zoomNormal: 'Digit2', // Normalansicht 2,2 Bildschirme
   beschriftung: 'KeyL',
   alles: 'Home',
   werkzeug: { auswahl: 'KeyV', gang: 'KeyG', knoten: 'KeyK', formteil: 'KeyB', wand: 'KeyW', hindernis: 'KeyH', gegner: 'KeyX', bereich: 'KeyA' },

@@ -1,8 +1,19 @@
-// Kamera des Plans: Mitte (cx, cy) in E, Zoomstufe, Drehung in 45°-Schritten. Reine Rechnung, ändert nie Daten.
+// Kamera des Plans: Mitte (cx, cy) in E, Zoom (stufenlos, in Bildschirmen Breite), Drehung in 45°-Schritten. Reine Rechnung, ändert nie Daten.
 // Drehung `blick` ist eine Richtung aus math.js: der Plan wird so gedreht, dass diese Richtung auf dem Bildschirm nach rechts zeigt
 // (E = Norden oben; ein Gang in Richtung h erscheint „wie im Spiel“, wenn blick = h).
 import { E, turnBy, headingAngle } from '../core/math.js';
-import { SCREEN_W, ZOOM_BILDSCHIRME, ZOOM_START } from './konstanten.js';
+import { SCREEN_W, ZOOM_MIN, ZOOM_MAX, ZOOM_START, ZOOM_RAD_FAKTOR, ZOOM_RAD_MAX, EINPASS_RAND } from './konstanten.js';
+
+const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+/**
+ * Zoomfaktor (> 1 = hineinzoomen) für ein Mausrad-/Touchpad-Ereignis: ZOOM_RAD_FAKTOR je 100 Einheiten deltaY, anteilig für kleine
+ * Schritte. `deltaMode` wie bei WheelEvent (0 Pixel, 1 Zeilen, 2 Seiten); Strg (Touchpad-Kneifen) wirkt stärker.
+ */
+export function radFaktor(deltaY, deltaMode = 0, strg = false) {
+  const px = deltaY * (deltaMode === 1 ? 40 : deltaMode === 2 ? 800 : 1) * (strg ? 4 : 1);
+  return Math.pow(ZOOM_RAD_FAKTOR, -klemme(px, -ZOOM_RAD_MAX, ZOOM_RAD_MAX) / 100);
+}
 
 export class Ansicht {
   constructor(w = 1280, h = 720) {
@@ -10,13 +21,13 @@ export class Ansicht {
     this.h = h;
     this.cx = 0;
     this.cy = 0;
-    this.stufe = ZOOM_START;
+    this.bildschirme = ZOOM_START; // so viele Bildschirme (480 E) passen in die Breite des Plans
     this.blick = E;
   }
 
   /** Bildschirmpixel je E. */
   get masstab() {
-    return this.w / (ZOOM_BILDSCHIRME[this.stufe] * SCREEN_W);
+    return this.w / (this.bildschirme * SCREEN_W);
   }
 
   get winkel() {
@@ -74,15 +85,20 @@ export class Ansicht {
     this.blick = h;
   }
 
-  /** Zoomstufe ändern, der Weltpunkt unter (px, py) bleibt an seiner Stelle. */
-  zoomen(schritte, px = this.w / 2, py = this.h / 2) {
-    const neu = Math.max(0, Math.min(ZOOM_BILDSCHIRME.length - 1, this.stufe + schritte));
-    if (neu === this.stufe) return;
+  /** Zoom auf `b` Bildschirme Breite setzen (begrenzt), der Weltpunkt unter (px, py) bleibt an seiner Stelle. */
+  setzeBildschirme(b, px = this.w / 2, py = this.h / 2) {
+    const neu = klemme(b, ZOOM_MIN, ZOOM_MAX);
+    if (neu === this.bildschirme) return;
     const [wx, wy] = this.bildZuWelt(px, py);
-    this.stufe = neu;
+    this.bildschirme = neu;
     const [vx, vy] = this.bildZuWelt(px, py);
     this.cx += wx - vx;
     this.cy += wy - vy;
+  }
+
+  /** Um `faktor` vergrößern (> 1) oder verkleinern (< 1), um den Punkt (px, py) herum. */
+  zoomen(faktor, px = this.w / 2, py = this.h / 2) {
+    this.setzeBildschirme(this.bildschirme / faktor, px, py);
   }
 
   /** Plan um (dpx, dpy) Bildschirmpixel mitziehen (Inhalt folgt der Maus). */
@@ -98,7 +114,7 @@ export class Ansicht {
     this.cy = y;
   }
 
-  /** Passt ein Weltrechteck ein (die stärkste Zoomstufe, in der es noch ganz sichtbar ist). */
+  /** Passt ein Weltrechteck ein: stufenlos, mit EINPASS_RAND Rand (die Ausdehnung zählt im gedrehten Bild). */
   einpassen(r) {
     this.zentrieren((r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2);
     // Ausdehnung des Rechtecks im gedrehten Bild (die Ecken drehen mit)
@@ -110,14 +126,8 @@ export class Ansicht {
     });
     const breite = Math.max(Math.max(...ecken.map((p) => p[0])) - Math.min(...ecken.map((p) => p[0])), 1);
     const hoehe = Math.max(Math.max(...ecken.map((p) => p[1])) - Math.min(...ecken.map((p) => p[1])), 1);
-    this.stufe = ZOOM_BILDSCHIRME.length - 1;
-    for (let i = 0; i < ZOOM_BILDSCHIRME.length; i++) {
-      const sichtBreite = ZOOM_BILDSCHIRME[i] * SCREEN_W;
-      const sichtHoehe = (sichtBreite * this.h) / this.w;
-      if (sichtBreite >= breite * 1.05 && sichtHoehe >= hoehe * 1.05) {
-        this.stufe = i;
-        break;
-      }
-    }
+    const nachBreite = (breite * EINPASS_RAND) / SCREEN_W;
+    const nachHoehe = (hoehe * EINPASS_RAND * this.w) / (this.h * SCREEN_W);
+    this.bildschirme = klemme(Math.max(nachBreite, nachHoehe), ZOOM_MIN, ZOOM_MAX);
   }
 }
