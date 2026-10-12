@@ -36,7 +36,7 @@ function createWindow() {
   win.setMenuBarVisibility(false);
   // Standard: Prototyp (P1). WENDEHALS_SPIEL=1 öffnet das alte v0.2-Spiel (für e2e/electron.mjs).
   // WENDEHALS_EDITOR=1 startet den Level-Editor (Paket 13, `npm run editor`).
-  const query = process.env.WENDEHALS_EDITOR ? { editor: '1' } : process.env.WENDEHALS_SPIEL ? { spiel: '1' } : undefined;
+  const query = process.env.WENDEHALS_EDITOR ? { editor: '1' } : process.env.WENDEHALS_TESTMENUE ? { testmenue: '1' } : process.env.WENDEHALS_SPIEL ? { spiel: '1' } : undefined;
   win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), query ? { query } : undefined);
   // Externe Links/Navigation verhindern – das Spiel braucht kein Internet.
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));

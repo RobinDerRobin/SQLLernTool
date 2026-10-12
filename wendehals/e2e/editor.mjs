@@ -1269,6 +1269,45 @@ check(tms < 16, `Leistung: 300 Objekte inkl. 100 Gegner in Spielgrafik, Zeichnen
 check(tFehler.length === 0, 'Stufe 6: keine Konsolenfehler', tFehler.join('; '));
 await tp.close();
 
+// ------------------------------------------------------------------ Stufe 7: Testmenü (Deck: nur Tasten/Controller)
+const tm = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+const tmFehler = [];
+tm.on('pageerror', (e) => tmFehler.push(e.message));
+tm.on('console', (m) => m.type() === 'error' && tmFehler.push(m.text()));
+await tm.goto(url + '?testmenue');
+await tm.waitForFunction(() => window.__testmenue);
+const tmListe = await tm.evaluate(() => window.__testmenue.liste.map((e) => ({ titel: e.titel, grund: e.grund, gebiet: e.gebiet, art: e.art })));
+check(tmListe.length > 0 && tmListe.some((e) => e.art === 'gang') && tmListe.some((e) => e.art === 'knoten'), `Testmenü: ${tmListe.length} Einträge (Level und Knoten) aus den Leveldateien`);
+const ersteSpielbar = tmListe.findIndex((e) => !e.grund);
+const ersteGesperrt = tmListe.findIndex((e) => e.grund);
+// Auswahl nur mit Pfeil runter (Controller-Stick löst im Input dieselbe Aktion aus)
+for (let i = 0; i < ersteSpielbar; i++) {
+  await tm.keyboard.press('ArrowDown');
+  await tm.waitForTimeout(50); // ein Druck pro Bildschirmfenster (Input fasst Drücke innerhalb eines Frames zusammen)
+}
+await tm.waitForTimeout(100);
+check((await tm.evaluate(() => window.__testmenue.st.wahl)) === ersteSpielbar, 'Testmenü: Pfeil runter wählt den Eintrag');
+await tm.keyboard.press('Enter');
+await tm.waitForSelector('#spiel-canvas', { timeout: 3000 });
+await tm.waitForTimeout(400);
+const leer = await tm.evaluate(() => {
+  const c = document.getElementById('spiel-canvas');
+  const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  let n = 0;
+  for (let i = 0; i < d.length; i += 4 * 97) if (d[i] + d[i + 1] + d[i + 2] > 30) n++;
+  return n;
+});
+check(leer > 50, `Testmenü: Enter startet den Fenster-Prototyp, Spielbild nicht leer (${leer} helle Proben)`);
+await tm.keyboard.press('Escape');
+await tm.waitForTimeout(200);
+check(await tm.evaluate(() => !document.getElementById('spiel') && !!document.getElementById('testmenue')), 'Testmenü: Esc führt zurück ins Menü');
+if (ersteGesperrt >= 0) {
+  await tm.evaluate((i) => { window.__testmenue.st.wahl = i; window.__testmenue.starte(); }, ersteGesperrt);
+  check(await tm.evaluate(() => !document.getElementById('spiel') && /noch nicht spielbar/.test(document.getElementById('testmenue-meldung').textContent)), 'Testmenü: nicht spielbarer Eintrag meldet „noch nicht spielbar“ statt zu starten');
+}
+check(tmFehler.length === 0, 'Testmenü: keine Konsolenfehler', tmFehler.join('; '));
+await tm.close();
+
 // ------------------------------------------------------------------ Spiel und Prototyp unberührt
 const page2 = await browser.newPage({ viewport: { width: 960, height: 540 } });
 const fehler2 = [];
