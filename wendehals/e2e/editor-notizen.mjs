@@ -105,6 +105,16 @@ await page.keyboard.press('Control+KeyZ');
 await page.keyboard.press('Control+KeyZ');
 check((await datenText()) === daten0, 'alles rückgängig = Ausgangszustand');
 
+// ------------------------------------------------------------------ Rechtsklick-Kopie einer Notiz: Cursor im Textfeld der Kopie
+{
+  await page.click('#t-notiz');
+  await klick([800, 400], RECHTS);
+  await page.keyboard.press('Enter');
+  await klick([1100, 450], RECHTS); // jetzt ist die Notiz gewählt: Rechtsklick kopiert sie
+  check((await page.evaluate(() => document.activeElement?.id)) === 'f-text', 'Rechtsklick-Kopie einer Notiz: der Cursor steht im Textfeld der Kopie (Tippen löst keine Kürzel aus)');
+  await ed((e) => { while (e.verlaufVon(e.state.gebietId).kannZurueck) e.rueckgaengig(); e.setzeWerkzeug('auswahl'); e.waehle(null); });
+}
+
 // ------------------------------------------------------------------ Notiz auf einem Gang verdeckt ihn nicht beim Doppelklick
 {
   await ed((e) => { e.setzeWerkzeug('auswahl'); e.waehle(null); });

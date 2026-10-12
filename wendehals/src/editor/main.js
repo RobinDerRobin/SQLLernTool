@@ -129,6 +129,7 @@ export function startEditor() {
     stempelGespeichert: formatiereStempel(STEMPEL), // zuletzt gespeicherter/geladener Text von stempel.json
     stempelId: null, // der Stempel, den das Stempel-Werkzeug setzt
     stempelName: '', // Name für den nächsten Stempel (Eingabefeld rechts)
+    stempelKaputt: false, // stempel.json war beim Laden ungültig: nicht überschreiben
     notizFokus: null, // ID einer eben gesetzten Notiz: der Cursor springt in ihr Textfeld
   };
   const ansicht = new Ansicht();
@@ -673,7 +674,10 @@ export function startEditor() {
       if (r.fehler) throw new Error(r.fehler);
       return r.dinge;
     });
-    if (neu) setzeAuswahl(neu);
+    if (neu) {
+      if (neu.length === 1 && neu[0].art === 'notiz') state.notizFokus = neu[0].id; // eine kopierte Notiz: gleich Text eingeben können, ohne dass Tasten als Kürzel wirken
+      setzeAuswahl(neu);
+    }
   }
   function fuegeEin() {
     if (state.ansichtArt === 'welt') return; // Gebiet-Befehle gelten nur in der Gebiet-Ansicht
@@ -772,7 +776,8 @@ export function startEditor() {
           wo += ` und ${wr.wo}`;
         }
       }
-      if (stempelUngespeichert()) {
+      if (state.stempelKaputt && stempelUngespeichert()) wo += ' (stempel.json nicht überschrieben: die Datei auf der Platte war ungültig – erst reparieren)';
+      else if (stempelUngespeichert()) {
         const stText = formatiereStempel(state.stempel);
         const sr = await state.speicher.sichere(STEMPEL_DATEI, stText);
         if (sr) {
@@ -843,7 +848,9 @@ export function startEditor() {
         state.stempel = ladeStempel(alle.stempel);
         state.stempelGespeichert = formatiereStempel(state.stempel);
         state.stempelId = null;
+        state.stempelKaputt = false;
       } catch (e) {
+        state.stempelKaputt = true; // die Datei auf der Platte bleibt unangetastet, bis sie repariert ist
         probleme.push(`${STEMPEL_DATEI}: ${e.message}`);
       }
     }
@@ -1643,7 +1650,7 @@ export function startEditor() {
     } else if (e.button === MAUS.setzen) {
       const w = rechtsWerkzeug();
       if (!w) {
-        if (state.ansichtArt !== 'welt') melde('Rechtsklick setzt das aktuelle Element – erst eines wählen (Leiste oder Palette: Gang, Knoten, Formteil, Wand, Hindernis, Gegner, Bereich).');
+        if (state.ansichtArt !== 'welt') melde('Rechtsklick setzt das aktuelle Element – erst eines wählen (Leiste oder Palette: Gang, Knoten, Formteil, Wand, Hindernis, Gegner, Notiz, Stempel, Bereich).');
         return;
       }
       if (gesperrtFuer(w.id)) return;

@@ -1,7 +1,8 @@
 // Stempel (Stufe 8): Stücke eines Gebiets (Knoten, Gänge, Teile, Notizen) als benannte Vorlage speichern und per Rechtsklick wieder
 // einsetzen. Reine Daten, kein DOM (läuft auch unter Node). Eine Vorlage hat dieselbe Form wie die Zwischenablage aus mehrfach.js
 // (`merkeDinge`): { knoten, gaenge, teile: [{ art, teil }], bezug: { x, y } }. Die Datei levels/stempel.json ist zugleich Material für die KI.
-import { FORMAT, STEMPEL_MAX, MAX_KOORD } from './konstanten.js';
+import { FORMAT, STEMPEL_MAX, MAX_KOORD, NOTIZ_MAX } from './konstanten.js';
+import { OBJEKTTYPEN, GEGNER } from './katalog.js';
 
 export const STEMPEL_ARTEN = ['formteil', 'objekt', 'notiz'];
 const kopie = (o) => JSON.parse(JSON.stringify(o));
@@ -41,7 +42,12 @@ export function pruefeStempel(d) {
     for (const g of s.gaenge) if (!g || !kids.has(g.von) || !kids.has(g.nach)) f.push(`${wo}: ein Gang verweist auf einen Knoten, der nicht im Stempel liegt.`);
     for (const t of s.teile) {
       if (!t || !STEMPEL_ARTEN.includes(t.art) || !t.teil || !zahl(t.teil.x) || !zahl(t.teil.y)) f.push(`${wo}: ein Teil ist unvollständig oder hat eine unbekannte Art.`);
-      else if (t.art === 'notiz' && typeof t.teil.text !== 'string') f.push(`${wo}: eine Notiz hat keinen Text.`);
+      else if (t.art === 'notiz') {
+        if (typeof t.teil.text !== 'string') f.push(`${wo}: eine Notiz hat keinen Text.`);
+        else if (t.teil.text.length > NOTIZ_MAX) f.push(`${wo}: eine Notiz ist länger als ${NOTIZ_MAX} Zeichen.`);
+      } else if (t.art === 'objekt' && !OBJEKTTYPEN[t.teil.typ]) f.push(`${wo}: unbekannter Objekttyp „${t.teil.typ}“.`);
+      else if (t.art === 'objekt' && t.teil.typ === 'gegner' && !GEGNER.includes(t.teil.art)) f.push(`${wo}: unbekannte Gegnerart „${t.teil.art}“.`);
+      else if ((t.art === 'formteil' || OBJEKTTYPEN[t.teil.typ]?.hatMasse) && !(zahl(t.teil.laenge) && zahl(t.teil.breite) && zahl(t.teil.winkel) && t.teil.laenge > 0 && t.teil.breite > 0)) f.push(`${wo}: einem Teil fehlen Länge, Breite oder Winkel.`);
     }
   }
   return f;

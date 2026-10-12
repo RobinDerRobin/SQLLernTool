@@ -196,3 +196,12 @@ test('Gebiet mit Notizen wird verlustfrei gespeichert und geladen', () => {
   const text = formatiere(g);
   assert.equal(formatiere(ladeGebiet(text)), text);
 });
+
+test('Stempel laden: Teile ohne Maße, unbekannte Typen und überlange Notizen werden abgelehnt', () => {
+  const d = leereStempel();
+  stempelAnlegen(d, auswahlStueck(beispiel()), 'A');
+  const f = (aendere) => { const k = kopie(d); aendere(k.stempel[0]); return pruefeStempel(k).join('\n'); };
+  assert.match(f((s) => delete s.teile.find((t) => t.art === 'formteil').teil.laenge), /Länge, Breite/);
+  assert.match(f((s) => (s.teile.find((t) => t.art === 'objekt').teil.typ = 'bogus')), /unbekannter Objekttyp/);
+  assert.match(f((s) => (s.teile.find((t) => t.art === 'notiz').teil.text = 'x'.repeat(NOTIZ_MAX + 1))), /länger als/);
+});

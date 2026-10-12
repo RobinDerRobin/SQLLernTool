@@ -2,7 +2,7 @@
 
 > Wird von jedem Bau-Lauf gepflegt (Brief: [`BRIEF.md`](BRIEF.md), Abschnitt 7). Zeiten in Europe/Berlin.
 
-**Sperre:** belegt seit 13.10.2026 01:12, Lauf https://claude.ai/code/session_01JfU4ZiVqTAbzKAHCUtsUhE (Stufe 8)
+**Sperre:** frei
 
 ## Stufen
 
@@ -117,6 +117,15 @@ umsetzen** (höchste Priorität), danach weiter mit den Stufen. **Fehler zuerst 
 - Stempel = benannte Zwischenablage (`merkeDinge`), Datei `levels/stempel.json`, wird mit Strg+S (Gebiets-Speichern) mitgeschrieben; Welt-Ansicht-Speichern schreibt sie nicht. Stempel wählen → Rechtsklick setzt (A7 bleibt: bei Auswahl kopiert Rechtsklick die Auswahl; Stempel wählen hebt sie auf). Electron: Pfad `stempel.json` zusätzlich erlaubt.
 - Das Notiz-Bild liegt im Abschnitt „Notiz“ über der Stempelliste, nicht in der Palette (die Palette-Tests zählen 3 Teile + 11 Gegner).
 
+## Offen aus Stufe 8 (Agenten-Prüfung, Hinweise)
+
+- Stempel anlegen/löschen/umbenennen sind nicht mit Strg+Z rückgängig (Datei bleibt bis Strg+S unverändert; Auf Vorbehalt, ob A5 das umfasst – Frage an Robin unten). Ist `stempel.json` beim Laden ungültig, wird sie nicht überschrieben. Stempel wird nur mit einem gültigen Gebiet gespeichert; in der Welt-Ansicht schreibt Strg+S ihn nicht und die „ungespeichert“-Anzeige ignoriert ihn.
+- Stempel-Liste liegt tief im rechten Feld (bei 720 px scrollen); keine Meldung beim Umbenennen/Löschen/Setzen; Listeneintrag abgeschnitten; Notiztexte überdecken Beschriftungen; Prüfer-Zahl steigt mit gesetzten Stempeln (SOLL S2 Gegner); M/U in der Welt-Ansicht wechseln still zurück ins Gebiet; Notiz-Länge wird nur in `setzeTeil` erzwungen, nicht beim Laden von Gebieten.
+
+## Fragen an Robin (Stufe 8)
+
+- Sollen Stempel (anlegen, löschen, umbenennen) mit Strg+Z rückgängig zu machen sein? (Bisher nein: sie sind eine eigene Datei, ✕ löscht bis Strg+S nur im Editor.)
+
 ## Laufprotokoll
 
 | Start | Lauf | Ergebnis |
@@ -131,7 +140,7 @@ umsetzen** (höchste Priorität), danach weiter mit den Stufen. **Fehler zuerst 
 | 12.10.2026 07:06 | Sonnet 5.5, Lauf 7 | Stufe 6 gebaut, Agenten-Befund (Leisten abgeschnitten) behoben, gepusht |
 | 12.10.2026 07:42 | Lauf 8 (Sonnet 5.5) | Stufe 7 fertig, grün |
 | 12.10.2026 18:34 | Lauf 9 (Sonnet 5.5, Bau-Session 7b) | Stufe 7b gebaut (A0–A8), Agenten-Befunde behoben, gepusht |
-| 13.10.2026 01:12 | Lauf 10 (Sonnet 5.5) | Stufe 8 gebaut (Notizen, Stempel), Prüfkette grün, Agenten-Befunde siehe unten |
+| 13.10.2026 01:12 | Lauf 10 (Sonnet 5.5) | Stufe 8 gebaut (Notizen, Stempel), Prüfkette grün, Agenten-Befunde (Fehler) behoben, gepusht |
 
 ## Auf Vorbehalt entschieden (Stufe 7b)
 
