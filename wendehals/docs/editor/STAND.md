@@ -2,7 +2,7 @@
 
 > Wird von jedem Bau-Lauf gepflegt (Brief: [`BRIEF.md`](BRIEF.md), Abschnitt 7). Zeiten in Europe/Berlin.
 
-**Sperre:** belegt seit 12.10.2026 05:57, Lauf https://claude.ai/code/session_01VALaerjD3GJzFh6qRqmCLJ
+**Sperre:** frei
 
 ## Stufen
 
@@ -12,7 +12,7 @@
 | 2a | Bauen I | fertig (Electron-Speichern ungetestet; Raumgröße nur per Zahlenfeld, kein Ziehgriff) | npm test 340, e2e, e2e:editor, beide Test-Agenten | Lauf 2 |
 | 2b | Bauen II | fertig (Electron ungetestet; Teile ohne Spielgrafik, Hindernis = Platzhalterbild) | npm test 357, e2e, e2e:editor, beide Test-Agenten | Lauf 3 |
 | 3 | Spielen ab hier + Bezeichnung | fertig (nur Ost/West/Nord/Süd-Gänge spielbar; Electron ungetestet) | npm test 369, e2e, e2e:editor, beide Test-Agenten | Lauf 4 |
-| 4 | Prüfer | offen | – | – |
+| 4 | Prüfer | fertig (Electron ungetestet; Marken nur bei offener Liste) | npm test 384, e2e, e2e:editor, beide Test-Agenten | Lauf 5 |
 | 5 | Gebiete und Übergänge | offen | – | – |
 | 6 | Tilesets und Spielgrafik | offen | – | – |
 | 7 | Testmenü am Deck | offen | – | – |
@@ -50,6 +50,14 @@
 - Nicht spielbar (Meldung vorher, nichts startet): Diagonal-Gänge, Achteck-Knoten, Teile mit Winkel ≠ 0°/90°, Gänge die sich ohne gemeinsamen Knoten kreuzen, getrennte Gangteile. Gegner = nur Hinweis. Daher ist „Beispiel“ (hat eine Diagonale) und „proto-achteck“ nicht spielbar, „proto-netz“ ja.
 - Knochen (Spielziel des Prototyps) liegen an Gangenden und in Räumen; Taste P beendet auch im Spiel (ist dort „Pause“). Tasten: P spielen, N Bezeichnung.
 
+## Auf Vorbehalt entschieden (Stufe 4)
+
+- Prüfer-Knopf unten zeigt die Zählung (rot/gelb/grün); Liste und Marken im Plan erscheinen erst nach Klick (damit Pixeltests der Spielbilder unberührt bleiben). M7 = `spielbarkeit().probleme`. M4 prüft Mittelpunkt + 4 um 2 E eingezogene Ecken; M3 misst ab Knotenmitte, nur Knoten vom Typ `kreuzung`. M2 tastet alle 20 E längs und 10 E quer ab.
+
+## Offen aus Stufe 4 (Agenten-Prüfung, Hinweise)
+
+- Layout bei 1024×600: Werkzeugleiste schneidet „Speichern/Öffnen“ ab (nicht neu, Stufe 2a/2b). Liste (440 px) verdeckt Plan und fängt Klicks; Schließen nur über den Knopf. Rahmen bleibt nach Objektwahl am früheren Gang. `teilSetzen` rundet bei Klick exakt auf Zellenmitte falsch (20×60). M7/M5-„kein Speicherort“/M6 ohne Ort (Klick springt nicht). M2 übersieht Wände < 20 E Dicke und rundet bis 10 E großzügig; M4 übersieht schmale Wand über Lücke; Gegner auf der Gangkante asymmetrisch; Zahlen der Marken in zeichnen.js. M2 braucht bei 300 Objekten/10 Gängen ca. 180 ms je Änderung.
+
 ## Offen aus Stufe 3 (Agenten-Prüfung, Hinweise)
 
 - Knochen-Lage wird nicht auf Erreichbarkeit geprüft (Wand/Hindernis auf dem Knochen); Rahmenstelle <120 E: Dackel wird auf Boden gesetzt, ohne Meldung; Konstanten (KNOCHEN_ABSTAND, PROBEN, SCHRITT) noch nicht in konstanten.js; Kreisprobe 16 Randpunkte (≈2 % Ungenauigkeit an Innenecken); Wand wirkt im Spiel wie ein Loch in Hintergrundfarbe; Rahmen zeigt den Dackel erst bei großem Zoom; M7 noch nicht als Regel in regeln.js (Stufe 4 ruft `spielbarkeit()` auf); untere Leiste bricht bei Meldung um; keine Bezeichnung für Wand/Formteil; SpielModus ohne Node-Test.
@@ -79,3 +87,4 @@
 | 12.10.2026 01:08 | Sonnet 5.5, Lauf 2 | Stufe 2a gebaut, Agenten-Befunde behoben, gepusht |
 | 12.10.2026 03:10 | Sonnet 5.5, Lauf 3 | Stufe 2b gebaut, Agenten-Befunde (Fehler) behoben, gepusht |
 | 12.10.2026 05:12 | Sonnet 5.5, Lauf 4 | Stufe 3 gebaut, Agenten-Befunde (Fehler) behoben, gepusht |
+| 12.10.2026 05:57 | Sonnet 5.5, Lauf 5 | Stufe 4 gebaut, Agenten-Befund (Leistung M2) behoben, gepusht |
