@@ -214,7 +214,7 @@ await ed((e) => e.tick(100));
 check((await ed((e) => ({ s: e.state.fahrt.s, l: e.state.fahrt.laeuft }))).l === false, 'Fahrt: hält am Gangende an');
 
 // ------------------------------------------------------------------ Bauen (Stufe 2a): mit der Maus, auf einer frischen Seite
-const bau = await browser.newPage({ viewport: { width: 1280, height: 860 }, acceptDownloads: true }); // höher als das Deck, damit der ganze Plan (bis y = 1500) im Bild liegt
+const bau = await browser.newPage({ viewport: { width: 1280, height: 920 }, acceptDownloads: true }); // höher als das Deck, damit der ganze Plan (bis y = 1500) im Bild liegt
 const bauFehler = [];
 bau.on('pageerror', (e) => bauFehler.push('pageerror: ' + e.message));
 bau.on('console', (m) => {
@@ -425,6 +425,203 @@ check(JSON.stringify(await gebietNow()) === JSON.stringify(g0), 'Rückgängig bi
 await bau.screenshot({ path: path.join(shots, 'editor-05-nach-rueckgaengig.png') });
 check(bauFehler.length === 0, 'Bauen: keine Konsolenfehler', bauFehler.join('; '));
 await bau.close();
+
+// ------------------------------------------------------------------ Bauen II (Stufe 2b): Formteil, Wand, Hindernis, Drehen, Kopieren, Löschen
+const teil = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+const teilFehler = [];
+teil.on('pageerror', (e) => teilFehler.push('pageerror: ' + e.message));
+teil.on('console', (m) => {
+  if (m.type() === 'error') teilFehler.push('console: ' + m.text());
+});
+await teil.goto(url + '?editor');
+await teil.waitForFunction(() => window.__editor);
+const t2 = (fn, arg) => teil.evaluate(`(${fn.toString()})(window.__editor, ${JSON.stringify(arg ?? null)})`);
+await t2((e) => {
+  e.state.echtzeit = false;
+  e.state.beschriftung = false;
+  e.wechsle('beispiel');
+  e.state.auswahl = null;
+  e.state.fahrt = null;
+  e.alles();
+  e.zeichne();
+});
+const tBox = await teil.locator('#plan canvas').boundingBox();
+const tBild = async ([x, y]) => {
+  const [px, py] = await t2((e, p) => e.ansicht.weltZuBild(p[0], p[1]), [x, y]);
+  return [tBox.x + px, tBox.y + py];
+};
+async function tZieh(von, nach) {
+  const [x0, y0] = await tBild(von);
+  const [x1, y1] = await tBild(nach);
+  await teil.mouse.move(x0, y0);
+  await teil.mouse.down();
+  await teil.mouse.move((x0 + x1) / 2, (y0 + y1) / 2, { steps: 4 });
+  await teil.mouse.move(x1, y1, { steps: 4 });
+  await teil.mouse.up();
+}
+async function tKlick(punkt) {
+  const [x, y] = await tBild(punkt);
+  await teil.mouse.click(x, y);
+}
+const tDaten = () => t2((e) => e.gebiet());
+const tPixel = ([x, y]) =>
+  t2((e, q) => {
+    const fahrt = e.state.fahrt;
+    e.state.fahrt = null;
+    e.state.auswahl = null; // der blaue Auswahlrand soll das Pixel nicht färben
+    e.zeichne();
+    const [px, py] = e.ansicht.weltZuBild(q[0], q[1]);
+    const p = e.pixel(px, py);
+    e.state.fahrt = fahrt;
+    return p;
+  }, [x, y]);
+// Pixel messen, ohne die Auswahl zu verlieren
+const tPixelMitAuswahl = async (q) => {
+  const au = await t2((e) => e.state.auswahl);
+  const p = await tPixel(q);
+  await t2((e, a) => {
+    e.state.auswahl = a;
+    e.zeichne();
+  }, au);
+  return p;
+};
+const tBoden = async (q) => {
+  const p = await tPixelMitAuswahl(q);
+  return gleich(p, hex(FLOOR)) || gleich(p, hex(FLOOR2));
+};
+const tWand = async (q) => gleich(await tPixelMitAuswahl(q), hex(WALL));
+const T0 = JSON.stringify(await tDaten());
+
+// Werkzeugliste: Knöpfe und Kürzel
+for (const [id, kuerzel] of [['formteil', 'KeyB'], ['wand', 'KeyW'], ['hindernis', 'KeyH']]) {
+  check((await teil.locator('#t-' + id).count()) === 1, `Werkzeug „${id}“ hat einen Knopf`);
+  await teil.keyboard.press(kuerzel);
+  check((await t2((e) => e.state.werkzeug)) === id, `Werkzeug: Taste ${kuerzel.replace('Key', '')} schaltet auf ${id}`);
+}
+
+// Formteil ziehen: Boden 120 E breit im leeren Gebiet
+await teil.keyboard.press('KeyB');
+check(!(await tBoden([410, 710])), 'Formteil: vorher dort kein Boden'); // Messpunkte abseits der Schachbrettlinien (Vielfache von 80 E)
+await tZieh([203, 703], [607, 690]);
+let d1 = await tDaten();
+const f = d1.formteile[d1.formteile.length - 1];
+check(d1.formteile.length === 2 && f.id === 'f2' && f.winkel === 0 && f.laenge === 400 && f.x === 400 && f.y === 700 && f.breite === 120, 'Formteil ziehen: 400 E lang, Mitte (400, 700), Winkel 0, Breite 120', JSON.stringify(f));
+check((await tBoden([410, 710])) && (await tBoden([410, 750])) && (await tWand([410, 790])), 'Formteil ziehen: im Bild Boden (Mitte, 40 E daneben), 80 E daneben Wand');
+check((await t2((e) => e.state.auswahl))?.id === 'f2', 'Formteil ziehen: das neue Formteil ist gewählt');
+check((await teil.locator('#f-laenge').inputValue()) === '400', 'Formteil: Eigenschaftenfeld zeigt Länge 400');
+
+// Wand quer über den Gang Schleuse (Boden → Wand)
+await teil.keyboard.press('KeyW');
+check(await tBoden([310, 10]), 'Wand: vorher ist dort Gangboden');
+await tZieh([300, -80], [300, 80]);
+d1 = await tDaten();
+const w = d1.objekte[d1.objekte.length - 1];
+check(w.typ === 'wand' && w.winkel === 90 && w.laenge === 160 && w.x === 300 && w.y === 0, 'Wand ziehen: nach Süden gezogen = 160 E lang, Winkel 90, Mitte (300, 0)', JSON.stringify(w));
+check((await tWand([310, 10])) && (await tWand([310, 70])) && (await tBoden([360, 10])), 'Wand ziehen: im Bild Wand in der Mitte und 70 E südlich, 30 E östlich neben der Wand weiter Boden');
+await teil.screenshot({ path: path.join(shots, 'editor-06-teile-gesetzt.png') });
+
+// Hindernis per Klick: Standardgröße, Platzhalterbild
+await teil.keyboard.press('KeyH');
+await tKlick([700, -300]);
+d1 = await tDaten();
+const h = d1.objekte[d1.objekte.length - 1];
+check(h.typ === 'hindernis' && h.x === 700 && h.y === -300 && h.laenge === 60 && h.breite === 60, 'Hindernis setzen: Klick = 60 × 60 E im Raster', JSON.stringify(h));
+const hp = await tPixelMitAuswahl([680, -290]); // abseits der Diagonalen des Platzhalterbildes
+check(hp[0] > 150 && hp[2] < 90, 'Hindernis setzen: im Bild die Platzhalterfarbe (orange)', JSON.stringify(hp));
+
+// Auswahl-Werkzeug: Teil wählen, verschieben, Eigenschaften
+await teil.keyboard.press('KeyV');
+await tKlick([300, 20]);
+check(JSON.stringify(await t2((e) => e.state.auswahl)) === JSON.stringify({ art: 'objekt', id: w.id }), 'Auswahl: Klick auf die Wand wählt sie');
+check((await teil.locator('#f-winkel').inputValue()) === '90', 'Auswahl: Eigenschaftenfeld zeigt Winkel 90');
+await tZieh([300, 20], [500, 20]);
+let wn = (await tDaten()).objekte.find((o) => o.id === w.id);
+check(wn.x === 500 && wn.y === 0, 'Teil ziehen: die Wand wandert um +200 nach Osten und rastet (Mitte 500, 0)', JSON.stringify(wn));
+check((await tBoden([310, 10])) && (await tWand([510, 10])), 'Teil ziehen: im Bild ist der Gang bei x=300 wieder frei, die Wand steht bei x=500');
+await teil.keyboard.press('Control+KeyZ');
+wn = (await tDaten()).objekte.find((o) => o.id === w.id);
+check(wn.x === 300 && (await tWand([310, 10])), 'Teil ziehen: Rückgängig stellt die Lage her (auch im Bild)');
+
+// Drehen mit R: 45°-Schritte; vier Schritte = 180° = gleiches Bild
+const vorDrehen = await tDaten();
+const hashVor = await t2((e) => e.hash());
+await teil.keyboard.press('KeyR');
+let wd = (await tDaten()).objekte.find((o) => o.id === w.id);
+check(wd.winkel === 135, 'Drehen: R dreht die Wand um 45° rechtsherum (90 → 135)', String(wd.winkel));
+check((await t2((e) => e.hash())) !== hashVor, 'Drehen: das Bild ändert sich');
+await teil.keyboard.press('Shift+KeyR');
+check((await tDaten()).objekte.find((o) => o.id === w.id).winkel === 90, 'Drehen: Umschalt+R dreht zurück');
+for (let i = 0; i < 4; i++) await teil.keyboard.press('KeyR');
+check(JSON.stringify(await tDaten()) === JSON.stringify(vorDrehen), 'Drehen: vier Schritte (180°) ergeben genau dieselben Daten');
+check((await t2((e) => e.hash())) === hashVor, 'Drehen: und dasselbe Bild');
+await teil.click('#b-teil-rechts');
+check((await tDaten()).objekte.find((o) => o.id === w.id).winkel === 135, 'Drehen: Knopf „⟳ 45°“ dreht ebenfalls');
+await teil.click('#b-teil-links');
+
+// Eigenschaften: Winkel nur in 45°-Schritten, Länge ändern
+await teil.fill('#f-winkel', '30');
+await teil.keyboard.press('Enter');
+check((await tDaten()).objekte.find((o) => o.id === w.id).winkel === 90, 'Winkel 30° wird abgewiesen: Daten unverändert');
+check((await teil.locator('#melden').textContent()).includes('45'), 'Winkel 30°: verständliche Meldung');
+check(await tBoden([310, 90]), 'Länge ändern: vorher ist bei y = 90 E noch Boden (Wand ist 160 lang)');
+await teil.fill('#f-laenge', '200');
+await teil.keyboard.press('Enter');
+check((await tDaten()).objekte.find((o) => o.id === w.id).laenge === 200, 'Länge ändern: 200 E in den Daten');
+check(await tWand([310, 90]), 'Länge ändern: im Bild reicht die Wand jetzt weiter nach Süden (bis 100 E)');
+
+// Kopieren und Einfügen an der Mausstelle, Duplizieren
+const vorKopie = await tDaten();
+await teil.keyboard.press('Control+KeyC');
+const [mx, my] = await tBild([700, 300]);
+await teil.mouse.move(mx, my);
+await teil.keyboard.press('Control+KeyV');
+let dk = await tDaten();
+const kop = dk.objekte[dk.objekte.length - 1];
+check(dk.objekte.length === vorKopie.objekte.length + 1 && kop.id !== w.id && kop.x === 700 && kop.y === 300 && kop.laenge === 200 && kop.winkel === 90 && kop.typ === 'wand', 'Kopieren/Einfügen: Strg+C, Maus auf (700, 300), Strg+V → Kopie mit neuer ID dort, gleiche Maße', JSON.stringify(kop));
+check((await t2((e) => e.state.auswahl))?.id === kop.id, 'Einfügen: die Kopie ist gewählt');
+await teil.keyboard.press('Control+KeyD');
+dk = await tDaten();
+const dup = dk.objekte[dk.objekte.length - 1];
+check(dk.objekte.length === vorKopie.objekte.length + 2 && dup.x === kop.x + 40 && dup.y === kop.y + 40, 'Duplizieren: Strg+D setzt eine Kopie 40 E versetzt', JSON.stringify(dup));
+await teil.keyboard.press('Control+KeyZ');
+await teil.keyboard.press('Control+KeyZ');
+check(JSON.stringify(await tDaten()) === JSON.stringify(vorKopie), 'Kopieren: zweimal Rückgängig stellt den Zustand davor exakt her');
+
+// Löschen
+await tKlick([300, 100]);
+check((await t2((e) => e.state.auswahl))?.id === w.id, 'Löschen: Wand gewählt', JSON.stringify(await t2((e) => [e.state.auswahl, e.state.werkzeug])));
+const vorLoesch = await tDaten();
+await teil.keyboard.press('Delete');
+const nachLoesch = await tDaten();
+check(nachLoesch.objekte.length === vorLoesch.objekte.length - 1 && !nachLoesch.objekte.some((o) => o.id === w.id), 'Löschen: Entf entfernt nur die Wand');
+check(nachLoesch.gaenge.length === vorLoesch.gaenge.length && nachLoesch.knoten.length === vorLoesch.knoten.length, 'Löschen: Gänge und Knoten bleiben');
+check(await tBoden([310, 10]), 'Löschen: im Bild ist der Gang wieder frei');
+await teil.keyboard.press('Control+KeyZ');
+check(JSON.stringify(await tDaten()) === JSON.stringify(vorLoesch), 'Löschen: Rückgängig bringt die Wand zurück');
+
+// Bestehende Teile aus der Datei sind klickbar (Formteil f1, Wand o1, Gegner-Platzhalter o2)
+await tKlick([600, 150]);
+check((await t2((e) => e.state.auswahl))?.id === 'f1', 'Auswahl: Klick auf das Formteil der Beispieldatei wählt f1');
+await tKlick([420, -70]);
+check((await t2((e) => e.state.auswahl))?.id === 'o1', 'Auswahl: Klick auf die Wand der Beispieldatei wählt o1');
+await tKlick([900, 0]);
+check((await t2((e) => e.state.auswahl))?.id === 'o2', 'Auswahl: Klick auf den Gegner-Platzhalter wählt o2');
+check((await teil.locator('#rechts').textContent()).includes('Platzhalter'), 'Gegner-Platzhalter: Hinweis im Eigenschaftenfeld');
+await teil.keyboard.press('KeyR');
+check(JSON.stringify((await tDaten()).objekte.find((o) => o.id === 'o2')) === JSON.stringify(vorLoesch.objekte.find((o) => o.id === 'o2')), 'Drehen: ein Gegner-Platzhalter hat keinen Winkel, nichts ändert sich');
+
+// Alles zurück bis zum Anfang; Speichern/Laden bleibt verlustfrei
+for (let i = 0; i < 40; i++) await teil.keyboard.press('Control+KeyZ');
+check(JSON.stringify(await tDaten()) === T0, 'Rückgängig bis zum Anfang: genau der geladene Zustand (Teile eingeschlossen)');
+await teil.keyboard.press('KeyB');
+await tZieh([203, 703], [607, 703]);
+await teil.keyboard.press('KeyV');
+const teilText = formatiere(await tDaten());
+const geladen = await t2((e, t) => e.oeffneText(t, 'test.json'), teilText);
+check(geladen === true && formatiere(await tDaten()) === teilText, 'Laden: gespeicherte Datei mit Teilen ergibt gleiche Daten (verlustfrei)');
+await teil.screenshot({ path: path.join(shots, 'editor-07-teile-fertig.png') });
+check(teilFehler.length === 0, 'Bauen II: keine Konsolenfehler', teilFehler.join('; '));
+await teil.close();
 
 // ------------------------------------------------------------------ Leistung: 300 Objekte
 const ms = await ed((e) => {

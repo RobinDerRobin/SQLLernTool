@@ -15,6 +15,14 @@ export const GANG_BREITE = 200; // Breite eines neu gezogenen Gangs (E)
 export const RAUM_W = 520; // Maße eines neuen Raums / Bosskampfs (E)
 export const RAUM_H = 400;
 export const MIN_RAUM = 100; // kleinste Raumseite (E)
+export const TEIL_STANDARD = {
+  // Maße eines neu gesetzten Teils (E), wenn nur geklickt statt gezogen wird
+  formteil: { laenge: 260, breite: 120 },
+  wand: { laenge: 240, breite: 60 },
+  hindernis: { laenge: 60, breite: 60 },
+};
+export const MIN_TEIL = RASTER; // kleinste Länge/Breite eines Teils (E)
+export const KOPIE_VERSATZ = 40; // Versatz einer Kopie, wenn keine Zielstelle bekannt ist (E)
 export const MIN_GANG_LAENGE = RASTER; // kürzere Gänge entstehen beim Ziehen nicht
 export const FANG_PX = 12; // Fangradius für Knoten und Gänge beim Ziehen/Setzen (Bildschirmpixel, wird mit dem Zoom in E umgerechnet)
 export const MAX_KOORD = 20000; // größte erlaubte Koordinate/Maßzahl (E)
@@ -34,7 +42,11 @@ export const KUERZEL = {
   zoomMinus: ['Minus', 'NumpadSubtract'],
   beschriftung: 'KeyL',
   alles: 'Home',
-  werkzeug: { auswahl: 'KeyV', gang: 'KeyG', knoten: 'KeyK' },
+  werkzeug: { auswahl: 'KeyV', gang: 'KeyG', knoten: 'KeyK', formteil: 'KeyB', wand: 'KeyW', hindernis: 'KeyH' },
+  teilDrehen: 'KeyR', // ohne Umschalt 45° rechtsherum, mit Umschalt linksherum
+  kopieren: 'KeyC', // mit Strg/Cmd
+  einfuegen: 'KeyV', // mit Strg/Cmd
+  duplizieren: 'KeyD', // mit Strg/Cmd
   loeschen: ['Delete', 'Backspace'],
   rueckgaengig: 'KeyZ', // mit Strg/Cmd; mit Umschalt = Wiederholen
   wiederholen: 'KeyY', // mit Strg/Cmd
@@ -61,6 +73,7 @@ export const FARBEN = {
   knoten: { speicher: '#5be07a', kreuzung: '#e8e8f0', raum: '#c89bff', ende: '#9aa0aa', boss: '#ff6b5e' },
   notiz: '#fff28a',
   platzhalter: '#ff9a3c',
+  hindernis: '#d9822b', // Platzhalterfarbe, bis die Spielgrafik der Hindernisse in Stufe 6 kommt
   massstab: '#ffffff',
 };
 export const KNOTEN_RADIUS_PX = 7; // Knotenmarke (Bildschirmpixel, unabhängig vom Zoom)

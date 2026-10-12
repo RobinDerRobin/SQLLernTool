@@ -5,5 +5,8 @@
 import auswahl from './auswahl.js';
 import gang from './gang.js';
 import knoten from './knoten.js';
+import formteil from './formteil.js';
+import wand from './wand.js';
+import hindernis from './hindernis.js';
 
-export const WERKZEUGE = [auswahl, gang, knoten];
+export const WERKZEUGE = [auswahl, gang, knoten, formteil, wand, hindernis];

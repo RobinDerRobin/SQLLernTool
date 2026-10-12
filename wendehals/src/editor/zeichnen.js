@@ -4,6 +4,7 @@ import { drawDackel } from '../render/sprites.js';
 import { FLOOR, FLOOR2, WALL, GRID, SCREEN_W, SCREEN_H, FARBEN, KNOTEN_RADIUS_PX } from './konstanten.js';
 import { bodenPolygone, wandPolygone, knotenMap, gangMasse, gangPolygon, rahmenEcken, rechteck } from './daten.js';
 import { KNOTENTYPEN } from './katalog.js';
+import { teilFinden, hatMasse, teilEcken } from './teile.js';
 
 const MAX_ZELLEN = 40000; // Schachbrett nur zeichnen, wenn es nicht Zehntausende Felder werden
 
@@ -83,6 +84,26 @@ export function zeichnePlan(ctx, g, ansicht, z = {}, dpr = 1) {
     ctx.fill();
   }
 
+  // Hindernisse: Platzhalterbild (Spielgrafik folgt mit Stufe 6), kenntlich an Farbe und Kreuz
+  for (const o of g.objekte) {
+    if (o.typ !== 'hindernis') continue;
+    const e = teilEcken(o);
+    pfad(ctx, [e]);
+    ctx.fillStyle = FARBEN.hindernis;
+    ctx.globalAlpha = 0.85;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 2 / s;
+    ctx.strokeStyle = '#000';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(e[0][0], e[0][1]);
+    ctx.lineTo(e[2][0], e[2][1]);
+    ctx.moveTo(e[1][0], e[1][1]);
+    ctx.lineTo(e[3][0], e[3][1]);
+    ctx.stroke();
+  }
+
   const km = knotenMap(g);
   const au = z.auswahl;
 
@@ -101,6 +122,16 @@ export function zeichnePlan(ctx, g, ansicht, z = {}, dpr = 1) {
       const k = km.get(au.id);
       if (k && k.w && k.h) {
         pfad(ctx, [rechteck(k.x, k.y, k.w, k.h, 0)]);
+        ctx.stroke();
+      }
+    } else if (au.art === 'formteil' || au.art === 'objekt') {
+      const o = teilFinden(g, au.art, au.id);
+      if (o && hatMasse(au.art, o)) {
+        pfad(ctx, [teilEcken(o)]);
+        ctx.stroke();
+      } else if (o) {
+        ctx.beginPath();
+        ctx.arc(o.x, o.y, 18, 0, Math.PI * 2);
         ctx.stroke();
       }
     }
@@ -181,6 +212,11 @@ export function zeichnePlan(ctx, g, ansicht, z = {}, dpr = 1) {
     if (o.typ !== 'gegner') continue;
     const [px, py] = ansicht.weltZuBild(o.x, o.y);
     if (sichtbarPx(px, py)) text(ctx, `Platzhalter: ${o.art}`, px, py + 26, FARBEN.platzhalter);
+  }
+  for (const o of g.objekte) {
+    if (o.typ !== 'hindernis') continue;
+    const [px, py] = ansicht.weltZuBild(o.x, o.y);
+    if (sichtbarPx(px, py) && o.laenge * s > 40) text(ctx, 'Hindernis (Platzhalter)', px, py, '#fff');
   }
   for (const n of g.notizen) {
     const [px, py] = ansicht.weltZuBild(n.x, n.y);

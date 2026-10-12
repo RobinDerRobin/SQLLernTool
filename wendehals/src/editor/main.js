@@ -1,14 +1,16 @@
 // Einstieg des Level-Editors (`?editor`, Electron: WENDEHALS_EDITOR=1). Baut die Oberfläche, verbindet die Module.
 // Stufe 1: Ansehen – Plan im Spielbild, Zoom/Verschieben/Drehen, Gang anklicken, Bildschirmrahmen mit Fahrt-Schieber.
 // Stufe 2a: Bauen – Werkzeuge (Auswahl, Gang, Knoten), Eigenschaften ändern, Rückgängig/Wiederholen, Speichern/Laden.
+// Stufe 2b: Formteile, Wände, Hindernisse – setzen, verschieben, drehen, kopieren, löschen, Eigenschaften.
 import { HEADINGS, DIR_NAMES, E } from '../core/math.js';
 import { Ansicht } from './ansicht.js';
 import { zeichnePlan } from './zeichnen.js';
 import { WELT, GEBIETE } from './startdaten.js';
 import { kopie, knotenMap, gangMasse, gangPolygon, knotenPolygon, punktInPolygon, ausdehnung, rahmenEcken, formatiere, formatiereWelt, ladeGebiet, pruefeFormat, Verlauf } from './daten.js';
 import { KNOTENTYPEN } from './katalog.js';
-import { KUERZEL, SCREEN_W, SPEED, ZOOM_BILDSCHIRME, PFEIL_SCHRITT_PX, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX } from './konstanten.js';
+import { KUERZEL, WINKEL_SCHRITT, SCREEN_W, SPEED, ZOOM_BILDSCHIRME, PFEIL_SCHRITT_PX, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX } from './konstanten.js';
 import { gangTeilen, loesche, setze } from './befehle.js';
+import { teilBei, teilFinden, teilDrehen, teilMerken, teilEinfuegen, loescheTeil, setzeTeil, istTeilArt, hatMasse, teilName, liste as teilListe } from './teile.js';
 import { erzeugeSpeicher } from './speicher.js';
 import { WERKZEUGE } from './werkzeuge/index.js';
 
@@ -17,30 +19,30 @@ const hat = (liste, code) => (Array.isArray(liste) ? liste.includes(code) : list
 
 const CSS = `
 html, body { margin: 0; height: 100%; background: #14121a; color: #e8e6ee; font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
-#editor { display: grid; grid-template-columns: 1fr 290px; grid-template-rows: auto auto 1fr 78px; height: 100%; }
+#editor { display: grid; grid-template-columns: 1fr 290px; grid-template-rows: 44px 44px 22px 1fr 78px; height: 100%; }
 #editor > * { min-width: 0; min-height: 0; }
-.leiste { background: #221f2b; display: flex; flex-wrap: wrap; align-items: center; min-height: 44px; padding-top: 3px; padding-bottom: 3px; box-sizing: border-box; gap: 8px; padding: 0 10px; border: 0 solid #38334a; }
+.leiste { background: #221f2b; display: flex; flex-wrap: nowrap; overflow: hidden; align-items: center; min-height: 44px; padding-top: 3px; padding-bottom: 3px; box-sizing: border-box; gap: 8px; padding: 0 10px; border: 0 solid #38334a; }
 #oben, #werk { grid-column: 1 / 3; border-bottom-width: 1px; }
-#plan { grid-row: 3; } #rechts { grid-row: 3; grid-column: 2; }
-#unten { grid-column: 1 / 3; border-top-width: 1px; gap: 12px; }
+#hinweiszeile { grid-column: 1 / 3; grid-row: 3; background: #221f2b; padding: 0 10px; line-height: 22px; border-bottom: 1px solid #38334a; overflow: hidden; }
+#plan { grid-row: 4; } #rechts { grid-row: 4; grid-column: 2; }
+#unten { grid-row: 5; grid-column: 1 / 3; border-top-width: 1px; gap: 12px; flex-wrap: wrap; overflow: auto; }
 #plan { position: relative; overflow: hidden; background: #1c1822; }
 #plan canvas { display: block; width: 100%; height: 100%; cursor: grab; }
 #rechts { background: #221f2b; border-left: 1px solid #38334a; padding: 10px 12px; overflow: auto; }
 #rechts h2 { font-size: 14px; margin: 0 0 8px; }
 #rechts dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 0; }
 #rechts dt { color: #a49fb8; } #rechts dd { margin: 0; }
-button, select { white-space: nowrap; background: #38334a; color: #e8e6ee; border: 1px solid #4b4560; border-radius: 4px; padding: 4px 9px; font: inherit; cursor: pointer; }
+button, select { white-space: nowrap; flex: none; background: #38334a; color: #e8e6ee; border: 1px solid #4b4560; border-radius: 4px; padding: 4px 7px; font: inherit; cursor: pointer; }
 button:hover, select:hover { background: #4a4462; }
 button.an { background: #3b6b8c; }
 button:disabled { opacity: .45; cursor: default; }
 .titel { white-space: nowrap; font-weight: 600; margin-right: 8px; }
 .grau { color: #a49fb8; }
-#anzeige { margin-left: auto; white-space: nowrap; }
+#anzeige { margin-left: auto; white-space: nowrap; flex: none; }
 #fahrt { flex: 1; min-width: 120px; }
 #melden { color: #b8e8c0; white-space: pre-line; max-height: 70px; overflow: auto; }
 #melden.fehler { color: #ff9a8a; }
-#werkhinweis { margin-left: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
-#werk, #oben { height: 44px; overflow: hidden; }
+#werkhinweis { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
 #stand.offen { color: #ffd24a; }
 input[type=text], input[type=number], #rechts select { width: 100%; box-sizing: border-box; background: #14121a; color: #e8e6ee; border: 1px solid #4b4560; border-radius: 4px; padding: 3px 6px; font: inherit; }
 #rechts .knoepfe { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
@@ -75,6 +77,8 @@ export function startEditor() {
     echtzeit: true, // false: Zeit und Fahrt laufen nur über tick() – für deterministische Tests
     werkzeug: WERKZEUGE[0].id,
     knotenTyp: 'kreuzung',
+    zwischen: null, // gemerktes Teil für Einfügen (Strg+C): { art, teil }
+    zeiger: null, // letzte Mausstelle im Plan (Welt), Zielstelle für Einfügen
     verlauf: {}, // Gebiets-ID → Verlauf (Rückgängig/Wiederholen)
     gespeichert: Object.fromEntries(Object.entries(GEBIETE).map(([id, g]) => [id, formatiere(g)])), // zuletzt gespeicherter/geladener Text je Gebiet
     weltGeaendert: false, // welt.json muss mitgeschrieben werden (neues Gebiet geöffnet)
@@ -98,7 +102,7 @@ export function startEditor() {
   const knopf = (text, titel, fn, id) => el('button', { text, title: titel, onclick: fn, ...(id ? { id } : {}) });
   const anzeige = el('span', { class: 'grau', id: 'anzeige' });
   const oben = el('div', { id: 'oben', class: 'leiste' }, [
-    el('span', { class: 'titel', text: 'Wendehals-Editor' }),
+    el('span', { class: 'titel', text: 'Editor' }),
     wahl,
     knopf('Links drehen', 'Ansicht 45° links drehen (Q)', () => drehen(-1), 'b-links'),
     knopf('Rechts drehen', 'Ansicht 45° rechts drehen (E)', () => drehen(1), 'b-rechts'),
@@ -120,8 +124,9 @@ export function startEditor() {
   });
   const undoKnopf = knopf('Rückgängig', 'Letzte Änderung zurücknehmen (Strg+Z)', () => rueckgaengig(), 'b-undo');
   const redoKnopf = knopf('Wiederholen', 'Zurückgenommene Änderung wiederholen (Strg+Y)', () => wiederholen(), 'b-redo');
-  const loeschKnopf = knopf('Löschen', 'Gewählten Gang oder Knoten löschen (Entf)', () => loescheAuswahl(), 'b-loeschen');
+  const loeschKnopf = knopf('Löschen', 'Gewählten Gang, Knoten oder gewähltes Teil löschen (Entf)', () => loescheAuswahl(), 'b-loeschen');
   const werkHinweis = el('span', { class: 'grau', id: 'werkhinweis' });
+  const hinweisZeile = el('div', { id: 'hinweiszeile' }, [werkHinweis]);
   const stand = el('span', { id: 'stand', class: 'grau' });
   const werk = el('div', { id: 'werk', class: 'leiste' }, [
     ...WERKZEUGE.map(knopfW),
@@ -132,7 +137,6 @@ export function startEditor() {
     knopf('Speichern', 'Gebiet speichern (Strg+S)', () => speichere(), 'b-speichern'),
     knopf('Öffnen …', 'Leveldatei öffnen (Strg+O)', () => oeffne(), 'b-oeffnen'),
     stand,
-    werkHinweis,
   ]);
   const rechts = el('div', { id: 'rechts' });
   const play = knopf('Fahrt', 'Rahmen mit Flugtempo durchs Level fahren lassen (Leertaste)', () => fahrtUmschalten(), 'b-fahrt');
@@ -142,7 +146,7 @@ export function startEditor() {
   const melden = el('span', { id: 'melden' });
   melden.addEventListener('click', () => melde(''));
   const unten = el('div', { id: 'unten', class: 'leiste' }, [play, schieber, fahrtText, melden]);
-  const wurzel = el('div', { id: 'editor' }, [oben, werk, plan, rechts, unten]);
+  const wurzel = el('div', { id: 'editor' }, [oben, werk, hinweisZeile, plan, rechts, unten]);
   document.body.append(wurzel);
 
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -242,6 +246,8 @@ export function startEditor() {
       if (Math.hypot(px - kx, py - ky) <= KNOTEN_RADIUS_PX + 3) return { art: 'knoten', id: k.id };
     }
     const [wx, wy] = ansicht.bildZuWelt(px, py);
+    const teil = teilBei(g, wx, wy, 3 / ansicht.masstab);
+    if (teil) return teil;
     const km = knotenMap(g);
     for (const k of g.knoten) {
       const poly = knotenPolygon(k);
@@ -272,7 +278,7 @@ export function startEditor() {
   function bereinige() {
     const g = gebiet();
     const au = state.auswahl;
-    const da = au && (au.art === 'gang' ? g.gaenge : au.art === 'knoten' ? g.knoten : []).some((o) => o.id === au.id);
+    const da = au && (au.art === 'gang' ? g.gaenge : au.art === 'knoten' ? g.knoten : istTeilArt(au.art) ? teilListe(g, au.art) : []).some((o) => o.id === au.id);
     if (au && !da) {
       state.auswahl = null;
       state.fahrt = null;
@@ -326,15 +332,47 @@ export function startEditor() {
   function setzeFeld(art, id, feld, wert) {
     let fehler = null;
     aendere('Eigenschaft ändern', (g) => {
-      fehler = setze(g, art, id, feld, wert);
+      fehler = istTeilArt(art) ? setzeTeil(g, art, id, feld, wert) : setze(g, art, id, feld, wert);
     });
     if (fehler) melde(fehler, 'fehler');
     refresh();
   }
   function loescheAuswahl() {
     const au = state.auswahl;
-    if (!au || (au.art !== 'gang' && au.art !== 'knoten')) return;
-    aendere('Löschen', (g) => loesche(g, au.art, au.id));
+    if (!au || (au.art !== 'gang' && au.art !== 'knoten' && !istTeilArt(au.art))) return;
+    aendere('Löschen', (g) => (istTeilArt(au.art) ? loescheTeil(g, au.art, au.id) : loesche(g, au.art, au.id)));
+  }
+  /** Gewähltes Teil (Formteil, Wand, Hindernis) oder null. */
+  const gewaehltesTeil = () => {
+    const au = state.auswahl;
+    return au && istTeilArt(au.art) ? teilFinden(gebiet(), au.art, au.id) ?? null : null;
+  };
+  function dreheTeil(k) {
+    const au = state.auswahl;
+    const o = gewaehltesTeil();
+    if (!o) return;
+    if (!hatMasse(au.art, o)) return melde(`${teilName(au.art, o)} hat keinen Winkel.`, 'fehler');
+    aendere(`${teilName(au.art, o)} drehen`, (g) => teilDrehen(g, au.art, au.id, k));
+  }
+  function kopiere() {
+    const au = state.auswahl;
+    if (!gewaehltesTeil()) return melde('Zum Kopieren erst ein Formteil, eine Wand oder ein Hindernis wählen.', 'fehler');
+    state.zwischen = teilMerken(gebiet(), au.art, au.id);
+    melde(`${teilName(au.art, state.zwischen.teil)} kopiert. Strg+V fügt es an der Mausstelle ein.`);
+    refresh();
+  }
+  function fuegeEin() {
+    if (!state.zwischen) return melde('Nichts kopiert – erst ein Teil wählen und Strg+C drücken.', 'fehler');
+    const z = state.zeiger;
+    const neu = aendere('Einfügen', (g) => teilEinfuegen(g, state.zwischen, z?.x, z?.y));
+    if (neu) waehle(neu);
+  }
+  function dupliziere() {
+    const au = state.auswahl;
+    if (!gewaehltesTeil()) return melde('Zum Duplizieren erst ein Formteil, eine Wand oder ein Hindernis wählen.', 'fehler');
+    const gemerkt = teilMerken(gebiet(), au.art, au.id);
+    const neu = aendere('Duplizieren', (g) => teilEinfuegen(g, gemerkt));
+    if (neu) waehle(neu);
   }
   function teileGang() {
     const au = state.auswahl;
@@ -495,6 +533,29 @@ export function startEditor() {
       if (k.form) zeile(dl, 'Form', `${k.form}, Seite ${k.seite} E`);
       zeile(dl, 'Gänge', g.gaenge.filter((x) => x.von === k.id || x.nach === k.id).map((x) => x.name || x.id).join(', ') || 'keine');
       knoepfe.append(knopf('Löschen', 'Knoten samt seinen Gängen löschen (Entf)', () => loescheAuswahl(), 'b-loeschen2'));
+    } else if (au && istTeilArt(au.art)) {
+      const o = teilFinden(g, au.art, au.id);
+      if (!o) return;
+      const name = teilName(au.art, o);
+      rechts.append(el('h2', { text: `${name} ${o.id}` }), dl);
+      zeile(dl, 'ID', o.id);
+      feld(dl, 'x (E)', 'f-x', o.x, (v) => setzeFeld(au.art, o.id, 'x', v), 'number', { step: 20 });
+      feld(dl, 'y (E)', 'f-y', o.y, (v) => setzeFeld(au.art, o.id, 'y', v), 'number', { step: 20 });
+      if (hatMasse(au.art, o)) {
+        feld(dl, 'Länge (E)', 'f-laenge', o.laenge, (v) => setzeFeld(au.art, o.id, 'laenge', v), 'number', { step: 20 });
+        feld(dl, 'Breite (E)', 'f-breite', o.breite, (v) => setzeFeld(au.art, o.id, 'breite', v), 'number', { step: 20 });
+        feld(dl, 'Winkel (°)', 'f-winkel', o.winkel, (v) => setzeFeld(au.art, o.id, 'winkel', v), 'number', { step: WINKEL_SCHRITT });
+        zeile(dl, 'Länge', `${fmt(o.laenge / SCREEN_W)} Bildschirme = ${fmt(o.laenge / SPEED)} s`);
+        knoepfe.append(
+          knopf('⟲ 45°', 'Um 45° linksherum drehen (Umschalt+R)', () => dreheTeil(-1), 'b-teil-links'),
+          knopf('⟳ 45°', 'Um 45° rechtsherum drehen (R)', () => dreheTeil(1), 'b-teil-rechts'),
+        );
+      } else if (o.platzhalter) zeile(dl, 'Hinweis', 'Platzhalter: Gegner-Verhalten im Fenster ungeprüft');
+      knoepfe.append(
+        knopf('Duplizieren', 'Kopie neben das Teil setzen (Strg+D)', () => dupliziere(), 'b-teil-dup'),
+        knopf('Kopieren', 'Teil merken, Strg+V fügt es an der Mausstelle ein (Strg+C)', () => kopiere(), 'b-teil-kopieren'),
+        knopf('Löschen', `${name} löschen (Entf)`, () => loescheAuswahl(), 'b-loeschen2'),
+      );
     } else {
       rechts.append(el('h2', { text: g.name }), dl);
       zeile(dl, 'Tileset', g.tileset);
@@ -505,7 +566,7 @@ export function startEditor() {
       zeile(dl, 'Notizen', g.notizen.length);
     }
     rechts.append(knoepfe);
-    rechts.append(el('p', { class: 'grau', text: 'V Auswahl, G Gang, K Knoten · Strg+Z/Y Rückgängig/Wiederholen · Strg+S Speichern · Q/E drehen, 0 Norden, F wie im Spiel, Leertaste Fahrt, Mausrad zoomt.' }));
+    rechts.append(el('p', { class: 'grau', text: 'V Auswahl, G Gang, K Knoten, B Formteil, W Wand, H Hindernis · R dreht ein Teil (Umschalt: links), Strg+C/V/D kopieren, einfügen, duplizieren · Strg+Z/Y Rückgängig/Wiederholen · Strg+S Speichern · Q/E drehen, 0 Norden, F wie im Spiel, Leertaste Fahrt, Mausrad zoomt.' }));
   }
   function refreshFahrt() {
     const m = ganzMasse();
@@ -531,7 +592,7 @@ export function startEditor() {
     const au = state.auswahl;
     for (const w of WERKZEUGE) document.getElementById('t-' + w.id)?.classList.toggle('an', w.id === state.werkzeug);
     typWahl.disabled = state.werkzeug !== 'knoten';
-    loeschKnopf.disabled = !(au && (au.art === 'gang' || au.art === 'knoten'));
+    loeschKnopf.disabled = !(au && (au.art === 'gang' || au.art === 'knoten' || istTeilArt(au.art)));
     stand.textContent = ungespeichert() ? '● ungespeichert' : '✓ gespeichert';
     stand.className = ungespeichert() ? 'offen' : 'grau';
     document.title = `${ungespeichert() ? '* ' : ''}Wendehals – Editor`;
@@ -557,7 +618,8 @@ export function startEditor() {
     if (!erfasst) canvas.style.cursor = 'grabbing';
   });
   canvas.addEventListener('pointermove', (e) => {
-    if (!zug) return werkzeug().schweben?.(kontext, zeigerPunkt(e));
+    state.zeiger = zeigerPunkt(e);
+    if (!zug) return werkzeug().schweben?.(kontext, state.zeiger);
     if (zug.modus === 'werkzeug') return werkzeug().move?.(kontext, zeigerPunkt(e));
     const dx = e.clientX - zug.x;
     const dy = e.clientY - zug.y;
@@ -595,7 +657,15 @@ export function startEditor() {
       const c = e.code;
       const tippt = imFeld && !(c === KUERZEL.speichern);
       if (tippt) return; // in Eingabefeldern gilt das eingebaute Rückgängig des Feldes
-      const fn = c === KUERZEL.rueckgaengig ? (e.shiftKey ? wiederholen : rueckgaengig) : c === KUERZEL.wiederholen ? wiederholen : c === KUERZEL.speichern ? speichere : c === KUERZEL.oeffnen ? oeffne : null;
+      const fn =
+        c === KUERZEL.rueckgaengig ? (e.shiftKey ? wiederholen : rueckgaengig)
+        : c === KUERZEL.wiederholen ? wiederholen
+        : c === KUERZEL.speichern ? speichere
+        : c === KUERZEL.oeffnen ? oeffne
+        : c === KUERZEL.kopieren ? kopiere
+        : c === KUERZEL.einfuegen ? fuegeEin
+        : c === KUERZEL.duplizieren ? dupliziere
+        : null;
       if (!fn) return;
       e.preventDefault();
       if (imFeld) e.target.blur(); // übernimmt einen halb getippten Wert, bevor gespeichert wird
@@ -619,6 +689,7 @@ export function startEditor() {
     else if (c === KUERZEL.rechts) ansicht.verschieben(-schritt, 0);
     else if (c === KUERZEL.hoch) ansicht.verschieben(0, schritt);
     else if (c === KUERZEL.runter) ansicht.verschieben(0, -schritt);
+    else if (c === KUERZEL.teilDrehen) dreheTeil(e.shiftKey ? -1 : 1);
     else if (c === KUERZEL.beschriftung) beschriften();
     else if (c === KUERZEL.alles) alles();
     else if (hat(KUERZEL.loeschen, c)) loescheAuswahl();
@@ -685,6 +756,10 @@ export function startEditor() {
     setzeFeld,
     setzeWerkzeug,
     loescheAuswahl,
+    dreheTeil,
+    kopiere,
+    fuegeEin,
+    dupliziere,
     speichere,
     oeffne,
     oeffneText,
