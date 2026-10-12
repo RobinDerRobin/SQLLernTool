@@ -24,13 +24,12 @@
 
 ## Verbindliche Anforderungen von Robin – gelten für jeden Lauf (Liste: BRIEF.md Abschnitt 9)
 
-Stand 12.10.2026: A1–A6 (Maus wie Lunar Magic + Shift-Ziehen verschiebt, stufenloser Zoom, Karten-/Levelansicht mit Ausgangsperspektive, Auswahl, Schutz + Strg+Z/Y, kein Feinraster). **Vor jeder neuen Stufe
+Stand 12.10.2026: A0–A8 (Grundsatz Lunar Magic, Rechtsklick bei Auswahl = Kopie, Tileset-Fenster) und A1–A6 (Maus wie Lunar Magic + Shift-Ziehen verschiebt, stufenloser Zoom, Karten-/Levelansicht mit Ausgangsperspektive, Auswahl, Schutz + Strg+Z/Y, kein Feinraster). **Vor jeder neuen Stufe
 umsetzen** (höchste Priorität), danach weiter mit den Stufen. **Fehler zuerst beheben:** „Spielen ab hier“ lehnt einen geraden Gang ab, sobald ein anderer Gang im Gebiet diagonal ist (UX-Bericht). Weitere UX-Vorschläge des Experten (S1–S7, K1–K5)
 (`docs/forschung/2026-10-12-editor-ux-1-ux-experte.md`) sind **keine** Anforderungen, bis Robin sie bestätigt.
 
 ## Fragen an Robin
 
-- Rechtsklick, wenn gerade etwas ausgewählt ist: setzt er eine **Kopie des ausgewählten Objekts** (wie in Lunar Magic), sonst das Element aus der Palette? Bis zur Antwort: Rechtsklick setzt immer das aktuelle Palettenelement; kein Menü.
 
 - (keine offen) – Weg der Dateien beantwortet am 11.10.2026: lokaler Klon in einer VM mit Claude Desktop, Editor
   speichert direkt in `wendehals/levels/` (Brief Abschnitt 4).

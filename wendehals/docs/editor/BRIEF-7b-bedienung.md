@@ -16,8 +16,7 @@
 - **Woran Robin es merkt:** Er zoomt fein auf eine Stelle, öffnet ein Level per Doppelklick, sieht nur dieses Level in
   seiner Ausgangsperspektive, setzt mit Rechtsklick Teile, wählt und verschiebt mit Links, macht mit Strg+Z/Strg+Y
   rückgängig/wieder – und nichts entsteht ungewollt.
-- **Bewusst nicht drin:** UX-Vorschläge S1–S7 und K1–K5 (nicht bestätigt), Feinraster unter 20 E (A6), Kontextmenü,
-  Tileset-Fenster, Spiel- und Prototyp-Verhalten.
+- **Bewusst nicht drin:** UX-Vorschläge S1–S7 und K1–K5 (nicht bestätigt), Feinraster unter 20 E (A6), Kontextmenü, Spiel- und Prototyp-Verhalten.
 
 ## 2. Abnahme-Checkliste (zuerst; jede Zeile ein automatischer Test aus Nutzersicht im echten Chromium)
 
@@ -27,8 +26,10 @@
       Gegner; Gang per Rechts-Ziehen von einem Knoten); **Linksklick setzt in keinem Zustand etwas** (Test: 50 zufällige
       Linksklicks mit jedem gewählten Element → Datei unverändert). Kein Browser-Kontextmenü über dem Plan.
 - [ ] **A1 Verschieben:** mittlere Maustaste und **Shift+Ziehen** verschieben den Plan, ändern keine Daten.
-- [ ] **A1 Rechtsklick bei Auswahl:** bis Robins Antwort setzt Rechtsklick immer das aktuelle Palettenelement (offene Frage
-      in STAND.md); kein Menü.
+- [ ] **A7 Rechtsklick bei Auswahl:** ist ein Objekt ausgewählt, setzt Rechtsklick eine Kopie davon an die Mausstelle;
+      ohne Auswahl das aktuelle Palettenelement; kein Menü.
+- [ ] **A8 Tileset-Fenster:** verschiebbares Fenster mit allen Teilen des Gebiet-Tilesets als Bilder, Klick wählt das
+      aktuelle Element, per Taste ein-/ausblendbar (Vorbild „Add Objects“ in Lunar Magic).
 - [ ] **A2 Zoom:** eine Mausrad-Raste ändert den Maßstab um ≈ 15 % (nicht mehr), der Punkt unter dem Mauszeiger bleibt
       auf ±1 px stehen; Touchpad-Kleinstschritte zoomen anteilig; Tasten zoomen; „Alles“ passt ohne Stufen ein (≥ 90 %
       der Breite oder Höhe genutzt); Zoomanzeige in Bildschirmen, Eingabefeld setzt den Zoom.
@@ -58,7 +59,10 @@
 1. B1: A2 Zoom (+ Fehler „Spielen ab hier“)
 2. B2: A1 Maus-Belegung, A5 Schutz und Strg+Z/Y
 3. B3: A3 Ebenen und Levelansicht mit Ausgangsperspektive
-4. B4: A4 Auswahl
+4. B4: A4 Auswahl, A7 Rechtsklick-Kopie
+5. B5: A8 Tileset-Fenster
+
+Grundsatz A0: offene Bedienfragen wie in Lunar Magic lösen.
 
 Nach jedem Block Prüfkette grün, committen, pushen. Am Ende Software-Tester-Agent und Spieletester-Agent (Spieletester
 bedient wie Robin: zoomen, Level öffnen, mit Rechtsklick bauen, rückgängig, speichern, spielen); Befunde „Fehler“ beheben.
