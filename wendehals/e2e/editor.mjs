@@ -1107,6 +1107,168 @@ check((await wa((e) => e.state.werkzeug)) === 'gang', 'Welt-Ansicht: ein Werkzeu
 check(wFehler.length === 0, 'Stufe 5: keine Konsolenfehler', wFehler.join('; '));
 await wp.close();
 
+// ------------------------------------------------------------------ Tilesets und Spielgrafik (Stufe 6)
+const tp = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+const tFehler = [];
+tp.on('pageerror', (e) => tFehler.push('pageerror: ' + e.message));
+tp.on('console', (m) => {
+  if (m.type() === 'error') tFehler.push('console: ' + m.text());
+});
+await tp.goto(url + '?editor');
+await tp.waitForFunction(() => window.__editor);
+const ta = (fn, arg) => tp.evaluate(`(${fn.toString()})(window.__editor, ${JSON.stringify(arg ?? null)})`);
+await ta((e) => {
+  e.state.echtzeit = false;
+  e.state.beschriftung = false;
+  e.wechsle('beispiel');
+  e.state.auswahl = null;
+  e.state.fahrt = null;
+  e.alles();
+  e.zeichne();
+});
+const tsBild = async ([x, y]) => {
+  const [px, py] = await ta((e, q) => e.ansicht.weltZuBild(q[0], q[1]), [x, y]);
+  const r = await tp.locator('canvas').first().boundingBox();
+  return [r.x + px, r.y + py];
+};
+// Anteil der Bildpunkte (Raster über das Bild), deren Farbe in `farben` liegt; Auswahl ist leer, Beschriftung aus
+const anteil = (farben) =>
+  ta((e, fs) => {
+    e.state.auswahl = null;
+    e.zeichne();
+    let n = 0;
+    let treffer = 0;
+    for (let px = 10; px < e.ansicht.w - 10; px += 23) {
+      for (let py = 10; py < e.ansicht.h - 10; py += 23) {
+        const p = e.pixel(px, py);
+        n++;
+        if (fs.some((f) => Math.abs(p[0] - f[0]) <= 2 && Math.abs(p[1] - f[1]) <= 2 && Math.abs(p[2] - f[2]) <= 2)) treffer++;
+      }
+    }
+    return treffer / n;
+  }, farben);
+const protoFarben = [hex(FLOOR), hex(FLOOR2), hex(WALL)];
+const badFarben = [hex('#4f9cbf'), hex('#9fd8ee'), hex('#1f4a66')];
+check((await ta((e) => e.state.look)) === 'proto', 'Look: Start mit den Prototyp-Farben');
+const a0 = await anteil(protoFarben);
+check(a0 > 0.7, `Look Prototyp: Boden/Wand in den Prototyp-Farben (${(a0 * 100).toFixed(0)} % der Bildpunkte)`);
+check((await anteil(badFarben)) === 0, 'Look Prototyp: keine Tileset-Farben im Bild');
+await tp.keyboard.press('KeyJ');
+check((await ta((e) => e.state.look)) === 'tileset', 'Look: Taste J schaltet auf Tileset');
+const a1 = await anteil(badFarben);
+check(a1 > 0.7 && (await anteil(protoFarben)) === 0, `Look Tileset „Badewannen-Ozean“: Boden, Schachbrett und Wand in den Tileset-Farben (${(a1 * 100).toFixed(0)} %), Prototyp-Farben verschwunden`);
+await tp.screenshot({ path: path.join(shots, 'editor-tileset-bad.png') });
+
+// Tileset des Gebiets ändern (Eigenschaftenfeld), Rückgängig
+check((await tp.locator('#f-tileset option').count()) === 5, 'Tileset: die Liste bietet die 5 Themen an');
+await tp.selectOption('#f-tileset', 'disco');
+check((await ta((e) => e.gebiet().tileset)) === 'disco', 'Tileset ändern: Gebiet hat das Tileset „disco“');
+const discoFarben = [hex('#5e3f80'), hex('#8ab0b0'), hex('#ff4fb0')];
+check((await anteil([hex('#5e3f80'), hex('#8a6ab0'), hex('#ff4fb0')])) > 0.7, 'Tileset ändern: im Bild die Farben des Themas „Disco-Vulkan“');
+void discoFarben;
+await tp.keyboard.press('Control+KeyZ');
+check((await ta((e) => e.gebiet().tileset)) === 'bad' && (await anteil(badFarben)) > 0.7, 'Tileset ändern: Rückgängig stellt „bad“ und sein Bild her');
+await tp.keyboard.press('KeyJ');
+check((await anteil(protoFarben)) > 0.7 && (await anteil(badFarben)) === 0, 'Look: zweites J = wieder Prototyp-Farben, dasselbe Bild');
+
+// Palette: Bilder, Reihenfolge (zuerst die Gegner des Tilesets), Klick wählt Werkzeug und Art
+const kacheln = await tp.locator('#palette canvas').count();
+check(kacheln === 3 + 11, `Palette: 3 Teile + 11 Gegner als Bilder (${kacheln})`);
+const ids = await tp.locator('#palette canvas').evaluateAll((l) => l.map((c) => c.id));
+check(ids.slice(3, 7).join() === 'p-gegner-ente,p-gegner-seife,p-gegner-nilpferd,p-gegner-socke', 'Palette: zuerst die Gegner des Tilesets „bad“', ids.join());
+const bunt = await tp.locator('#p-gegner-ente').evaluate((c) => {
+  const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  const farben = new Set();
+  for (let i = 0; i < d.length; i += 4) farben.add(d[i] + ',' + d[i + 1] + ',' + d[i + 2]);
+  return farben.size;
+});
+check(bunt > 6, `Palette: das Gegnerbild ist die Spielgrafik (${bunt} Farben)`);
+await tp.click('#p-gegner-seife');
+check((await ta((e) => [e.state.werkzeug, e.state.gegnerArt])).join() === 'gegner,seife', 'Palette: Klick auf „Seife“ wählt das Gegner-Werkzeug mit der Art „seife“');
+check((await tp.locator('#p-gegner-seife.aktiv').count()) === 1 && (await tp.locator('#p-gegner-ente.aktiv').count()) === 0, 'Palette: die gewählte Art ist markiert');
+
+// Gegner setzen: Klick im Plan, Spielgrafik im Bild, Rückgängig
+const vorGegner = JSON.stringify(await ta((e) => e.gebiet()));
+const zielGegner = [1220, 100];
+const [tgx, tgy] = await tsBild(zielGegner);
+await tp.mouse.click(tgx, tgy);
+const tgd = await ta((e) => e.gebiet());
+const tgn = tgd.objekte[tgd.objekte.length - 1];
+check(tgn.typ === 'gegner' && tgn.art === 'seife' && tgn.platzhalter === true && tgn.x === 1220 && tgn.y === 100, 'Gegner setzen: Klick legt einen Platzhalter „seife“ im Raster ab', JSON.stringify(tgn));
+check((await ta((e) => e.state.auswahl))?.id === tgn.id, 'Gegner setzen: der neue Gegner ist gewählt');
+// Bild: im Kästchen um den Gegner (28 × 28 E) sind Pixel, die weder Boden noch Wand noch Ring noch Auswahl sind
+await ta((e) => {
+  e.state.auswahl = null;
+  e.state.beschriftung = false;
+  e.ansicht.stufe = 0;
+  e.ansicht.cx = 1220;
+  e.ansicht.cy = 100;
+  e.ansicht.blick = 0;
+  e.zeichne();
+});
+const spritePixel = await ta((e) => {
+  e.zeichne();
+  const bunt = new Set();
+  const [mx, my] = e.ansicht.weltZuBild(1220, 100);
+  const r = 12 * e.ansicht.masstab;
+  let n = 0;
+  for (let px = Math.round(mx - r); px <= mx + r; px += 2) {
+    for (let py = Math.round(my - r); py <= my + r; py += 2) {
+      const p = e.pixel(px, py);
+      n++;
+      bunt.add(p.slice(0, 3).join());
+    }
+  }
+  return { farben: bunt.size, n };
+});
+check(spritePixel.farben >= 5, `Gegner im Bild: gezeichnet mit der Spielgrafik (${spritePixel.farben} Farben im Gegnerkästchen)`);
+await tp.screenshot({ path: path.join(shots, 'editor-gegner-seife.png') });
+await ta((e) => e.alles());
+await tp.keyboard.press('Control+KeyZ');
+check(JSON.stringify(await ta((e) => e.gebiet())) === vorGegner, 'Gegner setzen: Rückgängig stellt exakt den vorigen Stand her');
+
+// Gegner-Platzhalter bleibt markiert und gespeichert wie bisher (Format unverändert)
+await tp.keyboard.press('Control+KeyY');
+const tgd2 = await ta((e) => e.gebiet());
+check(tgd2.objekte.some((o) => o.typ === 'gegner' && o.art === 'seife') && (await ta((e) => e.pruefer().meldungen.some((m) => /Platzhalter/.test(m.text)))), 'Gegner: Wiederholen setzt ihn wieder; der Prüfer meldet ihn als Platzhalter (S2)');
+await tp.keyboard.press('Control+KeyZ');
+
+// Hindernis in der Farbe des Fensters (Vollfläche): Prototyp-Look = FARBEN.hindernis, Tileset-Look = Hindernisfarbe des Themas
+await ta((e) => {
+  e.setzeWerkzeug?.('auswahl');
+  e.gebiet().objekte.push({ id: 'oh', typ: 'hindernis', x: 1500, y: 100, laenge: 100, breite: 100, winkel: 0 });
+  e.state.auswahl = null;
+  e.state.look = 'proto';
+  e.ansicht.cx = 1500;
+  e.ansicht.cy = 100;
+  e.zeichne();
+});
+const hindernisPixel = () => ta((e) => (e.zeichne(), e.pixel(...e.ansicht.weltZuBild(1500, 100))));
+check(gleich(await hindernisPixel(), hex(FARBEN.hindernis)), 'Hindernis: Vollfläche in der Farbe, die der Fenster-Prototyp zeichnet', JSON.stringify(await hindernisPixel()));
+await ta((e) => (e.state.look = 'tileset'));
+check(gleich(await hindernisPixel(), hex('#ffe07a')), 'Hindernis: im Look „Tileset“ die Hindernisfarbe des Themas', JSON.stringify(await hindernisPixel()));
+await ta((e) => (e.state.look = 'proto'));
+
+// Leistung: 300 Objekte, davon 100 Gegner in Spielgrafik
+const tms = await ta((e) => {
+  const g = e.gebiet();
+  for (let i = 0; i < 100; i++) g.objekte.push({ id: 'pg' + i, typ: 'gegner', art: ['ente', 'seife', 'nilpferd', 'socke'][i % 4], x: (i % 20) * 60 - 200, y: Math.floor(i / 20) * 60 - 100, platzhalter: true });
+  for (let i = 0; i < 200; i++) g.objekte.push({ id: 'pw' + i, typ: i % 2 ? 'wand' : 'hindernis', x: (i % 40) * 40, y: 200 + Math.floor(i / 40) * 40, laenge: 20, breite: 20, winkel: 0 });
+  e.alles();
+  const z = [];
+  for (let i = 0; i < 30; i++) {
+    e.state.zeit += 0.016;
+    const t = performance.now();
+    e.zeichne();
+    z.push(performance.now() - t);
+  }
+  z.sort((a, b) => a - b);
+  return z[Math.floor(z.length * 0.9)];
+});
+check(tms < 16, `Leistung: 300 Objekte inkl. 100 Gegner in Spielgrafik, Zeichnen p90 ${tms.toFixed(1)} ms (< 16 ms)`);
+check(tFehler.length === 0, 'Stufe 6: keine Konsolenfehler', tFehler.join('; '));
+await tp.close();
+
 // ------------------------------------------------------------------ Spiel und Prototyp unberührt
 const page2 = await browser.newPage({ viewport: { width: 960, height: 540 } });
 const fehler2 = [];

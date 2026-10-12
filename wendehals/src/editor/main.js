@@ -4,12 +4,12 @@
 // Stufe 2b: Formteile, Wände, Hindernisse – setzen, verschieben, drehen, kopieren, löschen, Eigenschaften.
 import { HEADINGS, DIR_NAMES, E } from '../core/math.js';
 import { Ansicht } from './ansicht.js';
-import { zeichnePlan } from './zeichnen.js';
+import { zeichnePlan, zeichneGegner } from './zeichnen.js';
 import { WELT, GEBIETE } from './startdaten.js';
 import { kopie, bezeichnung, knotenMap, gangMasse, gangPolygon, knotenPolygon, punktInPolygon, ausdehnung, rahmenEcken, formatiere, ladeGebiet, pruefeFormat, Verlauf } from './daten.js';
 import { formatiereWelt, ladeWelt, pruefeWelt, weltLagen, weltAusdehnung, lageSetzen, bereichFeld, bereichAnpassen, bereichMasse, uebergangAnlegen, uebergangLoeschen, uebergaengeVon, uebergaengeAn, andereSeite, teileEnde, ausserhalb } from './welt.js';
-import { KNOTENTYPEN } from './katalog.js';
-import { KUERZEL, WINKEL_SCHRITT, SCREEN_W, SCREEN_H, SPEED, ZOOM_BILDSCHIRME, PFEIL_SCHRITT_PX, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX } from './konstanten.js';
+import { KNOTENTYPEN, TILESETS, GEGNER, gegnerFuer, tilesetFarben } from './katalog.js';
+import { KUERZEL, WINKEL_SCHRITT, SCREEN_W, SCREEN_H, SPEED, ZOOM_BILDSCHIRME, PFEIL_SCHRITT_PX, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX, FLOOR, FLOOR2, WALL, FARBEN, PALETTE_PX } from './konstanten.js';
 import { gangTeilen, loesche, setze, gesperrteIds } from './befehle.js';
 import { teilBei, teilFinden, teilDrehen, teilMerken, teilEinfuegen, loescheTeil, setzeTeil, istTeilArt, hatMasse, teilName, liste as teilListe } from './teile.js';
 import { erzeugeSpeicher } from './speicher.js';
@@ -57,6 +57,7 @@ button:disabled { opacity: .45; cursor: default; }
 #stand.offen { color: #ffd24a; }
 input[type=text], input[type=number], #rechts select { width: 100%; box-sizing: border-box; background: #14121a; color: #e8e6ee; border: 1px solid #4b4560; border-radius: 4px; padding: 3px 6px; font: inherit; }
 #rechts .knoepfe { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+#palette { margin-top: 14px; } .palette-titel { font-size: 14px; font-weight: bold; margin-bottom: 6px; } .palette-raster { display: flex; flex-wrap: wrap; gap: 6px; } .palette-raster canvas { border: 2px solid #4b4560; border-radius: 4px; cursor: pointer; } .palette-raster canvas.aktiv { border-color: #4ad0ff; }
 `;
 
 function el(tag, attrs = {}, kinder = []) {
@@ -91,6 +92,8 @@ export function startEditor() {
     zeit: 0,
     meldung: '',
     beschriftung: true,
+    look: 'proto', // 'proto' (Farben des Fenster-Prototyps) oder 'tileset' (Farben des Tilesets des Gebiets)
+    gegnerArt: null, // Art, die das Gegner-Werkzeug setzt (null = erste der Liste)
     echtzeit: true, // false: Zeit und Fahrt laufen nur über tick() – für deterministische Tests
     werkzeug: WERKZEUGE[0].id,
     knotenTyp: 'kreuzung',
@@ -134,6 +137,7 @@ export function startEditor() {
     knopf('Zoom +', 'Hineinzoomen (+)', () => zoom(-1), 'b-plus'),
     knopf('Alles', 'Ganzes Gebiet einpassen', () => alles(), 'b-alles'),
     knopf('Beschriftung', 'Knoten, Namen und Maßstab ein-/ausblenden (L)', () => beschriften(), 'b-beschriftung'),
+    knopf('Look', 'Farben umschalten: Prototyp ↔ Tileset des Gebiets (J)', () => lookUmschalten(), 'b-look'),
     anzeige,
   ]);
   const knopfW = (w) => el('button', { text: `${w.name} (${KUERZEL.werkzeug[w.id].replace('Key', '')})`, title: w.hinweis, id: 't-' + w.id, onclick: () => setzeWerkzeug(w.id) });
@@ -269,6 +273,15 @@ export function startEditor() {
     ansicht.zoomen(k, px, py);
     refresh();
   };
+  function lookFarben() {
+    return state.look === 'tileset' ? tilesetFarben(gebiet().tileset) : null;
+  }
+  function lookUmschalten() {
+    state.look = state.look === 'tileset' ? 'proto' : 'tileset';
+    melde(state.look === 'tileset' ? `Look: Tileset „${TILESETS[gebiet().tileset]?.name ?? gebiet().tileset}“` : 'Look: Prototyp-Farben');
+    dirty = true;
+    refresh();
+  }
   function beschriften() {
     state.beschriftung = !state.beschriftung;
     refresh();
@@ -920,6 +933,43 @@ export function startEditor() {
     }
     rechts.append(knoepfe);
   }
+  /** Palette mit Bildern: Boden/Wand-Farben des Tilesets, Formteil, Wand, Hindernis und die Gegner (zuerst die des Tilesets). Klick wählt das Werkzeug. */
+  function paletteFeld() {
+    const g = gebiet();
+    const farben = { boden: FLOOR, boden2: FLOOR2, wand: WALL, hindernis: FARBEN.hindernis, ...(lookFarben() || {}) };
+    const feldDiv = el('div', { id: 'palette' }, [el('div', { class: 'palette-titel', text: 'Palette' })]);
+    const raster = el('div', { class: 'palette-raster' });
+    const kachel = (id, titel, zeichneFn, aktivIst, bei) => {
+      const c = el('canvas', { width: String(PALETTE_PX * 2), height: String(PALETTE_PX * 2), title: titel, id: 'p-' + id, class: aktivIst ? 'aktiv' : '' });
+      c.style.width = c.style.height = PALETTE_PX + 'px';
+      const x = c.getContext('2d');
+      x.scale(2, 2);
+      x.fillStyle = farben.wand;
+      x.fillRect(0, 0, PALETTE_PX, PALETTE_PX);
+      zeichneFn(x);
+      c.addEventListener('click', bei);
+      raster.append(c);
+    };
+    const boden = (x, r = [4, 4, PALETTE_PX - 8, PALETTE_PX - 8]) => {
+      x.fillStyle = farben.boden;
+      x.fillRect(...r);
+      x.fillStyle = farben.boden2;
+      x.fillRect(r[0], r[1], r[2] / 2, r[3] / 2);
+      x.fillRect(r[0] + r[2] / 2, r[1] + r[3] / 2, r[2] / 2, r[3] / 2);
+    };
+    kachel('formteil', 'Formteil (B): erweitert den Boden', (x) => boden(x), state.werkzeug === 'formteil', () => setzeWerkzeug('formteil'));
+    kachel('wand', 'Wand (W): schneidet den Boden aus', (x) => { boden(x, [0, 0, PALETTE_PX, PALETTE_PX]); x.fillStyle = farben.wand; x.fillRect(14, 4, 28, PALETTE_PX - 8); }, state.werkzeug === 'wand', () => setzeWerkzeug('wand'));
+    kachel('hindernis', 'Hindernis (H)', (x) => { boden(x, [0, 0, PALETTE_PX, PALETTE_PX]); x.fillStyle = farben.hindernis; x.fillRect(16, 16, 24, 24); x.strokeStyle = '#000'; x.lineWidth = 1.5; x.strokeRect(16, 16, 24, 24); }, state.werkzeug === 'hindernis', () => setzeWerkzeug('hindernis'));
+    const art = GEGNER.includes(state.gegnerArt) ? state.gegnerArt : null;
+    for (const a of gegnerFuer(g.tileset)) {
+      kachel('gegner-' + a, `Gegner „${a}“ (X) – Platzhalter`, (x) => { boden(x, [0, 0, PALETTE_PX, PALETTE_PX]); zeichneGegner(x, a, PALETTE_PX / 2, PALETTE_PX / 2, 0, 1.4); }, state.werkzeug === 'gegner' && (art ?? GEGNER[0]) === a, () => {
+        state.gegnerArt = a;
+        setzeWerkzeug('gegner');
+      });
+    }
+    feldDiv.append(raster, el('p', { class: 'grau', text: 'Bild anklicken = Werkzeug wählen. Gegner sind Platzhalter (Verhalten im Fenster ungeprüft); zuerst die Gegner des Tilesets.' }));
+    return feldDiv;
+  }
   function eigenschaften() {
     if (state.ansichtArt === 'welt') return weltEigenschaften();
     rechts.replaceChildren();
@@ -991,7 +1041,15 @@ export function startEditor() {
       );
     } else {
       rechts.append(el('h2', { text: g.name }), dl);
-      zeile(dl, 'Tileset', g.tileset);
+      const ts = el('select', { id: 'f-tileset', title: 'Aussehen des Gebiets (Look „Tileset“, J)' }, Object.entries(TILESETS).map(([id, t]) => el('option', { value: id, text: t.name })));
+      ts.value = g.tileset;
+      ts.addEventListener('change', () => {
+        const wert = ts.value;
+        aendere('Tileset ändern', (gg) => {
+          gg.tileset = wert;
+        });
+      });
+      dl.append(el('dt', { text: 'Tileset' }), el('dd', {}, [ts]));
       const bm = bereichMasse(g.bereich);
       zeile(dl, 'Bereich', `${fmt(bm.w, 0)} × ${fmt(bm.h, 0)} E = ${fmt(bm.w / SCREEN_W)} × ${fmt(bm.h / SCREEN_H)} Bildschirme`);
       for (const f of ['x0', 'y0', 'x1', 'y1']) feld(dl, `Bereich ${f} (E)`, 'f-b' + f, g.bereich[f], (v) => setzeBereich(f, v), 'number', { step: 100 });
@@ -1005,7 +1063,8 @@ export function startEditor() {
       zeile(dl, 'Notizen', g.notizen.length);
     }
     rechts.append(knoepfe);
-    rechts.append(el('p', { class: 'grau', text: 'V Auswahl, G Gang, K Knoten, B Formteil, W Wand, H Hindernis, A Bereich, T Welt-Ansicht · R dreht ein Teil (Umschalt: links), Strg+C/V/D kopieren, einfügen, duplizieren · Strg+Z/Y Rückgängig/Wiederholen · Strg+S Speichern · P Spielen ab hier (Esc zurück), N Bezeichnung kopieren · Q/E drehen, 0 Norden, F wie im Spiel, Leertaste Fahrt, Mausrad zoomt.' }));
+    rechts.append(paletteFeld());
+    rechts.append(el('p', { class: 'grau', text: 'V Auswahl, G Gang, K Knoten, B Formteil, W Wand, H Hindernis, X Gegner, J Look, A Bereich, T Welt-Ansicht · R dreht ein Teil (Umschalt: links), Strg+C/V/D kopieren, einfügen, duplizieren · Strg+Z/Y Rückgängig/Wiederholen · Strg+S Speichern · P Spielen ab hier (Esc zurück), N Bezeichnung kopieren · Q/E drehen, 0 Norden, F wie im Spiel, Leertaste Fahrt, Mausrad zoomt.' }));
   }
   function refreshFahrt() {
     if (state.ansichtArt === 'welt') {
@@ -1157,6 +1216,7 @@ export function startEditor() {
     else if (c === KUERZEL.runter) ansicht.verschieben(0, -schritt);
     else if (c === KUERZEL.teilDrehen) dreheTeil(e.shiftKey ? -1 : 1);
     else if (c === KUERZEL.beschriftung) beschriften();
+    else if (c === KUERZEL.look) lookUmschalten();
     else if (c === KUERZEL.alles) alles();
     else if (hat(KUERZEL.loeschen, c)) loescheAuswahl();
     else if (Object.values(KUERZEL.werkzeug).includes(c)) setzeWerkzeug(Object.keys(KUERZEL.werkzeug).find((id) => KUERZEL.werkzeug[id] === c));
@@ -1182,7 +1242,7 @@ export function startEditor() {
   function zeichne() {
     const t0 = performance.now();
     if (state.ansichtArt === 'welt') zeichneWelt(ctx, { welt: state.welt, gebiete: state.gebiete, auswahl: state.weltAuswahl, aktuell: state.gebietId, marken: state.prueferOffen ? weltPruefer().meldungen : null, beschriftung: state.beschriftung }, ansicht, canvas.width / ansicht.w);
-    else zeichnePlan(ctx, gebiet(), ansicht, { auswahl: state.auswahl, fahrt: state.fahrt, zeit: state.zeit, beschriftung: state.beschriftung, marken: state.prueferOffen ? pruefer().meldungen : null, uebergaenge: uebergangsMarken(), vorschau: (c) => werkzeug().vorschau?.(c, kontext) }, canvas.width / ansicht.w);
+    else zeichnePlan(ctx, gebiet(), ansicht, { auswahl: state.auswahl, fahrt: state.fahrt, zeit: state.zeit, beschriftung: state.beschriftung, look: lookFarben(), marken: state.prueferOffen ? pruefer().meldungen : null, uebergaenge: uebergangsMarken(), vorschau: (c) => werkzeug().vorschau?.(c, kontext) }, canvas.width / ansicht.w);
     perf.zeichnenMs.push(performance.now() - t0);
     if (perf.zeichnenMs.length > 600) perf.zeichnenMs.shift();
     dirty = false;

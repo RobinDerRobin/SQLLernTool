@@ -1,13 +1,12 @@
 // Teile im Gang: Formteile (Boden), Wände und Hindernisse (Objekte mit Maßen). Setzen, Ziehen, Verschieben, Drehen, Kopieren,
 // Löschen, Eigenschaften. Reine Datenänderung auf dem übergebenen Gebiet (kein DOM, läuft auch unter Node) – Rückgängig macht main.js.
 // Alles rastet: Lage auf RASTER (20 E), Winkel auf 45°. Ein Teil ist { art: 'formteil'|'objekt', id }.
-import { MAX_KOORD, RASTER, MIN_TEIL, WINKEL_SCHRITT, TEIL_STANDARD, KOPIE_VERSATZ } from './konstanten.js';
+import { MAX_KOORD, RASTER, MIN_TEIL, WINKEL_SCHRITT, TEIL_STANDARD, KOPIE_VERSATZ, GEGNER_RADIUS } from './konstanten.js';
 import { OBJEKTTYPEN } from './katalog.js';
 import { rechteck, punktInPolygon } from './daten.js';
 import { neueId, rasterEnde } from './befehle.js';
 import { headingAngle } from '../core/math.js';
 
-const GEGNER_RADIUS = 14; // Trefferradius eines Gegner-Platzhalters (E), wie in zeichnen.js
 const rund = (v, r = 1) => Math.round(v / r) * r + 0; // + 0 macht aus -0 eine 0
 /** Winkel einer Richtung (0..7 aus math.js) in ganzen Grad. */
 const grad = (richtung) => Math.round(headingAngle(richtung) * (180 / Math.PI));

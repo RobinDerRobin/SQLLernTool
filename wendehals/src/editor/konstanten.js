@@ -42,7 +42,8 @@ export const KUERZEL = {
   zoomMinus: ['Minus', 'NumpadSubtract'],
   beschriftung: 'KeyL',
   alles: 'Home',
-  werkzeug: { auswahl: 'KeyV', gang: 'KeyG', knoten: 'KeyK', formteil: 'KeyB', wand: 'KeyW', hindernis: 'KeyH', bereich: 'KeyA' },
+  werkzeug: { auswahl: 'KeyV', gang: 'KeyG', knoten: 'KeyK', formteil: 'KeyB', wand: 'KeyW', hindernis: 'KeyH', gegner: 'KeyX', bereich: 'KeyA' },
+  look: 'KeyJ', // Look umschalten: Prototyp-Farben ↔ Tileset des Gebiets
   welt: 'KeyT', // zwischen Gebiet- und Welt-Ansicht umschalten
   teilDrehen: 'KeyR', // ohne Umschalt 45° rechtsherum, mit Umschalt linksherum
   kopieren: 'KeyC', // mit Strg/Cmd
@@ -83,6 +84,8 @@ export const FARBEN = {
   bereich: '#7fb3ff', // Rahmen des Gebiets-Bereichs im Plan
   uebergang: '#ff8ad8', // Übergang zwischen Gebieten
 };
+export const GEGNER_RADIUS = 14; // Trefferradius eines Gegner-Platzhalters (E)
+export const PALETTE_PX = 56; // Kantenlänge eines Palettenbilds (Bildschirmpixel)
 export const KNOTEN_RADIUS_PX = 7; // Knotenmarke (Bildschirmpixel, unabhängig vom Zoom)
 
 // Prüfer (Stufe 4): Abtastung der Regeln in regeln.js

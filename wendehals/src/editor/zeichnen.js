@@ -1,7 +1,7 @@
 // Zeichnet den Plan im Spielbild: Boden und Wand mit den Farben des Prototyps (fenster-draw.js), darüber Bedienhilfen
 // (Knoten, Beschriftung, Auswahl, Bildschirmrahmen mit Dackel, Maßstab). Nur Zeichnen – ändert keine Daten.
-import { drawDackel } from '../render/sprites.js';
-import { FLOOR, FLOOR2, WALL, GRID, SCREEN_W, SCREEN_H, FARBEN, KNOTEN_RADIUS_PX } from './konstanten.js';
+import { drawDackel, drawEnemy } from '../render/sprites.js';
+import { FLOOR, FLOOR2, WALL, GRID, SCREEN_W, SCREEN_H, FARBEN, KNOTEN_RADIUS_PX, GEGNER_RADIUS } from './konstanten.js';
 import { bodenPolygone, wandPolygone, knotenMap, gangMasse, gangPolygon, rahmenEcken, rechteck } from './daten.js';
 import { KNOTENTYPEN } from './katalog.js';
 import { teilFinden, hatMasse, teilEcken } from './teile.js';
@@ -33,15 +33,26 @@ function text(ctx, t, x, y, farbe = '#fff', ausrichtung = 'center') {
   ctx.fillText(t, x, y);
 }
 
+/** Gegner in Spielgrafik (drawEnemy des Spiels) an der Stelle (x, y); `art` ist der Name des v0.2-Gegners. */
+export function zeichneGegner(ctx, art, x, y, zeit = 0, skala = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(skala, skala);
+  drawEnemy(ctx, { kind: art, idx: 0, ang: 0, r: 12, rang: 0, t: zeit, chatter: 0, splitting: 0, dormant: 0 }, zeit);
+  ctx.restore();
+}
+
 /**
  * z: { uebergaenge: [{ knoten, text }] (Ringe an Knoten mit Übergang), auswahl: {art:'gang'|'knoten'|'objekt'|'notiz'|'formteil', id} | null, fahrt: {gang, s} | null, zeit, beschriftung }
+ * look: { boden, boden2, wand, hindernis } (Farben des Tilesets) oder weggelassen = Prototyp-Farben
  * (beschriftung: false blendet Knoten, Namen, Notizen und Maßstab aus – dann sieht man nur das Spielbild)
  * Gibt zurück, wie viele Schachbrettfelder gezeichnet wurden (für Tests).
  */
 export function zeichnePlan(ctx, g, ansicht, z = {}, dpr = 1) {
   const zeit = z.zeit || 0;
+  const look = { boden: FLOOR, boden2: FLOOR2, wand: WALL, hindernis: FARBEN.hindernis, ...(z.look || {}) };
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = WALL;
+  ctx.fillStyle = look.wand;
   ctx.fillRect(0, 0, ansicht.w, ansicht.h);
   if (!g) return 0;
 
@@ -51,7 +62,7 @@ export function zeichnePlan(ctx, g, ansicht, z = {}, dpr = 1) {
 
   // Boden, darauf das Schachbrett (nur im Boden, nur der sichtbare Teil)
   pfad(ctx, boden);
-  ctx.fillStyle = FLOOR;
+  ctx.fillStyle = look.boden;
   ctx.fill();
   let zellen = 0;
   const sicht = ansicht.sichtbar();
@@ -62,7 +73,7 @@ export function zeichnePlan(ctx, g, ansicht, z = {}, dpr = 1) {
   if ((i1 - i0 + 1) * (j1 - j0 + 1) <= MAX_ZELLEN) {
     ctx.save();
     ctx.clip();
-    ctx.fillStyle = FLOOR2;
+    ctx.fillStyle = look.boden2;
     ctx.beginPath();
     for (let i = i0; i <= i1; i++) {
       for (let j = j0; j <= j1; j++) {
@@ -80,27 +91,18 @@ export function zeichnePlan(ctx, g, ansicht, z = {}, dpr = 1) {
   const waende = wandPolygone(g);
   if (waende.length) {
     pfad(ctx, waende);
-    ctx.fillStyle = WALL;
+    ctx.fillStyle = look.wand;
     ctx.fill();
   }
 
-  // Hindernisse: Platzhalterbild (Spielgrafik folgt mit Stufe 6), kenntlich an Farbe und Kreuz
+  // Hindernisse: Vollfläche in der Hindernisfarbe, wie sie der Fenster-Prototyp zeichnet (spielen.js: block.farbe)
   for (const o of g.objekte) {
     if (o.typ !== 'hindernis') continue;
-    const e = teilEcken(o);
-    pfad(ctx, [e]);
-    ctx.fillStyle = FARBEN.hindernis;
-    ctx.globalAlpha = 0.85;
+    pfad(ctx, [teilEcken(o)]);
+    ctx.fillStyle = look.hindernis;
     ctx.fill();
-    ctx.globalAlpha = 1;
     ctx.lineWidth = 2 / s;
     ctx.strokeStyle = '#000';
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(e[0][0], e[0][1]);
-    ctx.lineTo(e[2][0], e[2][1]);
-    ctx.moveTo(e[1][0], e[1][1]);
-    ctx.lineTo(e[3][0], e[3][1]);
     ctx.stroke();
   }
 
@@ -137,16 +139,17 @@ export function zeichnePlan(ctx, g, ansicht, z = {}, dpr = 1) {
     }
   }
 
-  // Gegner-Platzhalter (Spielgrafik folgt mit Stufe 6)
+  // Gegner: Spielgrafik des v0.2-Gegners, darum ein orangefarbener Ring = Platzhalter (Verhalten im Fenster ungeprüft)
   for (const o of g.objekte) {
     if (o.typ !== 'gegner') continue;
+    zeichneGegner(ctx, o.art, o.x, o.y, zeit);
     ctx.beginPath();
-    ctx.arc(o.x, o.y, 14, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,154,60,0.55)';
-    ctx.fill();
+    ctx.arc(o.x, o.y, GEGNER_RADIUS + 4, 0, Math.PI * 2);
     ctx.lineWidth = 2 / s;
+    ctx.setLineDash([5 / s, 4 / s]);
     ctx.strokeStyle = FARBEN.platzhalter;
     ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   // Bildschirmrahmen mit Dackel
@@ -268,7 +271,7 @@ export function zeichnePlan(ctx, g, ansicht, z = {}, dpr = 1) {
   for (const o of g.objekte) {
     if (o.typ !== 'hindernis') continue;
     const [px, py] = ansicht.weltZuBild(o.x, o.y);
-    if (sichtbarPx(px, py) && o.laenge * s > 40) text(ctx, 'Hindernis (Platzhalter)', px, py, '#fff');
+    if (sichtbarPx(px, py) && o.laenge * s > 40) text(ctx, 'Hindernis', px, py, '#fff');
   }
   for (const n of g.notizen) {
     const [px, py] = ansicht.weltZuBild(n.x, n.y);
