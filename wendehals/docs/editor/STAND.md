@@ -2,7 +2,7 @@
 
 > Wird von jedem Bau-Lauf gepflegt (Brief: [`BRIEF.md`](BRIEF.md), Abschnitt 7). Zeiten in Europe/Berlin.
 
-**Sperre:** belegt seit 12.10.2026 07:06, Lauf https://claude.ai/code/session_01U3ZmwbFLLu7kxsU6pzfrfJ
+**Sperre:** frei
 
 ## Stufen
 
@@ -67,6 +67,7 @@
 
 ## Offen aus Stufe 6 (Agenten-Prüfung, Hinweise)
 
+- Obere Leisten scrollen jetzt waagerecht (vorher abgeschnitten); Palette bei 1024×600 nur gescrollt nutzbar; Gegner bei Normalzoom winzig; Beschriftungen überlappen; Hindernisfarbe im Look „Disco“ kaum von der Wand unterscheidbar.
 - „Spielen ab hier“ ignoriert das Tileset (Prototyp-Farben); Look „Tileset“ meldet bei unbekanntem Tileset trotzdem Erfolg (nur handgebaute Daten); Palette wird bei jedem `refresh()` neu gezeichnet; kein Pixelvergleich Editor ↔ Spielzeichnung für Gegner (gleiche Funktion `drawEnemy`).
 
 ## Offen aus Stufe 5 (Agenten-Prüfung, Hinweise)
@@ -108,3 +109,4 @@
 | 12.10.2026 05:12 | Sonnet 5.5, Lauf 4 | Stufe 3 gebaut, Agenten-Befunde (Fehler) behoben, gepusht |
 | 12.10.2026 05:57 | Sonnet 5.5, Lauf 5 | Stufe 4 gebaut, Agenten-Befund (Leistung M2) behoben, gepusht |
 | 12.10.2026 06:35 | Sonnet 5.5, Lauf 6 | Stufe 5 gebaut, Agenten-Befunde (Fehler) behoben, gepusht |
+| 12.10.2026 07:06 | Sonnet 5.5, Lauf 7 | Stufe 6 gebaut, Agenten-Befund (Leisten abgeschnitten) behoben, gepusht |

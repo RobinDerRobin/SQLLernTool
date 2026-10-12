@@ -27,7 +27,7 @@ const CSS = `
 html, body { margin: 0; height: 100%; background: #14121a; color: #e8e6ee; font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
 #editor { display: grid; grid-template-columns: 1fr 290px; grid-template-rows: 44px 44px 22px 1fr 78px; height: 100%; }
 #editor > * { min-width: 0; min-height: 0; }
-.leiste { background: #221f2b; display: flex; flex-wrap: nowrap; overflow: hidden; align-items: center; min-height: 44px; padding-top: 3px; padding-bottom: 3px; box-sizing: border-box; gap: 8px; padding: 0 10px; border: 0 solid #38334a; }
+.leiste { background: #221f2b; display: flex; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; align-items: center; min-height: 44px; padding-top: 3px; padding-bottom: 3px; box-sizing: border-box; gap: 8px; padding: 0 10px; border: 0 solid #38334a; }
 #oben, #werk { grid-column: 1 / 3; border-bottom-width: 1px; }
 #hinweiszeile { grid-column: 1 / 3; grid-row: 3; background: #221f2b; padding: 0 10px; line-height: 22px; border-bottom: 1px solid #38334a; overflow: hidden; }
 #plan { grid-row: 4; } #rechts { grid-row: 4; grid-column: 2; }
