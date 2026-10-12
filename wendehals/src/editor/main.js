@@ -6,12 +6,14 @@ import { HEADINGS, DIR_NAMES, E } from '../core/math.js';
 import { Ansicht } from './ansicht.js';
 import { zeichnePlan } from './zeichnen.js';
 import { WELT, GEBIETE } from './startdaten.js';
-import { kopie, knotenMap, gangMasse, gangPolygon, knotenPolygon, punktInPolygon, ausdehnung, rahmenEcken, formatiere, formatiereWelt, ladeGebiet, pruefeFormat, Verlauf } from './daten.js';
+import { kopie, bezeichnung, knotenMap, gangMasse, gangPolygon, knotenPolygon, punktInPolygon, ausdehnung, rahmenEcken, formatiere, formatiereWelt, ladeGebiet, pruefeFormat, Verlauf } from './daten.js';
 import { KNOTENTYPEN } from './katalog.js';
 import { KUERZEL, WINKEL_SCHRITT, SCREEN_W, SPEED, ZOOM_BILDSCHIRME, PFEIL_SCHRITT_PX, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX } from './konstanten.js';
 import { gangTeilen, loesche, setze } from './befehle.js';
 import { teilBei, teilFinden, teilDrehen, teilMerken, teilEinfuegen, loescheTeil, setzeTeil, istTeilArt, hatMasse, teilName, liste as teilListe } from './teile.js';
 import { erzeugeSpeicher } from './speicher.js';
+import { spielbarkeit, erzeugeSzene } from './spielen.js';
+import { SpielModus } from './spielmodus.js';
 import { WERKZEUGE } from './werkzeuge/index.js';
 
 const fmt = (n, d = 1) => n.toFixed(d).replace('.', ',');
@@ -77,6 +79,8 @@ export function startEditor() {
     echtzeit: true, // false: Zeit und Fahrt laufen nur über tick() – für deterministische Tests
     werkzeug: WERKZEUGE[0].id,
     knotenTyp: 'kreuzung',
+    spielen: null, // laufender SpielModus (Stufe 3) oder null
+    bezeichnung: '', // zuletzt kopierte Bezeichnung
     zwischen: null, // gemerktes Teil für Einfügen (Strg+C): { art, teil }
     zeiger: null, // letzte Mausstelle im Plan (Welt), Zielstelle für Einfügen
     verlauf: {}, // Gebiets-ID → Verlauf (Rückgängig/Wiederholen)
@@ -145,7 +149,11 @@ export function startEditor() {
   const fahrtText = el('span', { id: 'fahrt-text' });
   const melden = el('span', { id: 'melden' });
   melden.addEventListener('click', () => melde(''));
-  const unten = el('div', { id: 'unten', class: 'leiste' }, [play, schieber, fahrtText, melden]);
+  const spielKnopf = knopf('▶ Spielen ab hier', 'Fenster-Prototyp an der Rahmenstelle des gewählten Gangs starten; Esc führt zurück (P)', () => spielenAb(), 'b-spielen');
+  const bezKnopf = knopf('Bezeichnung kopieren', 'Bezeichnung des gewählten Gangs (mit Stelle) oder Knotens für Claude Code kopieren (N)', () => kopiereBezeichnung(), 'b-bezeichnung');
+  const bezFeld = el('input', { id: 'bezeichnung', type: 'text', readonly: 'readonly', title: 'Bezeichnung zum Markieren und Kopieren', size: '34' });
+  bezFeld.style.display = 'none';
+  const unten = el('div', { id: 'unten', class: 'leiste' }, [play, schieber, fahrtText, spielKnopf, bezKnopf, bezFeld, melden]);
   const wurzel = el('div', { id: 'editor' }, [oben, werk, hinweisZeile, plan, rechts, unten]);
   document.body.append(wurzel);
 
@@ -262,6 +270,54 @@ export function startEditor() {
     return null;
   }
 
+
+  // ---------------------------------------------------------------- Spielen ab hier, Bezeichnung (Stufe 3)
+  /** Fenster-Prototyp an der Rahmenstelle des gewählten Gangs starten. Was er nicht spielen kann, wird vorher gemeldet. */
+  function spielenAb() {
+    if (state.spielen?.aktiv) return;
+    const au = state.auswahl;
+    if (!au || au.art !== 'gang' || !state.fahrt) return melde('Zum Spielen erst einen Gang anklicken und den Rahmen an die Stelle fahren.', 'fehler');
+    const g = gebiet();
+    const { probleme, hinweise } = spielbarkeit(g);
+    if (probleme.length) return melde('Noch nicht spielbar: ' + probleme.join(' · '), 'fehler');
+    let szene;
+    try {
+      szene = erzeugeSzene(g, state.fahrt.gang, state.fahrt.s);
+    } catch (e) {
+      return melde(e.message, 'fehler');
+    }
+    state.fahrt.laeuft = false;
+    werkzeug().abbruch?.(kontext);
+    zug = null;
+    state.spielen = new SpielModus(szene, document.body, () => {
+      melde(hinweise.length ? 'Zurück im Editor. ' + hinweise.join(' ') : 'Zurück im Editor.');
+      refresh();
+    }, { echtzeit: () => state.echtzeit });
+    if (hinweise.length) melde(hinweise.join(' '));
+  }
+  /** Text für „Bezeichnung kopieren“ (Gang: mit Stelle des Rahmens, Knoten: ohne), sonst null. */
+  function bezeichnungText() {
+    const au = state.auswahl;
+    if (au?.art === 'gang') return bezeichnung(gebiet(), { art: 'gang', id: au.id }, state.fahrt?.s ?? null);
+    if (au?.art === 'knoten') return bezeichnung(gebiet(), { art: 'knoten', id: au.id });
+    return null;
+  }
+  async function kopiereBezeichnung() {
+    const text = bezeichnungText();
+    if (!text) return melde('Zum Kopieren erst einen Gang oder Knoten anklicken.', 'fehler');
+    bezFeld.value = text;
+    bezFeld.style.display = '';
+    bezFeld.select(); // Rückfall: markierter Text, falls die Zwischenablage gesperrt ist
+    let kopiert = false;
+    try {
+      await navigator.clipboard.writeText(text);
+      kopiert = true;
+    } catch {
+      /* Zwischenablage gesperrt (z. B. Dateiseite ohne Berechtigung): der markierte Text im Feld genügt zum Kopieren mit Strg+C */
+    }
+    state.bezeichnung = text;
+    melde(kopiert ? `Kopiert: ${text}` : `Nicht in die Zwischenablage gekommen – Text ist markiert, mit Strg+C kopieren: ${text}`);
+  }
 
   // ---------------------------------------------------------------- Bearbeiten (Stufe 2a)
   function melde(text, art = 'info') {
@@ -568,7 +624,7 @@ export function startEditor() {
       zeile(dl, 'Notizen', g.notizen.length);
     }
     rechts.append(knoepfe);
-    rechts.append(el('p', { class: 'grau', text: 'V Auswahl, G Gang, K Knoten, B Formteil, W Wand, H Hindernis · R dreht ein Teil (Umschalt: links), Strg+C/V/D kopieren, einfügen, duplizieren · Strg+Z/Y Rückgängig/Wiederholen · Strg+S Speichern · Q/E drehen, 0 Norden, F wie im Spiel, Leertaste Fahrt, Mausrad zoomt.' }));
+    rechts.append(el('p', { class: 'grau', text: 'V Auswahl, G Gang, K Knoten, B Formteil, W Wand, H Hindernis · R dreht ein Teil (Umschalt: links), Strg+C/V/D kopieren, einfügen, duplizieren · Strg+Z/Y Rückgängig/Wiederholen · Strg+S Speichern · P Spielen ab hier (Esc zurück), N Bezeichnung kopieren · Q/E drehen, 0 Norden, F wie im Spiel, Leertaste Fahrt, Mausrad zoomt.' }));
   }
   function refreshFahrt() {
     const m = ganzMasse();
@@ -592,6 +648,8 @@ export function startEditor() {
     undoKnopf.disabled = !v.kannZurueck;
     redoKnopf.disabled = !v.kannVor;
     const au = state.auswahl;
+    spielKnopf.disabled = !(au?.art === 'gang' && state.fahrt);
+    bezKnopf.disabled = !(au?.art === 'gang' || au?.art === 'knoten');
     for (const w of WERKZEUGE) document.getElementById('t-' + w.id)?.classList.toggle('an', w.id === state.werkzeug);
     typWahl.disabled = state.werkzeug !== 'knoten';
     loeschKnopf.disabled = !(au && (au.art === 'gang' || au.art === 'knoten' || istTeilArt(au.art)));
@@ -659,6 +717,7 @@ export function startEditor() {
     { passive: false },
   );
   window.addEventListener('keydown', (e) => {
+    if (state.spielen?.aktiv) return; // im Spielmodus gehören die Tasten dem Spiel
     const imFeld = e.target instanceof HTMLSelectElement || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
     if ((e.ctrlKey || e.metaKey) && !e.altKey) {
       const c = e.code;
@@ -689,6 +748,8 @@ export function startEditor() {
     else if (c === KUERZEL.wieImSpiel) wieImSpiel();
     else if (e.key === '+' || hat(KUERZEL.zoomPlus, c)) zoom(-1);
     else if (e.key === '-' || hat(KUERZEL.zoomMinus, c)) zoom(1);
+    else if (c === KUERZEL.spielen) spielenAb();
+    else if (c === KUERZEL.bezeichnung) kopiereBezeichnung();
     else if (c === KUERZEL.fahrtStart) fahrtUmschalten();
     else if (c === KUERZEL.fahrtVor) setzeFahrt((state.fahrt?.s || 0) + 20);
     else if (c === KUERZEL.fahrtZurueck) setzeFahrt((state.fahrt?.s || 0) - 20);
@@ -753,6 +814,9 @@ export function startEditor() {
     wechsle,
     waehle,
     setzeFahrt,
+    spielenAb,
+    kopiereBezeichnung,
+    bezeichnungText,
     fahrtUmschalten,
     tick,
     zeichne,

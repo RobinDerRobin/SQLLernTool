@@ -623,6 +623,97 @@ await teil.screenshot({ path: path.join(shots, 'editor-07-teile-fertig.png') });
 check(teilFehler.length === 0, 'Bauen II: keine Konsolenfehler', teilFehler.join('; '));
 await teil.close();
 
+// ------------------------------------------------------------------ Stufe 3: Spielen ab hier, Bezeichnung kopieren
+const vorSpiel = errors.length;
+await ed((e) => {
+  e.state.echtzeit = false;
+  e.wechsle('proto-netz');
+  e.waehle({ art: 'gang', id: 'nord-1' });
+  e.setzeFahrt(300);
+});
+const datenVorSpiel = await ed((e) => JSON.stringify(e.gebiet()));
+const stateVorSpiel = await ed((e) => JSON.stringify({ a: e.state.auswahl, f: e.state.fahrt, g: e.state.gebietId, w: e.state.werkzeug, z: e.ansicht.cx + ',' + e.ansicht.cy + ',' + e.ansicht.stufe + ',' + e.ansicht.blick }));
+check(await page.locator('#b-spielen').isEnabled(), 'Spielen: Knopf „Spielen ab hier“ ist mit gewähltem Gang bedienbar');
+await page.keyboard.press('KeyP');
+await page.waitForSelector('#spiel-canvas');
+const szene0 = await ed((e) => {
+  const sc = e.state.spielen.szene;
+  const m = sc.dogMap();
+  return { aktiv: e.state.spielen.aktiv, theta: sc.theta, s: sc.s, dog: [sc.dog.x, sc.dog.y], dogMap: [m.x, m.y], cam: [sc.cam.x, sc.cam.y], tot: sc.deaths };
+});
+// Gang nord-1 liegt von K1 (-900,-500) nach K2 (0,-500): Stelle 300 → Rahmenmitte (-600,-500), Dackel 120 E dahinter (-720,-500)
+check(szene0.aktiv && szene0.theta === 0 && szene0.s === 'R', 'Spielen: Start in Flugrichtung des Gangs (Osten)');
+check(Math.abs(szene0.dogMap[0] + 720) < 1e-6 && Math.abs(szene0.dogMap[1] + 500) < 1e-6 && Math.abs(szene0.cam[0] + 600) < 1e-6, 'Spielen: Dackel steht an der Stelle des Rahmens (Stelle 300 → Karte −720|−500)', JSON.stringify(szene0));
+check(szene0.dog[0] === 120 && szene0.dog[1] === 135, 'Spielen: Dackel auf der Bildschirmstelle (120|135) wie im Rahmen des Editors');
+// Bild messen (Regel 3): Gang ist 200 E breit → im Bild Boden von y = 35 bis 235; darüber/darunter Wand
+const spielPixel = (bx, by) => page.evaluate(([x, y]) => {
+  const c = document.getElementById('spiel-canvas');
+  const k = c.width / 480;
+  return Array.from(c.getContext('2d').getImageData(Math.round(x * k), Math.round(y * k), 1, 1).data);
+}, [bx, by]);
+const istBodenFarbe = (p) => gleich(p, hex(FLOOR), 2) || gleich(p, hex(FLOOR2), 2);
+check(istBodenFarbe(await spielPixel(330, 135)) && istBodenFarbe(await spielPixel(330, 60)) && istBodenFarbe(await spielPixel(330, 210)), 'Spielen: Bild zeigt den Gangboden');
+check(gleich(await spielPixel(330, 20), hex(WALL), 2) && gleich(await spielPixel(330, 250), hex(WALL), 2), 'Spielen: über und unter dem Gang ist Wand im Bild');
+await shot('08-spielen');
+const tasteImEditor = await ed((e) => e.state.werkzeug);
+await page.keyboard.press('KeyG');
+check((await ed((e) => e.state.werkzeug)) === tasteImEditor, 'Spielen: Spieltasten erreichen den Editor darunter nicht');
+await ed((e) => e.state.spielen.tick(2));
+const szene1 = await ed((e) => {
+  const sc = e.state.spielen.szene;
+  return { cam: [sc.cam.x, sc.cam.y], tot: sc.deaths };
+});
+check(Math.abs(szene1.cam[0] - szene0.cam[0] - 140) < 1.5 && szene1.tot === 0, `Spielen: Fenster scrollt mit 70 E/s (2 s → ${(szene1.cam[0] - szene0.cam[0]).toFixed(1)} E)`);
+await page.keyboard.down('ArrowDown');
+await ed((e) => e.state.spielen.tick(0.3));
+await page.keyboard.up('ArrowDown');
+check((await ed((e) => e.state.spielen.szene.dog.y)) > 135 + 20, 'Spielen: Pfeiltasten steuern den Dackel');
+await ed((e) => e.state.spielen.tick(3)); // weiter nach unten → Wand → Tod und Neustart an der letzten Kreuzung/Startstelle
+await page.keyboard.press('Escape');
+await page.waitForSelector('#spiel-canvas', { state: 'detached' });
+check(!(await ed((e) => e.state.spielen.aktiv)), 'Spielen: Esc führt zurück in den Editor');
+check((await ed((e) => JSON.stringify(e.gebiet()))) === datenVorSpiel, 'Spielen: Daten nach der Rückkehr unverändert');
+check(
+  (await ed((e) => JSON.stringify({ a: e.state.auswahl, f: e.state.fahrt, g: e.state.gebietId, w: e.state.werkzeug, z: e.ansicht.cx + ',' + e.ansicht.cy + ',' + e.ansicht.stufe + ',' + e.ansicht.blick }))) === stateVorSpiel,
+  'Spielen: Auswahl, Rahmenstelle und Ansicht nach der Rückkehr unverändert',
+  stateVorSpiel + ' ≠ ' + (await ed((e) => JSON.stringify({ a: e.state.auswahl, f: e.state.fahrt, g: e.state.gebietId, w: e.state.werkzeug, z: e.ansicht.cx + ',' + e.ansicht.cy + ',' + e.ansicht.stufe + ',' + e.ansicht.blick }))),
+);
+await page.keyboard.press('KeyG');
+check((await ed((e) => e.state.werkzeug)) === 'gang', 'Spielen: nach der Rückkehr gelten die Editor-Tasten wieder');
+await page.keyboard.press('KeyV');
+
+// Was der Prototyp nicht spielen kann, wird vorher gemeldet – nichts startet still falsch
+await ed((e) => {
+  e.wechsle('beispiel');
+  e.waehle({ art: 'gang', id: 'schleuse' });
+  e.setzeFahrt(400);
+});
+await page.click('#b-spielen');
+const meldung = await page.locator('#melden').textContent();
+check(/Noch nicht spielbar/.test(meldung) && /Diagonale/.test(meldung), 'Spielen: Diagonale im Gebiet → Meldung „Noch nicht spielbar“ mit Grund', meldung);
+check((await page.locator('#spiel-canvas').count()) === 0, 'Spielen: bei nicht spielbarem Gebiet startet nichts');
+await ed((e) => e.melde(''));
+
+// Bezeichnung kopieren
+await page.context().grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
+await ed((e) => {
+  e.waehle({ art: 'gang', id: 'schleuse' });
+  e.setzeFahrt(560);
+});
+await page.keyboard.press('KeyN');
+await page.waitForTimeout(100);
+check((await page.inputValue('#bezeichnung')) === 'Wendehals-Level beispiel/schleuse@560', 'Bezeichnung: Gang mit Stelle im Format Wendehals-Level <gebiet>/<level>@<stelle>', await page.inputValue('#bezeichnung'));
+check(await page.locator('#bezeichnung').isVisible(), 'Bezeichnung: Textfeld als Rückfall sichtbar');
+const zw = await page.evaluate(() => navigator.clipboard.readText().catch(() => null));
+check(zw === null || zw === 'Wendehals-Level beispiel/schleuse@560', 'Bezeichnung: Zwischenablage enthält die Bezeichnung (falls erlaubt)', String(zw));
+await ed((e) => e.waehle({ art: 'knoten', id: 'K2' }));
+await page.click('#b-bezeichnung');
+await page.waitForTimeout(100);
+check((await page.inputValue('#bezeichnung')) === 'Wendehals-Level beispiel/K2', 'Bezeichnung: Knoten im Format <gebiet>/<knoten>');
+await ed((e) => e.waehle(null));
+check(await page.locator('#b-bezeichnung').isDisabled() && await page.locator('#b-spielen').isDisabled(), 'Bezeichnung/Spielen: ohne Auswahl ausgegraut');
+check(errors.length === vorSpiel, 'Stufe 3: keine Konsolenfehler', errors.slice(vorSpiel).join('; '));
+
 // ------------------------------------------------------------------ Leistung: 300 Objekte
 const ms = await ed((e) => {
   const g = e.gebiet();

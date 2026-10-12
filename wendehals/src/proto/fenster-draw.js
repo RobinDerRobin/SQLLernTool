@@ -40,10 +40,12 @@ function drawPlan(ctx, sc, cam, ang) {
   ctx.fillRect(b.x0 - 700, b.y0 - 700, b.x1 - b.x0 + 1400, b.y1 - b.y0 + 1400);
   ctx.fillStyle = FLOOR;
   for (const c of map.corridors) ctx.fillRect(c.x0, c.y0, c.x1 - c.x0, c.y1 - c.y0);
+  for (const c of map.extraFloor ?? []) ctx.fillRect(c.x0, c.y0, c.x1 - c.x0, c.y1 - c.y0); // nur Editor-Karten (editor-karte.js)
   // Gitter, damit Scrollen und Drehung sichtbar sind (nur der sichtbare Teil)
   ctx.save();
   ctx.beginPath();
   for (const c of map.corridors) ctx.rect(c.x0, c.y0, c.x1 - c.x0, c.y1 - c.y0);
+  for (const c of map.extraFloor ?? []) ctx.rect(c.x0, c.y0, c.x1 - c.x0, c.y1 - c.y0);
   ctx.clip();
   ctx.fillStyle = FLOOR2;
   const R = 290;
@@ -55,6 +57,11 @@ function drawPlan(ctx, sc, cam, ang) {
     }
   }
   ctx.restore();
+  // Wände und Hindernisse im Gang (nur Editor-Karten): decken den Boden ab
+  for (const b of map.blocks ?? []) {
+    ctx.fillStyle = b.farbe;
+    ctx.fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
+  }
   // Kreuzungsquadrate (dünne Marke)
   ctx.strokeStyle = 'rgba(255,255,255,0.25)';
   ctx.lineWidth = 2;

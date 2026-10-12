@@ -52,6 +52,8 @@ export const KUERZEL = {
   wiederholen: 'KeyY', // mit Strg/Cmd
   speichern: 'KeyS', // mit Strg/Cmd
   oeffnen: 'KeyO', // mit Strg/Cmd
+  spielen: 'KeyP', // Spielen ab hier
+  bezeichnung: 'KeyN', // Bezeichnung kopieren
   fahrtStart: 'Space',
   fahrtVor: 'BracketRight',
   fahrtZurueck: 'BracketLeft',
