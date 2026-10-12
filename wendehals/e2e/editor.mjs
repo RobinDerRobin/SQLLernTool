@@ -721,6 +721,66 @@ await ed((e) => e.waehle(null));
 check(await page.locator('#b-bezeichnung').isDisabled() && await page.locator('#b-spielen').isDisabled(), 'Bezeichnung/Spielen: ohne Auswahl ausgegraut');
 check(errors.length === vorSpiel, 'Stufe 3: keine Konsolenfehler', errors.slice(vorSpiel).join('; '));
 
+// ------------------------------------------------------------------ Stufe 4: Prüfer
+const vorPruefer = errors.length;
+await ed((e) => {
+  e.state.echtzeit = false;
+  e.wechsle('proto-netz');
+  e.state.beschriftung = false;
+});
+const ohneMuss = await ed((e) => e.pruefer().meldungen.filter((m) => m.art === 'MUSS').length);
+check(ohneMuss === 0, 'Prüfer: Gebiet „Netz“ hat keine MUSS-Meldung', String(ohneMuss));
+check((await page.locator('#b-pruefer').textContent()).startsWith('Prüfer: ') && (await page.locator('#b-pruefer').getAttribute('class')).includes('soll') || (await page.locator('#b-pruefer').getAttribute('class')).includes('gut'), 'Prüfer: Knopf zeigt den Stand ohne MUSS (grün/gelb)');
+check(!(await page.locator('#prueferfeld').isVisible()), 'Prüfer: Liste ist zu, bis man sie öffnet');
+// Engstelle bauen (zwei Wände lassen 40 E Querweg) – Gang nord-1 geht von (-900,-500) nach (0,-500), 200 E breit
+await ed((e) => {
+  e.aendere('Engstelle', (g) => {
+    g.objekte.push({ id: 'oE1', typ: 'wand', x: -450, y: -560, laenge: 200, breite: 80, winkel: 0 }, { id: 'oE2', typ: 'wand', x: -450, y: -440, laenge: 200, breite: 80, winkel: 0 });
+  });
+});
+const engstelle = await ed((e) => e.pruefer().meldungen.filter((m) => m.regel === 'M2'));
+check(engstelle.length === 1 && engstelle[0].ort.id === 'nord-1' && engstelle[0].ort.s > 330 && engstelle[0].ort.s < 570, 'Prüfer: M2 meldet die Engstelle mit Gang und Stelle', JSON.stringify(engstelle));
+check((await page.locator('#b-pruefer').getAttribute('class')).includes('muss') && (await page.locator('#b-pruefer').textContent()).includes('1 MUSS'), 'Prüfer: Knopf wird rot und zählt „1 MUSS“');
+// Bild ohne Marken merken (Liste zu), dann öffnen: Marken erscheinen im Plan
+await ed((e) => {
+  e.waehle(null);
+  e.ansicht.zentrieren(-450, -500);
+  e.ansicht.stufe = 2;
+  e.refresh();
+});
+const hashOhne = await ed((e) => e.hash());
+await page.click('#b-pruefer');
+check(await page.locator('#prueferfeld').isVisible(), 'Prüfer: Klick auf „Prüfer“ öffnet die Liste');
+const hashMit = await ed((e) => e.hash());
+check(hashMit !== hashOhne, 'Prüfer: geöffnete Liste zeichnet Marken in den Plan (Bild ändert sich)');
+const punkte = await page.locator('#prueferfeld .pm').count();
+check(punkte >= 1 && (await page.locator('#prueferfeld .pm.MUSS').first().textContent()).includes('M2 MUSS'), 'Prüfer: Liste zeigt die Meldung mit Regel und Art', String(punkte));
+await shot('09-pruefer');
+// Klick auf die Meldung springt zur Stelle
+await ed((e) => {
+  e.ansicht.zentrieren(5000, 5000);
+  e.waehle(null);
+});
+await page.locator('#prueferfeld .pm.MUSS').first().click();
+const sprung = await ed((e) => ({ au: e.state.auswahl, s: e.state.fahrt?.s, cx: e.ansicht.cx, cy: e.ansicht.cy }));
+check(sprung.au?.id === 'nord-1' && sprung.s > 330 && sprung.s < 570 && Math.abs(sprung.cx + 450) < 120 && Math.abs(sprung.cy + 500) < 5, 'Prüfer: Klick springt zum Gang, zur Stelle und zentriert den Plan', JSON.stringify(sprung));
+// Engstelle weg (Rückgängig) → Meldung weg
+await ed((e) => e.rueckgaengig());
+check((await ed((e) => e.pruefer().muss)) === 0 && (await page.locator('#prueferfeld .pm.MUSS').count()) === 0, 'Prüfer: nach Rückgängig ist die Meldung weg');
+// Drehzone: Wand 100 E vor der Kreuzung K2 (0,-500)
+await ed((e) => {
+  e.aendere('Wand in der Drehzone', (g) => g.objekte.push({ id: 'oE3', typ: 'wand', x: -100, y: -560, laenge: 40, breite: 40, winkel: 0 }));
+});
+const m3 = await ed((e) => e.pruefer().meldungen.filter((m) => m.regel === 'M3').map((m) => m.ort.id));
+check(m3.includes('oE3'), 'Prüfer: M3 meldet die Wand in der Drehzone vor der Kreuzung', JSON.stringify(m3));
+await ed((e) => e.rueckgaengig());
+// Beispiel: Diagonale → „Noch nicht spielbar“ in der Liste (M7)
+await ed((e) => e.wechsle('beispiel'));
+check((await page.locator('#prueferfeld .pm', { hasText: 'Noch nicht spielbar' }).count()) >= 1, 'Prüfer: Beispiel zeigt „Noch nicht spielbar“ (M7)');
+await page.click('#b-pruefer');
+check(!(await page.locator('#prueferfeld').isVisible()), 'Prüfer: zweiter Klick schließt die Liste');
+check(errors.length === vorPruefer, 'Prüfer: keine Konsolenfehler', errors.slice(vorPruefer).join('; '));
+
 // ------------------------------------------------------------------ Leistung: 300 Objekte
 const ms = await ed((e) => {
   const g = e.gebiet();

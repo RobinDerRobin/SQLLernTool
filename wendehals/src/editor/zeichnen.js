@@ -182,6 +182,29 @@ export function zeichnePlan(ctx, g, ansicht, z = {}, dpr = 1) {
     }
   }
 
+  // Prüfer-Marken: Engstellen als Streifen, andere Fundstellen als Ring (nur wenn die Prüferliste offen ist)
+  for (const m of z.marken || []) {
+    const o = m.ort;
+    if (!o) continue;
+    const farbe = m.art === 'MUSS' ? FARBEN.pruefMuss : FARBEN.pruefSoll;
+    ctx.strokeStyle = farbe;
+    ctx.fillStyle = farbe;
+    if (o.x1 != null) {
+      ctx.globalAlpha = 0.35;
+      ctx.lineWidth = Math.max(20, 14 / s);
+      ctx.lineCap = 'butt';
+      ctx.beginPath();
+      ctx.moveTo(o.x1, o.y1);
+      ctx.lineTo(o.x2, o.y2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    ctx.lineWidth = 3 / s;
+    ctx.beginPath();
+    ctx.arc(o.x, o.y, 12 / s + 8, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
   // Vorschau des aktiven Werkzeugs (in Weltkoordinaten)
   z.vorschau?.(ctx);
 

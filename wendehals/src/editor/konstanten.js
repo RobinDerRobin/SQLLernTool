@@ -77,5 +77,13 @@ export const FARBEN = {
   platzhalter: '#ff9a3c',
   hindernis: '#d9822b', // Platzhalterfarbe, bis die Spielgrafik der Hindernisse in Stufe 6 kommt
   massstab: '#ffffff',
+  pruefMuss: '#ff3b2e', // Marken des Prüfers im Plan
+  pruefSoll: '#ffc830',
 };
 export const KNOTEN_RADIUS_PX = 7; // Knotenmarke (Bildschirmpixel, unabhängig vom Zoom)
+
+// Prüfer (Stufe 4): Abtastung der Regeln in regeln.js
+export const PRUEF_SCHRITT = 20; // Abstand der Messstellen entlang eines Gangs (E)
+export const PRUEF_QUER = 10; // Abstand der Messpunkte quer zum Gang (E)
+export const PRUEF_RAND = 2; // Toleranz am Rand des Bodens (E): Ecken dürfen so weit danebenliegen (Rundung, Raster)
+export const MIN_GANG_SOLL = SCREEN_W; // Regel S1: kürzere Gänge lassen die Drehzonen überlappen (E)

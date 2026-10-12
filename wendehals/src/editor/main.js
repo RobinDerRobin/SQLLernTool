@@ -13,6 +13,7 @@ import { gangTeilen, loesche, setze } from './befehle.js';
 import { teilBei, teilFinden, teilDrehen, teilMerken, teilEinfuegen, loescheTeil, setzeTeil, istTeilArt, hatMasse, teilName, liste as teilListe } from './teile.js';
 import { erzeugeSpeicher } from './speicher.js';
 import { spielbarkeit, erzeugeSzene } from './spielen.js';
+import { pruefeGebiet, zusammenfassung } from './pruefer.js';
 import { SpielModus } from './spielmodus.js';
 import { WERKZEUGE } from './werkzeuge/index.js';
 
@@ -30,6 +31,11 @@ html, body { margin: 0; height: 100%; background: #14121a; color: #e8e6ee; font:
 #unten { grid-row: 5; grid-column: 1 / 3; border-top-width: 1px; gap: 12px; flex-wrap: wrap; overflow: auto; }
 #plan { position: relative; overflow: hidden; background: #1c1822; }
 #plan canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+#prueferfeld { position: absolute; top: 8px; right: 8px; width: 440px; max-width: calc(100% - 16px); max-height: 45%; overflow: auto; background: rgba(34,31,43,.96); border: 1px solid #4b4560; border-radius: 6px; padding: 6px 8px; box-sizing: border-box; }
+#prueferfeld h3 { font-size: 13px; margin: 0 0 4px; }
+#prueferfeld .pm { display: block; width: 100%; text-align: left; white-space: normal; margin: 2px 0; }
+#prueferfeld .pm.MUSS { border-color: #ff6a5a; } #prueferfeld .pm.SOLL { border-color: #d9b43a; }
+#b-pruefer.muss { background: #8c3b3b; } #b-pruefer.soll { background: #7a6a2a; } #b-pruefer.gut { background: #2f6b45; }
 #rechts { background: #221f2b; border-left: 1px solid #38334a; padding: 10px 12px; overflow: auto; }
 #rechts h2 { font-size: 14px; margin: 0 0 8px; }
 #rechts dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 0; }
@@ -79,6 +85,7 @@ export function startEditor() {
     echtzeit: true, // false: Zeit und Fahrt laufen nur über tick() – für deterministische Tests
     werkzeug: WERKZEUGE[0].id,
     knotenTyp: 'kreuzung',
+    prueferOffen: false, // Liste der Prüfer-Meldungen sichtbar (und Marken im Plan)
     spielen: null, // laufender SpielModus (Stufe 3) oder null
     bezeichnung: '', // zuletzt kopierte Bezeichnung
     zwischen: null, // gemerktes Teil für Einfügen (Strg+C): { art, teil }
@@ -153,7 +160,11 @@ export function startEditor() {
   const bezKnopf = knopf('Bezeichnung kopieren', 'Bezeichnung des gewählten Gangs (mit Stelle) oder Knotens für Claude Code kopieren (N)', () => kopiereBezeichnung(), 'b-bezeichnung');
   const bezFeld = el('input', { id: 'bezeichnung', type: 'text', readonly: 'readonly', title: 'Bezeichnung zum Markieren und Kopieren', size: '34' });
   bezFeld.style.display = 'none';
-  const unten = el('div', { id: 'unten', class: 'leiste' }, [play, schieber, fahrtText, spielKnopf, bezKnopf, bezFeld, melden]);
+  const prueferKnopf = knopf('Prüfer', 'Regeln prüfen: Liste der Meldungen zeigen/verbergen (Klick auf eine Meldung springt zur Stelle)', () => prueferUmschalten(), 'b-pruefer');
+  const prueferFeld = el('div', { id: 'prueferfeld' });
+  prueferFeld.style.display = 'none';
+  plan.append(prueferFeld);
+  const unten = el('div', { id: 'unten', class: 'leiste' }, [play, schieber, fahrtText, prueferKnopf, spielKnopf, bezKnopf, bezFeld, melden]);
   const wurzel = el('div', { id: 'editor' }, [oben, werk, hinweisZeile, plan, rechts, unten]);
   document.body.append(wurzel);
 
@@ -322,6 +333,46 @@ export function startEditor() {
     bezFeld.blur(); // der Text bleibt markiert, die Kürzel gelten sofort wieder
     state.bezeichnung = text;
     melde(kopiert ? `Kopiert: ${text}` : `Nicht in die Zwischenablage gekommen – Text ist markiert, mit Strg+C kopieren: ${text}`);
+  }
+
+  // ---------------------------------------------------------------- Prüfer (Stufe 4)
+  let prueferMerk = { text: null, id: null, ergebnis: null };
+  /** Ergebnis des Prüfers für das aktuelle Gebiet (zwischengespeichert, bis sich das Gebiet ändert). */
+  function pruefer() {
+    const text = formatiere(gebiet());
+    if (prueferMerk.text !== text || prueferMerk.id !== state.gebietId) prueferMerk = { text, id: state.gebietId, ergebnis: pruefeGebiet(gebiet()) };
+    return prueferMerk.ergebnis;
+  }
+  function prueferUmschalten() {
+    state.prueferOffen = !state.prueferOffen;
+    refresh();
+  }
+  /** Springt zur Stelle einer Meldung: wählt das Objekt, fährt den Rahmen an die Stelle, zentriert den Plan. */
+  function springe(m) {
+    const o = m.ort;
+    if (!o) return;
+    const g = gebiet();
+    const da = o.art === 'gang' ? g.gaenge : o.art === 'knoten' ? g.knoten : o.art === 'formteil' ? g.formteile : g.objekte;
+    if (da.some((x) => x.id === o.id)) waehle({ art: o.art, id: o.id });
+    if (o.art === 'gang' && o.s != null) setzeFahrt(o.s);
+    ansicht.zentrieren(o.x, o.y);
+    refresh();
+  }
+  function prueferZeigen() {
+    prueferKnopf.classList.remove('muss', 'soll', 'gut');
+    const r = pruefer();
+    prueferKnopf.textContent = zusammenfassung(r);
+    prueferKnopf.classList.add(r.muss ? 'muss' : r.soll ? 'soll' : 'gut');
+    prueferFeld.style.display = state.prueferOffen ? '' : 'none';
+    if (!state.prueferOffen) return;
+    prueferFeld.replaceChildren(
+      el('h3', { text: r.meldungen.length ? 'Prüfer – Klick springt zur Stelle' : 'Prüfer – alles in Ordnung' }),
+      ...r.meldungen.map((m) => {
+        const b = el('button', { class: 'pm ' + m.art, title: m.ort ? 'Zur Stelle springen' : 'Betrifft das ganze Gebiet', text: `${m.regel} ${m.art}: ${m.text}` });
+        b.addEventListener('click', () => springe(m));
+        return b;
+      }),
+    );
   }
 
   // ---------------------------------------------------------------- Bearbeiten (Stufe 2a)
@@ -657,6 +708,7 @@ export function startEditor() {
     bezKnopf.disabled = !(au?.art === 'gang' || au?.art === 'knoten');
     for (const w of WERKZEUGE) document.getElementById('t-' + w.id)?.classList.toggle('an', w.id === state.werkzeug);
     typWahl.disabled = state.werkzeug !== 'knoten';
+    prueferZeigen();
     loeschKnopf.disabled = !(au && (au.art === 'gang' || au.art === 'knoten' || istTeilArt(au.art)));
     stand.textContent = ungespeichert() ? '● ungespeichert' : '✓ gespeichert';
     stand.className = ungespeichert() ? 'offen' : 'grau';
@@ -782,7 +834,7 @@ export function startEditor() {
   // ---------------------------------------------------------------- Schleife
   function zeichne() {
     const t0 = performance.now();
-    zeichnePlan(ctx, gebiet(), ansicht, { auswahl: state.auswahl, fahrt: state.fahrt, zeit: state.zeit, beschriftung: state.beschriftung, vorschau: (c) => werkzeug().vorschau?.(c, kontext) }, canvas.width / ansicht.w);
+    zeichnePlan(ctx, gebiet(), ansicht, { auswahl: state.auswahl, fahrt: state.fahrt, zeit: state.zeit, beschriftung: state.beschriftung, marken: state.prueferOffen ? pruefer().meldungen : null, vorschau: (c) => werkzeug().vorschau?.(c, kontext) }, canvas.width / ansicht.w);
     perf.zeichnenMs.push(performance.now() - t0);
     if (perf.zeichnenMs.length > 600) perf.zeichnenMs.shift();
     dirty = false;
@@ -820,6 +872,9 @@ export function startEditor() {
     waehle,
     setzeFahrt,
     spielenAb,
+    pruefer,
+    prueferUmschalten,
+    springe,
     kopiereBezeichnung,
     bezeichnungText,
     fahrtUmschalten,
@@ -844,6 +899,7 @@ export function startEditor() {
     verlaufVon,
     melde,
     alles,
+    refresh,
     beschriften,
     drehen,
     norden,
