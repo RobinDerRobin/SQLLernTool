@@ -64,6 +64,7 @@ function ausschnitt(g, gaenge, knoten, extra = new Set()) {
   const beruehrt = (poly) => flaechen.some((f) => ueberlappen(f, poly));
   return {
     ...g,
+    bereich: null, // der Bereichsrahmen gehört zum ganzen Gebiet, nicht zum Level
     knoten: g.knoten.filter((k) => knoten.includes(k) || extra.has(k.id)),
     gaenge: g.gaenge.filter((x) => gaenge.includes(x) || extra.has(x.id)),
     formteile: g.formteile.filter((f) => extra.has(f.id) || beruehrt(teilPolygon('formteil', f))),

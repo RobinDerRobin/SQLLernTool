@@ -1,7 +1,7 @@
 // Bearbeiten des Gebiets: Gang ziehen, Knoten setzen, Gang teilen, löschen, Eigenschaften ändern. Reine Datenänderung auf dem
 // übergebenen Gebiet (kein DOM, läuft auch unter Node) – Rückgängig macht main.js über den Verlauf aus daten.js.
 // Alles rastet: Gänge auf 8 Richtungen und RASTER (20 E), neue Knoten auf KNOTENRASTER (100 E).
-import { HEADINGS, DIR_VEC } from '../core/math.js';
+import { HEADINGS, DIR_VEC, HEADING_CODES } from '../core/math.js';
 import { MAX_KOORD, RASTER, KNOTENRASTER, GANG_BREITE, RAUM_W, RAUM_H, MIN_RAUM, MIN_QUERWEG, MIN_GANG_LAENGE } from './konstanten.js';
 import { KNOTENTYPEN } from './katalog.js';
 import { knotenMap, gangMasse, richtungVon } from './daten.js';
@@ -296,7 +296,7 @@ export function loesche(g, art, id) {
 
 /**
  * Ändert ein Feld eines Gangs oder Knotens. Gibt null zurück, wenn es geklappt hat, sonst eine verständliche Meldung (nichts geändert).
- * gang: name, breite · knoten: typ, x, y, w, h
+ * gang: name, breite, ansicht · knoten: typ, x, y, w, h
  */
 export function setze(g, art, id, feld, wert) {
   const o = (art === 'gang' ? g.gaenge : g.knoten).find((x) => x.id === id);
@@ -312,6 +312,11 @@ export function setze(g, art, id, feld, wert) {
     } else if (feld === 'breite') {
       if (!Number.isFinite(zahl) || zahl < MIN_QUERWEG) return `Die Breite muss mindestens ${MIN_QUERWEG} E sein (sonst ist der Gang nicht passierbar).`;
       o.breite = rund(zahl);
+    } else if (feld === 'ansicht') {
+      // Ausgangsperspektive (A3): die Richtung, die beim Öffnen des Levels im Plan nach rechts zeigt; E = Norden oben = Standard = kein Feld
+      if (!HEADING_CODES.includes(wert)) return `Die Ansicht muss eine der acht Richtungen sein (${HEADING_CODES.join(', ')}).`;
+      if (wert === 'E') delete o.ansicht;
+      else o.ansicht = wert;
     } else return `Feld „${feld}“ eines Gangs lässt sich nicht ändern.`;
     return null;
   }

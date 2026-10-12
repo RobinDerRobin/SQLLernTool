@@ -2,7 +2,7 @@
 // Stufe 1: Ansehen – Plan im Spielbild, Zoom/Verschieben/Drehen, Gang anklicken, Bildschirmrahmen mit Fahrt-Schieber.
 // Stufe 2a: Bauen – Werkzeuge (Auswahl, Gang, Knoten), Eigenschaften ändern, Rückgängig/Wiederholen, Speichern/Laden.
 // Stufe 2b: Formteile, Wände, Hindernisse – setzen, verschieben, drehen, kopieren, löschen, Eigenschaften.
-import { HEADINGS, DIR_NAMES, E } from '../core/math.js';
+import { HEADINGS, HEADING_CODES, DIR_NAMES, E } from '../core/math.js';
 import { Ansicht, radFaktor } from './ansicht.js';
 import { zeichnePlan, zeichneGegner } from './zeichnen.js';
 import { WELT, GEBIETE } from './startdaten.js';
@@ -16,6 +16,7 @@ import { erzeugeSpeicher } from './speicher.js';
 import { spielbarkeit, erzeugeSzene } from './spielen.js';
 import { pruefeGebiet, zusammenfassung } from './pruefer.js';
 import { SpielModus } from './spielmodus.js';
+import { levelInhalt } from './level.js';
 import { WERKZEUGE } from './werkzeuge/index.js';
 import auswahlWerkzeug from './werkzeuge/auswahl.js';
 import { EBENEN, ebeneVon, WERKZEUG_EBENEN } from './ebenen.js';
@@ -52,6 +53,7 @@ button:hover, select:hover { background: #4a4462; }
 button.an { background: #3b6b8c; }
 button:disabled { opacity: .45; cursor: default; }
 .titel { white-space: nowrap; font-weight: 600; margin-right: 8px; }
+.krume { cursor: pointer; color: #8fb8e8; font-weight: 400; } .krume:hover { text-decoration: underline; } .krume.jetzt { color: #fff; font-weight: 600; cursor: default; text-decoration: none; }
 .grau { color: #a49fb8; }
 #anzeige { margin-left: auto; white-space: nowrap; flex: none; }
 #fahrt { flex: 1; min-width: 120px; }
@@ -85,6 +87,7 @@ export function startEditor() {
   const state = {
     welt: kopie(WELT), // eine Arbeitskopie: der eingebaute Stand bleibt unverändert
     ansichtArt: 'gebiet', // 'gebiet' (ein Gebiet bearbeiten) oder 'welt' (Welt-Plan: Bereiche, Lage, Übergänge)
+    levelGang: null, // Levelansicht (A3): ID des Gangs, dessen Level allein gezeigt wird; null = Karte des ganzen Gebiets
     weltAuswahl: null, // in der Welt-Ansicht: { art: 'gebiet'|'uebergang', id }
     weltVerlauf: new Verlauf(), // Rückgängig/Wiederholen für welt.json (Lage, Übergänge)
     weltGespeichert: formatiereWelt(WELT), // zuletzt gespeicherter/geladener Text von welt.json
@@ -117,6 +120,15 @@ export function startEditor() {
   const perf = { zeichnenMs: [] };
   let dirty = true;
   const gebiet = () => state.gebiete[state.gebietId];
+  let sichtMerk = null; // zwischengespeicherte Levelansicht, bis sich Daten oder Auswahl ändern (refresh)
+  /** Was der Plan zeigt: in der Levelansicht nur das Level (Gang, zwei Knoten, berührende Teile; das Gewählte bleibt sichtbar), sonst das Gebiet. */
+  function sicht() {
+    if (!state.levelGang || state.ansichtArt === 'welt') return gebiet();
+    sichtMerk ??= levelInhalt(gebiet(), state.levelGang, state.auswahl ? [state.auswahl.id] : []);
+    return sichtMerk;
+  }
+  /** Ebene der Ansicht: 'welt' (alle Gebiete), 'karte' (ein Gebiet) oder 'level' (ein Gang). */
+  const ebene = () => (state.ansichtArt === 'welt' ? 'welt' : state.levelGang ? 'level' : 'karte');
   const werkzeug = () => WERKZEUGE.find((w) => w.id === state.werkzeug);
   const aktiv = () => (state.ansichtArt === 'welt' ? weltWerkzeug : werkzeug()); // dessen Hinweis zeigt die Hinweiszeile
   /** Werkzeug der linken Maustaste: in der Welt-Ansicht die Welt, sonst immer das Auswählen/Ziehen (Linksklick setzt nie etwas, A1). */
@@ -137,6 +149,7 @@ export function startEditor() {
     wechsle(wahl.value);
     wahl.blur(); // Kürzel sollen sofort wieder gelten
   });
+  const brotkrume = el('span', { id: 'brotkrume', class: 'titel' });
   const knopf = (text, titel, fn, id) => el('button', { text, title: titel, onclick: fn, ...(id ? { id } : {}) });
   const anzeige = el('span', { class: 'grau', id: 'anzeige' });
   const zoomFeld = el('input', { id: 'zoomfeld', type: 'text', size: '5', title: 'Zoom in Bildschirmen (480 E) Breite – Zahl eintippen und Enter (1 = so groß wie im Spiel, 2,2 = Normalansicht)' });
@@ -146,7 +159,7 @@ export function startEditor() {
     if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); // Kürzel gelten nicht beim Tippen
   });
   const oben = el('div', { id: 'oben', class: 'leiste' }, [
-    el('span', { class: 'titel', text: 'Editor' }),
+    brotkrume,
     wahl,
     knopf('Welt', 'Welt-Plan: alle Gebiete, ihre Bereiche, Lage und Übergänge (T)', () => weltUmschalten(), 'b-welt'),
     knopf('Drehen ⟲', 'Ansicht 45° links drehen (Q)', () => drehen(-1), 'b-links'),
@@ -228,6 +241,7 @@ export function startEditor() {
   }
   function wechsle(id) {
     if (!state.gebiete[id]) return;
+    state.levelGang = null;
     if (state.ansichtArt === 'welt') {
       state.kameras.welt = kamera();
       state.ansichtArt = 'gebiet';
@@ -246,6 +260,7 @@ export function startEditor() {
     refresh();
   }
   function waehle(auswahl) {
+    if (!auswahl && state.levelGang && gebiet().gaenge.some((x) => x.id === state.levelGang)) auswahl = { art: 'gang', id: state.levelGang }; // in der Levelansicht ist das Level immer gewählt
     state.auswahl = auswahl;
     bezFeld.style.display = 'none';
     if (/^(Zum Kopieren|Zum Spielen)/.test(state.meldung)) melde('');
@@ -321,13 +336,13 @@ export function startEditor() {
     refresh();
   }
   function alles() {
-    ansicht.einpassen(state.ansichtArt === 'welt' ? weltAusdehnung(state.welt, state.gebiete) : ausdehnung(gebiet()));
+    ansicht.einpassen(state.ansichtArt === 'welt' ? weltAusdehnung(state.welt, state.gebiete) : ausdehnung(sicht()));
     refresh();
   }
 
   /** Was liegt unter dem Bildschirmpunkt? Knoten vor Gang. */
   function treffer(px, py) {
-    const g = gebiet();
+    const g = sicht();
     const gesp = state.gesperrt;
     if (!gesp.has('knoten')) {
       for (const k of g.knoten) {
@@ -467,11 +482,16 @@ export function startEditor() {
   /** Nach Änderung, Rückgängig oder Laden: Auswahl und Fahrt gibt es vielleicht nicht mehr. */
   function bereinige() {
     const g = gebiet();
+    if (state.levelGang && !g.gaenge.some((x) => x.id === state.levelGang)) zuKarte(); // das Level gibt es nicht mehr (gelöscht oder rückgängig gemacht)
     const au = state.auswahl;
     const da = au && (au.art === 'gang' ? g.gaenge : au.art === 'knoten' ? g.knoten : istTeilArt(au.art) ? teilListe(g, au.art) : []).some((o) => o.id === au.id);
     if (au && !da) {
       state.auswahl = null;
       state.fahrt = null;
+    }
+    if (state.levelGang && !state.auswahl) {
+      state.auswahl = { art: 'gang', id: state.levelGang };
+      state.fahrt = { gang: state.levelGang, s: 0, laeuft: false };
     }
     if (state.fahrt) {
       const m = ganzMasse();
@@ -521,9 +541,9 @@ export function startEditor() {
     if (t != null) nachVerlauf(t);
   }
   /** Eigenschaft im rechten Feld ändern; Fehlermeldung statt Änderung bei unzulässigen Werten. */
-  function setzeFeld(art, id, feld, wert) {
+  function setzeFeld(art, id, feld, wert, label = 'Eigenschaft ändern') {
     let fehler = null;
-    aendere('Eigenschaft ändern', (g) => {
+    aendere(label, (g) => {
       fehler = istTeilArt(art) ? setzeTeil(g, art, id, feld, wert) : setze(g, art, id, feld, wert);
     });
     if (fehler) melde(fehler, 'fehler');
@@ -763,6 +783,7 @@ export function startEditor() {
   }
   function zuWelt() {
     if (state.ansichtArt === 'welt') return;
+    if (state.levelGang) zuKarte();
     abbrechen();
     state.kameras.gebiet = kamera();
     state.ansichtArt = 'welt';
@@ -785,6 +806,82 @@ export function startEditor() {
       Object.assign(ansicht, state.kameras.gebiet);
       refresh();
     }
+  }
+  // ---------------------------------------------------------------- Ebenen: Welt → Karte → Level (A3)
+  /** Die Ausgangsperspektive eines Gangs als Blickrichtung (0..7): Feld „ansicht“, fehlt es, Norden oben. */
+  const ausgangsBlick = (gang) => {
+    const i = HEADING_CODES.indexOf(gang?.ansicht);
+    return i < 0 ? E : i;
+  };
+  /** Öffnet die Levelansicht eines Gangs: nur dieses Level, in seiner Ausgangsperspektive, eingepasst. */
+  function oeffneLevel(gangId) {
+    if (state.ansichtArt === 'welt') return;
+    const gang = gebiet().gaenge.find((x) => x.id === gangId);
+    if (!gang) return;
+    abbrechen();
+    if (!state.levelGang) state.kameras.gebiet = kamera(); // die Kamera der Karte merken
+    state.levelGang = gangId;
+    sichtMerk = null;
+    state.auswahl = null; // waehle() setzt das Level
+    waehle({ art: 'gang', id: gangId });
+    state.fahrt = { gang: gangId, s: 0, laeuft: false };
+    ansicht.blick = ausgangsBlick(gang);
+    alles();
+  }
+  /** Zurück aus der Levelansicht in die Karte des Gebiets (Kamera wie vorher). */
+  function zuKarte() {
+    if (!state.levelGang) return;
+    const gangId = state.levelGang;
+    abbrechen();
+    state.levelGang = null;
+    sichtMerk = null;
+    if (state.kameras.gebiet) Object.assign(ansicht, state.kameras.gebiet);
+    if (gebiet().gaenge.some((x) => x.id === gangId)) waehle({ art: 'gang', id: gangId });
+    else state.auswahl = state.fahrt = null;
+    refresh();
+  }
+  /** Eine Ebene höher: Level → Karte → Welt. In der Welt gibt es nichts mehr darüber. */
+  function eineEbeneHoch() {
+    const e = ebene();
+    if (e === 'level') zuKarte();
+    else if (e === 'karte') zuWelt();
+  }
+  /** Brotkrume: direkt zu einer Ebene springen ('welt' | 'karte'). */
+  function geheZu(ziel) {
+    if (ziel === 'karte') {
+      if (state.ansichtArt === 'welt') zuGebiet();
+      else zuKarte();
+    } else if (ziel === 'welt') zuWelt();
+  }
+  /** Nächster/voriger Gang in der Levelansicht (Bild↑/Bild↓), ohne die Ebene zu verlassen. */
+  function nachbarLevel(schritt) {
+    const gaenge = gebiet().gaenge;
+    const i = gaenge.findIndex((x) => x.id === state.levelGang);
+    if (i < 0 || gaenge.length < 2) return;
+    oeffneLevel(gaenge[(i + schritt + gaenge.length) % gaenge.length].id);
+  }
+  /** Die aktuelle Drehung des Plans als Ausgangsperspektive des Levels speichern (mit Rückgängig). */
+  function ansichtMerken() {
+    const id = state.levelGang ?? (state.auswahl?.art === 'gang' ? state.auswahl.id : null);
+    if (!id) return melde('Zum Merken erst einen Gang wählen oder ein Level öffnen.', 'fehler');
+    setzeFeld('gang', id, 'ansicht', HEADING_CODES[ansicht.blick], 'Ausgangsansicht ändern');
+  }
+  /** Brotkrume oben links: Welt › Gebiet › Level, jeder Teil außer dem letzten ist anklickbar. */
+  function brotkrumeZeigen() {
+    const teile = [{ id: 'welt', text: 'Welt', ziel: 'welt' }];
+    if (ebene() !== 'welt') {
+      teile.push({ id: 'karte', text: gebiet().name, ziel: 'karte' });
+      const gang = state.levelGang && gebiet().gaenge.find((x) => x.id === state.levelGang);
+      if (gang) teile.push({ id: 'level', text: `Level „${gang.name || gang.id}“ (${gang.von} → ${gang.nach})`, ziel: null });
+    }
+    brotkrume.replaceChildren(
+      ...teile.flatMap((t, i) => {
+        const letzter = i === teile.length - 1;
+        const k = el('span', { class: 'krume' + (letzter ? ' jetzt' : ''), id: 'krume-' + t.id, text: t.text, title: letzter ? 'Hier bist du (Esc: eine Ebene höher)' : 'Zu dieser Ebene springen' });
+        if (!letzter) k.addEventListener('click', () => geheZu(t.ziel));
+        return letzter ? [k] : [k, el('span', { class: 'grau', text: ' › ' })];
+      }),
+    );
   }
   function weltUmschalten() {
     if (state.ansichtArt === 'welt') zuGebiet(state.weltAuswahl?.art === 'gebiet' && state.gebiete[state.weltAuswahl.id] ? state.weltAuswahl.id : state.gebietId);
@@ -1042,6 +1139,15 @@ export function startEditor() {
       zeile(dl, 'Flugzeit', `${fmt(m.sekunden)} s`);
       feld(dl, 'Breite (E)', 'f-breite', gang.breite, (v) => setzeFeld('gang', gang.id, 'breite', v), 'number', { step: 20 });
       zeile(dl, 'Richtung', m.richtung >= 0 ? `${m.richtungName} (${m.code})` : 'nicht im 45°-Raster');
+      const av = el('select', { id: 'f-ansicht', title: 'Drehung des Plans beim Öffnen des Levels (Ausgangsperspektive); „Norden oben“ ist der Standard' }, HEADINGS.map((h) => el('option', { value: HEADING_CODES[h], text: h === E ? 'Norden oben (Standard)' : `${DIR_NAMES[h]} nach rechts` })));
+      av.value = HEADING_CODES[ausgangsBlick(gang)];
+      av.addEventListener('change', () => {
+        setzeFeld('gang', gang.id, 'ansicht', av.value, 'Ausgangsansicht ändern');
+        av.blur();
+      });
+      dl.append(el('dt', { text: 'Ausgangsansicht' }), el('dd', {}, [av]));
+      if (!state.levelGang) knoepfe.append(knopf('Level öffnen', 'Nur dieses Level zeigen, in seiner Ausgangsansicht (Doppelklick oder Enter)', () => oeffneLevel(gang.id), 'b-level-oeffnen'));
+      knoepfe.append(knopf('Ansicht merken', 'Die aktuelle Drehung des Plans als Ausgangsansicht dieses Levels speichern', () => ansichtMerken(), 'b-ansicht-merken'));
       knoepfe.append(knopf('Hier teilen', 'Gang an der Stelle des Bildschirmrahmens teilen (neue Kreuzung)', () => teileGang(), 'b-teilen'));
       knoepfe.append(knopf('Löschen', 'Gang löschen (Entf)', () => loescheAuswahl(), 'b-loeschen2'));
     } else if (au && au.art === 'knoten') {
@@ -1138,6 +1244,8 @@ export function startEditor() {
       `Stelle ${fmt(s, 0)} E = ${fmt(s / SCREEN_W)} Bildschirme = ${fmt(s / SPEED)} s  ·  Gang ${fmt(m.laenge, 0)} E = ${fmt(m.bildschirme)} Bildschirme = ${fmt(m.sekunden)} s`;
   }
   function refresh() {
+    sichtMerk = null;
+    brotkrumeZeigen();
     gesperrteIds.clear();
     for (const m of uebergangsMarken()) gesperrteIds.add(m.knoten);
     const inWelt = state.ansichtArt === 'welt';
@@ -1238,10 +1346,15 @@ export function startEditor() {
     abbrechen();
   });
   canvas.addEventListener('dblclick', (e) => {
-    if (state.ansichtArt !== 'welt') return;
+    if (e.button !== MAUS.waehlen) return;
     const p = zeigerPunkt(e);
-    const t = weltTreffer(kontext, p.px, p.py);
-    if (t?.art === 'gebiet') zuGebiet(t.id);
+    if (state.ansichtArt === 'welt') {
+      const t = weltTreffer(kontext, p.px, p.py);
+      if (t?.art === 'gebiet') zuGebiet(t.id);
+    } else if (!state.levelGang) {
+      const t = treffer(p.px, p.py);
+      if (t?.art === 'gang') oeffneLevel(t.id); // Doppelklick auf einen Gang öffnet sein Level
+    }
   });
   canvas.addEventListener('pointerup', loslassen);
   canvas.addEventListener('pointercancel', loslassen);
@@ -1310,14 +1423,25 @@ export function startEditor() {
     else if (hat(KUERZEL.loeschen, c)) loescheAuswahl();
     else if (Object.values(KUERZEL.werkzeug).includes(c)) setzeWerkzeug(Object.keys(KUERZEL.werkzeug).find((id) => KUERZEL.werkzeug[id] === c));
     else if (c === KUERZEL.welt) weltUmschalten();
-    else if (c === 'Enter' && state.ansichtArt === 'welt') weltOeffneAuswahl();
+    else if (c === 'Enter') {
+      if (state.ansichtArt === 'welt') weltOeffneAuswahl();
+      else if (!state.levelGang && state.auswahl?.art === 'gang') oeffneLevel(state.auswahl.id); // Enter öffnet das Level des gewählten Gangs
+      else getan = false;
+    } else if (c === 'PageDown' && state.levelGang) nachbarLevel(1);
+    else if (c === 'PageUp' && state.levelGang) nachbarLevel(-1);
     else if (c === 'Escape') {
+      const lief = !!zug;
       abbrechen(); // ein laufender Zug (Ziehen, Aufziehen) wird verworfen, nichts ändert sich
-      if (state.ansichtArt === 'welt') {
+      if (lief) {
+        /* nur der Zug endet */
+      } else if (state.ansichtArt === 'welt') {
         if (state.weltAuswahl) weltWaehle(null);
-        else zuGebiet();
-      }
-      else waehle(null);
+      } else if (state.levelGang) {
+        const au = state.auswahl;
+        if (au?.art === 'gang' && au.id === state.levelGang && !(state.fahrt?.laeuft)) eineEbeneHoch(); // nur das Level selbst gewählt: eine Ebene hoch
+        else waehle(null); // sonst zurück zum Level selbst
+      } else if (state.auswahl) waehle(null);
+      else eineEbeneHoch(); // nichts gewählt: Karte → Welt
     }
     else getan = false;
     if (getan) {
@@ -1327,11 +1451,20 @@ export function startEditor() {
     }
   });
 
+  /** Prüfer-Marken, die im Plan zu sehen sind: in der Levelansicht nur die, deren Ding zum Level gehört. */
+  function sichtbareMarken() {
+    const alle = pruefer().meldungen;
+    if (!state.levelGang) return alle;
+    const g = sicht();
+    const da = { gang: g.gaenge, knoten: g.knoten, formteil: g.formteile, objekt: g.objekte, notiz: g.notizen };
+    return alle.filter((m) => m.ort && (da[m.ort.art] ?? []).some((x) => x.id === m.ort.id));
+  }
+
   // ---------------------------------------------------------------- Schleife
   function zeichne() {
     const t0 = performance.now();
     if (state.ansichtArt === 'welt') zeichneWelt(ctx, { welt: state.welt, gebiete: state.gebiete, auswahl: state.weltAuswahl, aktuell: state.gebietId, marken: state.prueferOffen ? weltPruefer().meldungen : null, beschriftung: state.beschriftung }, ansicht, canvas.width / ansicht.w);
-    else zeichnePlan(ctx, gebiet(), ansicht, { auswahl: state.auswahl, fahrt: state.fahrt, zeit: state.zeit, beschriftung: state.beschriftung, look: lookFarben(), marken: state.prueferOffen ? pruefer().meldungen : null, uebergaenge: uebergangsMarken(), vorschau: (c) => werkzeug().vorschau?.(c, kontext) }, canvas.width / ansicht.w);
+    else zeichnePlan(ctx, sicht(), ansicht, { auswahl: state.auswahl, fahrt: state.fahrt, zeit: state.zeit, beschriftung: state.beschriftung, look: lookFarben(), marken: state.prueferOffen ? sichtbareMarken() : null, uebergaenge: uebergangsMarken().filter((m) => !state.levelGang || sicht().knoten.some((k) => k.id === m.knoten)), vorschau: (c) => werkzeug().vorschau?.(c, kontext) }, canvas.width / ansicht.w);
     perf.zeichnenMs.push(performance.now() - t0);
     if (perf.zeichnenMs.length > 600) perf.zeichnenMs.shift();
     dirty = false;
@@ -1420,6 +1553,13 @@ export function startEditor() {
     wieImSpiel,
     zoom,
     setzeZoom,
+    ebene,
+    sicht,
+    oeffneLevel,
+    zuKarte,
+    eineEbeneHoch,
+    geheZu,
+    ansichtMerken,
     rahmenEcken: () => {
       const m = ganzMasse();
       return m ? rahmenEcken(m, state.fahrt.s) : null;

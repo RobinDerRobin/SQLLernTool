@@ -4,7 +4,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Ansicht, radFaktor } from '../src/editor/ansicht.js';
 import { ZOOM_MIN, ZOOM_MAX, ZOOM_RAD_FAKTOR } from '../src/editor/konstanten.js';
-import { ausdehnung, Verlauf } from '../src/editor/daten.js';
+import { ausdehnung, Verlauf, formatiere, ladeGebiet, pruefeFormat } from '../src/editor/daten.js';
+import { setze } from '../src/editor/befehle.js';
 import { ebeneVon, EBENEN, WERKZEUG_EBENEN } from '../src/editor/ebenen.js';
 import { teilBei } from '../src/editor/teile.js';
 import { WERKZEUGE } from '../src/editor/werkzeuge/index.js';
@@ -167,4 +168,23 @@ test('A5 Ebenen: jedes Ding gehört zu einer Ebene, jedes Werkzeug schreibt in b
   const gegner = g.objekte.find((o) => o.typ === 'gegner');
   assert.deepEqual(teilBei(g, gegner.x, gegner.y, 0), { art: 'objekt', id: gegner.id });
   assert.equal(teilBei(g, gegner.x, gegner.y, 0, (art, o) => ebeneVon(art, o) !== 'gegner'), null, 'gesperrter Gegner ist nicht zu treffen');
+});
+
+// ------------------------------------------------------------------ A3 Ausgangsperspektive im Datenformat
+test('A3 Ausgangsperspektive: Feld „ansicht“ am Gang – speichern, laden, prüfen, ändern; alte Dateien ohne das Feld laden fehlerfrei', () => {
+  const g = kopie(GEBIETE.beispiel);
+  assert.ok(g.gaenge.every((x) => !('ansicht' in x)), 'die vorhandenen Dateien haben das Feld nicht');
+  assert.deepEqual(pruefeFormat(g), [], 'ohne Feld gültig (Norden oben)');
+  assert.equal(setze(g, 'gang', 'schleuse', 'ansicht', 'SE'), null);
+  assert.equal(g.gaenge.find((x) => x.id === 'schleuse').ansicht, 'SE');
+  const text = formatiere(g);
+  assert.match(text, /"id": "schleuse", "name": "Schleuse", "von": "K1", "nach": "K2", "breite": 200, "ansicht": "SE"/, 'Schlüssel steht hinter „breite“');
+  assert.equal(formatiere(ladeGebiet(text)), text, 'Laden → Speichern ist verlustfrei');
+  assert.equal(setze(g, 'gang', 'schleuse', 'ansicht', 'E'), null);
+  assert.ok(!('ansicht' in g.gaenge.find((x) => x.id === 'schleuse')), 'Norden oben (E) ist der Standard und wird nicht gespeichert');
+  assert.equal(setze(g, 'gang', 'schleuse', 'ansicht', 'SO'), 'Die Ansicht muss eine der acht Richtungen sein (E, SE, S, SW, W, NW, N, NE).', 'ungültige Richtung wird abgewiesen');
+  const kaputt = kopie(GEBIETE.beispiel);
+  kaputt.gaenge[0].ansicht = 'quer';
+  assert.match(pruefeFormat(kaputt).join('|'), /ansicht/);
+  assert.throws(() => ladeGebiet(JSON.stringify(kaputt)), /ansicht/);
 });

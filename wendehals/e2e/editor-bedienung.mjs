@@ -6,7 +6,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { FLOOR, FLOOR2, WALL, SCREEN_W } from '../src/editor/konstanten.js';
-import { ausdehnung } from '../src/editor/daten.js';
+import { ausdehnung, bodenPolygone, istBoden, formatiere } from '../src/editor/daten.js';
+import { levelInhalt } from '../src/editor/level.js';
 import { GEBIETE } from '../src/editor/startdaten.js';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -495,6 +496,176 @@ const zufall = () => (rng = (rng * 1103515245 + 12345) % 2147483648) / 214748364
   await bau.keyboard.press('Control+KeyZ');
   await b((e) => e.zuGebiet());
 }
+
+// ------------------------------------------------------------------ A3 Ebenen und Levelansicht
+{
+  await b((e) => {
+    while (e.verlaufVon(e.state.gebietId).kannZurueck) e.rueckgaengig(); // zurück zum unveränderten Beispiel
+    e.setzeWerkzeug('auswahl');
+    e.wechsle('beispiel');
+    e.waehle(null);
+    e.alles();
+    e.setzeZoom(8);
+  });
+  const ebene = () => b((e) => e.ebene());
+  const daten0 = await daten();
+  check((await ebene()) === 'karte', 'A3: der Editor startet in der Karte (ein Gebiet)');
+  const [dx, dy] = await bild([1900, 0]);
+  await bau.mouse.dblclick(dx, dy);
+  check((await ebene()) === 'level' && (await b((e) => e.state.levelGang)) === 'ostgang', 'A3: Doppelklick auf einen Gang öffnet seine Levelansicht');
+  check((await b((e) => e.state.auswahl))?.id === 'ostgang', 'A3: das Level ist gewählt (Rahmen und Fahrt gehören dazu)');
+  const krume = await bau.locator('#brotkrume').textContent();
+  check(/Welt/.test(krume) && /Beispiel/.test(krume) && /Ostgang/.test(krume) && /K2/.test(krume) && /K5/.test(krume), 'A3: Brotkrume zeigt Welt › Gebiet › Level (K2 → K5)', krume);
+  check((await daten()) === daten0, 'A3: Ebenen wechseln ändert keine Daten');
+
+  // Ausgeblendet: außerhalb des Levels nur Wandfarbe (Pixeltest), innerhalb Gangboden
+  async function pixelProbe(gangId) {
+    const sicht = levelInhalt(GEBIETE.beispiel, gangId);
+    const polys = bodenPolygone(sicht);
+    const proben = [];
+    for (let i = 0; i < 700; i++) proben.push([bBox.width * 0.02 + zufall() * bBox.width * 0.96, bBox.height * 0.02 + zufall() * bBox.height * 0.96]);
+    const punkte = await b((e, ps) => {
+      const fahrt = e.state.fahrt;
+      e.state.fahrt = null; // ohne die abdunkelnde Rahmen-Überlagerung
+      e.state.beschriftung = false;
+      e.zeichne();
+      const out = ps.map(([px, py]) => ({ w: e.ansicht.bildZuWelt(px, py), p: e.pixel(px, py), s: e.ansicht.masstab }));
+      e.state.fahrt = fahrt;
+      return out;
+    }, proben);
+    let aussen = 0;
+    let innen = 0;
+    let falsch = 0;
+    for (const { w: [x, y], p, s } of punkte) {
+      const r = 3 / s;
+      const nah = [[r, 0], [-r, 0], [0, r], [0, -r]].some(([ex, ey]) => istBoden(x + ex, y + ey, polys) !== istBoden(x, y, polys));
+      const modul = (v) => ((v % 80) + 80) % 80;
+      const gitter = [x, y].some((v) => modul(v) < r || 80 - modul(v) < r); // auf den Linien des Schachbretts mischen sich beide Bodenfarben
+      const randNah = polys.some((poly) => poly.some((a, i) => {
+        const c = poly[(i + 1) % poly.length];
+        const l2 = (c[0] - a[0]) ** 2 + (c[1] - a[1]) ** 2 || 1;
+        const t = Math.max(0, Math.min(1, ((x - a[0]) * (c[0] - a[0]) + (y - a[1]) * (c[1] - a[1])) / l2));
+        return Math.hypot(x - (a[0] + t * (c[0] - a[0])), y - (a[1] + t * (c[1] - a[1]))) * s < 4;
+      })); // die Auswahllinie des Levels liegt auf den Kanten seiner Flächen
+      if (nah || randNah) continue;
+      const boden = istBoden(x, y, polys);
+      if (boden && gitter) continue;
+      if (boden) {
+        innen++;
+        if (!(gleich(p, hex(FLOOR)) || gleich(p, hex(FLOOR2)))) {
+          falsch++;
+          if (falsch <= 3) console.log('  innen falsch bei', x.toFixed(0), y.toFixed(0), p.join(','));
+        }
+      } else {
+        aussen++;
+        if (!gleich(p, hex(WALL))) {
+          falsch++;
+          if (falsch <= 3) console.log('  außen falsch bei', x.toFixed(0), y.toFixed(0), p.join(','));
+        }
+      }
+    }
+    return { aussen, innen, falsch };
+  }
+  const px1 = await pixelProbe('ostgang');
+  check(px1.aussen > 100 && px1.innen > 20 && px1.falsch === 0, `A3: Levelansicht „Ostgang“ – außerhalb des Levels nur Wandfarbe, darin Gangboden (${px1.aussen} außen, ${px1.innen} innen, ${px1.falsch} falsch)`);
+  await shot('a3-level-ostgang');
+  // Nicht wählbar: Klick auf die ausgeblendete Schleuse, den Nordgang, den Raum
+  for (const [name, p] of [['Schleuse', [600, 0]], ['Nordgang', [1200, -500]], ['Raum K3', [1200, -1100]], ['Diagonale', [1500, 300]], ['Gegner o2', [900, 0]]]) {
+    await klick(p);
+    const au = await b((e) => e.state.auswahl);
+    check(au?.art === 'gang' && au.id === 'ostgang', `A3: ausgeblendet und nicht wählbar: ${name}`, JSON.stringify(au));
+  }
+  const kn = await b((e) => e.sicht().knoten.map((k) => k.id).sort().join());
+  check(kn === 'K2,K5', 'A3: sichtbar sind nur die zwei Knoten des Levels', kn);
+  // Mit Rechtsklick lässt sich im Level bauen; das Gesetzte bleibt sichtbar, solange es gewählt ist
+  await b((e) => e.setzeWerkzeug('hindernis'));
+  await klick([1900, 0], RECHTS);
+  check((await b((e) => e.gebiet().objekte.at(-1).typ)) === 'hindernis' && (await b((e) => e.sicht().objekte.length)) === 1, 'A3: im Level baut der Rechtsklick (das neue Hindernis liegt im Gang und gehört zum Level)');
+  await b((e) => { e.rueckgaengig(); e.setzeWerkzeug('auswahl'); });
+  // Esc: Level → Karte → (Auswahl weg) → Welt; in der Welt bleibt es dabei
+  await bau.keyboard.press('Escape');
+  check((await ebene()) === 'karte', 'A3: Esc geht aus dem Level in die Karte');
+  check((await b((e) => e.sicht().gaenge.length)) === 4 && (await b((e) => e.state.auswahl))?.id === 'ostgang', 'A3: die Karte zeigt wieder alles; der Gang bleibt gewählt');
+  await bau.keyboard.press('Escape');
+  check((await ebene()) === 'karte' && (await b((e) => e.state.auswahl)) === null, 'A3: Esc in der Karte hebt zuerst die Auswahl auf');
+  await bau.keyboard.press('Escape');
+  check((await ebene()) === 'welt', 'A3: Esc ohne Auswahl geht aus der Karte in die Welt');
+  await bau.keyboard.press('Escape');
+  check((await ebene()) === 'welt', 'A3: in der Welt gibt es keine höhere Ebene');
+  await b((e) => e.zuGebiet());
+  // Enter öffnet das Level des gewählten Gangs
+  await b((e) => e.waehle({ art: 'gang', id: 'nordgang' }));
+  await bau.keyboard.press('Enter');
+  check((await ebene()) === 'level' && (await b((e) => e.state.levelGang)) === 'nordgang', 'A3: Enter öffnet das Level des gewählten Gangs');
+  const px2 = await pixelProbe('nordgang');
+  check(px2.falsch === 0 && px2.aussen > 100, `A3: Levelansicht „Nordgang“ ebenfalls ohne fremde Teile (${px2.falsch} falsch)`);
+  // Brotkrume schaltet die Ebene
+  await bau.click('#krume-karte');
+  check((await ebene()) === 'karte', 'A3: Klick auf das Gebiet in der Brotkrume geht in die Karte');
+  await bau.keyboard.press('Enter');
+  check((await ebene()) === 'level', 'A3: (Gang war noch gewählt) Enter öffnet das Level wieder');
+  await bau.click('#krume-welt');
+  check((await ebene()) === 'welt', 'A3: Klick auf „Welt“ in der Brotkrume geht in die Welt-Ansicht');
+  await b((e) => e.zuGebiet());
+  check((await ebene()) === 'karte', 'A3: aus der Welt zurück in die Karte');
+  // Bild↓ wechselt zum nächsten Level
+  await b((e) => e.oeffneLevel('schleuse'));
+  await bau.keyboard.press('PageDown');
+  check((await b((e) => e.state.levelGang)) === 'nordgang', 'A3: Bild↓ öffnet das nächste Level des Gebiets');
+  await bau.keyboard.press('PageUp');
+  check((await b((e) => e.state.levelGang)) === 'schleuse', 'A3: Bild↑ das vorige');
+  // Löscht man das Level, geht es zurück in die Karte
+  await bau.keyboard.press('Delete');
+  check((await ebene()) === 'karte' && (await b((e) => e.gebiet().gaenge.length)) === 3, 'A3: Entf auf dem Level löscht den Gang und kehrt in die Karte zurück');
+  await bau.keyboard.press('Control+KeyZ');
+  check((await ebene()) === 'karte' && (await daten()) === daten0, 'A3: Strg+Z stellt den Gang her');
+}
+
+// ------------------------------------------------------------------ A3 Ausgangsperspektive
+{
+  await b((e) => {
+    e.setzeWerkzeug('auswahl');
+    e.wechsle('beispiel');
+    e.waehle(null);
+    e.alles();
+    e.setzeZoom(8);
+  });
+  const daten0 = await daten();
+  await b((e) => e.oeffneLevel('ostgang'));
+  check((await b((e) => e.ansicht.blick)) === 0, 'A3: ohne Angabe wird das Level mit Norden oben geöffnet');
+  const s0 = await schritte();
+  await bau.selectOption('#f-ansicht', 'S');
+  const ost = await b((e) => e.gebiet().gaenge.find((x) => x.id === 'ostgang'));
+  check(ost.ansicht === 'S', 'A3: die Ausgangsansicht steht als Feld „ansicht“ am Gang', JSON.stringify(ost));
+  check((await schritte()) === s0 + 1 && (await bau.locator('#b-undo').textContent()) === 'Rückgängig: Ausgangsansicht ändern', 'A3: die Änderung ist ein Schritt mit Namen („Ausgangsansicht ändern“)');
+  await bau.keyboard.press('Escape');
+  await b((e) => e.oeffneLevel('ostgang'));
+  check((await b((e) => e.ansicht.blick)) === 2, 'A3: beim Öffnen wird die Ausgangsansicht angewendet (Süden nach rechts)');
+  const lage = await b((e) => [e.ansicht.weltZuBild(1200, 0), e.ansicht.weltZuBild(2600, 0)]);
+  check(Math.abs(lage[1][1] - lage[0][1]) > 5 * Math.abs(lage[1][0] - lage[0][0]), 'A3: im Bild verläuft der Ostgang jetzt senkrecht (gedreht)');
+  await shot('a3-ausgangsansicht');
+  await bau.keyboard.press('Control+KeyZ');
+  check(!(await b((e) => 'ansicht' in e.gebiet().gaenge.find((x) => x.id === 'ostgang'))), 'A3: Strg+Z nimmt die Ausgangsansicht zurück');
+  await bau.keyboard.press('Control+KeyY');
+  // Speichern und Laden verlustfrei, mit dem Feld
+  const text = await b((e) => e.gebiet()).then((g) => formatiere(g));
+  const geladen = await b((e, t) => e.oeffneText(t, 'test.json'), text);
+  check(geladen === true && formatiere(await b((e) => e.gebiet())) === text && /"ansicht": "S"/.test(text), 'A3: Speichern → Laden mit dem Feld ist verlustfrei');
+  await b((e) => e.oeffneLevel('ostgang'));
+  check((await b((e) => e.ansicht.blick)) === 2, 'A3: nach dem Laden gilt die Ausgangsansicht weiter');
+  // Ansicht merken: drehen und speichern
+  await b((e) => e.oeffneLevel('schleuse'));
+  await bau.keyboard.press('KeyE');
+  await bau.keyboard.press('KeyE');
+  await bau.keyboard.press('KeyE');
+  await bau.click('#b-ansicht-merken');
+  check((await b((e) => e.gebiet().gaenge.find((x) => x.id === 'schleuse').ansicht)) === 'SW', 'A3: „Ansicht merken“ speichert die aktuelle Drehung (dreimal E = Südwesten nach rechts)');
+  await bau.selectOption('#f-ansicht', 'E');
+  check(!(await b((e) => 'ansicht' in e.gebiet().gaenge.find((x) => x.id === 'schleuse'))), 'A3: „Norden oben“ entfernt das Feld wieder (Standard)');
+  await b((e) => { e.zuKarte(); e.rueckgaengig(); e.rueckgaengig(); e.rueckgaengig(); });
+  await b((e) => e.norden());
+}
+
 check(bauFehler.length === 0, 'Bedienung (Bauen): keine Konsolenfehler', bauFehler.join('; '));
 
 check(errors.length === 0, 'Bedienung: keine Konsolenfehler', errors.join('; '));

@@ -13,7 +13,7 @@ export const SCHLUESSEL = {
   gebiet: ['format', 'id', 'name', 'tileset', 'bereich', 'knoten', 'gaenge', 'formteile', 'objekte', 'notizen'],
   bereich: ['x0', 'y0', 'x1', 'y1'],
   knoten: ['id', 'typ', 'form', 'x', 'y', 'w', 'h', 'seite'],
-  gang: ['id', 'name', 'von', 'nach', 'breite'],
+  gang: ['id', 'name', 'von', 'nach', 'breite', 'ansicht'], // ansicht: Ausgangsperspektive (A3), fehlt = Norden oben
   formteil: ['id', 'x', 'y', 'laenge', 'breite', 'winkel'],
   objekt: ['id', 'typ', 'art', 'x', 'y', 'laenge', 'breite', 'winkel', 'platzhalter'],
   notiz: ['id', 'x', 'y', 'text'],
@@ -79,6 +79,7 @@ export function pruefeFormat(g) {
       if (art === 'objekt' && o.typ === 'gegner' && !GEGNER.includes(o.art)) f(`${wo} (${o.id}): unbekannte Gegnerart „${o.art}“.`);
       if (art === 'objekt' && OBJEKTTYPEN[o.typ]?.hatMasse) for (const k of ['laenge', 'breite', 'winkel']) if (!zahl(o[k])) f(`${wo} (${o.id}): „${k}“ ist keine Zahl.`);
       if (art === 'gang') for (const k of ['von', 'nach']) if (typeof o[k] !== 'string') f(`${wo} (${o.id}): „${k}“ fehlt.`);
+      if (art === 'gang' && 'ansicht' in o && !HEADING_CODES.includes(o.ansicht)) f(`${wo} (${o.id}): „ansicht“ muss eine Richtung sein (${HEADING_CODES.join(', ')}), nicht ${JSON.stringify(o.ansicht)}.`);
       if ((art === 'formteil' || (art === 'objekt' && OBJEKTTYPEN[o.typ]?.hatMasse)) && zahl(o.winkel) && Math.abs(o.winkel / WINKEL_SCHRITT - Math.round(o.winkel / WINKEL_SCHRITT)) > EPS) {
         f(`${wo} (${o.id}): Winkel ${o.winkel}° liegt nicht im ${WINKEL_SCHRITT}°-Raster.`);
       }
