@@ -41,6 +41,7 @@ export function teilWerkzeug(sorte, hinweisText) {
     abbruch(k) {
       zug = null;
       this.cursor = null;
+      k?.zeichnen();
       k?.hinweis('');
     },
     cursor: null,

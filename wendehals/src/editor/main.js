@@ -365,8 +365,8 @@ export function startEditor() {
   }
   function fuegeEin() {
     if (!state.zwischen) return melde('Nichts kopiert – erst ein Teil wählen und Strg+C drücken.', 'fehler');
-    const z = state.zeiger;
-    const neu = aendere('Einfügen', (g) => teilEinfuegen(g, state.zwischen, z?.x, z?.y));
+    const z = state.zeiger ?? { x: ansicht.cx, y: ansicht.cy }; // ohne Mausstelle: Mitte der Ansicht
+    const neu = aendere('Einfügen', (g) => teilEinfuegen(g, state.zwischen, z.x, z.y));
     if (neu) waehle(neu);
   }
   function dupliziere() {
@@ -494,7 +494,7 @@ export function startEditor() {
     i.addEventListener('change', () => bei(i.value));
     i.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') i.blur();
-      e.stopPropagation(); // Kürzel (Q, E, F …) gelten nicht beim Tippen
+      if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); // Kürzel (Q, E, F …) gelten nicht beim Tippen; Strg+S/Z gehen durch
     });
     dl.append(el('dt', { text: name }), el('dd', {}, [i]));
   }
@@ -585,7 +585,7 @@ export function startEditor() {
       `Stelle ${fmt(s, 0)} E = ${fmt(s / SCREEN_W)} Bildschirme = ${fmt(s / SPEED)} s  ·  Gang ${fmt(m.laenge, 0)} E = ${fmt(m.bildschirme)} Bildschirme = ${fmt(m.sekunden)} s`;
   }
   function refresh() {
-    anzeige.textContent = `Blick ${DIR_NAMES[ansicht.blick]} · ${fmt(ZOOM_BILDSCHIRME[ansicht.stufe], 1)} Bildschirme`;
+    anzeige.textContent = `${DIR_NAMES[ansicht.blick]} · ${fmt(ZOOM_BILDSCHIRME[ansicht.stufe], 1)} Bildschirme`;
     eigenschaften();
     refreshFahrt();
     const v = verlaufVon(state.gebietId);
@@ -642,7 +642,9 @@ export function startEditor() {
     else if (!z.bewegt && z.taste === 0) werkzeug().klick?.(kontext, zeigerPunkt(e));
   };
   canvas.addEventListener('pointerleave', () => {
-    if (!zug) state.zeiger = null;
+    if (zug) return;
+    state.zeiger = null;
+    werkzeug().abbruch?.(kontext);
   });
   canvas.addEventListener('pointerup', loslassen);
   canvas.addEventListener('pointercancel', loslassen);
