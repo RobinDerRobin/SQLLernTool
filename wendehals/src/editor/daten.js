@@ -2,7 +2,7 @@
 // Reine Daten und Geometrie – kein DOM, läuft auch unter Node (Tests). Einheiten E, x nach Osten, y nach Süden, Winkel in Grad.
 import { HEADINGS, DIR_VEC, headingAngle, HEADING_CODES, DIR_NAMES } from '../core/math.js';
 import { FORMAT, SCREEN_W, SCREEN_H, SPEED, WINKEL_SCHRITT, VERLAUF_MAX } from './konstanten.js';
-import { KNOTENTYPEN, OBJEKTTYPEN, TILESETS } from './katalog.js';
+import { KNOTENTYPEN, OBJEKTTYPEN, TILESETS, GEGNER } from './katalog.js';
 
 export const GEBIET_ID = /^(?!(?:con|prn|aux|nul|com\d|lpt\d)$)[a-z0-9][a-z0-9_-]*$/; // gültiger Dateiname (auch unter Windows)
 const EPS = 1e-6;
@@ -76,6 +76,7 @@ export function pruefeFormat(g) {
       if (art === 'gang' && !(o.breite > 0)) f(`${wo} (${o.id}): Breite muss größer als 0 sein.`);
       if (art === 'notiz' && typeof o.text !== 'string') f(`${wo} (${o.id}): „text“ muss Text sein.`);
       if (art === 'objekt' && !Object.hasOwn(OBJEKTTYPEN, o.typ)) f(`${wo} (${o.id}): unbekannter Objekttyp „${o.typ}“.`);
+      if (art === 'objekt' && o.typ === 'gegner' && !GEGNER.includes(o.art)) f(`${wo} (${o.id}): unbekannte Gegnerart „${o.art}“.`);
       if (art === 'objekt' && OBJEKTTYPEN[o.typ]?.hatMasse) for (const k of ['laenge', 'breite', 'winkel']) if (!zahl(o[k])) f(`${wo} (${o.id}): „${k}“ ist keine Zahl.`);
       if (art === 'gang') for (const k of ['von', 'nach']) if (typeof o[k] !== 'string') f(`${wo} (${o.id}): „${k}“ fehlt.`);
       if ((art === 'formteil' || (art === 'objekt' && OBJEKTTYPEN[o.typ]?.hatMasse)) && zahl(o.winkel) && Math.abs(o.winkel / WINKEL_SCHRITT - Math.round(o.winkel / WINKEL_SCHRITT)) > EPS) {

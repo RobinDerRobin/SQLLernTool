@@ -60,3 +60,11 @@ test('Gegner-Werkzeug setzt einen gültigen Platzhalter im Raster; Format bleibt
   assert.equal(new Set(g.objekte.map((x) => x.id)).size, g.objekte.length);
   assert.ok(KNOTENTYPEN && neueId);
 });
+
+test('Format: unbekannte oder fehlende Gegnerart wird beim Laden gemeldet', () => {
+  const g = JSON.parse(JSON.stringify(GEBIETE['proto-netz']));
+  g.objekte.push({ id: 'ox', typ: 'gegner', art: 'quatsch', x: 0, y: 0, platzhalter: true });
+  assert.match(pruefeFormat(g).join(), /Gegnerart/);
+  g.objekte[g.objekte.length - 1] = { id: 'ox', typ: 'gegner', x: 0, y: 0, platzhalter: true };
+  assert.match(pruefeFormat(g).join(), /Gegnerart/);
+});

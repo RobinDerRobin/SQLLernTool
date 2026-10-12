@@ -14,7 +14,7 @@ export const KNOTENTYPEN = {
 /** Objekttypen im Gang. `boden: false` = schneidet den Boden aus (Wand), `true` = Boden (Formteil läuft getrennt). */
 export const OBJEKTTYPEN = {
   wand: { name: 'Wand', hatMasse: true },
-  hindernis: { name: 'Hindernis', hatMasse: true }, // Spielgrafik kommt mit Stufe 6
+  hindernis: { name: 'Hindernis', hatMasse: true },
   gegner: { name: 'Gegner (Platzhalter)', platzhalter: true },
 };
 

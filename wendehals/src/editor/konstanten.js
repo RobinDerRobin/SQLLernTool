@@ -77,7 +77,7 @@ export const FARBEN = {
   knoten: { speicher: '#5be07a', kreuzung: '#e8e8f0', raum: '#c89bff', ende: '#9aa0aa', boss: '#ff6b5e' },
   notiz: '#fff28a',
   platzhalter: '#ff9a3c',
-  hindernis: '#d9822b', // Platzhalterfarbe, bis die Spielgrafik der Hindernisse in Stufe 6 kommt
+  hindernis: '#d9822b', // Farbe der Hindernisse (Look „Prototyp“, wie im Fenster-Prototyp)
   massstab: '#ffffff',
   pruefMuss: '#ff3b2e', // Marken des Prüfers im Plan
   pruefSoll: '#ffc830',

@@ -1,4 +1,4 @@
-// Werkzeug „Hindernis“ (H): Hindernis setzen. Die Spielgrafik der Hindernisse kommt mit Stufe 6, bis dahin ein Platzhalter im Plan.
+// Werkzeug „Hindernis“ (H): Hindernis setzen (im Plan als Vollfläche in der Farbe, die der Fenster-Prototyp zeichnet).
 import { teilWerkzeug } from './teil-werkzeug.js';
 
-export default teilWerkzeug('hindernis', 'Klick setzt ein Hindernis (Platzhalterbild), Ziehen legt Länge und Winkel fest.');
+export default teilWerkzeug('hindernis', 'Klick setzt ein Hindernis, Ziehen legt Länge und Winkel fest.');

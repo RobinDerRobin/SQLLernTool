@@ -14,7 +14,7 @@
 | 3 | Spielen ab hier + Bezeichnung | fertig (nur Ost/West/Nord/Süd-Gänge spielbar; Electron ungetestet) | npm test 369, e2e, e2e:editor, beide Test-Agenten | Lauf 4 |
 | 4 | Prüfer | fertig (Electron ungetestet; Marken nur bei offener Liste) | npm test 384, e2e, e2e:editor, beide Test-Agenten | Lauf 5 |
 | 5 | Gebiete und Übergänge | fertig (Electron ungetestet; „Level zuordnen“ = Gebietsdatei, kein Verschieben von Gängen zwischen Gebieten) | npm test 401, e2e, e2e:editor, beide Test-Agenten | Lauf 6 |
-| 6 | Tilesets und Spielgrafik | offen | – | – |
+| 6 | Tilesets und Spielgrafik | fertig (Electron ungetestet; Tileset-Look nur im Editor, „Spielen ab hier“ nutzt weiter Prototyp-Farben) | npm test 406, e2e, e2e:editor, beide Test-Agenten | Lauf 7 |
 | 7 | Testmenü am Deck | offen | – | – |
 | 8 | Notizen und Stempel | offen | – | – |
 | 9 | Bot-Spieltest | offen | – | – |
@@ -54,11 +54,20 @@
 
 - Prüfer-Knopf unten zeigt die Zählung (rot/gelb/grün); Liste und Marken im Plan erscheinen erst nach Klick (damit Pixeltests der Spielbilder unberührt bleiben). M7 = `spielbarkeit().probleme`. M4 prüft Mittelpunkt + 4 um 2 E eingezogene Ecken; M3 misst ab Knotenmitte, nur Knoten vom Typ `kreuzung`. M2 tastet alle 20 E längs und 10 E quer ab.
 
+## Auf Vorbehalt entschieden (Stufe 6)
+
+- Look-Schalter (Knopf „Look“, Taste J): Standard „Prototyp“ (Farben des Fenster-Prototyps, damit alle Pixeltests unverändert gelten); „Tileset“ färbt Boden/Schachbrett/Wand/Hindernis mit den Terrainfarben des Gebiets-Themas (`katalog.js: tilesetFarben`). Tileset des Gebiets wählbar im Eigenschaftenfeld (mit Rückgängig).
+- Gegner: neues Werkzeug X, Spielgrafik über `drawEnemy`, oranger gestrichelter Ring = Platzhalter. Hindernis = Vollfläche in der Fensterfarbe (kein Kreuz). Palette rechts mit Bildern (Formteil, Wand, Hindernis, 11 Gegner, Gegner des Tilesets zuerst). `pruefeFormat` meldet unbekannte Gegnerart.
+
 ## Auf Vorbehalt entschieden (Stufe 5)
 
 - `welt.json` additiv erweitert: je Gebiet optional `lage {x,y}` (nur Versatz im Welt-Plan), Liste `uebergaenge [{id, von:"gebiet/K", nach:"gebiet/K"}]`. Ohne `lage` ordnet `weltLagen` automatisch an; beim ersten Verschieben werden alle Lagen festgeschrieben.
 - Neue Ansicht „Welt“ (Taste T), Werkzeug „Bereich“ (A). Welt-Prüfer W1 MUSS (Übergänge gültig), W2/W3/W4 SOLL (Überlappung, Zusammenhang, Inhalt im Bereich) in `welt.js`, nicht in `regeln.js` (Gebiets-Prüfer unverändert). Zoomstufen um 64 und 128 Bildschirme ergänzt.
 - Löscht man einen Knoten mit Übergang, bleibt der Übergang stehen (W1 meldet); Knoten-IDs mit Übergang werden nicht neu vergeben. Welt-Rückgängig setzt nur Lage und Übergänge zurück, nicht die Gebietsliste.
+
+## Offen aus Stufe 6 (Agenten-Prüfung, Hinweise)
+
+- „Spielen ab hier“ ignoriert das Tileset (Prototyp-Farben); Look „Tileset“ meldet bei unbekanntem Tileset trotzdem Erfolg (nur handgebaute Daten); Palette wird bei jedem `refresh()` neu gezeichnet; kein Pixelvergleich Editor ↔ Spielzeichnung für Gegner (gleiche Funktion `drawEnemy`).
 
 ## Offen aus Stufe 5 (Agenten-Prüfung, Hinweise)
 
