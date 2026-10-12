@@ -54,6 +54,7 @@ export const KUERZEL = {
   look: 'KeyJ', // Look umschalten: Prototyp-Farben ↔ Tileset des Gebiets
   welt: 'KeyT', // zwischen Gebiet- und Welt-Ansicht umschalten
   teilDrehen: 'KeyR', // ohne Umschalt 45° rechtsherum, mit Umschalt linksherum
+  alleWaehlen: 'KeyA', // mit Strg/Cmd (ohne Strg ist A das Bereich-Werkzeug)
   kopieren: 'KeyC', // mit Strg/Cmd
   einfuegen: 'KeyV', // mit Strg/Cmd
   duplizieren: 'KeyD', // mit Strg/Cmd
@@ -72,7 +73,8 @@ export const KUERZEL = {
   hoch: 'ArrowUp',
   runter: 'ArrowDown',
 };
-export const PFEIL_SCHRITT_PX = 60; // Verschieben mit Pfeiltasten (Bildschirmpixel)
+export const PFEIL_SCHRITT_PX = 60; // Plan verschieben mit Pfeiltasten (Bildschirmpixel), wenn nichts Bewegbares gewählt ist
+export const PFEIL_GROSS = 5; // Umschalt+Pfeil verschiebt die Auswahl um so viele Rasterschritte
 export const KLICK_TOLERANZ_PX = 8; // Bewegung unter dieser Strecke gilt als Klick, erst darüber beginnt ein Ziehen (A5)
 /** Maustasten (MouseEvent.button): links wählt und zieht, rechts setzt das aktuelle Element, Mitte (und Shift+links) verschiebt den Plan (A1). */
 export const MAUS = { waehlen: 0, verschieben: 1, setzen: 2 };
@@ -82,6 +84,8 @@ export const FARBEN = {
   rahmen: '#ffd24a',
   rahmenAussen: 'rgba(0,0,0,0.38)',
   auswahl: '#4ad0ff',
+  hover: 'rgba(255,255,255,0.85)', // Umriss des Dings unter der Maus
+  rahmenAuswahl: '#7fd4ff', // Auswahlrahmen (Linksziehen im Leeren); gestrichelt, wenn Alt = „auch berühren“
   vorschau: '#8dffb0',
   vorschauFalsch: '#ff7a6a',
   knoten: { speicher: '#5be07a', kreuzung: '#e8e8f0', raum: '#c89bff', ende: '#9aa0aa', boss: '#ff6b5e' },

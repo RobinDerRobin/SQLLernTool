@@ -174,7 +174,10 @@ async function zieh(von, nach, opts = {}) {
 }
 async function klick(p, opts = {}) {
   const [x, y] = await bild(p);
-  await bau.mouse.click(x, y, opts);
+  const taste = opts.modifiers?.[0]; // mouse.click kennt keine Zusatztasten: Taste selbst halten
+  if (taste) await bau.keyboard.down(taste);
+  await bau.mouse.click(x, y, { button: opts.button });
+  if (taste) await bau.keyboard.up(taste);
 }
 const daten = () => b((e) => JSON.stringify(e.gebiet()));
 const welt = () => b((e) => JSON.stringify(e.state.welt));
@@ -664,6 +667,263 @@ const zufall = () => (rng = (rng * 1103515245 + 12345) % 2147483648) / 214748364
   check(!(await b((e) => 'ansicht' in e.gebiet().gaenge.find((x) => x.id === 'schleuse'))), 'A3: „Norden oben“ entfernt das Feld wieder (Standard)');
   await b((e) => { e.zuKarte(); e.rueckgaengig(); e.rueckgaengig(); e.rueckgaengig(); });
   await b((e) => e.norden());
+}
+
+
+// ------------------------------------------------------------------ A4 Auswahl: Hervorhebung, Rahmen, Strg+Klick, Pfeile, Strg+A, Kopieren mehrerer
+{
+  await b((e) => {
+    while (e.verlaufVon(e.state.gebietId).kannZurueck) e.rueckgaengig();
+    e.setzeWerkzeug('auswahl');
+    e.wechsle('beispiel');
+    e.waehle(null);
+    e.alles();
+    e.setzeZoom(8);
+    e.state.beschriftung = false;
+  });
+  const daten0 = await daten();
+  const liste = () => b((e) => e.auswahlListe().map((d) => d.art + ':' + d.id).sort().join(','));
+  const ohneFahrt = (fn, arg) =>
+    b((e, a) => {
+      const fahrt = e.state.fahrt;
+      e.state.fahrt = null;
+      e.zeichne();
+      const r = a.map(([x, y]) => {
+        const [px, py] = e.ansicht.weltZuBild(x, y);
+        return e.pixel(px, py);
+      });
+      e.state.fahrt = fahrt;
+      return r;
+    }, arg);
+
+  // Hervorhebung unter der Maus
+  const [hx, hy] = await bild([420, -70]);
+  await bau.mouse.move(hx + 300, hy + 300);
+  const hashAus = await b((e) => e.hash());
+  const randAus = (await ohneFahrt(null, [[420, -100]]))[0];
+  await bau.mouse.move(hx, hy);
+  await bau.waitForTimeout(40);
+  const randAn = (await ohneFahrt(null, [[420, -100]]))[0];
+  const hashAn = await b((e) => e.hash());
+  check(hashAn !== hashAus && randAn[0] > 190 && randAn[1] > 190 && randAn[0] > randAus[0] + 40, `A4: unter der Maus wird das Ding hervorgehoben (Rand der Wand ${randAus.slice(0, 3)} → ${randAn.slice(0, 3)})`);
+  await bau.mouse.move(hx + 300, hy + 300);
+  await bau.waitForTimeout(40);
+  check((await b((e) => e.hash())) === hashAus, 'A4: Maus weg → Hervorhebung weg (dasselbe Bild wie vorher)');
+  check((await daten()) === daten0, 'A4: Hervorhebung ändert keine Daten');
+
+  // Auswahlrahmen
+  await zieh([-150, -250], [1350, 250]);
+  const ganz = await liste();
+  check(ganz === 'formteil:f1,gang:schleuse,knoten:K1,knoten:K2,objekt:o1,objekt:o2', 'A4: Linksziehen im Leeren zieht einen Auswahlrahmen – gewählt ist, was ganz drin liegt', ganz);
+  check((await bau.locator('#rechts h2').textContent()) === '6 Dinge gewählt', 'A4: das rechte Feld sagt „6 Dinge gewählt“');
+  check((await daten()) === daten0, 'A4: Rahmen ändert keine Daten');
+  await zieh([1000, -300], [1180, -150]);
+  check((await liste()) === '', 'A4: ein Rahmen, der nichts ganz umschließt, wählt nichts (hebt die Auswahl auf)', await liste());
+  // mit Alt beim Loslassen: auch was nur hineinragt
+  {
+    const [x0, y0] = await bild([1000, -300]);
+    const [x1, y1] = await bild([1180, -150]);
+    await bau.mouse.move(x0, y0);
+    await bau.mouse.down();
+    await bau.mouse.move(x1, y1, { steps: 5 });
+    await bau.keyboard.down('Alt');
+    await bau.mouse.up();
+    await bau.keyboard.up('Alt');
+    check((await liste()) === 'gang:nordgang', 'A4: Alt beim Loslassen wählt auch, was der Rahmen nur berührt (Nordgang)', await liste());
+  }
+  // Strg + Rahmen ergänzt
+  await b((e) => e.waehle({ art: 'objekt', id: 'o2' }));
+  {
+    const [x0, y0] = await bild([300, 250]);
+    const [x1, y1] = await bild([700, 400]);
+    await bau.keyboard.down('Control');
+    await bau.mouse.move(x0, y0);
+    await bau.mouse.down();
+    await bau.mouse.move(x1, y1, { steps: 4 });
+    await bau.mouse.up();
+    await bau.keyboard.up('Control');
+    check((await liste()) === 'objekt:o2', 'A4: Strg+Rahmen über leerem Gebiet ergänzt nichts und behält die Auswahl', await liste());
+  }
+
+  // Strg+Klick ergänzt und entfernt
+  await klick([420, -70]);
+  check((await liste()) === 'objekt:o1', 'A4: Linksklick wählt ein Ding');
+  await klick([600, 150], { modifiers: ['Control'] });
+  check((await liste()) === 'formteil:f1,objekt:o1' && (await b((e) => e.state.auswahl)).id === 'f1', 'A4: Strg+Klick ergänzt die Auswahl (Hauptwahl ist das zuletzt gewählte Ding)', await liste());
+  await klick([900, 0], { modifiers: ['Control'] });
+  check((await liste()) === 'formteil:f1,objekt:o1,objekt:o2', 'A4: noch einmal Strg+Klick');
+  await klick([420, -70], { modifiers: ['Control'] });
+  check((await liste()) === 'formteil:f1,objekt:o2', 'A4: Strg+Klick auf ein gewähltes Ding nimmt es wieder heraus', await liste());
+  await klick([600, 150]);
+  check((await liste()) === 'formteil:f1', 'A4: Linksklick ohne Strg wählt nur dieses Ding');
+
+  // Gemeinsam verschieben (Ziehen)
+  await klick([420, -70]);
+  await klick([600, 150], { modifiers: ['Control'] });
+  const vorSchub = await b((e) => JSON.stringify([e.gebiet().formteile.find((f) => f.id === 'f1'), e.gebiet().objekte.find((o) => o.id === 'o1'), e.gebiet().objekte.find((o) => o.id === 'o2')]));
+  const s0 = await schritte();
+  await zieh([600, 150], [800, 250]); // f1 greifen und mit o1 zusammen schieben
+  const nachSchub = await b((e) => [e.gebiet().formteile.find((f) => f.id === 'f1'), e.gebiet().objekte.find((o) => o.id === 'o1'), e.gebiet().objekte.find((o) => o.id === 'o2')]);
+  const v = JSON.parse(vorSchub);
+  check(nachSchub[0].x === v[0].x + 200 && nachSchub[0].y === v[0].y + 100 && nachSchub[1].x === v[1].x + 200 && Math.abs(nachSchub[1].y - v[1].y - 100) <= 10, 'A4: Ziehen verschiebt die ganze Auswahl um denselben Betrag (+200 | +100)', JSON.stringify(nachSchub));
+  check(nachSchub[2].x === v[2].x && nachSchub[2].y === v[2].y, 'A4: nicht Gewähltes (Gegner o2) bleibt stehen');
+  check((await schritte()) === s0 + 1 && (await bau.locator('#b-undo').textContent()) === 'Rückgängig: Auswahl verschieben', 'A4: das Verschieben mehrerer ist ein einziger Rückgängig-Schritt („Auswahl verschieben“)');
+  await bau.keyboard.press('Control+KeyZ');
+  check((await daten()) === daten0, 'A4: Strg+Z stellt alles exakt her');
+
+  // Pfeiltasten verschieben die Auswahl im Raster
+  await klick([420, -70]);
+  const o1 = await b((e) => e.gebiet().objekte.find((o) => o.id === 'o1'));
+  const cx0 = await b((e) => e.ansicht.cx);
+  await bau.keyboard.press('ArrowRight');
+  let o1b = await b((e) => e.gebiet().objekte.find((o) => o.id === 'o1'));
+  check(o1b.x === o1.x + 20 && (await b((e) => e.ansicht.cx)) === cx0, 'A4: Pfeil rechts verschiebt die Auswahl um 20 E (der Plan bleibt stehen)', JSON.stringify(o1b));
+  await bau.keyboard.press('Shift+ArrowDown');
+  o1b = await b((e) => e.gebiet().objekte.find((o) => o.id === 'o1'));
+  check(Math.abs(o1b.y - (o1.y + 100)) <= 10, 'A4: Umschalt+Pfeil verschiebt um 5 Raster (100 E)', JSON.stringify(o1b));
+  check((await bau.locator('#b-undo').textContent()) === 'Rückgängig: Auswahl verschieben', 'A4: Pfeil-Verschiebung steht im Rückgängig');
+  await bau.keyboard.press('Control+KeyZ');
+  await bau.keyboard.press('Control+KeyZ');
+  check((await daten()) === daten0, 'A4: zwei Schritte zurück');
+  // gedrehte Ansicht: Pfeil nach rechts = die Achse, die auf dem Bildschirm nach rechts zeigt
+  await b((e) => { e.ansicht.blick = 2; }); // Süden zeigt nach rechts
+  await bau.keyboard.press('ArrowRight');
+  o1b = await b((e) => e.gebiet().objekte.find((o) => o.id === 'o1'));
+  check(o1b.x === o1.x && Math.abs(o1b.y - (o1.y + 20)) <= 10, 'A4: bei gedrehter Ansicht folgt der Pfeil dem Bildschirm (Süden = rechts → y + 20)', JSON.stringify(o1b));
+  await bau.keyboard.press('Control+KeyZ');
+  await b((e) => e.norden());
+  // Knoten in der Auswahl: Schritt 100 E (ihr Raster)
+  await b((e) => e.setzeAuswahl([{ art: 'knoten', id: 'K4' }]));
+  await bau.keyboard.press('ArrowRight');
+  check((await b((e) => e.gebiet().knoten.find((k) => k.id === 'K4').x)) === 1800 + 100 || (await b((e) => e.gebiet().knoten.length)) === 5, 'A4: ein gewählter Knoten rastet auf 100 E (Pfeil = 100 E)');
+  await bau.keyboard.press('Control+KeyZ');
+  // ohne Auswahl und bei nur einem gewählten Gang verschieben die Pfeile den Plan
+  await b((e) => e.waehle(null));
+  const cxA = await b((e) => e.ansicht.cx);
+  await bau.keyboard.press('ArrowLeft');
+  check((await b((e) => e.ansicht.cx)) !== cxA && (await daten()) === daten0, 'A4: ohne Auswahl verschiebt der Pfeil den Plan');
+  await b((e) => e.waehle({ art: 'gang', id: 'schleuse' }));
+  const cxB = await b((e) => e.ansicht.cx);
+  await bau.keyboard.press('ArrowLeft');
+  check((await b((e) => e.ansicht.cx)) !== cxB && (await daten()) === daten0, 'A4: ist nur ein Gang gewählt, verschiebt der Pfeil den Plan (kein versehentliches Verschieben)');
+
+  // Strg+A
+  await b((e) => e.waehle(null));
+  await bau.keyboard.press('Control+KeyA');
+  const alle = await b((e) => { const g = e.gebiet(); return [e.auswahlListe().length, g.knoten.length + g.gaenge.length + g.formteile.length + g.objekte.length]; });
+  check(alle[0] === alle[1], `A4: Strg+A wählt alles in der Ansicht (${alle[0]} von ${alle[1]})`);
+  await bau.click('#l-gegner');
+  await bau.keyboard.press('Control+KeyA');
+  const ohneG = await liste();
+  check(!/objekt:o2/.test(ohneG) && /objekt:o1/.test(ohneG), 'A4: Strg+A lässt gesperrte Ebenen aus (Gegner)');
+  await zieh([-150, -250], [1350, 250]);
+  check(!/objekt:o2/.test(await liste()), 'A4: der Auswahlrahmen lässt gesperrte Ebenen aus');
+  await bau.click('#l-gegner');
+  await b((e) => e.oeffneLevel('schleuse'));
+  await bau.keyboard.press('Control+KeyA');
+  check((await liste()) === 'formteil:f1,gang:schleuse,knoten:K1,knoten:K2,objekt:o1,objekt:o2', 'A4: Strg+A in der Levelansicht wählt nur die Dinge des Levels', await liste());
+  await b((e) => e.zuKarte());
+
+  // Kopieren, Einfügen, Duplizieren mehrerer Dinge
+  await b((e) => e.setzeAuswahl([{ art: 'objekt', id: 'o1' }, { art: 'formteil', id: 'f1' }]));
+  await bau.keyboard.press('Control+KeyC');
+  const [mx, my] = await bild([1500, -700]);
+  await bau.mouse.move(mx, my);
+  const s1 = await schritte();
+  await bau.keyboard.press('Control+KeyV');
+  let g1 = await b((e) => e.gebiet());
+  check(g1.objekte.length === 3 && g1.formteile.length === 2 && (await schritte()) === s1 + 1, 'A4: Strg+C, Maus verschieben, Strg+V fügt beide Teile in einem Schritt ein');
+  const neuO = g1.objekte.at(-1);
+  const neuF = g1.formteile.at(-1);
+  check(neuO.id !== 'o1' && neuF.id !== 'f1' && neuO.laenge === 240 && neuF.laenge === 260, 'A4: die Kopien haben neue IDs und die Maße der Originale');
+  check(Math.abs((neuO.x + neuF.x) / 2 - 1500) <= 60 && Math.abs((neuO.y + neuF.y) / 2 + 700) <= 60, 'A4: die Mitte der Gruppe liegt an der Mausstelle');
+  check((await liste()) === `formteil:${neuF.id},objekt:${neuO.id}`, 'A4: die Kopien sind danach gewählt');
+  await bau.keyboard.press('Control+KeyD');
+  g1 = await b((e) => e.gebiet());
+  check(g1.objekte.length === 4 && g1.formteile.length === 3 && g1.objekte.at(-1).x === neuO.x + 40, 'A4: Strg+D dupliziert die ganze Auswahl (+40 E)');
+  await bau.keyboard.press('Control+KeyZ');
+  await bau.keyboard.press('Control+KeyZ');
+  check((await daten()) === daten0, 'A4: zwei Schritte zurück = Ausgangszustand');
+  // Gang samt Knoten
+  await b((e) => e.setzeAuswahl([{ art: 'gang', id: 'ostgang' }]));
+  await bau.keyboard.press('Control+KeyC');
+  const [gx, gy] = await bild([1500, 800]);
+  await bau.mouse.move(gx, gy);
+  await bau.keyboard.press('Control+KeyV');
+  const g2 = await b((e) => e.gebiet());
+  const neuGang = g2.gaenge.at(-1);
+  check(g2.gaenge.length === 5 && g2.knoten.length === 7 && neuGang.name === 'Ostgang' && neuGang.von !== 'K2' && neuGang.nach !== 'K5', 'A4: ein kopierter Gang nimmt neue Knoten mit (Gang und zwei Knoten)');
+  await bau.keyboard.press('Control+KeyZ');
+  check((await daten()) === daten0, 'A4: Rückgängig nimmt Gang und Knoten zusammen zurück');
+  // Löschen mehrerer
+  await b((e) => e.setzeAuswahl([{ art: 'objekt', id: 'o1' }, { art: 'formteil', id: 'f1' }, { art: 'objekt', id: 'o2' }]));
+  await bau.keyboard.press('Delete');
+  const g3 = await b((e) => e.gebiet());
+  check(g3.objekte.length === 0 && g3.formteile.length === 0 && (await b((e) => e.state.auswahl)) === null, 'A4: Entf löscht die ganze Auswahl');
+  await bau.keyboard.press('Control+KeyZ');
+  check((await daten()) === daten0, 'A4: ein Strg+Z bringt alle zurück');
+  // Drehen mehrerer
+  await b((e) => e.setzeAuswahl([{ art: 'objekt', id: 'o1' }, { art: 'formteil', id: 'f1' }]));
+  await bau.keyboard.press('KeyR');
+  const g4 = await b((e) => e.gebiet());
+  check(g4.objekte.find((o) => o.id === 'o1').winkel === 45 && g4.formteile.find((f) => f.id === 'f1').winkel === 45, 'A4: R dreht alle gewählten Teile um 45°');
+  await bau.keyboard.press('Control+KeyZ');
+}
+
+// ------------------------------------------------------------------ A7 Rechtsklick bei Auswahl = Kopie des ausgewählten Objekts
+{
+  await b((e) => {
+    while (e.verlaufVon(e.state.gebietId).kannZurueck) e.rueckgaengig();
+    e.setzeWerkzeug('auswahl');
+    e.waehle(null);
+  });
+  const daten0 = await daten();
+  const s0 = await schritte();
+  await klick([420, -70]); // die Wand o1 (240 × 60)
+  await klick([900, -600], RECHTS);
+  let g = await b((e) => e.gebiet());
+  let kopie1 = g.objekte.at(-1);
+  check(g.objekte.length === 3 && kopie1.typ === 'wand' && kopie1.laenge === 240 && kopie1.breite === 60 && kopie1.winkel === 0 && kopie1.x === 900 && kopie1.y === -600 && kopie1.id !== 'o1', 'A7: Rechtsklick bei gewählter Wand setzt eine Kopie davon an die Mausstelle (240 × 60, im Raster)', JSON.stringify(kopie1));
+  check((await b((e) => e.state.auswahl))?.id === kopie1.id && (await bau.locator('#b-undo').textContent()) === 'Rückgängig: Kopie setzen', 'A7: die Kopie ist danach gewählt; im Rückgängig steht „Kopie setzen“');
+  await klick([1500, -600], RECHTS);
+  g = await b((e) => e.gebiet());
+  check(g.objekte.length === 4 && g.objekte.at(-1).x === 1500, 'A7: noch ein Rechtsklick kopiert die Kopie weiter');
+  // Gegner kopieren
+  await klick([900, 0]);
+  await klick([1500, -300], RECHTS);
+  g = await b((e) => e.gebiet());
+  check(g.objekte.at(-1).typ === 'gegner' && g.objekte.at(-1).art === 'ente' && g.objekte.at(-1).platzhalter === true && g.objekte.at(-1).x === 1500, 'A7: ein gewählter Gegner wird als Gegner derselben Art kopiert');
+  // Rechts ziehen mit Auswahl kopiert nicht
+  const vor = await daten();
+  await zieh([1900, -700], [2100, -700], RECHTS);
+  check((await daten()) === vor, 'A7: Rechts ziehen mit Auswahl setzt nichts');
+  // Element wählen hebt die Auswahl auf: Rechtsklick setzt dann das Element, nicht die Kopie
+  await bau.keyboard.press('KeyH');
+  check((await b((e) => e.state.auswahl)) === null, 'A7: ein Element wählen (Taste H) hebt die Auswahl auf');
+  await klick([1900, -700], RECHTS);
+  g = await b((e) => e.gebiet());
+  check(g.objekte.at(-1).typ === 'hindernis' && g.objekte.at(-1).laenge === 60, 'A7: ohne Auswahl setzt der Rechtsklick das Palettenelement (Hindernis 60 × 60)');
+  // Nur ein Gang gewählt zählt nicht als Objekt: das Palettenelement wird gesetzt
+  await b((e) => e.waehle({ art: 'gang', id: 'schleuse' }));
+  await klick([2100, 400], RECHTS);
+  g = await b((e) => e.gebiet());
+  check(g.objekte.at(-1).typ === 'hindernis' && g.objekte.at(-1).x === 2100, 'A7: bei nur einem gewählten Gang setzt der Rechtsklick das Palettenelement');
+  // Knoten kopieren
+  await bau.keyboard.press('KeyV');
+  await b((e) => e.setzeAuswahl([{ art: 'knoten', id: 'K5' }]));
+  await klick([1500, 900], RECHTS);
+  g = await b((e) => e.gebiet());
+  const nk = g.knoten.at(-1);
+  check(nk.typ === 'raum' && nk.w === 520 && nk.h === 400 && nk.x === 1500 && nk.y === 900, 'A7: ein gewählter Knoten (Raum) wird mit Maßen an die Mausstelle kopiert (im 100-E-Raster)', JSON.stringify(nk)); // richtung-ok
+  // gesperrte Ebene: keine Kopie
+  await b((e) => e.setzeAuswahl([{ art: 'objekt', id: 'o1' }]));
+  await b((e) => { e.state.gesperrt.add('waende'); });
+  const vor2 = await daten();
+  await klick([1000, -900], RECHTS);
+  check((await daten()) === vor2 && /gesperrt/.test(await bau.locator('#melden').textContent()), 'A7: in eine gesperrte Ebene wird nicht kopiert (Meldung)');
+  await b((e) => { e.state.gesperrt.delete('waende'); e.melde(''); });
+  while ((await schritte()) > s0) await bau.keyboard.press('Control+KeyZ');
+  check((await daten()) === daten0, 'A7: alles rückgängig = Ausgangszustand');
 }
 
 check(bauFehler.length === 0, 'Bedienung (Bauen): keine Konsolenfehler', bauFehler.join('; '));

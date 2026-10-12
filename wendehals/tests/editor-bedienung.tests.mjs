@@ -8,6 +8,7 @@ import { ausdehnung, Verlauf, formatiere, ladeGebiet, pruefeFormat } from '../sr
 import { setze } from '../src/editor/befehle.js';
 import { ebeneVon, EBENEN, WERKZEUG_EBENEN } from '../src/editor/ebenen.js';
 import { teilBei } from '../src/editor/teile.js';
+import { inRahmen, alleDinge, verschiebeDinge, merkeDinge, fuegeDingeEin, fuegeDingeAn, loescheDinge, dreheDinge, schrittFuer, duplikatVersatz } from '../src/editor/mehrfach.js';
 import { WERKZEUGE } from '../src/editor/werkzeuge/index.js';
 import { spielbarkeit, erzeugeSzene } from '../src/editor/spielen.js';
 import { levelInhalt, spielGebiet } from '../src/editor/level.js';
@@ -187,4 +188,106 @@ test('A3 Ausgangsperspektive: Feld „ansicht“ am Gang – speichern, laden, p
   kaputt.gaenge[0].ansicht = 'quer';
   assert.match(pruefeFormat(kaputt).join('|'), /ansicht/);
   assert.throws(() => ladeGebiet(JSON.stringify(kaputt)), /ansicht/);
+});
+
+// ------------------------------------------------------------------ A4 Mehrfachauswahl
+test('A4 Auswahlrahmen: wählt, was ganz im Rahmen liegt; mit „berühren“ auch, was hineinragt; gesperrte Ebenen zählen nicht', () => {
+  const g = kopie(GEBIETE.beispiel);
+  const ganz = inRahmen(g, { x0: -100, y0: -100, x1: 1300, y1: 100 });
+  const s = (l) => l.map((d) => d.art + ':' + d.id).sort();
+  assert.ok(s(ganz).includes('gang:schleuse') && s(ganz).includes('knoten:K1') && s(ganz).includes('knoten:K2'), 'Schleuse samt Knoten');
+  assert.ok(!s(ganz).includes('gang:nordgang') && !s(ganz).includes('gang:ostgang'), 'ragende Gänge sind nicht ganz drin');
+  const beruehrt = inRahmen(g, { x0: -100, y0: -100, x1: 1300, y1: 100 }, { beruehren: true });
+  assert.ok(s(beruehrt).includes('gang:nordgang') && s(beruehrt).includes('gang:ostgang') && s(beruehrt).includes('gang:diagonale'), 'berührende Gänge');
+  assert.equal(inRahmen(g, { x0: 5000, y0: 5000, x1: 6000, y1: 6000 }).length, 0);
+  const ohneGegner = inRahmen(g, { x0: -5000, y0: -5000, x1: 5000, y1: 5000 }, { gesperrt: new Set(['gegner']) });
+  assert.ok(!ohneGegner.some((d) => d.art === 'objekt' && g.objekte.find((o) => o.id === d.id).typ === 'gegner'));
+  assert.equal(alleDinge(g).length, g.knoten.length + g.gaenge.length + g.formteile.length + g.objekte.length);
+  assert.ok(alleDinge(g, new Set(['knoten', 'gaenge'])).every((d) => d.art !== 'knoten' && d.art !== 'gang'));
+});
+
+test('A4 Verschieben: mehrere Dinge zusammen, Gänge folgen ihren Knoten, Raster 100 E für Knoten und 20 E für Teile, ungültig → nichts geändert', () => {
+  const g = kopie(GEBIETE.beispiel);
+  g.objekte.find((o) => o.id === 'o1').y = -60; // das Beispiel hat y = −70 (abseits des 20-E-Rasters): Teile rasten beim Verschieben ein
+  const vor = JSON.stringify(g);
+  const dinge = [{ art: 'gang', id: 'schleuse' }, { art: 'formteil', id: 'f1' }, { art: 'objekt', id: 'o1' }];
+  assert.equal(schrittFuer(g, dinge), 100);
+  assert.equal(schrittFuer(g, [{ art: 'objekt', id: 'o1' }]), 20);
+  assert.match(verschiebeDinge(g, dinge, 40, 0), /100 E/, 'Knoten nur in 100-E-Schritten');
+  assert.equal(JSON.stringify(g), vor, 'dabei nichts geändert');
+  assert.equal(verschiebeDinge(g, dinge, 0, 0), 'Keine Verschiebung.');
+  // die Schleuse (K1–K2) schieben: K2 hängt an Nord-, Ost- und Diagonalgang → sie ändern ihre Richtung/Länge, K2 allein verschoben bricht das Raster
+  const r = verschiebeDinge(g, dinge, 0, 100);
+  assert.match(r, /45°-Raster/);
+  assert.equal(JSON.stringify(g), vor, 'ungültige Verschiebung lässt alles unverändert');
+  // alles zusammen: Knoten K1 und K2 + K3, K4, K5 → alle Gänge gleichzeitig verschoben bleiben gültig
+  const alles = alleDinge(g);
+  assert.equal(verschiebeDinge(g, alles, 200, -100), null);
+  assert.equal(g.knoten.find((k) => k.id === 'K1').x, 200);
+  assert.equal(g.knoten.find((k) => k.id === 'K1').y, -100);
+  assert.equal(g.formteile.find((f) => f.id === 'f1').x, GEBIETE.beispiel.formteile.find((f) => f.id === 'f1').x + 200);
+  assert.equal(g.gaenge.length, GEBIETE.beispiel.gaenge.length);
+  assert.equal(verschiebeDinge(g, alleDinge(g), -200, 100), null);
+  assert.equal(JSON.stringify(g), vor, 'zurückgeschoben = Ausgangszustand');
+  // Teile im 20er-Raster
+  const t = kopie(GEBIETE.beispiel);
+  t.objekte.find((o) => o.id === 'o1').y = -60;
+  assert.equal(verschiebeDinge(t, [{ art: 'objekt', id: 'o1' }], 40, -20), null);
+  const o1 = { ...GEBIETE.beispiel.objekte.find((o) => o.id === 'o1'), y: -60 };
+  assert.deepEqual([t.objekte.find((o) => o.id === 'o1').x, t.objekte.find((o) => o.id === 'o1').y], [o1.x + 40, o1.y - 20]);
+  // Kollision mit einem Knoten, der nicht mitwandert
+  const k = kopie(GEBIETE.beispiel);
+  assert.match(verschiebeDinge(k, [{ art: 'knoten', id: 'K1' }], 1200, 0), /schon ein Knoten/);
+});
+
+test('A4 Kopieren/Einfügen/Duplizieren mehrerer Dinge: neue IDs, Gänge samt Knoten, Rückgängig-fähig (Zustand vorher exakt)', () => {
+  const g = kopie(GEBIETE.beispiel);
+  const vor = JSON.stringify(g);
+  const dinge = [{ art: 'gang', id: 'ostgang' }, { art: 'objekt', id: 'o1' }];
+  const clip = merkeDinge(g, dinge);
+  assert.equal(clip.knoten.length, 2, 'der Gang nimmt seine zwei Knoten mit');
+  assert.equal(clip.gaenge.length, 1);
+  assert.equal(clip.teile.length, 1);
+  const [dx, dy] = duplikatVersatz(clip);
+  assert.deepEqual([dx, dy], [100, 100]);
+  const r = fuegeDingeEin(g, clip, dx, dy);
+  assert.ok(!r.fehler && r.dinge.length === 4);
+  const neuGang = g.gaenge.at(-1);
+  assert.notEqual(neuGang.id, 'ostgang');
+  assert.equal(neuGang.name, 'Ostgang');
+  const vonK = g.knoten.find((k) => k.id === neuGang.von);
+  const alt = GEBIETE.beispiel.knoten.find((k) => k.id === 'K2');
+  assert.deepEqual([vonK.x, vonK.y], [alt.x + 100, alt.y + 100], 'Gang verweist auf die neuen Knoten, um den Versatz verschoben');
+  assert.equal(g.knoten.length, GEBIETE.beispiel.knoten.length + 2);
+  assert.equal(g.objekte.length, GEBIETE.beispiel.objekte.length + 1);
+  // an einer Mausstelle: Mitte der Gruppe auf die Stelle (gerastert)
+  const h = kopie(GEBIETE.beispiel);
+  const r2 = fuegeDingeAn(h, clip, 3000, 2000);
+  assert.ok(!r2.fehler);
+  const mit = merkeDinge(h, r2.dinge);
+  assert.ok(Math.abs(mit.bezug.x - 3000) <= 50 && Math.abs(mit.bezug.y - 2000) <= 50, 'die Mitte liegt an der Zielstelle (' + mit.bezug.x + '|' + mit.bezug.y + ')');
+  // Kollision: dieselbe Stelle noch einmal → Meldung, nichts geändert
+  const vor2 = JSON.stringify(h);
+  const r3 = fuegeDingeAn(h, clip, 3000, 2000);
+  assert.match(r3.fehler, /schon ein Knoten/);
+  assert.equal(JSON.stringify(h), vor2);
+  // einzelnes Teil: Mitte rastet auf die Maus (wie bisher)
+  const e = kopie(GEBIETE.beispiel);
+  const c1 = merkeDinge(e, [{ art: 'objekt', id: 'o1' }]);
+  const r4 = fuegeDingeAn(e, c1, 713, 297);
+  assert.deepEqual([e.objekte.at(-1).x, e.objekte.at(-1).y], [720, 300]);
+  assert.equal(r4.dinge.length, 1);
+  assert.equal(JSON.stringify(g) === vor, false);
+});
+
+test('A4 Löschen und Drehen mehrerer Dinge', () => {
+  const g = kopie(GEBIETE.beispiel);
+  const n = loescheDinge(g, [{ art: 'objekt', id: 'o1' }, { art: 'formteil', id: 'f1' }, { art: 'gang', id: 'ostgang' }]);
+  assert.equal(n, 3);
+  assert.ok(!g.objekte.some((o) => o.id === 'o1') && !g.formteile.length && !g.gaenge.some((x) => x.id === 'ostgang'));
+  assert.equal(loescheDinge(g, [{ art: 'objekt', id: 'o1' }]), 0, 'Doppeltes Löschen schadet nicht');
+  const h = kopie(GEBIETE.beispiel);
+  const w0 = h.objekte.find((o) => o.id === 'o1').winkel;
+  assert.equal(dreheDinge(h, [{ art: 'objekt', id: 'o1' }, { art: 'formteil', id: 'f1' }, { art: 'objekt', id: 'o2' }, { art: 'knoten', id: 'K1' }], 1), 2, 'Gegner und Knoten haben keinen Winkel');
+  assert.equal(h.objekte.find((o) => o.id === 'o1').winkel, (w0 + 45) % 180);
 });

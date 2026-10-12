@@ -2,21 +2,22 @@
 // Stufe 1: Ansehen – Plan im Spielbild, Zoom/Verschieben/Drehen, Gang anklicken, Bildschirmrahmen mit Fahrt-Schieber.
 // Stufe 2a: Bauen – Werkzeuge (Auswahl, Gang, Knoten), Eigenschaften ändern, Rückgängig/Wiederholen, Speichern/Laden.
 // Stufe 2b: Formteile, Wände, Hindernisse – setzen, verschieben, drehen, kopieren, löschen, Eigenschaften.
-import { HEADINGS, HEADING_CODES, DIR_NAMES, E } from '../core/math.js';
+import { HEADINGS, HEADING_CODES, DIR_NAMES, DIR_VEC, CARDINALS, E } from '../core/math.js';
 import { Ansicht, radFaktor } from './ansicht.js';
 import { zeichnePlan, zeichneGegner } from './zeichnen.js';
 import { WELT, GEBIETE } from './startdaten.js';
 import { kopie, bezeichnung, knotenMap, gangMasse, gangPolygon, knotenPolygon, punktInPolygon, ausdehnung, rahmenEcken, formatiere, ladeGebiet, pruefeFormat, Verlauf } from './daten.js';
 import { formatiereWelt, ladeWelt, pruefeWelt, weltLagen, weltAusdehnung, lageSetzen, bereichFeld, bereichAnpassen, bereichMasse, uebergangAnlegen, uebergangLoeschen, uebergaengeVon, uebergaengeAn, andereSeite, teileEnde, ausserhalb } from './welt.js';
 import { KNOTENTYPEN, TILESETS, GEGNER, gegnerFuer, tilesetFarben } from './katalog.js';
-import { KUERZEL, MAUS, WINKEL_SCHRITT, SCREEN_W, SCREEN_H, SPEED, ZOOM_TASTE_FAKTOR, ZOOM_FESTWERTE, PFEIL_SCHRITT_PX, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX, FLOOR, FLOOR2, WALL, FARBEN, PALETTE_PX } from './konstanten.js';
+import { KUERZEL, MAUS, WINKEL_SCHRITT, SCREEN_W, SCREEN_H, SPEED, ZOOM_TASTE_FAKTOR, ZOOM_FESTWERTE, PFEIL_SCHRITT_PX, PFEIL_GROSS, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX, FLOOR, FLOOR2, WALL, FARBEN, PALETTE_PX } from './konstanten.js';
 import { gangTeilen, loesche, setze, gesperrteIds } from './befehle.js';
-import { teilBei, teilFinden, teilDrehen, teilMerken, teilEinfuegen, loescheTeil, setzeTeil, istTeilArt, hatMasse, teilName, liste as teilListe } from './teile.js';
+import { teilBei, teilFinden, setzeTeil, istTeilArt, hatMasse, teilName, liste as teilListe } from './teile.js';
 import { erzeugeSpeicher } from './speicher.js';
 import { spielbarkeit, erzeugeSzene } from './spielen.js';
 import { pruefeGebiet, zusammenfassung } from './pruefer.js';
 import { SpielModus } from './spielmodus.js';
 import { levelInhalt } from './level.js';
+import { alleDinge, inRahmen, schrittFuer, verschiebeDinge, merkeDinge, fuegeDingeEin, fuegeDingeAn, loescheDinge, dreheDinge, duplikatVersatz, gleichesDing, dingFinden } from './mehrfach.js';
 import { WERKZEUGE } from './werkzeuge/index.js';
 import auswahlWerkzeug from './werkzeuge/auswahl.js';
 import { EBENEN, ebeneVon, WERKZEUG_EBENEN } from './ebenen.js';
@@ -95,7 +96,8 @@ export function startEditor() {
     entwurf: null, // vorbelegter Anfang eines neuen Übergangs: { gebiet, knoten }
     gebiete: Object.fromEntries(Object.entries(GEBIETE).map(([id, g]) => [id, kopie(g)])),
     gebietId: WELT.gebiete[0].id,
-    auswahl: null, // { art: 'gang'|'knoten', id }
+    auswahl: null, // das zuletzt gewählte Ding { art: 'gang'|'knoten'|'formteil'|'objekt', id }
+    mehrfach: [], // die übrigen gewählten Dinge (Mehrfachauswahl, A4); die ganze Auswahl liefert auswahlListe()
     fahrt: null, // { gang, s, laeuft }
     zeit: 0,
     meldung: '',
@@ -109,7 +111,7 @@ export function startEditor() {
     prueferOffen: false, // Liste der Prüfer-Meldungen sichtbar (und Marken im Plan)
     spielen: null, // laufender SpielModus (Stufe 3) oder null
     bezeichnung: '', // zuletzt kopierte Bezeichnung
-    zwischen: null, // gemerktes Teil für Einfügen (Strg+C): { art, teil }
+    zwischen: null, // gemerkte Dinge für Einfügen (Strg+C, mehrfach.js merkeDinge): { knoten, gaenge, teile, bezug }
     zeiger: null, // letzte Mausstelle im Plan (Welt), Zielstelle für Einfügen
     verlauf: {}, // Gebiets-ID → Verlauf (Rückgängig/Wiederholen)
     gespeichert: Object.fromEntries(Object.entries(GEBIETE).map(([id, g]) => [id, formatiere(g)])), // zuletzt gespeicherter/geladener Text je Gebiet
@@ -181,6 +183,7 @@ export function startEditor() {
   typWahl.addEventListener('change', () => {
     state.knotenTyp = typWahl.value;
     typWahl.blur();
+    waehle(null); // ein anderes Element gewählt: Rechtsklick setzt jetzt dieses, nicht eine Kopie der Auswahl
     dirty = true;
   });
   const undoKnopf = knopf('Rückgängig', 'Letzte Änderung zurücknehmen (Strg+Z)', () => rueckgaengig(), 'b-undo');
@@ -259,18 +262,51 @@ export function startEditor() {
     alles();
     refresh();
   }
-  function waehle(auswahl) {
+  function waehle(auswahl, rest = [], bezeichnungBehalten = false) {
     if (!auswahl && state.levelGang && gebiet().gaenge.some((x) => x.id === state.levelGang)) auswahl = { art: 'gang', id: state.levelGang }; // in der Levelansicht ist das Level immer gewählt
     state.auswahl = auswahl;
-    bezFeld.style.display = 'none';
+    state.mehrfach = auswahl ? rest : [];
+    if (rest.length) state.fahrt = null; // der Bildschirmrahmen gehört zu genau einem gewählten Gang
+    if (!bezeichnungBehalten) bezFeld.style.display = 'none';
     if (/^(Zum Kopieren|Zum Spielen)/.test(state.meldung)) melde('');
     if (!auswahl) state.fahrt = null; // nichts gewählt: kein Rahmen, keine Fahrt
     if (auswahl && auswahl.art === 'knoten') state.fahrt = null; // der Rahmen gehört zu Gängen
-    if (auswahl && auswahl.art === 'gang') {
+    if (auswahl && auswahl.art === 'gang' && !rest.length) {
       if (!state.fahrt || state.fahrt.gang !== auswahl.id) state.fahrt = { gang: auswahl.id, s: 0, laeuft: false };
     }
     refresh();
   }
+  /** Alle gewählten Dinge (die Hauptwahl zuletzt); Dinge, die es nicht mehr gibt, zählen nicht. */
+  function auswahlListe() {
+    if (!state.auswahl) return [];
+    const g = gebiet();
+    return [...state.mehrfach, state.auswahl].filter((d, i, a) => dingFinden(g, d) && a.findIndex((x) => gleichesDing(x, d)) === i);
+  }
+  /** Mehrere Dinge wählen (das letzte ist die Hauptwahl, auf die sich rechtes Feld, Rahmen und Fahrt beziehen). */
+  function setzeAuswahl(liste) {
+    const g = gebiet();
+    const gut = liste.filter((d, i, a) => dingFinden(g, d) && a.findIndex((x) => gleichesDing(x, d)) === i);
+    if (!gut.length) return waehle(null);
+    waehle(gut.at(-1), gut.slice(0, -1));
+  }
+  /** Strg+Klick: ein Ding zur Auswahl hinzufügen oder, wenn es schon gewählt ist, wieder entfernen. */
+  function schalteAuswahl(ding) {
+    const liste = auswahlListe();
+    if (liste.some((d) => gleichesDing(d, ding))) setzeAuswahl(liste.filter((d) => !gleichesDing(d, ding)));
+    else setzeAuswahl([...liste, ding]);
+  }
+  /** Strg+A: alles in der Ansicht (Karte bzw. Level) wählen, außer gesperrten Ebenen. */
+  function alleWaehlen() {
+    if (state.ansichtArt === 'welt') return;
+    const alle = alleDinge(sicht(), state.gesperrt);
+    setzeAuswahl(alle);
+    melde(alle.length ? `${alle.length} Dinge gewählt.` : 'Nichts zu wählen (alle Ebenen gesperrt oder leer).');
+  }
+  /** Gewählte Dinge, die sich bewegen, kopieren und einfügen lassen: nur ein Gang allein (z. B. das Level) zählt nicht. */
+  const bewegbareAuswahl = () => {
+    const l = auswahlListe();
+    return l.some((d) => d.art !== 'gang') ? l : [];
+  };
   function setzeFahrt(s) {
     const m = ganzMasse();
     if (!m) return;
@@ -486,9 +522,11 @@ export function startEditor() {
     const au = state.auswahl;
     const da = au && (au.art === 'gang' ? g.gaenge : au.art === 'knoten' ? g.knoten : istTeilArt(au.art) ? teilListe(g, au.art) : []).some((o) => o.id === au.id);
     if (au && !da) {
-      state.auswahl = null;
+      const rest = state.mehrfach.filter((d) => dingFinden(g, d));
+      state.auswahl = rest.at(-1) ?? null; // war die Hauptwahl weg, rückt ein anderes gewähltes Ding nach
+      state.mehrfach = rest.slice(0, -1);
       state.fahrt = null;
-    }
+    } else state.mehrfach = state.mehrfach.filter((d) => dingFinden(g, d));
     if (state.levelGang && !state.auswahl) {
       state.auswahl = { art: 'gang', id: state.levelGang };
       state.fahrt = { gang: state.levelGang, s: 0, laeuft: false };
@@ -551,50 +589,96 @@ export function startEditor() {
   }
   function loescheAuswahl() {
     if (state.ansichtArt === 'welt') return loescheUebergang();
-    const au = state.auswahl;
-    if (!au || (au.art !== 'gang' && au.art !== 'knoten' && !istTeilArt(au.art))) return;
+    const dinge = auswahlListe();
+    if (!dinge.length) return;
     const hatKnoten = (g) => new Set(g.knoten.map((k) => k.id));
     const vorher = hatKnoten(gebiet());
-    aendere('Löschen', (g) => (istTeilArt(au.art) ? loescheTeil(g, au.art, au.id) : loesche(g, au.art, au.id)));
+    aendere('Löschen', (g) => loescheDinge(g, dinge));
     const weg = [...vorher].filter((id) => !hatKnoten(gebiet()).has(id));
     const offen = weg.reduce((n, id) => n + uebergaengeAn(state.welt, state.gebietId, id).length, 0);
     if (offen) melde(`${offen === 1 ? 'Ein Übergang zeigt' : offen + ' Übergänge zeigen'} jetzt ins Leere – der Welt-Prüfer (Taste T) meldet es (W1).`, 'fehler');
   }
-  /** Gewähltes Teil (Formteil, Wand, Hindernis) oder null. */
-  const gewaehltesTeil = () => {
-    const au = state.auswahl;
-    return au && istTeilArt(au.art) ? teilFinden(gebiet(), au.art, au.id) ?? null : null;
-  };
+  /** Kurzer Name für Meldungen: „Wand“, „3 Dinge“. */
+  function dingeName(dinge) {
+    if (dinge.length === 1) {
+      const o = dingFinden(gebiet(), dinge[0]);
+      if (istTeilArt(dinge[0].art)) return teilName(dinge[0].art, o);
+      return dinge[0].art === 'knoten' ? `Knoten ${o.id}` : `Gang „${o.name || o.id}“`;
+    }
+    return `${dinge.length} Dinge`;
+  }
   function dreheTeil(k) {
     if (state.ansichtArt === 'welt') return; // Gebiet-Befehle gelten nur in der Gebiet-Ansicht
-    const au = state.auswahl;
-    const o = gewaehltesTeil();
-    if (!o) return;
-    if (!hatMasse(au.art, o)) return melde(`${teilName(au.art, o)} hat keinen Winkel.`, 'fehler');
-    aendere(`${teilName(au.art, o)} drehen`, (g) => teilDrehen(g, au.art, au.id, k));
+    const dinge = auswahlListe().filter((d) => istTeilArt(d.art));
+    if (!dinge.length) return;
+    const mitMass = dinge.filter((d) => hatMasse(d.art, dingFinden(gebiet(), d)));
+    if (!mitMass.length) return melde(`${dingeName(dinge)} ${dinge.length === 1 ? 'hat' : 'haben'} keinen Winkel.`, 'fehler');
+    aendere(dinge.length === 1 ? `${dingeName(dinge)} drehen` : 'Auswahl drehen', (g) => dreheDinge(g, dinge, k));
   }
   function kopiere() {
     if (state.ansichtArt === 'welt') return; // Gebiet-Befehle gelten nur in der Gebiet-Ansicht
-    const au = state.auswahl;
-    if (!gewaehltesTeil()) return melde('Zum Kopieren erst ein Formteil, eine Wand oder ein Hindernis wählen.', 'fehler');
-    state.zwischen = teilMerken(gebiet(), au.art, au.id);
-    melde(`${teilName(au.art, state.zwischen.teil)} kopiert. Strg+V fügt es an der Mausstelle ein.`);
+    const dinge = bewegbareAuswahl().length ? bewegbareAuswahl() : auswahlListe();
+    const clip = dinge.length ? merkeDinge(gebiet(), dinge) : null;
+    if (!clip) return melde('Zum Kopieren erst etwas wählen (Formteil, Wand, Hindernis, Gegner, Knoten oder Gang).', 'fehler');
+    state.zwischen = clip;
+    melde(`${dingeName(dinge)} kopiert. Strg+V fügt ${dinge.length === 1 ? 'es' : 'sie'} an der Mausstelle ein.`);
     refresh();
+  }
+  /** Gemerkte Dinge an die Stelle (x, y) setzen; ein Fehler (z. B. Knoten schon da) lässt alles unverändert. */
+  function setzeKopie(clip, x, y, label) {
+    const gesp = [...clip.knoten.map(() => 'knoten'), ...clip.gaenge.map(() => 'gaenge'), ...clip.teile.map((t) => ebeneVon(t.art, t.teil))].find((e) => state.gesperrt.has(e));
+    if (gesp) return melde(`Die Ebene „${EBENEN.find((e) => e.id === gesp).name}“ ist gesperrt – erst entsperren, dann lässt sich dort etwas einfügen.`, 'fehler');
+    const neu = aendere(label, (g) => {
+      const r = fuegeDingeAn(g, clip, x, y);
+      if (r.fehler) throw new Error(r.fehler);
+      return r.dinge;
+    });
+    if (neu) setzeAuswahl(neu);
   }
   function fuegeEin() {
     if (state.ansichtArt === 'welt') return; // Gebiet-Befehle gelten nur in der Gebiet-Ansicht
-    if (!state.zwischen) return melde('Nichts kopiert – erst ein Teil wählen und Strg+C drücken.', 'fehler');
+    if (!state.zwischen) return melde('Nichts kopiert – erst etwas wählen und Strg+C drücken.', 'fehler');
     const z = state.zeiger ?? { x: ansicht.cx, y: ansicht.cy }; // ohne Mausstelle: Mitte der Ansicht
-    const neu = aendere('Einfügen', (g) => teilEinfuegen(g, state.zwischen, z.x, z.y));
-    if (neu) waehle(neu);
+    setzeKopie(state.zwischen, z.x, z.y, 'Einfügen');
   }
   function dupliziere() {
     if (state.ansichtArt === 'welt') return; // Gebiet-Befehle gelten nur in der Gebiet-Ansicht
-    const au = state.auswahl;
-    if (!gewaehltesTeil()) return melde('Zum Duplizieren erst ein Formteil, eine Wand oder ein Hindernis wählen.', 'fehler');
-    const gemerkt = teilMerken(gebiet(), au.art, au.id);
-    const neu = aendere('Duplizieren', (g) => teilEinfuegen(g, gemerkt));
-    if (neu) waehle(neu);
+    const dinge = bewegbareAuswahl().length ? bewegbareAuswahl() : auswahlListe();
+    const clip = dinge.length ? merkeDinge(gebiet(), dinge) : null;
+    if (!clip) return melde('Zum Duplizieren erst etwas wählen (Formteil, Wand, Hindernis, Gegner, Knoten oder Gang).', 'fehler');
+    const [dx, dy] = duplikatVersatz(clip);
+    const neu = aendere('Duplizieren', (g) => {
+      const r = fuegeDingeEin(g, clip, dx, dy);
+      if (r.fehler) throw new Error(r.fehler);
+      return r.dinge;
+    });
+    if (neu) setzeAuswahl(neu);
+  }
+  /** Pfeiltasten verschieben die Auswahl: in Richtung der Taste auf dem Bildschirm (die nächste Achse der Karte), um ein Raster, mit Umschalt um PFEIL_GROSS. */
+  function bewegePfeil(dsx, dsy, gross) {
+    const dinge = bewegbareAuswahl();
+    const [ox, oy] = ansicht.weltZuBild(0, 0);
+    let beste = null;
+    let bestWert = -Infinity;
+    for (const richtung of CARDINALS) {
+      const [ax, ay] = DIR_VEC[richtung];
+      const [bx, by] = ansicht.weltZuBild(ax, ay);
+      const wert = (bx - ox) * dsx + (by - oy) * dsy;
+      if (wert > bestWert) {
+        bestWert = wert;
+        beste = [ax, ay];
+      }
+    }
+    const q = schrittFuer(gebiet(), dinge) * (gross ? PFEIL_GROSS : 1);
+    aendere('Auswahl verschieben', (g) => {
+      const fehler = verschiebeDinge(g, dinge, beste[0] * q, beste[1] * q);
+      if (fehler) throw new Error(fehler);
+    });
+  }
+  /** Rechtsklick bei gewählten Dingen (A7): eine Kopie der Auswahl an die Mausstelle setzen. */
+  function rechtsKopie(p) {
+    const clip = merkeDinge(gebiet(), bewegbareAuswahl());
+    if (clip) setzeKopie(clip, p.x, p.y, 'Kopie setzen');
   }
   function teileGang() {
     if (state.ansichtArt === 'welt') return; // Gebiet-Befehle gelten nur in der Gebiet-Ansicht
@@ -620,6 +704,7 @@ export function startEditor() {
     if (state.ansichtArt === 'welt') zuGebiet();
     abbrechen();
     state.werkzeug = id;
+    if (id !== 'auswahl') waehle(null, [], true); // ein Element gewählt: Rechtsklick setzt jetzt dieses, nicht eine Kopie der Auswahl (A7)
     cursorSetzen();
     hinweis('');
     refresh();
@@ -970,6 +1055,11 @@ export function startEditor() {
     gebiet,
     treffer,
     waehle: (a) => waehle(a),
+    auswahlListe,
+    setzeAuswahl,
+    schalteAuswahl,
+    inRahmen: (r, beruehren = false) => inRahmen(sicht(), r, { beruehren, gesperrt: state.gesperrt }),
+    schrittFuer: (dinge) => schrittFuer(gebiet(), dinge),
     aendere,
     hinweis,
     melde: (t, art) => melde(t, art),
@@ -1119,8 +1209,33 @@ export function startEditor() {
     feldDiv.append(raster, el('p', { class: 'grau', text: 'Bild anklicken = Werkzeug wählen. Gegner sind Platzhalter (Verhalten im Fenster ungeprüft); zuerst die Gegner des Tilesets.' }));
     return feldDiv;
   }
+  /** Rechtes Feld bei mehreren gewählten Dingen: Anzahl je Art und die Befehle für alle zusammen. */
+  function mehrfachEigenschaften(liste) {
+    rechts.replaceChildren();
+    const g = gebiet();
+    const dl = el('dl');
+    rechts.append(el('h2', { text: `${liste.length} Dinge gewählt` }), dl);
+    const namen = { knoten: 'Knoten', gang: 'Gänge', formteil: 'Formteile', objekt: 'Wände, Hindernisse, Gegner' };
+    for (const art of Object.keys(namen)) {
+      const n = liste.filter((d) => d.art === art).length;
+      if (n) zeile(dl, namen[art], n);
+    }
+    const drehbar = liste.some((d) => istTeilArt(d.art) && hatMasse(d.art, dingFinden(g, d)));
+    const knoepfe = el('div', { class: 'knoepfe' });
+    if (drehbar) {
+      knoepfe.append(knopf('⟲ 45°', 'Alle gewählten Teile um 45° linksherum drehen (Umschalt+R)', () => dreheTeil(-1), 'b-teil-links'), knopf('⟳ 45°', 'Alle gewählten Teile um 45° rechtsherum drehen (R)', () => dreheTeil(1), 'b-teil-rechts'));
+    }
+    knoepfe.append(
+      knopf('Duplizieren', 'Kopie neben die Auswahl setzen (Strg+D)', () => dupliziere(), 'b-teil-dup'),
+      knopf('Kopieren', 'Auswahl merken, Strg+V fügt sie an der Mausstelle ein (Strg+C)', () => kopiere(), 'b-teil-kopieren'),
+      knopf('Löschen', 'Alle gewählten Dinge löschen (Entf)', () => loescheAuswahl(), 'b-loeschen2'),
+    );
+    rechts.append(knoepfe, el('p', { class: 'grau', text: 'Ziehen verschiebt alle zusammen, Pfeiltasten auch. Strg+Klick ergänzt oder entfernt ein Ding, Esc hebt die Auswahl auf.' }));
+    rechts.append(paletteFeld());
+  }
   function eigenschaften() {
     if (state.ansichtArt === 'welt') return weltEigenschaften();
+    if (auswahlListe().length > 1) return mehrfachEigenschaften(auswahlListe());
     rechts.replaceChildren();
     const g = gebiet();
     const au = state.auswahl;
@@ -1222,7 +1337,7 @@ export function startEditor() {
     }
     rechts.append(knoepfe);
     rechts.append(paletteFeld());
-    rechts.append(el('p', { class: 'grau', text: 'V Auswahl, G Gang, K Knoten, B Formteil, W Wand, H Hindernis, X Gegner, J Look, A Bereich, T Welt-Ansicht · R dreht ein Teil (Umschalt: links), Strg+C/V/D kopieren, einfügen, duplizieren · Strg+Z/Y Rückgängig/Wiederholen · Strg+S Speichern · P Spielen ab hier (Esc zurück), N Bezeichnung kopieren · Q/E drehen, 0 Norden, F wie im Spiel, Leertaste Fahrt, Mausrad zoomt.' }));
+    rechts.append(el('p', { class: 'grau', text: 'Linksklick wählt (Strg+Klick ergänzt, Ziehen im Leeren = Rahmen, Strg+A alles), Ziehen und Pfeile (Umschalt ×5) verschieben die Auswahl. Rechtsklick setzt das Element, das du mit G K B W H X A oder in der Palette wählst; ist etwas gewählt, kopiert er es. Mittlere Taste oder Shift+Ziehen verschiebt den Plan, das Mausrad zoomt (+ − 1 2, Pos1 = alles). Doppelklick oder Enter öffnet das Level, Esc geht eine Ebene hoch. R dreht ein Teil, Strg+C/V/D, nur Entf löscht, Strg+Z/Y Rückgängig/Wiederholen, Strg+S Speichern, P Spielen ab hier (Esc zurück), N Bezeichnung kopieren, Q/E drehen die Ansicht, 0 Norden, F wie im Spiel, J Look, T Welt, Leertaste Fahrt.' }));
   }
   function refreshFahrt() {
     if (state.ansichtArt === 'welt') {
@@ -1283,7 +1398,7 @@ export function startEditor() {
     const px = e.clientX - r.left;
     const py = e.clientY - r.top;
     const [x, y] = ansicht.bildZuWelt(px, py);
-    return { px, py, x, y };
+    return { px, py, x, y, strg: e.ctrlKey || e.metaKey, alt: e.altKey, shift: e.shiftKey };
   };
   /** Ist eine Ebene, in die das Werkzeug schreibt, gesperrt? Dann Meldung und true. */
   function gesperrtFuer(werkzeugId) {
@@ -1302,6 +1417,8 @@ export function startEditor() {
     if (planVerschieben) {
       zug = { modus: 'plan', x: e.clientX, y: e.clientY, bewegt: false, taste: e.button };
       canvas.style.cursor = 'grabbing';
+    } else if (e.button === MAUS.setzen && state.ansichtArt !== 'welt' && bewegbareAuswahl().length) {
+      zug = { modus: 'kopie', x: e.clientX, y: e.clientY, bewegt: false, taste: e.button }; // A7: Rechtsklick kopiert die Auswahl an die Mausstelle
     } else if (e.button === MAUS.setzen) {
       const w = rechtsWerkzeug();
       if (!w) {
@@ -1318,12 +1435,15 @@ export function startEditor() {
   });
   canvas.addEventListener('pointermove', (e) => {
     state.zeiger = zeigerPunkt(e);
-    if (!zug) return rechtsWerkzeug()?.schweben?.(kontext, state.zeiger);
+    if (!zug) {
+      linksWerkzeug().schweben?.(kontext, state.zeiger); // Hervorhebung unter der Maus
+      return bewegbareAuswahl().length ? undefined : rechtsWerkzeug()?.schweben?.(kontext, state.zeiger); // Geist des Elements, das ein Rechtsklick setzen würde
+    }
     const dx = e.clientX - zug.x;
     const dy = e.clientY - zug.y;
     if (!zug.bewegt && Math.hypot(dx, dy) >= KLICK_TOLERANZ_PX) zug.bewegt = true;
     if (zug.erfasst) return zug.werkzeug.move?.(kontext, zeigerPunkt(e));
-    if (zug.modus === 'rechts' || !zug.bewegt) return;
+    if (zug.modus === 'rechts' || zug.modus === 'kopie' || !zug.bewegt) return;
     ansicht.verschieben(dx, dy); // Plan mitziehen: mittlere Taste, Shift+links oder (vorerst) links im Leeren
     zug.x = e.clientX;
     zug.y = e.clientY;
@@ -1337,6 +1457,7 @@ export function startEditor() {
     if (e.type === 'pointercancel') return abbrechen();
     const p = zeigerPunkt(e);
     if (z.modus === 'plan') return;
+    if (z.modus === 'kopie') return z.bewegt ? undefined : rechtsKopie(p);
     if (z.erfasst) return z.werkzeug.up?.(kontext, p);
     if (!z.bewegt) z.werkzeug.klick?.(kontext, p); // Klick (links: wählen; rechts: Knoten und Gegner setzen)
   };
@@ -1385,6 +1506,7 @@ export function startEditor() {
         : c === KUERZEL.wiederholen ? wiederholen
         : c === KUERZEL.speichern ? speichere
         : c === KUERZEL.oeffnen ? oeffne
+        : c === KUERZEL.alleWaehlen ? alleWaehlen
         : c === KUERZEL.kopieren ? kopiere
         : c === KUERZEL.einfuegen ? fuegeEin
         : c === KUERZEL.duplizieren ? dupliziere
@@ -1412,10 +1534,13 @@ export function startEditor() {
     else if (c === KUERZEL.fahrtStart) fahrtUmschalten();
     else if (c === KUERZEL.fahrtVor) setzeFahrt((state.fahrt?.s || 0) + 20);
     else if (c === KUERZEL.fahrtZurueck) setzeFahrt((state.fahrt?.s || 0) - 20);
-    else if (c === KUERZEL.links) ansicht.verschieben(schritt, 0);
-    else if (c === KUERZEL.rechts) ansicht.verschieben(-schritt, 0);
-    else if (c === KUERZEL.hoch) ansicht.verschieben(0, schritt);
-    else if (c === KUERZEL.runter) ansicht.verschieben(0, -schritt);
+    else if (c === KUERZEL.links || c === KUERZEL.rechts || c === KUERZEL.hoch || c === KUERZEL.runter) {
+      // Pfeile verschieben die Auswahl (A4); ist nichts Bewegbares gewählt, den Plan
+      const dsx = c === KUERZEL.links ? -1 : c === KUERZEL.rechts ? 1 : 0;
+      const dsy = c === KUERZEL.hoch ? -1 : c === KUERZEL.runter ? 1 : 0;
+      if (state.ansichtArt !== 'welt' && bewegbareAuswahl().length) bewegePfeil(dsx, dsy, e.shiftKey);
+      else ansicht.verschieben(-dsx * schritt, -dsy * schritt);
+    }
     else if (c === KUERZEL.teilDrehen) dreheTeil(e.shiftKey ? -1 : 1);
     else if (c === KUERZEL.beschriftung) beschriften();
     else if (c === KUERZEL.look) lookUmschalten();
@@ -1464,7 +1589,9 @@ export function startEditor() {
   function zeichne() {
     const t0 = performance.now();
     if (state.ansichtArt === 'welt') zeichneWelt(ctx, { welt: state.welt, gebiete: state.gebiete, auswahl: state.weltAuswahl, aktuell: state.gebietId, marken: state.prueferOffen ? weltPruefer().meldungen : null, beschriftung: state.beschriftung }, ansicht, canvas.width / ansicht.w);
-    else zeichnePlan(ctx, sicht(), ansicht, { auswahl: state.auswahl, fahrt: state.fahrt, zeit: state.zeit, beschriftung: state.beschriftung, look: lookFarben(), marken: state.prueferOffen ? sichtbareMarken() : null, uebergaenge: uebergangsMarken().filter((m) => !state.levelGang || sicht().knoten.some((k) => k.id === m.knoten)), vorschau: (c) => werkzeug().vorschau?.(c, kontext) }, canvas.width / ansicht.w);
+    else zeichnePlan(ctx, sicht(), ansicht, { auswahl: state.auswahl, auswahlen: auswahlListe(), fahrt: state.fahrt, zeit: state.zeit, beschriftung: state.beschriftung, look: lookFarben(), marken: state.prueferOffen ? sichtbareMarken() : null, uebergaenge: uebergangsMarken().filter((m) => !state.levelGang || sicht().knoten.some((k) => k.id === m.knoten)), vorschau: (c) => {
+      for (const w of new Set([auswahlWerkzeug, werkzeug()])) w.vorschau?.(c, kontext);
+    } }, canvas.width / ansicht.w);
     perf.zeichnenMs.push(performance.now() - t0);
     if (perf.zeichnenMs.length > 600) perf.zeichnenMs.shift();
     dirty = false;
@@ -1500,6 +1627,9 @@ export function startEditor() {
     gebiet,
     wechsle,
     waehle,
+    auswahlListe,
+    setzeAuswahl,
+    alleWaehlen,
     setzeFahrt,
     spielenAb,
     pruefer,

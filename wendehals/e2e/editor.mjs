@@ -114,11 +114,11 @@ check((await ed((e) => e.ansicht.blick)) === 0, 'Ansicht: 0 stellt Norden oben w
 const canvasBox = await page.locator('#plan canvas').boundingBox();
 const vorher = await ed((e) => ({ cx: e.ansicht.cx, cy: e.ansicht.cy, bildschirme: e.ansicht.bildschirme }));
 await page.mouse.move(canvasBox.x + 300, canvasBox.y + 200);
-await page.mouse.down();
+await page.mouse.down({ button: 'middle' }); // Plan verschieben: mittlere Taste (oder Shift+Ziehen); Linksziehen im Leeren zieht einen Auswahlrahmen (A1, A4)
 await page.mouse.move(canvasBox.x + 380, canvasBox.y + 240, { steps: 5 });
-await page.mouse.up();
+await page.mouse.up({ button: 'middle' });
 const nachZug = await ed((e) => ({ cx: e.ansicht.cx, cy: e.ansicht.cy, auswahl: e.state.auswahl }));
-check(Math.hypot(nachZug.cx - vorher.cx, nachZug.cy - vorher.cy) > 10, 'Ansicht: Ziehen verschiebt den Plan');
+check(Math.hypot(nachZug.cx - vorher.cx, nachZug.cy - vorher.cy) > 10, 'Ansicht: Ziehen mit der mittleren Maustaste verschiebt den Plan');
 await page.mouse.move(canvasBox.x + 400, canvasBox.y + 300);
 await page.mouse.wheel(0, 100);
 await page.waitForTimeout(50);
