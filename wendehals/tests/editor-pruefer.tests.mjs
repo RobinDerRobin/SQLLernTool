@@ -172,8 +172,12 @@ test('Startinhalt: kein Absturz, Meldungen mit Ort haben Zahlen', () => {
   }
 });
 
-test('Prüfzeit: 300 Objekte in unter 300 ms', () => {
+test('Prüfzeit: 300 Objekte auf 10 Gängen in unter 300 ms', () => {
   const g = ell();
+  for (let i = 0; i < 8; i++) {
+    g.knoten.push({ id: 'Z' + i, typ: 'ende', x: -3000 - 100 * i, y: 400 * i }, { id: 'Y' + i, typ: 'ende', x: 1000, y: 400 * i });
+    g.gaenge.push({ id: 'g' + i, name: 'G', von: 'Z' + i, nach: 'Y' + i, breite: 200 });
+  }
   for (let i = 0; i < 300; i++) g.objekte.push(wand('p' + i, (i % 30) * 40, -60 + Math.floor(i / 30) * 12, 20, 6));
   const t = performance.now();
   pruefeGebiet(g);

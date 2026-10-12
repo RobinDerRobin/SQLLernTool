@@ -14,6 +14,9 @@ const gangName = (gang) => `Gang „${gang.name || gang.id}“`;
 /** Hindernis-Polygone (Wand und Hindernis blockieren den Weg; Gegner nicht). */
 const sperren = (g) => g.objekte.filter((o) => o.typ === 'wand' || o.typ === 'hindernis').map((o) => ({ o, poly: rechteck(o.x, o.y, o.laenge, o.breite, o.winkel) }));
 
+/** Polygon samt achsenparalleler Hüllbox. */
+const mitBox = (poly) => ({ poly, x0: Math.min(...poly.map((p) => p[0])), x1: Math.max(...poly.map((p) => p[0])), y0: Math.min(...poly.map((p) => p[1])), y1: Math.max(...poly.map((p) => p[1])) });
+
 /** Überlappen sich zwei konvexe Polygone (Trennachsensatz)? Berührung zählt nicht. */
 export function ueberlappen(a, b) {
   for (const poly of [a, b]) {
@@ -71,12 +74,17 @@ export const REGELN = [
     pruefe(g) {
       const out = [];
       const km = knotenMap(g);
-      const boden = bodenPolygone(g);
-      const bl = sperren(g).map((x) => x.poly);
-      const frei = (x, y) => boden.some((p) => punktInPolygon(x, y, p)) && !bl.some((p) => punktInPolygon(x, y, p));
+      const boden = bodenPolygone(g).map(mitBox);
+      const bl = sperren(g).map((x) => mitBox(x.poly));
       for (const gang of g.gaenge) {
         const m = gangMasse(g, gang, km);
         if (!m || m.laenge <= EPS) continue;
+        // nur Polygone in Gangnähe prüfen (sonst wächst die Rechenzeit mit Gängen × Objekten)
+        const rand = gang.breite / 2 + 1;
+        const nah = (q) => q.x1 >= Math.min(m.a.x, m.b.x) - rand && q.x0 <= Math.max(m.a.x, m.b.x) + rand && q.y1 >= Math.min(m.a.y, m.b.y) - rand && q.y0 <= Math.max(m.a.y, m.b.y) + rand;
+        const bodenNah = boden.filter(nah).map((q) => q.poly);
+        const blNah = bl.filter(nah).map((q) => q.poly);
+        const frei = (x, y) => bodenNah.some((p) => punktInPolygon(x, y, p)) && !blNah.some((p) => punktInPolygon(x, y, p));
         const nx = -m.uy;
         const ny = m.ux;
         const halb = gang.breite / 2;
@@ -197,7 +205,7 @@ export const REGELN = [
   {
     id: 'S1',
     art: 'SOLL',
-    text: 'Gang nicht kürzer als 1 Bildschirm (480 E) – die Drehzonen überlappen sonst.',
+    text: `Gang nicht kürzer als 1 Bildschirm (${MIN_GANG_SOLL} E) – die Drehzonen überlappen sonst.`,
     pruefe(g) {
       const out = [];
       const km = knotenMap(g);

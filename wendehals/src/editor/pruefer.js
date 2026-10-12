@@ -11,6 +11,8 @@ export function pruefeGebiet(g, regeln = REGELN) {
       liste = r.pruefe(g);
     } catch (e) {
       liste = [{ text: `Regel ${r.id} konnte nicht geprüft werden: ${e.message}` }];
+      meldungen.push({ regel: r.id, art: 'MUSS', text: liste[0].text, ort: null });
+      continue;
     }
     for (const m of liste) meldungen.push({ regel: r.id, art: r.art, text: m.text, ort: m.ort ?? null });
   }
