@@ -77,11 +77,26 @@ Welt-Plan nicht · W3 SOLL alle Gebiete hängen über Übergänge zusammen · W4
 `formatiereWelt()` (ein Gebiet und ein Übergang je Zeile). Geschrieben wird nur, was es als Datei gibt (neu geöffnete, noch
 ungespeicherte Gebiete und ihre Übergänge bleiben draußen).
 
+## Notizen und Stempel (Stufe 8)
+
+- **Notiz** (Werkzeug M): Rechtsklick setzt eine Notiz (Lage auf 20 E, Text „Neue Notiz“); der Cursor springt ins Textfeld rechts, Enter übernimmt.
+  Notizen sind wählbar (Linksklick, Rahmen, Strg+A), verschiebbar (Pfeile, Ziehen), kopierbar (Strg+C/V/D, Rechtsklick bei Auswahl), löschbar
+  (Entf) und haben eine eigene sperrbare Ebene „Notizen“. Sie ändern nichts am Spiel und werden von „Spielen ab hier“ und dem Prüfer ignoriert.
+  Ein Text ist eine Zeile, höchstens 200 Zeichen (`NOTIZ_MAX`); im Plan werden längere gekürzt (`NOTIZ_ANZEIGE`).
+- **Stempel** (Werkzeug U): Auswahl wählen → rechts unter „Stempel“ optional einen Namen tippen → „Auswahl als Stempel“. Der Stempel merkt Knoten,
+  Gänge, Formteile, Wände, Hindernisse, Gegner und Notizen (wie die Zwischenablage, aber benannt und dauerhaft). Stempel in der Liste anklicken wählt
+  ihn als aktuelles Element: Rechtsklick setzt ihn an die Mausstelle (Raster wie beim Einfügen; Knoten rasten auf 100 E, steht dort schon ein Knoten, passiert
+  nichts und es gibt eine Meldung), ein Strg+Z nimmt ihn in einem Schritt zurück. Die Vorlage bleibt dabei unverändert. „✕“ löscht, „Umbenennen“ nimmt den Namen aus dem Feld.
+- **Datei:** `levels/stempel.json` (`{ "format": 1, "stempel": [{ id, name, bezug, knoten, gaenge, teile: [{ art, teil }] }] }`). Strg+S schreibt sie
+  zusammen mit dem Gebiet, wenn sie sich geändert hat; Electron erlaubt den Pfad `stempel.json` zusätzlich. Die Datei ist auch Material für Claude Code
+  („setze einen Stempel wie `Enge Schleuse` an die Stelle …“). Kaputte Datei → Meldung, die eingebauten Stände bleiben.
+
 ## Dateien
 
 ```
 levels/welt.json              Liste der Gebiete, ihre Lage, die Übergänge
 levels/gebiete/<id>.json      ein Gebiet: Knoten, Gänge, Formteile, Objekte, Notizen  (Quelle der Wahrheit)
+levels/stempel.json           Stempel-Vorlagen (Stufe 8)
 src/editor/konstanten.js      alle Zahlen, Tastenkürzel, Farben, Zoom, Maus-Belegung
 src/editor/katalog.js         Knotentypen, Objekttypen, Tilesets, Gegner-Platzhalter, Schloss-Platz
 src/editor/daten.js           Format prüfen/formatieren, Geometrie (Gang, Rahmen, Boden), Bezeichnung
@@ -89,6 +104,8 @@ src/editor/ansicht.js         Kamera: Mitte, stufenloser Zoom (in Bildschirmen),
 src/editor/level.js           Levelinhalt (Levelansicht) und spielbare Karte um einen Gang (reine Geometrie)
 src/editor/mehrfach.js        Mehrfachauswahl: Rahmen, gemeinsam verschieben/kopieren/einfügen/löschen/drehen
 src/editor/ebenen.js          sperrbare Ebenen: Zuordnung der Dinge und Werkzeuge
+src/editor/stempel.js         Stempel: anlegen, prüfen, laden/formatieren, als Zwischenablage (reine Daten)
+src/editor/werkzeuge/notiz.js, stempel.js  Rechtsklick-Werkzeuge M und U
 src/editor/werkzeuge/auswahl.js  linke Maustaste: wählen, ziehen, Auswahlrahmen, Hervorhebung
 src/editor/zeichnen.js        Plan im Spielbild (Farben und Schachbrett wie der Prototyp), Rahmen, Beschriftung
 src/editor/startdaten.js      bettet levels/*.json in den Build ein
@@ -99,7 +116,7 @@ src/editor/spielmodus.js      Oberfläche „Spielen ab hier“ (eigene Eingabe,
 src/proto/editor-karte.js     Karte mit Boden ohne Kreuzungswirkung und festen Blöcken
 src/editor/main.js            Oberfläche und Eingabe, `window.__editor` für Tests
 tools/gen-editor-start.mjs    erzeugt proto-netz/proto-achteck aus den Prototyp-Karten (einmalig; danach sind die Dateien maßgeblich)
-tests/editor-daten.tests.mjs  Einheitentests; e2e/editor.mjs  Browser-Test
+tests/editor-daten.tests.mjs  Einheitentests; e2e/editor.mjs  Browser-Test; tests/editor-notizen.tests.mjs, e2e/editor-notizen.mjs  Stufe 8
 ```
 
 ## Datenformat (Version 1)
@@ -121,6 +138,7 @@ zusätzlicher Boden, **Wand-Objekte** schneiden Boden aus. Gespeichert wird imme
 | neuer Knoten-/Objekttyp, Gegner, Tileset | `src/editor/katalog.js` |
 | anderes Aussehen eines Typs im Plan | `src/editor/zeichnen.js` |
 | neue Prüfregel (Gebiet) / (Welt) | `src/editor/regeln.js` / `pruefeWelt()` in `src/editor/welt.js` |
+| Notiz-Länge/-Standardtext, Stempel-Höchstzahl, Dateiname der Stempel | `NOTIZ_*`, `STEMPEL_*` in `src/editor/konstanten.js` |
 | neues Werkzeug | neue Datei in `src/editor/werkzeuge/` und ein Eintrag in der Werkzeugliste (ab Stufe 2a) |
 | was „Spielen ab hier“ kann / meldet | `spielbarkeit()`/`baueKarte()` in `src/editor/spielen.js` |
 | Anzeigen rechts/unten | `eigenschaften()`/`refreshFahrt()` in `src/editor/main.js` |

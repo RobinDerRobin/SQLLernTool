@@ -9,6 +9,8 @@ import formteil from './formteil.js';
 import wand from './wand.js';
 import hindernis from './hindernis.js';
 import gegner from './gegner.js';
+import notiz from './notiz.js';
+import stempel from './stempel.js';
 import bereich from './bereich.js';
 
-export const WERKZEUGE = [auswahl, gang, knoten, formteil, wand, hindernis, gegner, bereich];
+export const WERKZEUGE = [auswahl, gang, knoten, formteil, wand, hindernis, gegner, notiz, stempel, bereich];

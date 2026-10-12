@@ -55,11 +55,11 @@ ipcMain.on('wendehals:fullscreen', (e, on) => {
   if (win) win.setFullScreen(!!on);
 });
 
-// Level-Editor (WENDEHALS_EDITOR=1): Leveldateien lesen und schreiben – ausschließlich in wendehals/levels/ (welt.json und gebiete/<id>.json).
+// Level-Editor (WENDEHALS_EDITOR=1): Leveldateien lesen und schreiben – ausschließlich in wendehals/levels/ (welt.json, stempel.json und gebiete/<id>.json).
 // Ohne die Umgebungsvariable gibt es diese Kanäle nicht; das Spiel kann nie Dateien schreiben.
 if (process.env.WENDEHALS_EDITOR) {
   const levelsDir = path.join(__dirname, '..', 'levels');
-  const erlaubt = (rel) => typeof rel === 'string' && /^(welt\.json|gebiete\/[a-z0-9][a-z0-9_-]*\.json)$/.test(rel);
+  const erlaubt = (rel) => typeof rel === 'string' && /^(welt\.json|stempel\.json|gebiete\/[a-z0-9][a-z0-9_-]*\.json)$/.test(rel);
   ipcMain.handle('wendehals:levels-alle', () => {
     const welt = fs.readFileSync(path.join(levelsDir, 'welt.json'), 'utf8');
     const gebiete = {};
@@ -71,10 +71,16 @@ if (process.env.WENDEHALS_EDITOR) {
         // fehlende Datei: Gebiet fehlt, der Rest wird trotzdem geladen
       }
     }
-    return { welt, gebiete };
+    let stempel;
+    try {
+      stempel = fs.readFileSync(path.join(levelsDir, 'stempel.json'), 'utf8');
+    } catch {
+      // noch keine Stempeldatei: der eingebaute (leere) Stand gilt
+    }
+    return { welt, gebiete, stempel };
   });
   ipcMain.handle('wendehals:levels-schreibe', (e, rel, text) => {
-    if (!erlaubt(rel) || typeof text !== 'string' || text.length > 5e6) throw new Error('Nur welt.json und gebiete/<id>.json im Ordner levels/ dürfen geschrieben werden.');
+    if (!erlaubt(rel) || typeof text !== 'string' || text.length > 5e6) throw new Error('Nur welt.json, stempel.json und gebiete/<id>.json im Ordner levels/ dürfen geschrieben werden.');
     const ziel = path.join(levelsDir, rel);
     fs.mkdirSync(path.dirname(ziel), { recursive: true });
     fs.writeFileSync(ziel + '.tmp', text); // erst daneben schreiben, dann ersetzen: eine abgebrochene Speicherung zerstört nie die alte Datei

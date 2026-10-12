@@ -1,7 +1,7 @@
 // Zeichnet den Plan im Spielbild: Boden und Wand mit den Farben des Prototyps (fenster-draw.js), darüber Bedienhilfen
 // (Knoten, Beschriftung, Auswahl, Bildschirmrahmen mit Dackel, Maßstab). Nur Zeichnen – ändert keine Daten.
 import { drawDackel, drawEnemy } from '../render/sprites.js';
-import { FLOOR, FLOOR2, WALL, GRID, SCREEN_W, SCREEN_H, FARBEN, KNOTEN_RADIUS_PX, GEGNER_RADIUS } from './konstanten.js';
+import { FLOOR, FLOOR2, WALL, GRID, SCREEN_W, SCREEN_H, FARBEN, KNOTEN_RADIUS_PX, GEGNER_RADIUS, NOTIZ_ANZEIGE } from './konstanten.js';
 import { bodenPolygone, wandPolygone, knotenMap, gangMasse, gangPolygon, rahmenEcken, rechteck } from './daten.js';
 import { KNOTENTYPEN } from './katalog.js';
 import { teilFinden, hatMasse, teilEcken } from './teile.js';
@@ -67,7 +67,7 @@ export function zeichneUmriss(ctx, g, ding, s, dx = 0, dy = 0, km = knotenMap(g)
       ctx.arc(k.x + dx, k.y + dy, (KNOTEN_RADIUS_PX + 4) / s, 0, Math.PI * 2);
       ctx.stroke();
     }
-  } else if (ding.art === 'formteil' || ding.art === 'objekt') {
+  } else if (ding.art === 'formteil' || ding.art === 'objekt' || ding.art === 'notiz') {
     const o = teilFinden(g, ding.art, ding.id);
     if (o && hatMasse(ding.art, o)) {
       pfad(ctx, [versetzt(teilEcken(o))]);
@@ -293,7 +293,8 @@ export function zeichnePlan(ctx, g, ansicht, z = {}, dpr = 1) {
     if (!sichtbarPx(px, py)) continue;
     ctx.fillStyle = FARBEN.notiz;
     ctx.fillRect(px - 5, py - 5, 10, 10);
-    text(ctx, n.text, px + 10, py, FARBEN.notiz, 'left');
+    const kurz = n.text.length > NOTIZ_ANZEIGE ? n.text.slice(0, NOTIZ_ANZEIGE - 1) + '…' : n.text;
+    text(ctx, kurz, px + 10, py, gewaehlt('notiz', n.id) ? FARBEN.auswahl : FARBEN.notiz, 'left');
   }
 
   // Maßstab: größte „runde“ Länge, die höchstens ein Drittel der Breite einnimmt

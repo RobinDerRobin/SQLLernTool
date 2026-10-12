@@ -1,7 +1,7 @@
 // Teile im Gang: Formteile (Boden), Wände und Hindernisse (Objekte mit Maßen). Setzen, Ziehen, Verschieben, Drehen, Kopieren,
 // Löschen, Eigenschaften. Reine Datenänderung auf dem übergebenen Gebiet (kein DOM, läuft auch unter Node) – Rückgängig macht main.js.
 // Alles rastet: Lage auf RASTER (20 E), Winkel auf 45°. Ein Teil ist { art: 'formteil'|'objekt', id }.
-import { MAX_KOORD, RASTER, MIN_TEIL, WINKEL_SCHRITT, TEIL_STANDARD, KOPIE_VERSATZ, GEGNER_RADIUS } from './konstanten.js';
+import { MAX_KOORD, RASTER, MIN_TEIL, WINKEL_SCHRITT, TEIL_STANDARD, KOPIE_VERSATZ, GEGNER_RADIUS, NOTIZ_STANDARD, NOTIZ_MAX } from './konstanten.js';
 import { OBJEKTTYPEN } from './katalog.js';
 import { rechteck, punktInPolygon } from './daten.js';
 import { neueId, rasterEnde } from './befehle.js';
@@ -19,13 +19,15 @@ export const TEILSORTEN = {
   hindernis: { art: 'objekt', typ: 'hindernis', name: 'Hindernis', praefix: 'o' },
 };
 
-export const istTeilArt = (art) => art === 'formteil' || art === 'objekt';
-export const liste = (g, art) => (art === 'formteil' ? g.formteile : g.objekte);
+export const istTeilArt = (art) => art === 'formteil' || art === 'objekt' || art === 'notiz';
+export const liste = (g, art) => (art === 'formteil' ? g.formteile : art === 'notiz' ? g.notizen : g.objekte);
+/** Präfix der IDs je Art (`f1`, `o1`, `n1`). */
+export const praefixVon = (art) => (art === 'formteil' ? 'f' : art === 'notiz' ? 'n' : 'o');
 export const teilFinden = (g, art, id) => liste(g, art).find((o) => o.id === id);
 /** Hat das Teil Länge, Breite und Winkel (alles außer Gegner-Platzhaltern)? */
 export const hatMasse = (art, o) => art === 'formteil' || !!OBJEKTTYPEN[o.typ]?.hatMasse;
 /** Name für Meldungen und die Eigenschaftenliste. */
-export const teilName = (art, o) => (art === 'formteil' ? 'Formteil' : OBJEKTTYPEN[o.typ]?.name ?? 'Objekt');
+export const teilName = (art, o) => (art === 'formteil' ? 'Formteil' : art === 'notiz' ? 'Notiz' : OBJEKTTYPEN[o.typ]?.name ?? 'Objekt');
 
 /** Winkel auf [0, 180): ein Rechteck sieht nach 180° wieder gleich aus. */
 const winkelNorm = (w) => (((w % 180) + 180) % 180) + 0;
@@ -38,6 +40,11 @@ export const teilEcken = (o) => rechteck(o.x, o.y, o.laenge, o.breite, o.winkel)
  * Gesetztes über früher Gesetztem. `erlaubt(art, o)` kann Teile ausschließen (gesperrte Ebenen). Gibt { art, id } oder null.
  */
 export function teilBei(g, x, y, tol = 0, erlaubt = null) {
+  for (let i = g.notizen.length - 1; i >= 0; i--) {
+    const n = g.notizen[i];
+    if (erlaubt && !erlaubt('notiz', n)) continue;
+    if (Math.hypot(x - n.x, y - n.y) <= GEGNER_RADIUS + tol) return { art: 'notiz', id: n.id };
+  }
   for (let i = g.objekte.length - 1; i >= 0; i--) {
     const o = g.objekte[i];
     if (erlaubt && !erlaubt('objekt', o)) continue;
@@ -79,6 +86,13 @@ export function teilSetzen(g, sorte, sx, sy, ex = sx, ey = sy) {
   return anlegen(g, sorte, (a.x + z.x) / 2, (a.y + z.y) / 2, sauber(laenge), std.breite, grad(z.richtung));
 }
 
+/** Setzt eine Notiz (Lage rastet auf RASTER). Gibt { art: 'notiz', id } zurück. */
+export function notizSetzen(g, x, y, text = NOTIZ_STANDARD) {
+  const n = { id: neueId(g, 'n'), x: klemme(rund(x, RASTER)), y: klemme(rund(y, RASTER)), text };
+  g.notizen.push(n);
+  return { art: 'notiz', id: n.id };
+}
+
 /** Wo läge das Teil beim Setzen? Ändert keine Daten (Vorschau): { x, y, laenge, breite, winkel }. */
 export function teilEntwurf(sorte, sx, sy, ex = sx, ey = sy) {
   const std = TEIL_STANDARD[sorte];
@@ -118,7 +132,7 @@ export function teilMerken(g, art, id) {
 export function teilEinfuegen(g, gemerkt, x = null, y = null) {
   if (!gemerkt) return null;
   const o = JSON.parse(JSON.stringify(gemerkt.teil));
-  o.id = neueId(g, gemerkt.art === 'formteil' ? 'f' : 'o');
+  o.id = neueId(g, praefixVon(gemerkt.art));
   o.x = klemme(x == null ? sauber(o.x + KOPIE_VERSATZ) : rund(x, RASTER));
   o.y = klemme(y == null ? sauber(o.y + KOPIE_VERSATZ) : rund(y, RASTER));
   liste(g, gemerkt.art).push(o);
@@ -143,6 +157,14 @@ export function loescheTeil(g, art, id) {
 export function setzeTeil(g, art, id, feld, wert) {
   const o = teilFinden(g, art, id);
   if (!o) return `Teil „${id}“ gibt es nicht.`;
+  if (feld === 'text') {
+    if (art !== 'notiz') return `${teilName(art, o)} hat keinen Text.`;
+    const t = String(wert).replace(/\s+/g, ' ').trim();
+    if (!t) return 'Eine Notiz braucht einen Text.';
+    if (t.length > NOTIZ_MAX) return `Eine Notiz darf höchstens ${NOTIZ_MAX} Zeichen lang sein.`;
+    o.text = t;
+    return null;
+  }
   const text = String(wert).trim();
   const zahl = typeof wert === 'number' ? wert : text === '' ? NaN : Number(text.replace(',', '.'));
   if (!['x', 'y', 'laenge', 'breite', 'winkel'].includes(feld)) return `Feld „${feld}“ eines Teils lässt sich nicht ändern.`;

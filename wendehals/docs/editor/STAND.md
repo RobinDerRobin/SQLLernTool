@@ -17,7 +17,7 @@
 | 6 | Tilesets und Spielgrafik | fertig (Electron ungetestet; Tileset-Look nur im Editor, „Spielen ab hier“ nutzt weiter Prototyp-Farben) | npm test 406, e2e, e2e:editor, beide Test-Agenten | Lauf 7 |
 | 7 | Testmenü am Deck | fertig (`?testmenue` / `WENDEHALS_TESTMENUE=1`; Electron und echtes Gamepad ungetestet) | npm test 410, e2e, e2e:editor, beide Test-Agenten | Lauf 8 |
 | 7b | Bedienung (Brief: BRIEF-7b-bedienung.md) | fertig: A0–A8 und Fehler „Spielen ab hier“ erfüllt (Electron ungetestet; obere Leisten bei 1280 px scrollen waagerecht) | npm test 422, e2e, e2e:editor (neu: e2e/editor-bedienung.mjs), beide Test-Agenten | Lauf 9 |
-| 8 | Notizen und Stempel | offen | – | – |
+| 8 | Notizen und Stempel | fertig (Electron ungetestet; Stempel nur per Rechtsklick, kein Vorschaubild in der Liste) | npm test 435, e2e, e2e:editor (neu: e2e/editor-notizen.mjs), beide Test-Agenten | Lauf 10 |
 | 9 | Bot-Spieltest | offen | – | – |
 | 10 | KI-Varianten nebeneinander | offen | – | – |
 | 11 | Abschluss | offen | – | – |
@@ -110,6 +110,13 @@ umsetzen** (höchste Priorität), danach weiter mit den Stufen. **Fehler zuerst 
 
 - Testmenü als eigener Start `?testmenue` (Electron `WENDEHALS_TESTMENUE=1`), nicht im Spiel-Titel. Je Gang und je Knoten ein Eintrag; Knoten am Gangende: Dackel 120 E vor dem Knoten (Rahmen auf dem Knoten). Im Spiel steht noch der Hinweis „zurück zum Editor“ (kosmetisch). Stick hat kein Auto-Repeat in langen Listen.
 
+## Auf Vorbehalt entschieden (Stufe 8)
+
+- Notiz = neue Dingart `notiz` (eigene sperrbare Ebene „Notizen“), wählbar/verschiebbar/kopierbar/löschbar wie ein Teil; Strg+A und Auswahlrahmen nehmen sie mit. **Dafür zwei bestehende Zähl-Erwartungen um `+ notizen` ergänzt** (`tests/editor-bedienung.tests.mjs` „A4 Auswahlrahmen“, `e2e/editor-bedienung.mjs` „Strg+A wählt alles“) – die Prüfungen sind sonst unverändert und gelten weiter für alle anderen Arten. Notizen ändern nichts am Spiel; „Spielen ab hier“ und Prüfer ignorieren sie.
+- Notiztext: eine Zeile (Zeilenumbrüche werden zu Leerzeichen), höchstens 200 Zeichen; Eingabe rechts, Cursor springt nach dem Setzen dorthin. Kürzel M (Notiz), U (Stempel).
+- Stempel = benannte Zwischenablage (`merkeDinge`), Datei `levels/stempel.json`, wird mit Strg+S (Gebiets-Speichern) mitgeschrieben; Welt-Ansicht-Speichern schreibt sie nicht. Stempel wählen → Rechtsklick setzt (A7 bleibt: bei Auswahl kopiert Rechtsklick die Auswahl; Stempel wählen hebt sie auf). Electron: Pfad `stempel.json` zusätzlich erlaubt.
+- Das Notiz-Bild liegt im Abschnitt „Notiz“ über der Stempelliste, nicht in der Palette (die Palette-Tests zählen 3 Teile + 11 Gegner).
+
 ## Laufprotokoll
 
 | Start | Lauf | Ergebnis |
@@ -124,6 +131,7 @@ umsetzen** (höchste Priorität), danach weiter mit den Stufen. **Fehler zuerst 
 | 12.10.2026 07:06 | Sonnet 5.5, Lauf 7 | Stufe 6 gebaut, Agenten-Befund (Leisten abgeschnitten) behoben, gepusht |
 | 12.10.2026 07:42 | Lauf 8 (Sonnet 5.5) | Stufe 7 fertig, grün |
 | 12.10.2026 18:34 | Lauf 9 (Sonnet 5.5, Bau-Session 7b) | Stufe 7b gebaut (A0–A8), Agenten-Befunde behoben, gepusht |
+| 13.10.2026 01:12 | Lauf 10 (Sonnet 5.5) | Stufe 8 gebaut (Notizen, Stempel), Prüfkette grün, Agenten-Befunde siehe unten |
 
 ## Auf Vorbehalt entschieden (Stufe 7b)
 

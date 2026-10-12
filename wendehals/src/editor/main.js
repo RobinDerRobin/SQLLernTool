@@ -5,11 +5,12 @@
 import { HEADINGS, HEADING_CODES, DIR_NAMES, DIR_VEC, CARDINALS, E } from '../core/math.js';
 import { Ansicht, radFaktor } from './ansicht.js';
 import { zeichnePlan, zeichneGegner } from './zeichnen.js';
-import { WELT, GEBIETE } from './startdaten.js';
+import { WELT, GEBIETE, STEMPEL } from './startdaten.js';
+import { ladeStempel, formatiereStempel, stempelAnlegen, stempelLoeschen as stempelEntfernen, stempelUmbenennen, stempelInhalt } from './stempel.js';
 import { kopie, bezeichnung, knotenMap, gangMasse, gangPolygon, knotenPolygon, punktInPolygon, ausdehnung, rahmenEcken, formatiere, ladeGebiet, pruefeFormat, Verlauf } from './daten.js';
 import { formatiereWelt, ladeWelt, pruefeWelt, weltLagen, weltAusdehnung, lageSetzen, bereichFeld, bereichAnpassen, bereichMasse, uebergangAnlegen, uebergangLoeschen, uebergaengeVon, uebergaengeAn, andereSeite, teileEnde, ausserhalb } from './welt.js';
 import { KNOTENTYPEN, TILESETS, GEGNER, gegnerFuer, tilesetFarben } from './katalog.js';
-import { KUERZEL, MAUS, WINKEL_SCHRITT, SCREEN_W, SCREEN_H, SPEED, ZOOM_TASTE_FAKTOR, ZOOM_FESTWERTE, PFEIL_SCHRITT_PX, PFEIL_GROSS, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX, FLOOR, FLOOR2, WALL, FARBEN, PALETTE_PX } from './konstanten.js';
+import { KUERZEL, MAUS, WINKEL_SCHRITT, SCREEN_W, SCREEN_H, SPEED, ZOOM_TASTE_FAKTOR, ZOOM_FESTWERTE, PFEIL_SCHRITT_PX, PFEIL_GROSS, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX, FLOOR, FLOOR2, WALL, FARBEN, PALETTE_PX, NOTIZ_MAX, STEMPEL_DATEI } from './konstanten.js';
 import { gangTeilen, loesche, setze, gesperrteIds } from './befehle.js';
 import { teilBei, teilFinden, setzeTeil, istTeilArt, hatMasse, teilName, liste as teilListe } from './teile.js';
 import { erzeugeSpeicher } from './speicher.js';
@@ -70,6 +71,7 @@ button:disabled { opacity: .45; cursor: default; }
 #zoomfeld { width: 54px; flex: none; text-align: right; }
 input[type=text], input[type=number], #rechts select { width: 100%; box-sizing: border-box; background: #14121a; color: #e8e6ee; border: 1px solid #4b4560; border-radius: 4px; padding: 3px 6px; font: inherit; }
 #rechts .knoepfe { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+#stempel-feld { margin-top: 14px; } #stempel-feld input { width: 100%; box-sizing: border-box; margin-bottom: 6px; } .stempel-zeile { display: flex; gap: 4px; margin-bottom: 4px; } .stempel-zeile button:first-child { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .stempel-zeile.an button:first-child { border-color: #4ad0ff; }
 #palette { margin-top: 14px; } .palette-titel { font-size: 14px; font-weight: bold; margin-bottom: 6px; } .palette-raster { display: flex; flex-wrap: wrap; gap: 6px; } .palette-raster canvas { border: 2px solid #4b4560; border-radius: 4px; cursor: pointer; } .palette-raster canvas.aktiv { border-color: #4ad0ff; }
 `;
 
@@ -123,6 +125,11 @@ export function startEditor() {
     gespeichert: Object.fromEntries(Object.entries(GEBIETE).map(([id, g]) => [id, formatiere(g)])), // zuletzt gespeicherter/geladener Text je Gebiet
     neueGebiete: new Set(), // geöffnete Gebiete, deren Datei noch nicht gespeichert ist (kommen erst danach in welt.json)
     speicher: erzeugeSpeicher(),
+    stempel: kopie(STEMPEL), // Stempel-Vorlagen (levels/stempel.json, Stufe 8): { format, stempel: [{ id, name, bezug, knoten, gaenge, teile }] }
+    stempelGespeichert: formatiereStempel(STEMPEL), // zuletzt gespeicherter/geladener Text von stempel.json
+    stempelId: null, // der Stempel, den das Stempel-Werkzeug setzt
+    stempelName: '', // Name für den nächsten Stempel (Eingabefeld rechts)
+    notizFokus: null, // ID einer eben gesetzten Notiz: der Cursor springt in ihr Textfeld
   };
   const ansicht = new Ansicht();
   const perf = { zeichnenMs: [] };
@@ -410,7 +417,7 @@ export function startEditor() {
   }
 
   /** Was liegt unter dem Bildschirmpunkt? Knoten vor Gang. */
-  function treffer(px, py) {
+  function treffer(px, py, ohneNotizen = false) {
     const g = sicht();
     const gesp = state.gesperrt;
     if (!gesp.has('knoten')) {
@@ -420,7 +427,7 @@ export function startEditor() {
       }
     }
     const [wx, wy] = ansicht.bildZuWelt(px, py);
-    const teil = teilBei(g, wx, wy, 3 / ansicht.masstab, (art, o) => !gesp.has(ebeneVon(art, o)));
+    const teil = teilBei(g, wx, wy, 3 / ansicht.masstab, (art, o) => !gesp.has(ebeneVon(art, o)) && !(ohneNotizen && art === 'notiz'));
     if (teil) return teil;
     const km = knotenMap(g);
     if (!gesp.has('knoten')) {
@@ -652,7 +659,7 @@ export function startEditor() {
     if (state.ansichtArt === 'welt') return; // Gebiet-Befehle gelten nur in der Gebiet-Ansicht
     const dinge = bewegbareAuswahl().length ? bewegbareAuswahl() : auswahlListe();
     const clip = dinge.length ? merkeDinge(gebiet(), dinge) : null;
-    if (!clip) return melde('Zum Kopieren erst etwas wählen (Formteil, Wand, Hindernis, Gegner, Knoten oder Gang).', 'fehler');
+    if (!clip) return melde('Zum Kopieren erst etwas wählen (Formteil, Wand, Hindernis, Gegner, Notiz, Knoten oder Gang).', 'fehler');
     state.zwischen = clip;
     melde(`${dingeName(dinge)} kopiert. Strg+V fügt ${dinge.length === 1 ? 'es' : 'sie'} an der Mausstelle ein.`);
     refresh();
@@ -765,6 +772,14 @@ export function startEditor() {
           wo += ` und ${wr.wo}`;
         }
       }
+      if (stempelUngespeichert()) {
+        const stText = formatiereStempel(state.stempel);
+        const sr = await state.speicher.sichere(STEMPEL_DATEI, stText);
+        if (sr) {
+          state.stempelGespeichert = stText;
+          wo += ` und ${sr.wo}`;
+        }
+      }
       melde(`Gespeichert: ${wo}`);
     } catch (e) {
       melde('Nicht gespeichert: ' + e.message, 'fehler');
@@ -823,6 +838,15 @@ export function startEditor() {
     state.verlauf = {};
     const geladen = welt.gebiete.filter((e) => neu[e.id]);
     wahl.replaceChildren(...geladen.map((e) => el('option', { value: e.id, text: e.name })));
+    if (typeof alle.stempel === 'string') {
+      try {
+        state.stempel = ladeStempel(alle.stempel);
+        state.stempelGespeichert = formatiereStempel(state.stempel);
+        state.stempelId = null;
+      } catch (e) {
+        probleme.push(`${STEMPEL_DATEI}: ${e.message}`);
+      }
+    }
     wechsle(geladen[0].id);
     if (probleme.length) melde('Einige Dateien wurden übersprungen:\n' + probleme.join('\n'), 'fehler');
   }
@@ -1114,10 +1138,79 @@ export function startEditor() {
     },
     weltWaehle: (a) => weltWaehle(a),
     tolE: () => FANG_PX / ansicht.masstab,
+    setzeKopie: (clip, x, y, label) => setzeKopie(clip, x, y, label),
+    stempelAktuell: () => stempelAktuell(),
     zeichnen: () => {
       dirty = true;
     },
   };
+
+  // ---------------------------------------------------------------- Stempel (Stufe 8)
+  const stempelAktuell = () => state.stempel.stempel.find((x) => x.id === state.stempelId) ?? null;
+  const stempelUngespeichert = () => formatiereStempel(state.stempel) !== state.stempelGespeichert;
+  /** Die Auswahl (oder, ohne Auswahl, nichts) als Stempel merken. */
+  function stempelSpeichern(name = state.stempelName) {
+    if (state.ansichtArt === 'welt') return;
+    const dinge = bewegbareAuswahl().length ? bewegbareAuswahl() : auswahlListe();
+    const clip = dinge.length ? merkeDinge(gebiet(), dinge) : null;
+    if (!clip) return melde('Für einen Stempel erst etwas wählen (Knoten, Gänge, Teile, Gegner oder Notizen).', 'fehler');
+    const r = stempelAnlegen(state.stempel, clip, name);
+    if (r.fehler) return melde(r.fehler, 'fehler');
+    state.stempelId = r.stempel.id;
+    state.stempelName = '';
+    melde(`Stempel „${r.stempel.name}“ angelegt (${stempelInhalt(r.stempel)}). Mit Strg+S wird ${STEMPEL_DATEI} gespeichert; Rechtsklick setzt ihn (Stempel-Werkzeug U).`);
+    refresh();
+  }
+  function stempelWaehlen(id) {
+    if (!state.stempel.stempel.some((x) => x.id === id)) return;
+    state.stempelId = id;
+    if (state.werkzeug === 'stempel') refresh();
+    else setzeWerkzeug('stempel');
+  }
+  function stempelLoeschen(id = state.stempelId) {
+    if (!stempelEntfernen(state.stempel, id)) return;
+    if (state.stempelId === id) state.stempelId = null;
+    melde('Stempel gelöscht (noch nicht gespeichert – Strg+S).');
+    refresh();
+  }
+  function stempelBenennen(name) {
+    const fehler = state.stempelId && stempelUmbenennen(state.stempel, state.stempelId, name);
+    if (fehler) melde(fehler, 'fehler');
+    else state.stempelName = '';
+    refresh();
+  }
+  /** Rechte Spalte: Liste der Stempel, Knopf zum Anlegen aus der Auswahl. */
+  function stempelFeld() {
+    const notizKachel = { id: 'notiz', titel: 'Notiz (M): hält fest, was an der Stelle werden soll (ändert nichts am Spiel)', zeichne: (x) => { x.fillStyle = FARBEN.notiz; x.fillRect(PALETTE_PX / 2 - 8, PALETTE_PX / 2 - 8, 16, 16); x.strokeStyle = '#000'; x.lineWidth = 1.5; x.strokeRect(PALETTE_PX / 2 - 8, PALETTE_PX / 2 - 8, 16, 16); }, aktiv: state.werkzeug === 'notiz', bei: () => setzeWerkzeug('notiz') };
+    const f = el('div', { id: 'stempel-feld' }, [
+      el('div', { class: 'palette-titel', text: 'Notiz' }),
+      el('div', { class: 'palette-raster' }, [kachelBild('n-', notizKachel, kachelFarben())]),
+      el('div', { class: 'palette-titel', text: 'Stempel', style: 'margin-top:10px' }),
+    ]);
+    const name = el('input', { type: 'text', id: 'f-stempel-name', placeholder: 'Name des Stempels', value: state.stempelName, maxlength: '60' });
+    name.addEventListener('input', () => {
+      state.stempelName = name.value;
+    });
+    name.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') name.blur();
+      if (!(e.ctrlKey || e.metaKey)) e.stopPropagation();
+    });
+    f.append(name);
+    const knoepfe = el('div', { class: 'knoepfe' }, [knopf('Auswahl als Stempel', 'Die gewählten Dinge als Vorlage merken (landet in stempel.json)', () => stempelSpeichern(), 'b-stempel-neu')]);
+    if (stempelAktuell()) knoepfe.append(knopf('Umbenennen', 'Den gewählten Stempel so nennen, wie im Feld steht', () => stempelBenennen(name.value), 'b-stempel-umbenennen'));
+    f.append(knoepfe);
+    const liste = el('div', { class: 'stempel-liste' });
+    for (const x of state.stempel.stempel) {
+      const an = x.id === state.stempelId && state.werkzeug === 'stempel';
+      liste.append(el('div', { class: 'stempel-zeile' + (an ? ' an' : '') }, [
+        el('button', { text: `${x.name} – ${stempelInhalt(x)}`, title: 'Stempel wählen: Rechtsklick setzt ihn (U)', id: 'st-' + x.id, class: an ? 'aktiv' : '', onclick: () => stempelWaehlen(x.id) }),
+        el('button', { text: '✕', title: 'Stempel löschen', id: 'st-weg-' + x.id, onclick: () => stempelLoeschen(x.id) }),
+      ]));
+    }
+    if (!state.stempel.stempel.length) liste.append(el('p', { class: 'grau', text: 'Noch keine Stempel. Etwas wählen und „Auswahl als Stempel“ drücken.' }));
+    f.append(liste, el('p', { class: 'grau', text: `Stempel liegen in ${STEMPEL_DATEI} (Strg+S speichert sie mit) und sind Material für Claude Code.` }));
+    return f;
+  }
 
   // ---------------------------------------------------------------- Anzeigen
   function zeile(dl, name, wert) {
@@ -1321,7 +1414,7 @@ export function startEditor() {
     const g = gebiet();
     const dl = el('dl');
     rechts.append(el('h2', { text: `${liste.length} Dinge gewählt` }), dl);
-    const namen = { knoten: 'Knoten', gang: 'Gänge', formteil: 'Formteile', objekt: 'Wände, Hindernisse, Gegner' };
+    const namen = { knoten: 'Knoten', gang: 'Gänge', formteil: 'Formteile', objekt: 'Wände, Hindernisse, Gegner', notiz: 'Notizen' };
     for (const art of Object.keys(namen)) {
       const n = liste.filter((d) => d.art === art).length;
       if (n) zeile(dl, namen[art], n);
@@ -1338,6 +1431,7 @@ export function startEditor() {
     );
     rechts.append(knoepfe, el('p', { class: 'grau', text: 'Ziehen verschiebt alle zusammen, Pfeiltasten auch. Strg+Klick ergänzt oder entfernt ein Ding, Esc hebt die Auswahl auf.' }));
     rechts.append(paletteFeld());
+    rechts.append(stempelFeld());
   }
   function eigenschaften() {
     if (state.ansichtArt === 'welt') return weltEigenschaften();
@@ -1419,6 +1513,9 @@ export function startEditor() {
           knopf('⟲ 45°', 'Um 45° linksherum drehen (Umschalt+R)', () => dreheTeil(-1), 'b-teil-links'),
           knopf('⟳ 45°', 'Um 45° rechtsherum drehen (R)', () => dreheTeil(1), 'b-teil-rechts'),
         );
+      } else if (au.art === 'notiz') {
+        feld(dl, 'Text', 'f-text', o.text, (v) => setzeFeld('notiz', o.id, 'text', v, 'Notiztext ändern'), 'text', { maxlength: String(NOTIZ_MAX) });
+        zeile(dl, 'Hinweis', 'Nur für Menschen und die KI – ändert nichts am Spiel');
       } else if (o.platzhalter) zeile(dl, 'Hinweis', 'Platzhalter: Gegner-Verhalten im Fenster ungeprüft');
       knoepfe.append(
         knopf('Duplizieren', 'Kopie neben das Teil setzen (Strg+D)', () => dupliziere(), 'b-teil-dup'),
@@ -1451,7 +1548,16 @@ export function startEditor() {
     }
     rechts.append(knoepfe);
     rechts.append(paletteFeld());
-    rechts.append(el('p', { class: 'grau', text: 'Linksklick wählt (Strg+Klick ergänzt, Ziehen im Leeren = Rahmen, Strg+A alles), Ziehen und Pfeile (Umschalt ×5) verschieben die Auswahl. Rechtsklick setzt das Element, das du mit G K B W H X A oder in der Palette wählst; ist etwas gewählt, kopiert er es. Mittlere Taste oder Shift+Ziehen verschiebt den Plan, das Mausrad zoomt (+ − 1 2, Pos1 = alles). Doppelklick oder Enter öffnet das Level, Esc geht eine Ebene hoch. R dreht ein Teil, Strg+C/V/D, nur Entf löscht, Strg+Z/Y Rückgängig/Wiederholen, Strg+S Speichern, P Spielen ab hier (Esc zurück), N Bezeichnung kopieren, Q/E drehen die Ansicht, 0 Norden, F wie im Spiel, J Look, T Welt, Leertaste Fahrt.' }));
+    rechts.append(stempelFeld());
+    if (state.notizFokus) {
+      const i = rechts.querySelector('#f-text');
+      if (i && au?.id === state.notizFokus) {
+        i.focus();
+        i.select();
+        state.notizFokus = null;
+      }
+    }
+    rechts.append(el('p', { class: 'grau', text: 'Linksklick wählt (Strg+Klick ergänzt, Ziehen im Leeren = Rahmen, Strg+A alles), Ziehen und Pfeile (Umschalt ×5) verschieben die Auswahl. Rechtsklick setzt das Element, das du mit G K B W H X M U A oder in der Palette wählst; ist etwas gewählt, kopiert er es. Mittlere Taste oder Shift+Ziehen verschiebt den Plan, das Mausrad zoomt (+ − 1 2, Pos1 = alles). Doppelklick oder Enter öffnet das Level, Esc geht eine Ebene hoch. R dreht ein Teil, Strg+C/V/D, nur Entf löscht, Strg+Z/Y Rückgängig/Wiederholen, Strg+S Speichern, P Spielen ab hier (Esc zurück), N Bezeichnung kopieren, Q/E drehen die Ansicht, 0 Norden, F wie im Spiel, J Look, T Welt, Leertaste Fahrt.' }));
   }
   function refreshFahrt() {
     if (state.ansichtArt === 'welt') {
@@ -1497,7 +1603,7 @@ export function startEditor() {
     prueferZeigen();
     tilesetFensterZeigen();
     loeschKnopf.disabled = inWelt ? state.weltAuswahl?.art !== 'uebergang' : !(au && (au.art === 'gang' || au.art === 'knoten' || istTeilArt(au.art)));
-    const offen = inWelt ? weltUngespeichert() : ungespeichert() || weltUngespeichert();
+    const offen = inWelt ? weltUngespeichert() : ungespeichert() || weltUngespeichert() || stempelUngespeichert();
     stand.textContent = offen ? '● ungespeichert' : '✓ gespeichert';
     stand.className = offen ? 'offen' : 'grau';
     document.title = `${offen ? '* ' : ''}Wendehals – Editor`;
@@ -1588,7 +1694,7 @@ export function startEditor() {
       const t = weltTreffer(kontext, p.px, p.py);
       if (t?.art === 'gebiet') zuGebiet(t.id);
     } else if (!state.levelGang) {
-      const t = treffer(p.px, p.py);
+      const t = treffer(p.px, p.py, true); // eine Notiz auf dem Gang verdeckt ihn nicht: Doppelklick meint den Gang darunter
       if (t?.art === 'gang') oeffneLevel(t.id); // Doppelklick auf einen Gang öffnet sein Level
     }
   });
@@ -1727,7 +1833,7 @@ export function startEditor() {
   setzeWerkzeug(state.werkzeug);
   requestAnimationFrame(frame);
   window.addEventListener('beforeunload', (e) => {
-    if (Object.keys(state.gebiete).some((id) => ungespeichert(id)) || weltUngespeichert()) e.preventDefault(); // Rückfrage statt stillem Verlust
+    if (Object.keys(state.gebiete).some((id) => ungespeichert(id)) || weltUngespeichert() || stempelUngespeichert()) e.preventDefault(); // Rückfrage statt stillem Verlust
   });
   // Electron: die Leveldateien frisch von der Platte lesen (die eingebauten Stände sind nur der Rückfall)
   state.speicher
@@ -1762,6 +1868,12 @@ export function startEditor() {
     wiederholen,
     setzeFeld,
     setzeWerkzeug,
+    stempelSpeichern,
+    stempelWaehlen,
+    stempelLoeschen,
+    stempelBenennen,
+    stempelAktuell,
+    stempelUngespeichert,
     loescheAuswahl,
     dreheTeil,
     kopiere,

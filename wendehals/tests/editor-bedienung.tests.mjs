@@ -202,7 +202,7 @@ test('A4 Auswahlrahmen: wählt, was ganz im Rahmen liegt; mit „berühren“ au
   assert.equal(inRahmen(g, { x0: 5000, y0: 5000, x1: 6000, y1: 6000 }).length, 0);
   const ohneGegner = inRahmen(g, { x0: -5000, y0: -5000, x1: 5000, y1: 5000 }, { gesperrt: new Set(['gegner']) });
   assert.ok(!ohneGegner.some((d) => d.art === 'objekt' && g.objekte.find((o) => o.id === d.id).typ === 'gegner'));
-  assert.equal(alleDinge(g).length, g.knoten.length + g.gaenge.length + g.formteile.length + g.objekte.length);
+  assert.equal(alleDinge(g).length, g.knoten.length + g.gaenge.length + g.formteile.length + g.objekte.length + g.notizen.length);
   assert.ok(alleDinge(g, new Set(['knoten', 'gaenge'])).every((d) => d.art !== 'knoten' && d.art !== 'gang'));
 });
 

@@ -8,13 +8,15 @@ export const EBENEN = [
   { id: 'formteile', name: 'Formteile' },
   { id: 'waende', name: 'Wände/Hindernisse' },
   { id: 'gegner', name: 'Gegner' },
+  { id: 'notizen', name: 'Notizen' },
 ];
 
-/** Ebene eines Dings: art 'knoten' | 'gang' | 'formteil' | 'objekt' (Wand, Hindernis, Gegner), `o` = das Objekt (nur für 'objekt' nötig). */
+/** Ebene eines Dings: art 'knoten' | 'gang' | 'formteil' | 'objekt' (Wand, Hindernis, Gegner) | 'notiz', `o` = das Objekt (nur für 'objekt' nötig). */
 export function ebeneVon(art, o = null) {
   if (art === 'knoten') return 'knoten';
   if (art === 'gang') return 'gaenge';
   if (art === 'formteil') return 'formteile';
+  if (art === 'notiz') return 'notizen';
   return o?.typ === 'gegner' ? 'gegner' : 'waende';
 }
 
@@ -26,5 +28,7 @@ export const WERKZEUG_EBENEN = {
   wand: ['waende'],
   hindernis: ['waende'],
   gegner: ['gegner'],
+  notiz: ['notizen'],
+  stempel: [], // die Ebenen der Stempelteile prüft das Einfügen selbst (setzeKopie)
   bereich: [],
 };

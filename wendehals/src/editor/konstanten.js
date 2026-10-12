@@ -50,7 +50,7 @@ export const KUERZEL = {
   zoomNormal: 'Digit2', // Normalansicht 2,2 Bildschirme
   beschriftung: 'KeyL',
   alles: 'Home',
-  werkzeug: { auswahl: 'KeyV', gang: 'KeyG', knoten: 'KeyK', formteil: 'KeyB', wand: 'KeyW', hindernis: 'KeyH', gegner: 'KeyX', bereich: 'KeyA' },
+  werkzeug: { auswahl: 'KeyV', gang: 'KeyG', knoten: 'KeyK', formteil: 'KeyB', wand: 'KeyW', hindernis: 'KeyH', gegner: 'KeyX', notiz: 'KeyM', stempel: 'KeyU', bereich: 'KeyA' },
   tilesetFenster: 'KeyI', // Tileset-Fenster (A8) ein-/ausblenden
   look: 'KeyJ', // Look umschalten: Prototyp-Farben ↔ Tileset des Gebiets
   welt: 'KeyT', // zwischen Gebiet- und Welt-Ansicht umschalten
@@ -99,6 +99,11 @@ export const FARBEN = {
   bereich: '#7fb3ff', // Rahmen des Gebiets-Bereichs im Plan
   uebergang: '#ff8ad8', // Übergang zwischen Gebieten
 };
+export const NOTIZ_STANDARD = 'Neue Notiz'; // Text einer neu gesetzten Notiz (Stufe 8)
+export const NOTIZ_MAX = 200; // längster Notiztext (Zeichen)
+export const NOTIZ_ANZEIGE = 48; // im Plan werden längere Texte gekürzt (Zeichen)
+export const STEMPEL_DATEI = 'stempel.json'; // Stempel-Vorlagen in levels/ (Stufe 8)
+export const STEMPEL_MAX = 200; // so viele Stempel höchstens
 export const GEGNER_RADIUS = 14; // Trefferradius eines Gegner-Platzhalters (E)
 export const PALETTE_PX = 56; // Kantenlänge eines Palettenbilds (Bildschirmpixel)
 export const KNOTEN_RADIUS_PX = 7; // Knotenmarke (Bildschirmpixel, unabhängig vom Zoom)

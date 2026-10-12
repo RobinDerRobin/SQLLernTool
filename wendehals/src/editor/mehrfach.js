@@ -1,11 +1,11 @@
 // Auswahl mehrerer Dinge (A4): Rahmen, alles wählen, gemeinsam verschieben, kopieren/einfügen, löschen, drehen. Reine Datenänderung auf dem
 // übergebenen Gebiet (kein DOM, läuft auch unter Node) – Rückgängig macht main.js über den Verlauf. Ein Ding ist { art, id } mit
-// art 'knoten' | 'gang' | 'formteil' | 'objekt' (Wand, Hindernis, Gegner).
+// art 'knoten' | 'gang' | 'formteil' | 'objekt' (Wand, Hindernis, Gegner) | 'notiz'.
 import { MAX_KOORD, RASTER, KNOTENRASTER, GEGNER_RADIUS, KOPIE_VERSATZ, MIN_GANG_LAENGE } from './konstanten.js';
 import { knotenMap, gangMasse, gangPolygon, knotenPolygon, rechteck } from './daten.js';
 import { ueberlappen } from './level.js';
 import { ebeneVon } from './ebenen.js';
-import { liste as teilListe, teilFinden, hatMasse, teilEcken, teilDrehen, loescheTeil } from './teile.js';
+import { liste as teilListe, teilFinden, hatMasse, teilEcken, teilDrehen, loescheTeil, praefixVon } from './teile.js';
 import { neueId, loesche } from './befehle.js';
 
 const rund = (v, r) => Math.round(v / r) * r + 0;
@@ -13,7 +13,7 @@ const sauber = (v) => Math.round(v * 1000) / 1000 + 0;
 const kopieVon = (o) => JSON.parse(JSON.stringify(o));
 
 export const gleichesDing = (a, b) => a.art === b.art && a.id === b.id;
-export const istTeil = (d) => d.art === 'formteil' || d.art === 'objekt';
+export const istTeil = (d) => d.art === 'formteil' || d.art === 'objekt' || d.art === 'notiz';
 
 /** Das Ding im Gebiet (oder undefined). */
 export function dingFinden(g, d) {
@@ -42,6 +42,7 @@ export function alleDinge(g, gesperrt = new Set()) {
   for (const x of g.gaenge) out.push({ art: 'gang', id: x.id });
   for (const f of g.formteile) out.push({ art: 'formteil', id: f.id });
   for (const o of g.objekte) out.push({ art: 'objekt', id: o.id });
+  for (const n of g.notizen) out.push({ art: 'notiz', id: n.id });
   return out.filter((d) => !gesperrt.has(ebeneDes(g, d)));
 }
 
@@ -206,7 +207,7 @@ export function fuegeDingeEin(g, clip, dx, dy, absolut = null) {
   }
   for (const t of clip.teile) {
     const o = kopieVon(t.teil);
-    o.id = neueId(g, t.art === 'formteil' ? 'f' : 'o');
+    o.id = neueId(g, praefixVon(t.art));
     o.x = absolut ? rund(absolut.x, RASTER) : sauber(t.teil.x + dx);
     o.y = absolut ? rund(absolut.y, RASTER) : sauber(t.teil.y + dy);
     if (Math.abs(o.x) > MAX_KOORD || Math.abs(o.y) > MAX_KOORD) return zurueck('Zu weit draußen.');
@@ -214,6 +215,12 @@ export function fuegeDingeEin(g, clip, dx, dy, absolut = null) {
     neu.push({ art: t.art, id: o.id });
   }
   return { dinge: neu };
+}
+
+/** Um wie viel verschiebt `fuegeDingeAn` die gemerkten Dinge für die Zielstelle? (Vorschau des Stempels.) */
+export function einfuegeVersatz(clip, zielX, zielY) {
+  if (einzelTeil(clip)) return [rund(zielX, RASTER) - clip.teile[0].teil.x, rund(zielY, RASTER) - clip.teile[0].teil.y];
+  return versatzZu(clip, zielX, zielY);
 }
 
 /** Fügt an einer Zielstelle ein: ein einzelnes Teil mit der Mitte auf der Stelle (gerastert), sonst die Mitte der Gruppe, gerastert. */

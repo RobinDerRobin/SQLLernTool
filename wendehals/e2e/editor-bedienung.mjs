@@ -812,7 +812,7 @@ const zufall = () => (rng = (rng * 1103515245 + 12345) % 2147483648) / 214748364
   // Strg+A
   await b((e) => e.waehle(null));
   await bau.keyboard.press('Control+KeyA');
-  const alle = await b((e) => { const g = e.gebiet(); return [e.auswahlListe().length, g.knoten.length + g.gaenge.length + g.formteile.length + g.objekte.length]; });
+  const alle = await b((e) => { const g = e.gebiet(); return [e.auswahlListe().length, g.knoten.length + g.gaenge.length + g.formteile.length + g.objekte.length + g.notizen.length]; });
   check(alle[0] === alle[1], `A4: Strg+A wählt alles in der Ansicht (${alle[0]} von ${alle[1]})`);
   await bau.click('#l-gegner');
   await bau.keyboard.press('Control+KeyA');
