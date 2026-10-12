@@ -1085,6 +1085,7 @@ await wa((e) => {
   e.loescheAuswahl();
 });
 check(/ins Leere/.test(await wa((e) => e.state.meldung)), 'Knoten löschen: Hinweis auf den verwaisten Übergang');
+await wa((e) => e.zuWelt());
 // Leistung der Welt-Ansicht
 const wMs = await wa((e) => {
   e.alles();
