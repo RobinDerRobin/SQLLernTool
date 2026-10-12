@@ -178,6 +178,8 @@ export function startEditor() {
   }
   function wechsle(id) {
     if (!state.gebiete[id]) return;
+    bezFeld.style.display = 'none'; // die kopierte Bezeichnung gehörte zum alten Gebiet
+    melde('');
     state.gebietId = id;
     wahl.value = id;
     state.auswahl = null;
@@ -191,6 +193,8 @@ export function startEditor() {
   }
   function waehle(auswahl) {
     state.auswahl = auswahl;
+    bezFeld.style.display = 'none';
+    if (/^(Zum Kopieren|Zum Spielen)/.test(state.meldung)) melde('');
     if (!auswahl) state.fahrt = null; // nichts gewählt: kein Rahmen, keine Fahrt
     if (auswahl && auswahl.art === 'knoten') state.fahrt = null; // der Rahmen gehört zu Gängen
     if (auswahl && auswahl.art === 'gang') {
@@ -315,6 +319,7 @@ export function startEditor() {
     } catch {
       /* Zwischenablage gesperrt (z. B. Dateiseite ohne Berechtigung): der markierte Text im Feld genügt zum Kopieren mit Strg+C */
     }
+    bezFeld.blur(); // der Text bleibt markiert, die Kürzel gelten sofort wieder
     state.bezeichnung = text;
     melde(kopiert ? `Kopiert: ${text}` : `Nicht in die Zwischenablage gekommen – Text ist markiert, mit Strg+C kopieren: ${text}`);
   }
@@ -718,7 +723,7 @@ export function startEditor() {
   );
   window.addEventListener('keydown', (e) => {
     if (state.spielen?.aktiv) return; // im Spielmodus gehören die Tasten dem Spiel
-    const imFeld = e.target instanceof HTMLSelectElement || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+    const imFeld = e.target instanceof HTMLSelectElement || (e.target instanceof HTMLInputElement && e.target.type !== 'range' && !e.target.readOnly) || e.target instanceof HTMLTextAreaElement; // Schieber und das schreibgeschützte Bezeichnungsfeld nehmen keine Kürzel weg
     if ((e.ctrlKey || e.metaKey) && !e.altKey) {
       const c = e.code;
       const tippt = imFeld && !(c === KUERZEL.speichern);

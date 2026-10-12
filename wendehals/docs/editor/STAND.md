@@ -2,7 +2,7 @@
 
 > Wird von jedem Bau-Lauf gepflegt (Brief: [`BRIEF.md`](BRIEF.md), Abschnitt 7). Zeiten in Europe/Berlin.
 
-**Sperre:** belegt seit 12.10.2026 05:12, Lauf https://claude.ai/code/session_01MSxhWT6JzGHdSTsKU8XW9P
+**Sperre:** frei
 
 ## Stufen
 
@@ -11,7 +11,7 @@
 | 1 | Grundgerüst + Ansehen | fertig (Electron-Start ungetestet) | npm test 313, e2e, e2e:editor, beide Test-Agenten | Lauf 1 |
 | 2a | Bauen I | fertig (Electron-Speichern ungetestet; Raumgröße nur per Zahlenfeld, kein Ziehgriff) | npm test 340, e2e, e2e:editor, beide Test-Agenten | Lauf 2 |
 | 2b | Bauen II | fertig (Electron ungetestet; Teile ohne Spielgrafik, Hindernis = Platzhalterbild) | npm test 357, e2e, e2e:editor, beide Test-Agenten | Lauf 3 |
-| 3 | Spielen ab hier + Bezeichnung | offen | – | – |
+| 3 | Spielen ab hier + Bezeichnung | fertig (nur Ost/West/Nord/Süd-Gänge spielbar; Electron ungetestet) | npm test 369, e2e, e2e:editor, beide Test-Agenten | Lauf 4 |
 | 4 | Prüfer | offen | – | – |
 | 5 | Gebiete und Übergänge | offen | – | – |
 | 6 | Tilesets und Spielgrafik | offen | – | – |
@@ -44,6 +44,16 @@
 - Werkzeuge Formteil (B), Wand (W), Hindernis (H): Klick = Standardmaße (konstanten.js), Ziehen = Länge/Winkel im 8er-Raster. Teile-Winkel auf [0,180) normiert (Rechtecke). Lage rastet auf 20 E. Kürzel R/Umschalt+R drehen, Strg+C/V/D kopieren/einfügen/duplizieren (Einfügen an der Maus, sonst Ansichtsmitte).
 - Teile liegen in der Auswahl über Gängen/Knotenflächen; Ziehen auf ihnen verschiebt das Teil (Plan: mittlere/rechte Maustaste). Leisten haben feste Höhen (kein Umbrechen).
 
+## Auf Vorbehalt entschieden (Stufe 3)
+
+- „Spielen ab hier“ nutzt eine neue Karte (`src/proto/editor-karte.js`); `fenster-draw.js` nur additiv (extraFloor/blocks). Dackel startet 120 E hinter der Rahmenmitte (Bildstelle 120|135, wie im Rahmen gezeichnet).
+- Nicht spielbar (Meldung vorher, nichts startet): Diagonal-Gänge, Achteck-Knoten, Teile mit Winkel ≠ 0°/90°, Gänge die sich ohne gemeinsamen Knoten kreuzen, getrennte Gangteile. Gegner = nur Hinweis. Daher ist „Beispiel“ (hat eine Diagonale) und „proto-achteck“ nicht spielbar, „proto-netz“ ja.
+- Knochen (Spielziel des Prototyps) liegen an Gangenden und in Räumen; Taste P beendet auch im Spiel (ist dort „Pause“). Tasten: P spielen, N Bezeichnung.
+
+## Offen aus Stufe 3 (Agenten-Prüfung, Hinweise)
+
+- Knochen-Lage wird nicht auf Erreichbarkeit geprüft (Wand/Hindernis auf dem Knochen); Rahmenstelle <120 E: Dackel wird auf Boden gesetzt, ohne Meldung; Konstanten (KNOCHEN_ABSTAND, PROBEN, SCHRITT) noch nicht in konstanten.js; Kreisprobe 16 Randpunkte (≈2 % Ungenauigkeit an Innenecken); Wand wirkt im Spiel wie ein Loch in Hintergrundfarbe; Rahmen zeigt den Dackel erst bei großem Zoom; M7 noch nicht als Regel in regeln.js (Stufe 4 ruft `spielbarkeit()` auf); untere Leiste bricht bei Meldung um; keine Bezeichnung für Wand/Formteil; SpielModus ohne Node-Test.
+
 ## Offen aus Stufe 2b (Agenten-Prüfung, Hinweise)
 
 - Wand auf leerem Grund unsichtbar (nur Auswahlumriss); Doppelklick setzt zwei Teile; Hinweis-Label breiter als kleines Hindernis; Auswahl nach Rückgängig leer; alte Meldungen bleiben bei wirkungslosen Tasten; „Öffnen“ markiert Gebiet als ungespeichert; Zahlenfeld mit Komma im Nicht-Deutsch-Chrome ungeprüft; TEILSORTEN liegt in teile.js statt katalog.js (Änderbarkeit); obere Leiste bei 1280 Breite knapp.
@@ -68,3 +78,4 @@
 | 11.10.2026 23:28 | Sonnet 5.5, Lauf 1 | Stufe 1 gebaut, Agenten-Befunde (Fehler) behoben, gepusht |
 | 12.10.2026 01:08 | Sonnet 5.5, Lauf 2 | Stufe 2a gebaut, Agenten-Befunde behoben, gepusht |
 | 12.10.2026 03:10 | Sonnet 5.5, Lauf 3 | Stufe 2b gebaut, Agenten-Befunde (Fehler) behoben, gepusht |
+| 12.10.2026 05:12 | Sonnet 5.5, Lauf 4 | Stufe 3 gebaut, Agenten-Befunde (Fehler) behoben, gepusht |

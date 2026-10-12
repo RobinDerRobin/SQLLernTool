@@ -702,6 +702,13 @@ await ed((e) => {
 });
 await page.keyboard.press('KeyN');
 await page.waitForTimeout(100);
+await page.keyboard.press('KeyG');
+check((await ed((e) => e.state.werkzeug)) === 'gang', 'Bezeichnung: nach N gelten die Kürzel sofort wieder (Fokus nicht im Feld)');
+await page.keyboard.press('KeyV');
+await page.focus('#fahrt');
+await page.keyboard.press('KeyG');
+check((await ed((e) => e.state.werkzeug)) === 'gang', 'Kürzel gelten auch, wenn der Fahrt-Schieber den Fokus hat');
+await page.keyboard.press('KeyV');
 check((await page.inputValue('#bezeichnung')) === 'Wendehals-Level beispiel/schleuse@560', 'Bezeichnung: Gang mit Stelle im Format Wendehals-Level <gebiet>/<level>@<stelle>', await page.inputValue('#bezeichnung'));
 check(await page.locator('#bezeichnung').isVisible(), 'Bezeichnung: Textfeld als Rückfall sichtbar');
 const zw = await page.evaluate(() => navigator.clipboard.readText().catch(() => null));
