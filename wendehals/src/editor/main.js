@@ -174,6 +174,8 @@ export function startEditor() {
     wahl.value = id;
     state.auswahl = null;
     state.fahrt = null;
+    state.zeiger = null;
+    werkzeug().abbruch?.(kontext);
     const g = gebiet();
     if (g.gaenge.length) waehle({ art: 'gang', id: g.gaenge[0].id });
     alles();
@@ -639,6 +641,9 @@ export function startEditor() {
     if (z.modus === 'werkzeug') werkzeug().up?.(kontext, zeigerPunkt(e));
     else if (!z.bewegt && z.taste === 0) werkzeug().klick?.(kontext, zeigerPunkt(e));
   };
+  canvas.addEventListener('pointerleave', () => {
+    if (!zug) state.zeiger = null;
+  });
   canvas.addEventListener('pointerup', loslassen);
   canvas.addEventListener('pointercancel', loslassen);
   canvas.addEventListener(

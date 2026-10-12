@@ -52,7 +52,12 @@ export function teilBei(g, x, y, tol = 0) {
   return null;
 }
 
+const klemme = (v) => Math.max(-MAX_KOORD, Math.min(MAX_KOORD, v));
+
 function anlegen(g, sorte, x, y, laenge, breite, winkel) {
+  x = klemme(x);
+  y = klemme(y);
+  laenge = Math.min(laenge, MAX_KOORD);
   const s = TEILSORTEN[sorte];
   const o = { id: neueId(g, s.praefix), ...(s.typ ? { typ: s.typ } : {}), x: sauber(x), y: sauber(y), laenge, breite, winkel: winkelNorm(winkel) };
   liste(g, s.art).push(o);
@@ -113,8 +118,8 @@ export function teilEinfuegen(g, gemerkt, x = null, y = null) {
   if (!gemerkt) return null;
   const o = JSON.parse(JSON.stringify(gemerkt.teil));
   o.id = neueId(g, gemerkt.art === 'formteil' ? 'f' : 'o');
-  o.x = x == null ? sauber(o.x + KOPIE_VERSATZ) : rund(x, RASTER);
-  o.y = y == null ? sauber(o.y + KOPIE_VERSATZ) : rund(y, RASTER);
+  o.x = klemme(x == null ? sauber(o.x + KOPIE_VERSATZ) : rund(x, RASTER));
+  o.y = klemme(y == null ? sauber(o.y + KOPIE_VERSATZ) : rund(y, RASTER));
   liste(g, gemerkt.art).push(o);
   return { art: gemerkt.art, id: o.id };
 }

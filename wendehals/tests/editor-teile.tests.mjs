@@ -251,3 +251,11 @@ test('Teile ändern Gänge und Knoten nicht', () => {
   teilDrehen(g, 'objekt', 'o1', 1);
   assert.equal(JSON.stringify([g.knoten, g.gaenge]), gaenge);
 });
+
+test('Setzen und Einfügen halten MAX_KOORD ein', () => {
+  const g = leer();
+  const t = teilFinden(g, ...Object.values(teilSetzen(g, 'hindernis', 0, 0, 500000, 0)));
+  assert.ok(Math.abs(t.x) <= MAX_KOORD && t.laenge <= MAX_KOORD);
+  const e = teilFinden(g, ...Object.values(teilEinfuegen(g, teilMerken(g, 'objekt', t.id), 25000, -25000)));
+  assert.deepEqual([e.x, e.y], [MAX_KOORD, -MAX_KOORD]);
+});

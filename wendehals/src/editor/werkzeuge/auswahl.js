@@ -46,6 +46,7 @@ export default {
     if (z.art !== 'knoten') {
       const g = k.gebiet();
       const o = teilFinden(g, z.art, z.id);
+      if (!o) return;
       const name = teilName(z.art, o);
       if (!k.aendere(`${name} verschieben`, (gg) => teilVerschieben(gg, z.art, z.id, z.x, z.y))) k.hinweis('');
       return k.waehle({ art: z.art, id: z.id });
