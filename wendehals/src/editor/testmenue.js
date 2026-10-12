@@ -49,7 +49,7 @@ export function startTestmenue({ gebiete = GEBIETE, welt = WELT } = {}) {
   wurzel.id = 'testmenue';
   wurzel.style.cssText = 'position:fixed;inset:0;background:#15131c;color:#e8e6f0;font:18px system-ui,sans-serif;overflow:auto;padding:16px 24px;box-sizing:border-box';
   const kopf = document.createElement('div');
-  kopf.textContent = 'Testmenü – Pfeile/Stick wählen · Enter/A startet · Esc/B im Spiel zurück';
+  kopf.textContent = 'Testmenü – Pfeile/Stick wählen · Enter/A startet · Esc/Start im Spiel zurück';
   kopf.style.cssText = 'color:#a9a5bd;margin-bottom:12px;font-size:15px';
   const ul = document.createElement('ul');
   ul.style.cssText = 'list-style:none;margin:0;padding:0';

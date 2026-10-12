@@ -2,7 +2,7 @@
 
 > Wird von jedem Bau-Lauf gepflegt (Brief: [`BRIEF.md`](BRIEF.md), Abschnitt 7). Zeiten in Europe/Berlin.
 
-**Sperre:** belegt seit 12.10.2026 07:42, Lauf https://claude.ai/code/session_017E39ngF9fCTpbq4DyWnN15
+**Sperre:** frei
 
 ## Stufen
 
@@ -15,7 +15,7 @@
 | 4 | Prüfer | fertig (Electron ungetestet; Marken nur bei offener Liste) | npm test 384, e2e, e2e:editor, beide Test-Agenten | Lauf 5 |
 | 5 | Gebiete und Übergänge | fertig (Electron ungetestet; „Level zuordnen“ = Gebietsdatei, kein Verschieben von Gängen zwischen Gebieten) | npm test 401, e2e, e2e:editor, beide Test-Agenten | Lauf 6 |
 | 6 | Tilesets und Spielgrafik | fertig (Electron ungetestet; Tileset-Look nur im Editor, „Spielen ab hier“ nutzt weiter Prototyp-Farben) | npm test 406, e2e, e2e:editor, beide Test-Agenten | Lauf 7 |
-| 7 | Testmenü am Deck | offen | – | – |
+| 7 | Testmenü am Deck | fertig (`?testmenue` / `WENDEHALS_TESTMENUE=1`; Electron und echtes Gamepad ungetestet) | npm test 410, e2e, e2e:editor, beide Test-Agenten | Lauf 8 |
 | 8 | Notizen und Stempel | offen | – | – |
 | 9 | Bot-Spieltest | offen | – | – |
 | 10 | KI-Varianten nebeneinander | offen | – | – |
@@ -98,6 +98,10 @@
 - `treffer()` trifft Raumflächen nicht; Knoten bei ausgeblendeter Beschriftung klickbar; Zeichenzahlen (Gegnerradius, Schrift) noch in zeichnen.js.
 - `?editor` ist im Release-Bundle erreichbar (Brief: selber Build).
 
+## Auf Vorbehalt entschieden (Stufe 7)
+
+- Testmenü als eigener Start `?testmenue` (Electron `WENDEHALS_TESTMENUE=1`), nicht im Spiel-Titel. Je Gang und je Knoten ein Eintrag; Knoten am Gangende: Dackel 120 E vor dem Knoten (Rahmen auf dem Knoten). Im Spiel steht noch der Hinweis „zurück zum Editor“ (kosmetisch). Stick hat kein Auto-Repeat in langen Listen.
+
 ## Laufprotokoll
 
 | Start | Lauf | Ergebnis |
@@ -110,3 +114,4 @@
 | 12.10.2026 05:57 | Sonnet 5.5, Lauf 5 | Stufe 4 gebaut, Agenten-Befund (Leistung M2) behoben, gepusht |
 | 12.10.2026 06:35 | Sonnet 5.5, Lauf 6 | Stufe 5 gebaut, Agenten-Befunde (Fehler) behoben, gepusht |
 | 12.10.2026 07:06 | Sonnet 5.5, Lauf 7 | Stufe 6 gebaut, Agenten-Befund (Leisten abgeschnitten) behoben, gepusht |
+| 12.10.2026 07:42 | Lauf 8 (Sonnet 5.5) | Stufe 7 fertig, grün |
