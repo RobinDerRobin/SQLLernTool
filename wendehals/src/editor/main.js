@@ -200,6 +200,9 @@ export function startEditor() {
   const hinweisZeile = el('div', { id: 'hinweiszeile' }, [werkHinweis]);
   const stand = el('span', { id: 'stand', class: 'grau' });
   const werk = el('div', { id: 'werk', class: 'leiste' }, [
+    knopf('Speichern', 'Gebiet speichern (Strg+S)', () => speichere(), 'b-speichern'),
+    knopf('Öffnen …', 'Leveldatei öffnen (Strg+O)', () => oeffne(), 'b-oeffnen'),
+    stand,
     ...WERKZEUGE.map(knopfW),
     typWahl,
     undoKnopf,
@@ -207,9 +210,6 @@ export function startEditor() {
     loeschKnopf,
     el('span', { class: 'grau', text: 'Sperren:' }),
     ...EBENEN.map((eb) => knopf(eb.name, `Ebene „${eb.name}“ sperren: nicht mehr wählbar, nicht verschiebbar, nicht bestückbar (nochmal klicken entsperrt)`, () => sperreUmschalten(eb.id), 'l-' + eb.id)),
-    knopf('Speichern', 'Gebiet speichern (Strg+S)', () => speichere(), 'b-speichern'),
-    knopf('Öffnen …', 'Leveldatei öffnen (Strg+O)', () => oeffne(), 'b-oeffnen'),
-    stand,
   ]);
   const rechts = el('div', { id: 'rechts' });
   const play = knopf('Fahrt', 'Rahmen mit Flugtempo durchs Level fahren lassen (Leertaste)', () => fahrtUmschalten(), 'b-fahrt');
@@ -1363,6 +1363,10 @@ export function startEditor() {
       av.value = HEADING_CODES[ausgangsBlick(gang)];
       av.addEventListener('change', () => {
         setzeFeld('gang', gang.id, 'ansicht', av.value, 'Ausgangsansicht ändern');
+        if (state.levelGang === gang.id) {
+          ansicht.blick = ausgangsBlick(gebiet().gaenge.find((x) => x.id === gang.id)); // im offenen Level sofort drehen
+          alles();
+        }
         av.blur();
       });
       dl.append(el('dt', { text: 'Ausgangsansicht' }), el('dd', {}, [av]));
@@ -1563,7 +1567,7 @@ export function startEditor() {
     if (e.type === 'pointercancel') return abbrechen();
     const p = zeigerPunkt(e);
     if (z.modus === 'plan') return;
-    if (z.modus === 'kopie') return z.bewegt ? undefined : rechtsKopie(p);
+    if (z.modus === 'kopie') return z.bewegt ? melde('Rechts ziehen setzt nichts, solange etwas gewählt ist: Rechtsklick kopiert die Auswahl. Zum Aufziehen erst Esc drücken oder das Element neu wählen (G K B W H X).') : rechtsKopie(p);
     if (z.erfasst) return z.werkzeug.up?.(kontext, p);
     if (!z.bewegt) z.werkzeug.klick?.(kontext, p); // Klick (links: wählen; rechts: Knoten und Gegner setzen)
   };
