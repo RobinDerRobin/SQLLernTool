@@ -5,13 +5,16 @@
 //   node tools/gen-dashboard.mjs                      → docs/dashboard.html (eigenständig, lokal öffnen)
 //   node tools/gen-dashboard.mjs --artifact <datei>   → Seitenteil ohne <!doctype>, für das Artifact-Tool
 //   node tools/gen-dashboard.mjs --json               → die gelesenen Daten als JSON (zum Prüfen)
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PROTO = readFileSync(join(ROOT, 'docs/PROTOTYPEN.md'), 'utf8');
 const LEVEL = readFileSync(join(ROOT, 'docs/LEVELDESIGN.md'), 'utf8');
+// Bau-Stand des Editors (Paket 13), von den Bau-Läufen gepflegt; fehlt die Datei, gilt „noch nichts gebaut“.
+const STAND_PFAD = join(ROOT, 'docs/editor/STAND.md');
+const EDSTAND = existsSync(STAND_PFAD) ? readFileSync(STAND_PFAD, 'utf8') : '';
 
 // ---------- Lesen ----------
 const strip = (s) => s
@@ -134,10 +137,19 @@ for (const p of packages) {
       p.modell = OPUS; p.modellGrund = 'Deutung und Brief, danach Sonnet 5.5 bauen';
     }
   } else if (p.id === '13') {
-    p.stand = 'festgelegt';
-    p.standText = 'festgelegt, noch nichts gebaut';
-    p.schritt = 'Stufe E1 erst bauen, wenn Robin beim Bauen eines echten Levels etwas vermisst. Vorher: offene Fragen aus LEVELDESIGN.md Abschnitt 3.';
-    p.modell = SONNET; p.modellGrund = 'Bau-Sessions laut LEVELDESIGN.md; Brief zu E1 zuerst mit Opus 5.5';
+    const stufen = EDSTAND ? table(section(EDSTAND, '## Stufen'), '#') : [];
+    const fertig = stufen.filter((r) => /^fertig/.test(wortlaut(r[2])));
+    const naechste = stufen.find((r) => !/^fertig/.test(wortlaut(r[2])));
+    if (stufen.length) {
+      p.stand = fertig.length === stufen.length ? 'keep' : 'laufend';
+      p.standText = fertig.length === stufen.length ? 'Editor fertig gebaut' : `im Bau: ${fertig.length} von ${stufen.length} Stufen fertig`;
+      p.schritt = naechste ? `Nächster nächtlicher Bau-Lauf (23–09 Uhr): Stufe ${wortlaut(naechste[0])} „${wortlaut(naechste[1])}“.` : 'Robin probiert den Editor einmal aus und sagt, was stört.';
+    } else {
+      p.stand = 'festgelegt';
+      p.standText = 'festgelegt, noch nichts gebaut';
+      p.schritt = 'Bau-Brief docs/editor/BRIEF.md.';
+    }
+    p.modell = SONNET; p.modellGrund = 'automatische Bau-Läufe nach docs/editor/BRIEF.md';
   } else {
     p.stand = offeneDeps.length ? 'wartet' : 'offen';
     p.standText = offeneDeps.length ? `wartet auf ${offeneDeps.join(', ')}` : 'noch nicht begonnen';
@@ -151,11 +163,14 @@ for (const p of packages) {
   p.warteAufRobin ??= false;
 }
 
-// Editor-Stufen E1–E5 (LEVELDESIGN.md)
-const editorRows = table(section(LEVEL, '## 1.'), 'Stufe');
-const editor = editorRows.map(([id, inhalt, est]) => ({ id: wortlaut(id), inhalt: wortlaut(inhalt), schaetzung: wortlaut(est) }));
-const editorOffen = section(LEVEL, '## 3.').split('\n').filter((l) => l.startsWith('- ')).map((l) => wortlaut(l.slice(2)));
-const editorRegel = 'Eine Stufe wird erst gebaut, wenn Robin sie beim Bauen eines echten Levels vermisst.';
+// Editor-Stufen aus docs/editor/STAND.md (Bau-Stand); offene Fragen aus STAND („Fragen an Robin“) und LEVELDESIGN.md Abschnitt 3
+const editor = (EDSTAND ? table(section(EDSTAND, '## Stufen'), '#') : []).map(([id, inhalt, stand, getestet]) =>
+  ({ id: wortlaut(id), inhalt: wortlaut(inhalt), stand: wortlaut(stand), getestet: wortlaut(getestet || '') }));
+const editorOffen = [
+  ...(EDSTAND ? section(EDSTAND, '## Fragen an Robin').split('\n').filter((l) => l.startsWith('- ') && !/keine offen/.test(l)).map((l) => wortlaut(l.slice(2))) : []),
+  ...section(LEVEL, '## 3.').split('\n').filter((l) => l.startsWith('- ')).map((l) => wortlaut(l.slice(2))),
+];
+const editorRegel = 'Gebaut von automatischen Läufen nachts (23–09 Uhr), getestet von npm test, e2e, Editor-Tests und zwei Test-Agenten.';
 
 // Protokoll (Abschnitt 5)
 const protokoll = table(section(PROTO, '## 5.'), 'ID').map(([id, datum, thema, antwort, urteil, schritt]) =>
@@ -216,8 +231,11 @@ const decRow = (d) => `<li class="dec ${d.art}"><span class="id">${esc(d.id)}</s
 const htmlDec = offeneEntsch.map(decRow).join('\n');
 const htmlDecDone = decisions.filter((d) => d.art !== 'offen').map(decRow).join('\n');
 
-const htmlEditor = editor.map((e) => `<li class="stage"><span class="nr">${esc(e.id)}</span><div><p>${esc(e.inhalt)}</p>
-  <p class="meta">${esc(e.schaetzung)} Sitzung${e.schaetzung === '1' ? '' : 'en'} · ${modellChip(SONNET)} · noch nicht gebaut</p></div></li>`).join('\n');
+const htmlEditor = editor.map((e) => {
+  const ok = /^fertig/.test(e.stand);
+  return `<li class="stage"><span class="nr">${esc(e.id)}</span><div><p>${esc(e.inhalt)} <span class="chip s-${ok ? 'ok' : 'idle'}">${ok ? 'fertig' : 'offen'}</span></p>
+  <p class="meta">${esc(e.stand)}${e.getestet && e.getestet !== '–' ? ' · getestet: ' + esc(e.getestet) : ''}</p></div></li>`;
+}).join('\n');
 
 const htmlLog = protokoll.map((l) => `<li class="log"><p><strong>${esc(l.id)}</strong> · ${esc(l.datum)} · ${esc(l.thema)} <span class="chip s-idle">${esc(l.urteil)}</span></p>
   <p class="meta">${esc(l.antwort)}</p><p class="meta">Nächster Schritt: ${esc(l.schritt)}</p></li>`).join('\n');
@@ -267,7 +285,7 @@ const body = `
 </section>
 
 <section id="editor">
-  <h2>Editor, Paket 13: Stufen E1–E5</h2>
+  <h2>Editor, Paket 13: Bau-Stand</h2>
   <p class="legend">${esc(editorRegel)} Die Textdatei geht immer auch ohne Editor.</p>
   <ol class="list stages">${htmlEditor}</ol>
   <h3 class="sub2">Offene Fragen zum Editor</h3>
@@ -275,7 +293,7 @@ const body = `
 </section>
 
 <footer>
-  <p>Nicht von Hand ändern. Nach jeder Änderung an <code>docs/PROTOTYPEN.md</code> oder <code>docs/LEVELDESIGN.md</code>: <code>node tools/gen-dashboard.mjs</code> und Artifact neu veröffentlichen.</p>
+  <p>Nicht von Hand ändern. Nach jeder Änderung an <code>docs/PROTOTYPEN.md</code>, <code>docs/LEVELDESIGN.md</code> oder <code>docs/editor/STAND.md</code>: <code>node tools/gen-dashboard.mjs</code> und Artifact neu veröffentlichen.</p>
 </footer>
 </main>`;
 

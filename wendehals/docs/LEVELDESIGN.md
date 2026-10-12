@@ -157,8 +157,5 @@ Für ein erstes eigenes Gebiet reichen Stufen 1–4 (etwa 5–7 Sessions).
 
 ## 3. Offen
 
-- Gegner/Wellen von Anfang an im Editor oder erst die Geometrie?
-- Robins Rückmeldung zur Optik-Skizze.
-- Was kommt in den Editor, solange Konzepte noch im Prototyp sind (Robin, 11.10.2026: „es ist wichtig, zuerst die
-  Konzepte durchzuprüfen, bevor man sie editieren kann“)? Vorschlag in Arbeit.
-- Bestätigung der Vorschläge in Abschnitt 2.
+- Robins Bestätigung der Punkte „auf Vorbehalt“ (Tileset = Aussehen, v0.2-Themen als Platzhalter, Gegner als
+  Platzhalter, Formen aus geraden Teilen) – beim ersten Ausprobieren des fertigen Editors.

@@ -98,12 +98,12 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
 
 <section id="heute" class="today">
   <h2>Was von dir gebraucht wird</h2>
-  <ul class="bigs"><li><strong>Spieltest:</strong> P1c „Netz“</li><li><strong>Spieltest:</strong> P3 „45°-Kreuzung“</li><li><strong>6 offene Entscheidungen</strong> im Register (E2, E3, E4, E8, E9, E10)</li></ul>
+  <ul class="bigs"><li><strong>Spieltest:</strong> P1c „Netz“</li><li><strong>Spieltest:</strong> P3 „45°-Kreuzung“</li><li><strong>7 offene Entscheidungen</strong> im Register (E2, E3, E11, E4, E8, E9, E10)</li></ul>
   <div class="counts">
     <div><b>14</b><span>Pakete aktiv<br><small>(5 gestrichen)</small></span></div>
     <div><b>6</b><span>Prototypen<br><small>2 keep</small></span></div>
     <div><b>2</b><span>warten auf Spieltest</span></div>
-    <div><b>6</b><span>offene Entscheidungen</span></div>
+    <div><b>7</b><span>offene Entscheidungen</span></div>
   </div>
 </section>
 
@@ -207,17 +207,17 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
   <header><span class="nr">12</span><h3>Welt bauen</h3><span class="chip s-block">blockiert</span></header>
   <p class="meta">Produktion · <span class="std">wartet auf Paket 13</span></p>
   <p class="q">Gebiete, Knoten, Level (Gänge) – läuft parallel zu den Prototypen (E11)</p>
-  <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-plan" title="festgelegt, noch nichts gebaut">Paket 13</span></div><div class="note">Später zusätzlich: fertige Welt: 8, 11, S</div>
+  <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-plan" title="im Bau: 8 von 12 Stufen fertig">Paket 13</span></div><div class="note">Später zusätzlich: fertige Welt: 8, 11, S</div>
   <div class="step"><span class="lbl">Nächster Schritt</span><p>Erst Paket 13 klären.</p></div>
   <div class="mod"><span class="chip m-opus">Opus 5.5</span><span class="why">Deutung und Brief, danach Sonnet 5.5 bauen</span></div>
 </article>
 <article class="card" id="p-13">
-  <header><span class="nr">13</span><h3>Editor (festgelegt, Robin 11.10.2026)</h3><span class="chip s-plan">festgelegt</span></header>
-  <p class="meta">Werkzeug · festgelegt (Robin, 11.10.2026) · <span class="std">festgelegt, noch nichts gebaut</span></p>
+  <header><span class="nr">13</span><h3>Editor (festgelegt, Robin 11.10.2026; im Bau nach Brief, Stand: STAND)</h3><span class="chip s-plan">laufend</span></header>
+  <p class="meta">Werkzeug · festgelegt (Robin, 11.10.2026) · <span class="std">im Bau: 8 von 12 Stufen fertig</span></p>
   <p class="q">Kann Robin Welt, Gebiete und Level selbst bauen und sofort spielen; kann die KI dieselben Daten lesen und schreiben?</p>
   <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-idle">P1 „Kreuzung“</span></div>
-  <div class="step"><span class="lbl">Nächster Schritt</span><p>Stufe E1 erst bauen, wenn Robin beim Bauen eines echten Levels etwas vermisst. Vorher: offene Fragen aus LEVELDESIGN.md Abschnitt 3.</p></div>
-  <div class="mod"><span class="chip m-sonnet">Sonnet 5.5</span><span class="why">Bau-Sessions laut LEVELDESIGN.md; Brief zu E1 zuerst mit Opus 5.5</span></div>
+  <div class="step"><span class="lbl">Nächster Schritt</span><p>Nächster nächtlicher Bau-Lauf (23–09 Uhr): Stufe 8 „Notizen und Stempel“.</p></div>
+  <div class="mod"><span class="chip m-sonnet">Sonnet 5.5</span><span class="why">automatische Bau-Läufe nach docs/editor/BRIEF.md</span></div>
 </article>
 <article class="card" id="p-Q">
   <header><span class="nr">Q</span><h3>Querschnitt</h3><span class="chip s-plan">laufend</span></header>
@@ -279,7 +279,8 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
 <section id="entsch">
   <h2>Offene Entscheidungen</h2>
   <ul class="list"><li class="dec offen"><span class="id">E2</span><div><p>Drehzahl: Kosten pro 45° oder feste Ladungen?</p><p class="meta">offen (Paket „Drehen begrenzen“)</p></div></li>
-<li class="dec offen"><span class="id">E3</span><div><p>Steuerung zum Drehen</p><p class="meta">im Prototyp: LB/RB (U/O) ±90°, seit P3 „45°-Kreuzung“ LT/RT (J/K) ±45° (Robin, 10.10.2026); fürs Spiel offen</p></div></li>
+<li class="dec offen"><span class="id">E3</span><div><p>Steuerung zum Drehen</p><p class="meta">im Prototyp: LB/RB (U/O) ±90°, seit P3 „45°-Kreuzung“ LT/RT (J/K) ±45° (Robin, 10.10.2026); seit 11.10.2026 drei umschaltbare Schemata (Akkord Shift+A/D bzw. Shift+W+A/D, „nächster Gang“ links/rechts, klassisch) und zwei Speicher-Modi, siehe P3-Brief Abschnitt 10; fürs Spiel offen</p></div></li>
+<li class="dec offen"><span class="id">E11</span><div><p>Drehformel / Mindeststrecke (Robin, 11.10.2026: „Es soll grundsätzlich so sein, dass die Formel die wir vereinbart hatten, bestimmt, wann gedreht werden kann.“)</p><p class="meta">offen, Robin zu erinnern, sobald das Thema „Formel“ drankommt: statt der festen Dreh-Zone 160 entscheidet die Formel (Scrollgeschwindigkeit, Dackel-Geschwindigkeit, Strecke zum Gang, Puffer). Vorschlag zur Prüfung: Drehen nur, wenn der Dackel in der neuen Flugrichtung bei Scroll-Tempo 70 ohne Lenken noch eine Mindeststrecke frei hat (Hypothese 1,5 s ≈ 105 E plus Dackelradius; map.freeDistance kann das). Folge: In den Armen wäre kaum Drehen erlaubt, die Zone wäre praktisch das Achteck. Gilt auch für „zu früh gedreht“ (nach innen um 45° ist heute nicht tödlich).</p></div></li>
 <li class="dec offen"><span class="id">E4</span><div><p>Kreisel ohne Fähigkeit schubst 180° zurück?</p><p class="meta">offen; 180° ist jetzt nur Scroll-Umkehr</p></div></li>
 <li class="dec offen"><span class="id">E8</span><div><p>Ist die 180°-Umkehr frei oder an eine Fähigkeit (Wendehals) gebunden?</p><p class="meta">offen (im P1 frei)</p></div></li>
 <li class="dec offen"><span class="id">E9</span><div><p>P1-Türen: „passende Scrollrichtung“ = Kartenrichtung des Gangs oder Bildschirmseite?</p><p class="meta">offen; Standard im P1: Kartenrichtung (Tür offen, wenn das Fenster entlang dieses Arms scrollt, egal in welche Richtung)</p></div></li>
@@ -291,35 +292,51 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
 <li class="dec erledigt"><span class="id">E11</span><div><p>Leveldesign erst nach Logik/Konzept?</p><p class="meta">erledigt (11.10.2026): parallel; „Kein Grundkonzept ohne Prototypentests“ – LEVELDESIGN.md</p></div></li>
 <li class="dec erledigt"><span class="id">E12</span><div><p>Leveldaten: Kachelraster oder Objekte?</p><p class="meta">erledigt (11.10.2026): Objekte mit Maßen (Lage, Länge, Breite, Winkel), Raster nur zum Einrasten; Level = Gang zwischen Knoten, Gebiet = Themengruppe</p></div></li>
 <li class="dec erledigt"><span class="id">E13</span><div><p>Wie entstehen Level (Hand/KI)?</p><p class="meta">erledigt (11.10.2026): Editor nach Vorbild Lunar Magic (Paket 13) + KI (Varianten, Prüfen, Gebiete nach Regeln, Robins Stücke verbinden/extrapolieren, Regeln ableiten); KI arbeitet teilweise selbst, fragt bei großen Entscheidungen. Offen: Datei pro Gebiet, Regelwerk MUSS/SOLL, Editor am PC oder Deck, Gegner ab E1</p></div></li></ul></details>
-  <details><summary>Entscheidungsprotokoll (4)</summary><ul class="list"><li class="log"><p><strong>F0</strong> · 05.10.2026 · Richtungen: Fenster-Konzept <span class="chip s-idle">keep (Konzept)</span></p>
+  <details><summary>Entscheidungsprotokoll (5)</summary><ul class="list"><li class="log"><p><strong>F0</strong> · 05.10.2026 · Richtungen: Fenster-Konzept <span class="chip s-idle">keep (Konzept)</span></p>
   <p class="meta">siehe Abschnitt 2</p><p class="meta">Nächster Schritt: P1 bauen</p></li>
 <li class="log"><p><strong>F1</strong> · 07.10.2026 · P1 „Kreuzung“ <span class="chip s-idle">keep (Feature)</span></p>
   <p class="meta">„I am happy with the feature for now.“ (Änderungen nach Spieltests: Brief Abschnitt 9)</p><p class="meta">Nächster Schritt: Checkliste 4a; Retrospektive; nächster Prototyp offen (P2 laut Leiter)</p></li>
 <li class="log"><p><strong>F5</strong> · 11.10.2026 · Leveldesign <span class="chip s-idle">keep (Konzept)</span></p>
   <p class="meta">„Das Leveldesign soll doch schon stattfinden. […] Stattdessen: Kein Grundkonzept ohne Prototypentests.“ – „B klingt gut.“ – „Arbeitspaket auf jeden Fall so festlegen.“</p><p class="meta">Nächster Schritt: LEVELDESIGN.md; Paket 13 „Editor“; Arbeitspakete-Dashboard in eigenem Chat</p></li>
 <li class="log"><p><strong>F3</strong> · 10.10.2026 · P2 „Minimap“ <span class="chip s-idle">keep</span></p>
-  <p class="meta">„P2 war gut. Alle Prototypen bleiben bisher bestehen.“</p><p class="meta">Nächster Schritt: Kein Prototyp wird gelöscht (auch P1, P1c bleiben im Build). Offen: welche Minimap-Version, V3-Füllung; nächster Prototyp: P3 „45°“ (erweitert die 90°-Kreuzungen um 45°-Gänge), neuer Chat</p></li></ul></details>
+  <p class="meta">„P2 war gut. Alle Prototypen bleiben bisher bestehen.“</p><p class="meta">Nächster Schritt: Kein Prototyp wird gelöscht (auch P1, P1c bleiben im Build). Offen: welche Minimap-Version, V3-Füllung; nächster Prototyp: P3 „45°“ (erweitert die 90°-Kreuzungen um 45°-Gänge), neuer Chat</p></li>
+<li class="log"><p><strong>F4</strong> · 11.10.2026 · P3 „45°-Kreuzung“ <span class="chip s-idle">iterate</span></p>
+  <p class="meta">„Ein Diagonalgang fühlt sich nicht anders an. Ja das passt. [Schwenk 0,5 s] … Ich verwechsle es oft [LT/RT und LB/RB], wann weiß ich nicht. Eine bessere Tastaturbelegung wäre wünschenswert.“ Am Steam Deck noch nicht getestet („Prüfung an der echten Hardware kommt später“); Spieltest erst, wenn die ersten Level stehen.</p><p class="meta">Nächster Schritt: Iteration 11.10.2026: Schemata und Speicher (Brief Abschnitt 10); Designrunde forschung/2026-10-11-drehstufen-tastenbelegung.md</p></li></ul></details>
 </section>
 
 <section id="editor">
-  <h2>Editor, Paket 13: Stufen E1–E5</h2>
-  <p class="legend">Eine Stufe wird erst gebaut, wenn Robin sie beim Bauen eines echten Levels vermisst. Die Textdatei geht immer auch ohne Editor.</p>
-  <ol class="list stages"><li class="stage"><span class="nr">E1</span><div><p>Einen Gang bearbeiten: Objekte setzen/ziehen/löschen, Rückgängig, Speichern/Laden, „Spielen ab hier“</p>
-  <p class="meta">2–3 Sessions Sitzungen · <span class="chip m-sonnet">Sonnet 5.5</span> · noch nicht gebaut</p></div></li>
-<li class="stage"><span class="nr">E2</span><div><p>Prüfer-Meldungen im Editor</p>
-  <p class="meta">1 Sitzung · <span class="chip m-sonnet">Sonnet 5.5</span> · noch nicht gebaut</p></div></li>
-<li class="stage"><span class="nr">E3</span><div><p>Gebiet-Ebene (Knoten, Gänge, Themen)</p>
-  <p class="meta">2 Sitzungen · <span class="chip m-sonnet">Sonnet 5.5</span> · noch nicht gebaut</p></div></li>
-<li class="stage"><span class="nr">E4</span><div><p>Gegner und Wellen setzen</p>
-  <p class="meta">2–3 Sitzungen · <span class="chip m-sonnet">Sonnet 5.5</span> · noch nicht gebaut</p></div></li>
-<li class="stage"><span class="nr">E5</span><div><p>Welt-Ebene, KI-Varianten nebeneinander vergleichen</p>
-  <p class="meta">1–2 Sitzungen · <span class="chip m-sonnet">Sonnet 5.5</span> · noch nicht gebaut</p></div></li></ol>
+  <h2>Editor, Paket 13: Bau-Stand</h2>
+  <p class="legend">Gebaut von automatischen Läufen nachts (23–09 Uhr), getestet von npm test, e2e, Editor-Tests und zwei Test-Agenten. Die Textdatei geht immer auch ohne Editor.</p>
+  <ol class="list stages"><li class="stage"><span class="nr">1</span><div><p>Grundgerüst + Ansehen <span class="chip s-ok">fertig</span></p>
+  <p class="meta">fertig (Electron-Start ungetestet) · getestet: npm test 313, e2e, e2e:editor, beide Test-Agenten</p></div></li>
+<li class="stage"><span class="nr">2a</span><div><p>Bauen I <span class="chip s-ok">fertig</span></p>
+  <p class="meta">fertig (Electron-Speichern ungetestet; Raumgröße nur per Zahlenfeld, kein Ziehgriff) · getestet: npm test 340, e2e, e2e:editor, beide Test-Agenten</p></div></li>
+<li class="stage"><span class="nr">2b</span><div><p>Bauen II <span class="chip s-ok">fertig</span></p>
+  <p class="meta">fertig (Electron ungetestet; Teile ohne Spielgrafik, Hindernis = Platzhalterbild) · getestet: npm test 357, e2e, e2e:editor, beide Test-Agenten</p></div></li>
+<li class="stage"><span class="nr">3</span><div><p>Spielen ab hier + Bezeichnung <span class="chip s-ok">fertig</span></p>
+  <p class="meta">fertig (nur Ost/West/Nord/Süd-Gänge spielbar; Electron ungetestet) · getestet: npm test 369, e2e, e2e:editor, beide Test-Agenten</p></div></li>
+<li class="stage"><span class="nr">4</span><div><p>Prüfer <span class="chip s-ok">fertig</span></p>
+  <p class="meta">fertig (Electron ungetestet; Marken nur bei offener Liste) · getestet: npm test 384, e2e, e2e:editor, beide Test-Agenten</p></div></li>
+<li class="stage"><span class="nr">5</span><div><p>Gebiete und Übergänge <span class="chip s-ok">fertig</span></p>
+  <p class="meta">fertig (Electron ungetestet; „Level zuordnen“ = Gebietsdatei, kein Verschieben von Gängen zwischen Gebieten) · getestet: npm test 401, e2e, e2e:editor, beide Test-Agenten</p></div></li>
+<li class="stage"><span class="nr">6</span><div><p>Tilesets und Spielgrafik <span class="chip s-ok">fertig</span></p>
+  <p class="meta">fertig (Electron ungetestet; Tileset-Look nur im Editor, „Spielen ab hier“ nutzt weiter Prototyp-Farben) · getestet: npm test 406, e2e, e2e:editor, beide Test-Agenten</p></div></li>
+<li class="stage"><span class="nr">7</span><div><p>Testmenü am Deck <span class="chip s-ok">fertig</span></p>
+  <p class="meta">fertig (?testmenue / WENDEHALS_TESTMENUE=1; Electron und echtes Gamepad ungetestet) · getestet: npm test 410, e2e, e2e:editor, beide Test-Agenten</p></div></li>
+<li class="stage"><span class="nr">8</span><div><p>Notizen und Stempel <span class="chip s-idle">offen</span></p>
+  <p class="meta">offen</p></div></li>
+<li class="stage"><span class="nr">9</span><div><p>Bot-Spieltest <span class="chip s-idle">offen</span></p>
+  <p class="meta">offen</p></div></li>
+<li class="stage"><span class="nr">10</span><div><p>KI-Varianten nebeneinander <span class="chip s-idle">offen</span></p>
+  <p class="meta">offen</p></div></li>
+<li class="stage"><span class="nr">11</span><div><p>Abschluss <span class="chip s-idle">offen</span></p>
+  <p class="meta">offen</p></div></li></ol>
   <h3 class="sub2">Offene Fragen zum Editor</h3>
-  <ul class="plain"><li>Wo arbeitet Robin am Editor: PC mit Maus, auch Steam Deck?</li><li>Gegner/Wellen von Anfang an im Editor oder erst die Geometrie?</li><li>Klickbare Optik-Skizze des Editors vor dem Brief zu E1?</li><li>Bestätigung der Vorschläge in Abschnitt 2.</li></ul>
+  <ul class="plain"><li>Robins Bestätigung der Punkte „auf Vorbehalt“ (Tileset = Aussehen, v0.2-Themen als Platzhalter, Gegner als</li></ul>
 </section>
 
 <footer>
-  <p>Nicht von Hand ändern. Nach jeder Änderung an <code>docs/PROTOTYPEN.md</code> oder <code>docs/LEVELDESIGN.md</code>: <code>node tools/gen-dashboard.mjs</code> und Artifact neu veröffentlichen.</p>
+  <p>Nicht von Hand ändern. Nach jeder Änderung an <code>docs/PROTOTYPEN.md</code>, <code>docs/LEVELDESIGN.md</code> oder <code>docs/editor/STAND.md</code>: <code>node tools/gen-dashboard.mjs</code> und Artifact neu veröffentlichen.</p>
 </footer>
 </main>
 </html>
