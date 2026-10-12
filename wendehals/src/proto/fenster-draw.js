@@ -5,10 +5,10 @@ import { DENY_TIME } from './fenster.js';
 import { drawMinimap, minimapFor } from './minimap.js';
 import { ARMS8, APO, END, HALF, WIDTH, STRIPE_GAP } from './achteck-map.js';
 
-const FLOOR = '#6a5f55';
-const FLOOR2 = '#756a5f';
-const WALL = '#1c1822';
-const GRID = 80;
+export const FLOOR = '#6a5f55';
+export const FLOOR2 = '#756a5f';
+export const WALL = '#1c1822';
+export const GRID = 80;
 
 function drawBone(ctx, x, y, color, t) {
   ctx.save();
@@ -40,10 +40,12 @@ function drawPlan(ctx, sc, cam, ang) {
   ctx.fillRect(b.x0 - 700, b.y0 - 700, b.x1 - b.x0 + 1400, b.y1 - b.y0 + 1400);
   ctx.fillStyle = FLOOR;
   for (const c of map.corridors) ctx.fillRect(c.x0, c.y0, c.x1 - c.x0, c.y1 - c.y0);
+  for (const c of map.extraFloor ?? []) ctx.fillRect(c.x0, c.y0, c.x1 - c.x0, c.y1 - c.y0); // nur Editor-Karten (editor-karte.js)
   // Gitter, damit Scrollen und Drehung sichtbar sind (nur der sichtbare Teil)
   ctx.save();
   ctx.beginPath();
   for (const c of map.corridors) ctx.rect(c.x0, c.y0, c.x1 - c.x0, c.y1 - c.y0);
+  for (const c of map.extraFloor ?? []) ctx.rect(c.x0, c.y0, c.x1 - c.x0, c.y1 - c.y0);
   ctx.clip();
   ctx.fillStyle = FLOOR2;
   const R = 290;
@@ -55,6 +57,11 @@ function drawPlan(ctx, sc, cam, ang) {
     }
   }
   ctx.restore();
+  // Wände und Hindernisse im Gang (nur Editor-Karten): decken den Boden ab
+  for (const b of map.blocks ?? []) {
+    ctx.fillStyle = b.farbe;
+    ctx.fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
+  }
   // Kreuzungsquadrate (dünne Marke)
   ctx.strokeStyle = 'rgba(255,255,255,0.25)';
   ctx.lineWidth = 2;
@@ -252,10 +259,8 @@ function hintY(ctx, x, y) {
   ctx.closePath();
   ctx.fill();
 }
-function drawHint45(ctx) {
+function drawHint45(ctx, x0 = (SCREEN_W - 300) / 2, y = SCREEN_H - 58) {
   const w = 300;
-  const x0 = (SCREEN_W - w) / 2;
-  const y = SCREEN_H - 58;
   ctx.fillStyle = 'rgba(0,0,0,0.62)';
   ctx.beginPath();
   ctx.roundRect(x0, y - 4, w, 30, 5);
@@ -268,6 +273,107 @@ function drawHint45(ctx) {
   hintTrigger(ctx, x0 + 136, cy, 1);
   hintAngle(ctx, x0 + 156, cy + 4, 45);
   hintY(ctx, x0 + 214, cy);
+}
+
+/** Tastenkappe mit Zeichen: 'shift' (Hohlpfeil nach oben), 'up', 'left', 'right' (Dreiecke). */
+function cap(ctx, x, cy, kind) {
+  ctx.fillStyle = '#d8d4de';
+  ctx.beginPath();
+  ctx.roundRect(x - 7, cy - 7, 14, 14, 3);
+  ctx.fill();
+  ctx.fillStyle = '#2a2430';
+  ctx.strokeStyle = '#2a2430';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  if (kind === 'shift') {
+    ctx.moveTo(x, cy - 5);
+    ctx.lineTo(x + 5, cy);
+    ctx.lineTo(x + 2, cy);
+    ctx.lineTo(x + 2, cy + 4);
+    ctx.lineTo(x - 2, cy + 4);
+    ctx.lineTo(x - 2, cy);
+    ctx.lineTo(x - 5, cy);
+    ctx.closePath();
+    ctx.stroke();
+    return;
+  }
+  const d = { up: [0, -1], left: [-1, 0], right: [1, 0] }[kind];
+  ctx.moveTo(x + d[0] * 4.5, cy + d[1] * 4.5);
+  ctx.lineTo(x - d[0] * 3 - d[1] * 4, cy - d[1] * 3 + d[0] * 4);
+  ctx.lineTo(x - d[0] * 3 + d[1] * 4, cy - d[1] * 3 - d[0] * 4);
+  ctx.closePath();
+  ctx.fill();
+}
+function plus(ctx, x, cy) {
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x - 3, cy);
+  ctx.lineTo(x + 3, cy);
+  ctx.moveTo(x, cy - 3);
+  ctx.lineTo(x, cy + 3);
+  ctx.stroke();
+}
+
+/** Dauerhafter Hinweis (klein, unten links, nie gedreht): Eingabe-Schema, Speicher-Modus und Schema-Punkte – alles gezeichnet. */
+function drawSchemeHint(ctx, sc) {
+  const x0 = 6;
+  const y = 38; // unter dem Knochen-Zähler (oben links), nie über dem Dreh-Symbol unten
+  if (sc.scheme === 'klassisch') drawHint45(ctx, x0, y);
+  else {
+    ctx.fillStyle = 'rgba(0,0,0,0.62)';
+    ctx.beginPath();
+    ctx.roundRect(x0, y - 4, sc.scheme === 'akkord' ? 250 : 138, 30, 5);
+    ctx.fill();
+    const cy = y + 11;
+    if (sc.scheme === 'akkord') {
+      cap(ctx, x0 + 14, cy, 'shift');
+      plus(ctx, x0 + 27, cy);
+      cap(ctx, x0 + 40, cy, 'left');
+      cap(ctx, x0 + 57, cy, 'right');
+      hintAngle(ctx, x0 + 75, cy + 4, 90);
+      cap(ctx, x0 + 108, cy, 'shift');
+      plus(ctx, x0 + 121, cy);
+      cap(ctx, x0 + 134, cy, 'up');
+      plus(ctx, x0 + 147, cy);
+      cap(ctx, x0 + 160, cy, 'left');
+      cap(ctx, x0 + 177, cy, 'right');
+      hintAngle(ctx, x0 + 195, cy + 4, 45);
+      hintY(ctx, x0 + 223, cy);
+    } else {
+      // Gang: links/rechts drehen zum nächsten Gang (Gabel-Symbol)
+      cap(ctx, x0 + 14, cy, 'left');
+      cap(ctx, x0 + 31, cy, 'right');
+      ctx.strokeStyle = '#ffe27a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x0 + 50, cy + 6);
+      ctx.lineTo(x0 + 62, cy);
+      ctx.lineTo(x0 + 76, cy - 6);
+      ctx.moveTo(x0 + 62, cy);
+      ctx.lineTo(x0 + 76, cy + 6);
+      ctx.moveTo(x0 + 62, cy);
+      ctx.lineTo(x0 + 78, cy);
+      ctx.stroke();
+      hintY(ctx, x0 + 98, cy);
+    }
+  }
+  // Speicher-Modus: getrennt = zwei gleich lange Bögen nacheinander, schneller = zweiter Bogen kürzer; Schema-Punkte darüber
+  const bx = x0 + (sc.scheme === 'akkord' ? 258 : sc.scheme === 'gang' ? 146 : 308);
+  const cy2 = y + 11;
+  ctx.fillStyle = 'rgba(0,0,0,0.62)';
+  ctx.beginPath();
+  ctx.roundRect(bx, y - 4, 40, 30, 5);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(bx + 5, cy2 - 1, 14, 4);
+  ctx.fillRect(bx + 21, cy2 - 1, sc.bufMode === 'schneller' ? 7 : 14, 4);
+  for (let i = 0; i < 3; i++) {
+    ctx.fillStyle = i === ['akkord', 'gang', 'klassisch'].indexOf(sc.scheme) ? '#ffe27a' : 'rgba(255,255,255,0.3)';
+    ctx.beginPath();
+    ctx.arc(bx + 12 + i * 8, cy2 - 8, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 /** Ein Dreh-Symbol unten in der Mitte (für beide Richtungen): leuchtet und pulsiert, wenn Drehen geht (Kreuzung),
@@ -356,7 +462,7 @@ export function drawFenster(ctx, sc) {
     ctx.stroke();
     ctx.restore();
   }
-  if (sc.hint > 0 && sc.map.kind === 'achteck') drawHint45(ctx);
+  if (sc.map.kind === 'achteck') drawSchemeHint(ctx, sc);
   else if (sc.hint > 0) {
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.fillRect(SCREEN_W / 2 - 190, SCREEN_H - 58, 380, 20);

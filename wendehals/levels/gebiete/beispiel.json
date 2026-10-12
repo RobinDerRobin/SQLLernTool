@@ -1,0 +1,30 @@
+{
+  "format": 1,
+  "id": "beispiel",
+  "name": "Beispiel „Kanal“",
+  "tileset": "bad",
+  "bereich": { "x0": -400, "y0": -1500, "x1": 3200, "y1": 1300 },
+  "knoten": [
+    { "id": "K1", "typ": "speicher", "x": 0, "y": 0 },
+    { "id": "K2", "typ": "kreuzung", "x": 1200, "y": 0, "w": 200, "h": 200 },
+    { "id": "K3", "typ": "raum", "x": 1200, "y": -1100, "w": 520, "h": 400 },
+    { "id": "K4", "typ": "ende", "x": 1800, "y": 600 },
+    { "id": "K5", "typ": "raum", "x": 2600, "y": 0, "w": 520, "h": 400 }
+  ],
+  "gaenge": [
+    { "id": "schleuse", "name": "Schleuse", "von": "K1", "nach": "K2", "breite": 200 },
+    { "id": "nordgang", "name": "Nordgang", "von": "K2", "nach": "K3", "breite": 160 },
+    { "id": "diagonale", "name": "Diagonale", "von": "K2", "nach": "K4", "breite": 200 },
+    { "id": "ostgang", "name": "Ostgang", "von": "K2", "nach": "K5", "breite": 200 }
+  ],
+  "formteile": [
+    { "id": "f1", "x": 600, "y": 140, "laenge": 260, "breite": 120, "winkel": 0 }
+  ],
+  "objekte": [
+    { "id": "o1", "typ": "wand", "x": 420, "y": -70, "laenge": 240, "breite": 60, "winkel": 0 },
+    { "id": "o2", "typ": "gegner", "art": "ente", "x": 900, "y": 0, "platzhalter": true }
+  ],
+  "notizen": [
+    { "id": "n1", "x": 1900, "y": 0, "text": "hier soll es eng werden" }
+  ]
+}

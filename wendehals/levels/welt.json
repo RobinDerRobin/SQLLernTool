@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "gebiete": [
+    { "id": "beispiel", "name": "Beispiel „Kanal“", "datei": "gebiete/beispiel.json" },
+    { "id": "proto-netz", "name": "P1c „Netz“ (Prototyp-Karte)", "datei": "gebiete/proto-netz.json" },
+    { "id": "proto-achteck", "name": "P3 „45°-Kreuzung“ (Prototyp-Karte)", "datei": "gebiete/proto-achteck.json" }
+  ],
+  "uebergaenge": [
+    { "id": "u1", "von": "beispiel/K5", "nach": "proto-netz/K1" },
+    { "id": "u2", "von": "proto-netz/K6", "nach": "proto-achteck/K6" }
+  ]
+}

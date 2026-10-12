@@ -69,10 +69,17 @@ const setup = (s) =>
     p.warp(s.x, s.y, s.theta, s.s);
   }, s);
 await wait(300);
+check(await proto(() => window.__wendehals.game.proto.scheme === 'akkord' && window.__wendehals.game.proto.bufMode === 'getrennt'), 'Standard: Schema „Akkord“, Speicher „getrennt“');
 await page.screenshot({ path: path.join(shots, 'achteck-0-start.png') });
-await proto(() => { window.__wendehals.game.proto.hint = 8; });
-await wait(100);
-await page.screenshot({ path: path.join(shots, 'achteck-0-hinweis.png') });
+// Hinweis je Schema (bleibt dauerhaft sichtbar)
+for (const sch of ['akkord', 'gang', 'klassisch']) {
+  for (const buf of ['getrennt', 'schneller']) {
+    await proto((a) => { const p = window.__wendehals.game.proto; p.scheme = a.sch; p.bufMode = a.buf; p.warp(-60, 0, 0, 'R'); p.hint = 0; }, { sch, buf });
+    await wait(120);
+    await page.screenshot({ path: path.join(shots, `achteck-hinweis-${sch}-${buf}.png`), clip: { x: 0, y: 0, width: 960, height: 140 } });
+  }
+}
+await proto(() => { const p = window.__wendehals.game.proto; p.scheme = 'akkord'; p.bufMode = 'getrennt'; });
 // in jedem Diagonal-Arm (Fenster ausgerichtet, Blick nach außen)
 for (const [name, dir] of [['nordost', T.NE], ['suedost', T.SE], ['suedwest', T.SW], ['nordwest', T.NW]]) {
   const p = at(dir, A + 200);
@@ -81,6 +88,48 @@ for (const [name, dir] of [['nordost', T.NE], ['suedost', T.SE], ['suedwest', T.
   await page.screenshot({ path: path.join(shots, `achteck-arm-${name}.png`) });
 }
 // 45°-Drehung im Achteck: vor, mitten im Schwenk, nach 45°
+// Akkord auf der echten Tastatur: Shift+D = 90° rechts, Shift+A = 90° links, Shift+W+D = 45° rechts, Shift+W+A = 45° links
+for (const [keys, theta, text] of [[['KeyD'], 2, 'Shift+D = 90° rechts (Osten → Süden)'], [['KeyA'], 6, 'Shift+A = 90° links (Osten → Norden)'], [['KeyW', 'KeyD'], 1, 'Shift+W+D = 45° rechts (Osten → Südosten)'], [['KeyW', 'KeyA'], 7, 'Shift+W+A = 45° links (Osten → Nordosten)']]) {
+  await setup({ x: -60, y: 0, theta: T.E, s: 'R' });
+  await page.keyboard.down('Shift');
+  for (const k of keys) await page.keyboard.down(k);
+  await wait(60);
+  for (const k of keys) await page.keyboard.up(k);
+  await page.keyboard.up('Shift');
+  await wait(800);
+  check(await proto((t) => window.__wendehals.game.proto.theta === t, theta), text);
+}
+// Shift gehalten: die Figur bewegt sich nicht
+await setup({ x: -60, y: 0, theta: T.E, s: 'R' });
+const d0 = await proto(() => window.__wendehals.game.proto.dog.x);
+await page.keyboard.down('Shift');
+await page.keyboard.down('ArrowRight');
+await wait(400);
+const d1 = await proto(() => window.__wendehals.game.proto.dog.x);
+await page.keyboard.up('ArrowRight');
+await page.keyboard.up('Shift');
+check(Math.abs(d1 - d0) < 0.5, `Shift gehalten: Figur steht auf dem Bildschirm still (${d0.toFixed(1)} → ${d1.toFixed(1)})`);
+// M wechselt das Schema, B den Speicher-Modus
+await page.keyboard.press('KeyM');
+await wait(80);
+check(await proto(() => window.__wendehals.game.proto.scheme === 'gang'), 'M wechselt das Schema (Akkord → Gang)');
+await page.keyboard.press('KeyB');
+await wait(80);
+check(await proto(() => window.__wendehals.game.proto.bufMode === 'schneller'), 'B wechselt den Speicher-Modus');
+await page.keyboard.press('KeyM');
+await wait(80);
+check(await proto(() => window.__wendehals.game.proto.scheme === 'klassisch'), 'M: Gang → klassisch');
+await proto(() => { window.__wendehals.game.proto.bufMode = 'getrennt'; });
+// Gang: zweimal schnell rechts → gespeichert, zweiter Schwenk
+await proto(() => { window.__wendehals.game.proto.scheme = 'gang'; });
+await setup({ x: -60, y: 0, theta: T.E, s: 'R' });
+await page.keyboard.press('KeyO');
+await wait(150);
+await page.keyboard.press('KeyO');
+await wait(1200);
+check(await proto(() => window.__wendehals.game.proto.theta === 2), 'Gang + getrennt: zwei Drücke ergeben zwei Schwenke (Osten → Süden)');
+// die folgenden Prüfungen und Screenshots laufen im Schema „klassisch“
+await proto(() => { window.__wendehals.game.proto.scheme = 'klassisch'; });
 await setup({ x: -60, y: 0, theta: T.E, s: 'R' });
 await wait(150);
 await page.screenshot({ path: path.join(shots, 'achteck-45-1-vor.png') });
@@ -122,6 +171,7 @@ await ready();
 await proto(() => {
   const p = window.__wendehals.game.proto;
   p.hint = 0;
+  p.scheme = 'klassisch';
   p.warp(-140, 0, 0, 'R');
   window.__wendehals.perf.reset();
 });

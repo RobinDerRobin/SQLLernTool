@@ -16,6 +16,8 @@
     "dist:linux": "npm run build && electron-builder --linux --x64 --publish never",
     "e2e:desktop": "node e2e/electron.mjs",
     "icon": "node tools/make-icon.mjs",
+    "e2e:editor": "npm run build && node e2e/editor.mjs",
+    "editor": "node tools/editor.mjs",
     "e2e:perf": "npm run build && node e2e/perf.mjs",
     "e2e:flash": "npm run build && node e2e/flash.mjs",
     "check:welt": "node tools/pruefe-welt.mjs",

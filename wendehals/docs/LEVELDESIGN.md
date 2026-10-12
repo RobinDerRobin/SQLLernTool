@@ -58,7 +58,12 @@ Regeln für das Paket:
 - Der Editor ist ein Werkzeug, keine allgemeine Engine: die Engine ist das Spiel selbst; der Editor bearbeitet nur die
   Daten, die sie liest (wie Lunar Magic für Super Mario World).
 
-Editor-Skizze (Aussehen, nicht bestätigt):
+**Robin arbeitet am PC** (Maus, Tastatur); der Editor muss nicht auf dem Steam Deck laufen. Gespielt und abgenommen
+wird weiterhin auf dem Deck (Regel 8). **Klickbare Optik-Skizze gewünscht** („Ja sehr gut.“):
+[`editor-skizze.html`](editor-skizze.html), veröffentlicht unter https://claude.ai/artifact/Sp9Ncg4tAyzVZqk2jrKo1P
+(nur Optik, Prüfregeln darin sind Beispiele).
+
+Editor-Skizze als Text (Aussehen, nicht bestätigt):
 
 ```
 ┌ Welt ▸ Gebiet „Kanal“ ▸ Gang „Schleuse“ ─────────── [▶ Spielen ab hier] ┐
@@ -73,7 +78,70 @@ Editor-Skizze (Aussehen, nicht bestätigt):
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## 2. Vorschläge (besprochen, noch nicht bestätigt)
+## 1b. Entschieden in Runde 2 (Robin, 11.10.2026)
+
+- **Echtes Spielbild statt Symbolen.** Robin zur ersten Skizze: „Die symbolische Darstellung ist unpraktisch. Das Level
+  fühlt sich auch viel kleiner an, als in dem eigentlichen Spiel.“ Daher: der Editor zeichnet mit der Spielzeichnung,
+  Normalansicht 1:1 mit **Bildschirmrahmen** (480 × 270 E, so viel sieht der Spieler auf einmal), Längen immer auch in
+  Bildschirmen und Sekunden Flug (Prototyp: 70 E/s → 1800 E ≈ 3,8 Bildschirme ≈ 26 s).
+- **Ein durchgehender Grundriss** statt getrennter Bildschirme für Welt/Gebiet/Gang: Gebiete sind Bereiche auf dem
+  Plan, Level (Gänge) und Knoten liegen darin; Lage und Länge ergeben sich aus dem Plan. Werkzeuge: Gang von einem
+  Knoten aus in 8 Richtungen ziehen (neuer Knoten am Ende im Leeren), Knoten setzen, Gang anklicken = T-Kreuzung.
+  Robin: „Klingt alles gut.“
+- **Ansicht:** normal Norden oben, drehen möglich.
+- **Der Editor kennt nur, was ein Prototyp bestätigt hat** (Robin: „Ja“). Erst Geometrie; Gegner, Drehen begrenzen,
+  Tempo, Schlösser kommen erst nach ihrem Prototyp bzw. Paket in den Katalog.
+- Die Stufen E1–E5 aus Abschnitt 1 werden dadurch neu zugeschnitten (E1 = Grundriss-Editor); neuer Zuschnitt folgt
+  nach Robins Bestätigung.
+
+## 1c. Entschieden in Runde 3 (Robin, 11.10.2026) und Reihenfolge der Editor-Features
+
+- **Welt metroidvania-typisch verknüpft** (Robin: „ja“): eine zusammenhängende Karte, Gebiete mit mehreren
+  Verbindungen, Schlösser, Abkürzungen, Hubs/Speicherorte, Sequence Breaks nur wo der Löser zeigt, dass niemand
+  stecken bleibt. **Wie Schlösser funktionieren, wird von Feature zu Feature bestimmt** – „Türen, Hindernisse,
+  unbesiegbare Gegner, Dunkelheit. Die Möglichkeiten sind verschiedene.“ Im Editor ist ein Schloss deshalb ein
+  allgemeiner Platz an einem Arm/Übergang; die Typen kommen aus dem Katalog, sobald ein Feature sie festlegt.
+- **Levelformen:** Level sind nicht nur Rechtecke. **Kein Prototyp „Freie Gangform“** – Robin: „die unregelmäßigen
+  Gänge möchte ich wahrscheinlich nicht bauen. Sollte dies doch auffällig sein in der Praxis, möchte ich es nochmal
+  ausgiebig prüfen, bevor ich mich für dieses Design entscheide.“ Deutung (zu bestätigen): Formen aus geraden Teilen
+  (Formteile: Nischen, Verbreiterungen, Stufen, 45°-Stücke); unregelmäßig/geschwungen ist geparkt.
+- **Testen durch Robin braucht keine KI-Vorprüfung.** Feature **„Bezeichnung kopieren“**: der Editor gibt die
+  Bezeichnung des Levels bzw. der Stelle aus, z. B. `Wendehals-Level kanal/schleuse@560` (Gebiet/Level@Stelle in E ab
+  Gang-Anfang; Knoten: `kanal/K2`), die Robin Claude Code zum Prüfen gibt.
+- **Bildschirmrahmen** im Editor: gut (Robin).
+- Skizze 2 (ein Grundriss im Spielbild, Rahmen mit Fahrt-Schieber, Formteile, Gebiete mit Übergang, Bezeichnung
+  kopieren): [`editor-skizze.html`](editor-skizze.html), gleiche Artifact-URL wie oben.
+
+**Reihenfolge der Editor-Features** (von Claude erstellt auf Robins Auftrag; ersetzt die Stufen E1–E5 in
+Abschnitt 1). Jede Stufe wird erst gebrieft, wenn die vorige steht; Gegner, Schlösser, Look erst nach ihren Paketen.
+
+| # | Stufe | Inhalt | Sessions |
+|---|---|---|---|
+| 1 | **Ansehen** | Grundriss im Spielbild, Zoom/Verschieben, Norden oben + Drehen, Bildschirmrahmen + Fahrt-Schieber (Bildschirme, Sekunden); öffnet die vorhandenen Prototyp-Karten („Netz“, „45°-Kreuzung“) | 1–2 |
+| 2 | **Bauen** | Gang ziehen (8 Richtungen), Knoten setzen/Gang teilen, Raumgröße, Breite, Wand, Hindernis, Formteile, Rückgängig, Datei speichern/laden | 2 |
+| 3 | **Spielen ab hier + Bezeichnung kopieren** | Prototyp an der Rahmenstelle starten, Esc zurück; Bezeichnung für Claude Code | 1 |
+| 4 | **Prüfer-Leiste** | Geometrie-MUSS-Regeln live (45°-Raster, passierbar, Drehzone frei …), Klick springt zur Stelle | 1–2 |
+| 5 | **Gebiete und Übergänge** | Bereiche zeichnen, Level zuordnen, Übergänge anzeigen | 1 |
+| 6 | **Testmenü auf dem Deck** | im Build jedes Level/jeden Knoten aus der Datei direkt starten | 1 |
+| 7 | **Notizen und Stempel** | Absicht an Stellen notieren; Stücke als Vorlage speichern (Material für die KI) | 1–2 |
+| 8 | **Bot-Spieltest** | ein Bot fliegt jedes Level ab | 2 |
+| 9 | **KI-Varianten nebeneinander** | Vorschläge vergleichen, übernehmen | 1–2 |
+| – | nach ihren Paketen | Schlösser (je Feature), Gegner und Wellen (Paket 10, „Druck“), Look pro Gebiet (Setting) | je 1–3 |
+
+Für ein erstes eigenes Gebiet reichen Stufen 1–4 (etwa 5–7 Sessions).
+
+## 1d. Bau (Robin, 11.10.2026)
+
+- Robin: „Ich habe keine Zeit das alles zu testen. Ich möchte, dass der Editor funktioniert und dass er ohne große Mühe
+  änderbar ist, wenn mich etwas daran stört. Es darf auch 2 Wochen dauern.“ – „Mehrere Sessions pro Tag. Nachts ab 23 Uhr
+  bis 09 Uhr morgens dürfen sie stattfinden. Mach die Läufe so, dass es funktioniert und es schnell erledigt ist, ohne
+  die Qualität zu vernachlässigen.“
+- Umsetzung: Bau-Brief [`editor/BRIEF.md`](editor/BRIEF.md), Stand [`editor/STAND.md`](editor/STAND.md); Routine startet
+  nachts alle 2 Stunden (23:07, 01:07, 03:07, 05:07, 07:07) eine Sonnet-Session mit Sperre; getestet wird automatisch
+  plus Test-Agenten; Robin probiert am Ende aus.
+- Auf Vorbehalt (Robin hat nicht widersprochen, Bestätigung steht aus): Tileset = Aussehen, Form frei; v0.2-Themen als
+  Platzhalter-Tilesets; Gegner als markierte Platzhalter; Formen aus geraden Teilen.
+ (besprochen, noch nicht bestätigt)
 
 - **Quelle der Wahrheit:** eine Textdatei (JSON) pro Gebiet; Editor, KI und Prüfer lesen und schreiben dieselbe Datei.
 - **Ablauf mit der KI:** Robin baut Stücke → KI analysiert und schlägt Regeln vor → Robin bestätigt → Regelwerk
@@ -89,7 +157,8 @@ Editor-Skizze (Aussehen, nicht bestätigt):
 
 ## 3. Offen
 
-- Wo arbeitet Robin am Editor: PC mit Maus, auch Steam Deck?
 - Gegner/Wellen von Anfang an im Editor oder erst die Geometrie?
-- Klickbare Optik-Skizze des Editors vor dem Brief zu E1?
+- Robins Rückmeldung zur Optik-Skizze.
+- Was kommt in den Editor, solange Konzepte noch im Prototyp sind (Robin, 11.10.2026: „es ist wichtig, zuerst die
+  Konzepte durchzuprüfen, bevor man sie editieren kann“)? Vorschlag in Arbeit.
 - Bestätigung der Vorschläge in Abschnitt 2.

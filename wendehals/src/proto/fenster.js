@@ -243,8 +243,9 @@ export class FensterScene {
 
     if (this.swing) {
       const sw = this.swing;
-      sw.t = Math.min(SWING_TIME, sw.t + dt);
-      const k = smooth(sw.t / SWING_TIME);
+      const dur = sw.dur ?? SWING_TIME; // P3 „45°-Kreuzung“: verkettete Drehungen können schneller sein
+      sw.t = Math.min(dur, sw.t + dt);
+      const k = smooth(sw.t / dur);
       this.ang = sw.a0 + (sw.a1 - sw.a0) * k;
       const px = sw.pivot.x;
       const py = sw.pivot.y;
@@ -254,7 +255,7 @@ export class FensterScene {
       const sn = Math.sin(this.ang);
       this.cam.x = px - (ox * c - oy * sn);
       this.cam.y = py - (ox * sn + oy * c);
-      if (sw.t >= SWING_TIME) {
+      if (sw.t >= dur) {
         this.ang = sw.a1;
         this.swing = null;
       }
