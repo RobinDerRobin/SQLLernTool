@@ -21,18 +21,11 @@
 | 10 | KI-Varianten nebeneinander | offen | – | – |
 | 11 | Abschluss | offen | – | – |
 
-## Offene Rückmeldung von Robin (12.10.2026) – Regel 1 gilt
+## Verbindliche Anforderungen von Robin – gelten für jeden Lauf (Liste: BRIEF.md Abschnitt 9)
 
-Robin (Wortlaut): „Der Zoom ist eine Katastrophe. Der ist viel zu unfein. In der Ansicht der Karte, mit den Leveln und
-Knotenpunkten möchte ich ein Level herausnehmen und es einzeln betrachten. Dafür möchte ich nicht auch alles andere
-sehen. Also Kartenansicht, Levelansicht. Ich möchte wie in Lunar Magic nicht versehentlich Elemente platzieren.
-Rechtsklick platziert, nicht Linksklick. Allgemein ist in Sachen UX wirklich Verbesserungspotenzial.“
-Ein UX-Experte erarbeitet Vorschläge (`docs/forschung/2026-10-12-editor-ux-1-ux-experte.md`); Robin entscheidet.
-
-**Bis Robin entschieden hat:** keine Arbeit an Bedienung, Zoom, Ansichten, Maus-/Tastenbelegung, Werkzeugen oder
-Oberfläche – auch nicht „nebenbei“. Stufen, die neue Bedienung brauchen (8 Notizen und Stempel, 10 KI-Varianten
-nebeneinander), warten. Erlaubt ist Arbeit ohne Bedienungsfragen, z. B. Stufe 9 Bot-Spieltest (ohne Oberfläche).
-Gibt es nichts Erlaubtes mehr: nichts bauen, nur melden.
+Neu am 12.10.2026: A1 Rechtsklick platziert, A2 feiner Zoom, A3 Karten- und Levelansicht. **Vor jeder neuen Stufe
+umsetzen** (höchste Priorität), danach weiter mit den Stufen. Weitere UX-Vorschläge des Experten
+(`docs/forschung/2026-10-12-editor-ux-1-ux-experte.md`) sind **keine** Anforderungen, bis Robin sie bestätigt.
 
 ## Fragen an Robin
 

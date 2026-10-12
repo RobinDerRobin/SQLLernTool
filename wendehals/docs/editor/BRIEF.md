@@ -176,9 +176,23 @@ tests/editor-*.tests.mjs, e2e/editor*.mjs
 10. **Projektregeln gelten für jeden Lauf** (Robin, 12.10.2026): `wendehals/CLAUDE.md` „Regeln für jede Prototyp-Arbeit“
     1–9, vor allem Regel 1 „Erst validieren, dann bauen“. Steht in STAND.md eine **offene Rückmeldung von Robin**,
     wird nichts gebaut, was sie berührt, bis Robin die Deutung und den Lösungsansatz bestätigt hat; nur Arbeit, die sie
-    nicht berührt.
+    nicht berührt. **Robins Anforderungen in Abschnitt 9 sind dagegen bestätigt** und werden automatisch umgesetzt.
+11. **Anforderungen zuerst:** Erfüllt der Editor eine Anforderung aus Abschnitt 9 noch nicht, wird das vor der nächsten
+    Stufe umgesetzt (mit Test aus Nutzersicht). Jede neue Arbeit muss alle Anforderungen erfüllen.
 
 ## 8. Auf Vorbehalt (Robins Antworten stehen aus; Empfehlungen, denen Robin nicht widersprochen hat)
 
 - Tileset = Aussehen eines Gebiets, Form bleibt frei. · v0.2-Themen als Platzhalter-Tilesets. · Gegner als markierte
   Platzhalter. · Formen aus geraden Teilen, unregelmäßige geparkt. · Weg der Dateien ins Repo: entschieden (Abschnitt 4).
+
+## 9. Verbindliche Anforderungen von Robin (gelten für jeden Lauf, neue werden hier ergänzt)
+
+Robin, 12.10.2026: „Wenn aktuelle Anforderungen sagen, rechtsklick platziert, dann sollen das alle Läufe automatisch
+berücksichtigen.“ Jede Anforderung bekommt einen automatischen Test aus Nutzersicht; Umsetzungsdetails, die Robin nicht
+festgelegt hat, unter „Auf Vorbehalt entschieden“ eintragen.
+
+| ID | Anforderung (Robin, Wortlaut) | Bedeutung für den Editor |
+|---|---|---|
+| A1 | „Ich möchte wie in Lunar Magic nicht versehentlich Elemente platzieren. Rechtsklick platziert, nicht Linksklick.“ | Neue Objekte, Knoten, Gänge und Teile entstehen nur per Rechtsklick (bzw. Rechtsklick-Ziehen). Linksklick wählt aus und verschiebt, platziert nie etwas. Kein Kontextmenü des Browsers im Plan. |
+| A2 | „Der Zoom ist eine Katastrophe. Der ist viel zu unfein.“ | Feiner Zoom: kleine Schritte bzw. stufenlos mit dem Mausrad, um den Mauszeiger herum; Tasten +/−; Anzeige des Maßstabs in Bildschirmen. |
+| A3 | „In der Ansicht der Karte, mit den Leveln und Knotenpunkten möchte ich ein Level herausnehmen und es einzeln betrachten. Dafür möchte ich nicht auch alles andere sehen. Also Kartenansicht, Levelansicht.“ | Zwei Ansichten: Kartenansicht (Gebiet/Welt mit Leveln und Knoten) und Levelansicht (nur das gewählte Level mit seinen beiden Knoten, alles andere ausgeblendet). Wechsel z. B. per Doppelklick bzw. Taste, klarer Rückweg zur Karte. |
