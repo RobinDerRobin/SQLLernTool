@@ -16,6 +16,7 @@
 | 5 | Gebiete und Übergänge | fertig (Electron ungetestet; „Level zuordnen“ = Gebietsdatei, kein Verschieben von Gängen zwischen Gebieten) | npm test 401, e2e, e2e:editor, beide Test-Agenten | Lauf 6 |
 | 6 | Tilesets und Spielgrafik | fertig (Electron ungetestet; Tileset-Look nur im Editor, „Spielen ab hier“ nutzt weiter Prototyp-Farben) | npm test 406, e2e, e2e:editor, beide Test-Agenten | Lauf 7 |
 | 7 | Testmenü am Deck | fertig (`?testmenue` / `WENDEHALS_TESTMENUE=1`; Electron und echtes Gamepad ungetestet) | npm test 410, e2e, e2e:editor, beide Test-Agenten | Lauf 8 |
+| 7b | Bedienung (Brief: BRIEF-7b-bedienung.md) | offen | – | A1–A6, Fehler „Spielen ab hier“ |
 | 8 | Notizen und Stempel | offen | – | – |
 | 9 | Bot-Spieltest | offen | – | – |
 | 10 | KI-Varianten nebeneinander | offen | – | – |
