@@ -1,6 +1,6 @@
 # Level-Editor (Paket 13) – Aufbau und „so ändere ich X“
 
-> Stand: Stufe 10 (Bedienung wie Lunar Magic). Wird in Stufe 11 vervollständigt. Bau-Brief: [`editor/BRIEF.md`](editor/BRIEF.md), Stand:
+> Stand: Stufe 11 (alle Stufen gebaut, Bedienung wie Lunar Magic). Bau-Brief: [`editor/BRIEF.md`](editor/BRIEF.md), Stand:
 > [`editor/STAND.md`](editor/STAND.md), Entscheidungen: [`LEVELDESIGN.md`](LEVELDESIGN.md).
 
 ## Starten
@@ -100,6 +100,50 @@ Objekte, Gegner, Notizen), den Prüferstand und den **Unterschied zum aktuellen 
 **Übernehmen** gibt dem offenen Gebiet den Inhalt der Variante (ID und Name bleiben, damit Datei und Bezeichnungen stimmen); das ist ein normaler Schritt mit
 Strg+Z/Strg+Y. Gespeichert wird erst mit Strg+S. Varianten sind nur Ansicht: sie liegen nicht in `welt.json`, ändern keine Daten und gehören zum Gebiet
 (Gebietswechsel leert die Liste). Code: `src/editor/varianten.js` (reine Rechnung), Fenster in `main.js` (`variantenZeigen`).
+
+## Bauen (Stufen 2a/2b)
+
+Alles Bauen geschieht mit **Rechtsklick** (A1): Werkzeug wählen (Knöpfe oder Tasten `G` Gang, `K` Knoten, `B` Formteil, `W` Wand, `H` Hindernis, `X` Gegner, `M` Notiz, `U` Stempel, `A` Bereich; `V` = nichts), dann rechts klicken oder (Gang, Bereich) rechts ziehen.
+Gänge rasten auf 8 Richtungen und 20 E; im Leeren entsteht am Ende ein Knoten, nahe einem vorhandenen Knoten wird verbunden. „Hier teilen“ (rechts am Gang) macht eine T-Kreuzung und behält alle übrigen Daten.
+Raumgröße (`w`/`h`), Breite, Lage und Winkel stehen als Zahlenfelder rechts (A6 gilt für Maus, Pfeile und Einfügen; die Zahlenfelder nehmen auch Werte abseits des 20-E-Rasters an – siehe STAND „Offen“). Jede Aktion ist ein Rückgängig-Schritt; Laden → Speichern ergibt dieselben Bytes; ungültige Dateien werden mit Grund abgelehnt, der bisherige Stand bleibt.
+
+## Prüfer (Stufe 4)
+
+Leiste unten (Knopf „Prüfer“): `regeln.js` liefert Meldungen `{ text, ort }`; ein Klick springt zur Stelle, Marken im Plan zeigen die Engstellen (nur bei offener Liste).
+MUSS: **M1** 45°-Raster · **M2** Gang passierbar (≥ 60 E freier Querweg, Formteile zählen als Boden) · **M3** Drehzone (160 E vor Kreuzungen) frei · **M4** Objekte im Boden · **M5** Knoten haben Gänge, Gebiet hat Speicherort · **M6** IDs eindeutig, Gänge verweisen auf Knoten · **M7** „noch nicht spielbar“ (`spielbarkeit()`).
+SOLL: **S1** Gang ≥ 1 Bildschirm · **S2** Gegner sind Platzhalter. Eine abstürzende Regel erscheint als MUSS-Meldung, nie still. Neue Regel = ein Eintrag in `regeln.js` plus ein Test mit gutem und schlechtem Beispiel (`tests/editor-pruefer.tests.mjs`).
+
+## Tilesets, Look und Spielgrafik (Stufe 6)
+
+Jedes Gebiet hat ein `tileset` (Platzhalter: die v0.2-Themen aus `src/data/themes.js`). `J` schaltet den Plan zwischen Prototyp-Farben und Tileset-Look um. Gegner und Hindernisse werden mit den Zeichenfunktionen des Spiels gezeichnet (`sprites.js`); Gegner sind **Platzhalter** (`platzhalter: true`, deutlich markiert).
+„Spielen ab hier“ nutzt weiter die Prototyp-Farben (Tileset-Look nur im Editor).
+
+## Testmenü am Deck (Stufe 7)
+
+`dist/index.html?testmenue` (Electron: `WENDEHALS_TESTMENUE=1`): listet Gebiete, Level und Knoten aus den Leveldateien im Build und startet sie direkt im Fenster-Prototyp; bedienbar mit Tastatur und Controller (Pfeile/Stick wählen, Enter/A startet, Esc/Start im Spiel zurück). Nicht spielbare Einträge bleiben sichtbar, mit Grund statt Start. Code: `src/editor/testmenue.js`.
+
+## Bot-Spieltest (Stufe 9)
+
+Knopf „Bot-Spieltest“ oder Taste `Z` (ohne Strg): ein Bot (`src/editor/bot.js`) fliegt jeden spielbaren Gang des Gebiets im Fenster-Prototyp ab und meldet je Gang `ok`, `tod`, `stecken`, `zeit` oder `nicht spielbar` mit **Bezeichnung** der Fehlerstelle; Klick in der Liste springt dorthin.
+Grenzen: nur Hinweg, keine Gegner, kein Ausweichen in Nischen außerhalb des Gangs, Diagonalen nicht spielbar; der Lauf blockiert kurz (Netz ≈ 0,5 s).
+
+## Testen
+
+| Befehl | Prüft |
+|---|---|
+| `npm test` | alle Einheitentests (`tests/editor-*.tests.mjs`) und Prototyp-/Spiel-Tests, Golden Master der v0.2-Welt unverändert |
+| `npm run e2e` | Smoke-Test des Spiels im Chromium |
+| `npm run e2e:editor` | baut und fährt `e2e/editor.mjs`, `editor-bedienung.mjs`, `editor-notizen.mjs`, `editor-bot.mjs`, `editor-varianten.mjs` im echten Chromium (klicken, ziehen, tippen, Pixel und Daten messen) |
+
+Vor jedem Push als eine Kette: `npm test && npm run e2e && npm run e2e:editor`.
+
+## Bekannte Grenzen (Stand Stufe 11)
+
+- Electron-Start und der echte Speichern-/Öffnen-Dialog sind nur im Chromium geprüft, nicht in Electron.
+- Diagonale Gänge, Achteck-Knoten und Teile mit Winkel ≠ 0°/90° sind im Fenster-Prototyp (noch) nicht spielbar; der Editor meldet das vorher.
+- Gegner sind Platzhalter; Schlösser nur als ausgegrauter Platz.
+- Varianten (Stufe 10) nur über den Dateidialog, kein Ordner `levels/varianten/`.
+- Offene Hinweise und UX-Vorschläge des Experten (S1–S7, K1–K5, nicht bestätigt) stehen in [`editor/STAND.md`](editor/STAND.md).
 
 ## Dateien
 
