@@ -207,16 +207,16 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
   <header><span class="nr">12</span><h3>Welt bauen</h3><span class="chip s-block">blockiert</span></header>
   <p class="meta">Produktion · <span class="std">wartet auf Paket 13</span></p>
   <p class="q">Gebiete, Knoten, Level (Gänge) – läuft parallel zu den Prototypen (E11)</p>
-  <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-plan" title="im Bau: 8 von 12 Stufen fertig">Paket 13</span></div><div class="note">Später zusätzlich: fertige Welt: 8, 11, S</div>
+  <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-ok" title="Editor fertig gebaut">Paket 13</span></div><div class="note">Später zusätzlich: fertige Welt: 8, 11, S</div>
   <div class="step"><span class="lbl">Nächster Schritt</span><p>Erst Paket 13 klären.</p></div>
   <div class="mod"><span class="chip m-opus">Opus 5.5</span><span class="why">Deutung und Brief, danach Sonnet 5.5 bauen</span></div>
 </article>
 <article class="card" id="p-13">
-  <header><span class="nr">13</span><h3>Editor (festgelegt, Robin 11.10.2026; im Bau nach Brief, Stand: STAND)</h3><span class="chip s-plan">laufend</span></header>
-  <p class="meta">Werkzeug · festgelegt (Robin, 11.10.2026) · <span class="std">im Bau: 8 von 12 Stufen fertig</span></p>
+  <header><span class="nr">13</span><h3>Editor (festgelegt, Robin 11.10.2026; gebaut, Stufen 1–11, nach Brief; Bedienung: EDITOR.md; wartet auf Robins Ausprobieren, Stand: STAND)</h3><span class="chip s-ok">keep</span></header>
+  <p class="meta">Werkzeug · festgelegt (Robin, 11.10.2026) · <span class="std">Editor fertig gebaut</span></p>
   <p class="q">Kann Robin Welt, Gebiete und Level selbst bauen und sofort spielen; kann die KI dieselben Daten lesen und schreiben?</p>
   <div class="deps"><span class="lbl">hängt ab von</span> <span class="dep s-idle">P1 „Kreuzung“</span></div>
-  <div class="step"><span class="lbl">Nächster Schritt</span><p>Nächster nächtlicher Bau-Lauf (23–09 Uhr): Stufe 8 „Notizen und Stempel“.</p></div>
+  <div class="step"><span class="lbl">Nächster Schritt</span><p>Robin probiert den Editor einmal aus und sagt, was stört.</p></div>
   <div class="mod"><span class="chip m-sonnet">Sonnet 5.5</span><span class="why">automatische Bau-Läufe nach docs/editor/BRIEF.md</span></div>
 </article>
 <article class="card" id="p-Q">
@@ -323,14 +323,16 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
   <p class="meta">fertig (Electron ungetestet; Tileset-Look nur im Editor, „Spielen ab hier“ nutzt weiter Prototyp-Farben) · getestet: npm test 406, e2e, e2e:editor, beide Test-Agenten</p></div></li>
 <li class="stage"><span class="nr">7</span><div><p>Testmenü am Deck <span class="chip s-ok">fertig</span></p>
   <p class="meta">fertig (?testmenue / WENDEHALS_TESTMENUE=1; Electron und echtes Gamepad ungetestet) · getestet: npm test 410, e2e, e2e:editor, beide Test-Agenten</p></div></li>
-<li class="stage"><span class="nr">8</span><div><p>Notizen und Stempel <span class="chip s-idle">offen</span></p>
-  <p class="meta">offen</p></div></li>
-<li class="stage"><span class="nr">9</span><div><p>Bot-Spieltest <span class="chip s-idle">offen</span></p>
-  <p class="meta">offen</p></div></li>
-<li class="stage"><span class="nr">10</span><div><p>KI-Varianten nebeneinander <span class="chip s-idle">offen</span></p>
-  <p class="meta">offen</p></div></li>
-<li class="stage"><span class="nr">11</span><div><p>Abschluss <span class="chip s-idle">offen</span></p>
-  <p class="meta">offen</p></div></li></ol>
+<li class="stage"><span class="nr">7b</span><div><p>Bedienung (Brief: BRIEF-7b-bedienung.md) <span class="chip s-ok">fertig</span></p>
+  <p class="meta">fertig: A0–A8 und Fehler „Spielen ab hier“ erfüllt (Electron ungetestet; obere Leisten bei 1280 px scrollen waagerecht) · getestet: npm test 422, e2e, e2e:editor (neu: e2e/editor-bedienung.mjs), beide Test-Agenten</p></div></li>
+<li class="stage"><span class="nr">8</span><div><p>Notizen und Stempel <span class="chip s-ok">fertig</span></p>
+  <p class="meta">fertig (Electron ungetestet; Stempel nur per Rechtsklick, kein Vorschaubild in der Liste) · getestet: npm test 435, e2e, e2e:editor (neu: e2e/editor-notizen.mjs), beide Test-Agenten</p></div></li>
+<li class="stage"><span class="nr">9</span><div><p>Bot-Spieltest <span class="chip s-ok">fertig</span></p>
+  <p class="meta">fertig: Knopf/Taste Z, Liste mit Bezeichnung, Sprung zur Stelle (Electron ungetestet; Bot fliegt nur Hinweg, kein Rückweg; weicht nicht in Nischen außerhalb des Gangs aus; Diagonalen nicht spielbar) · getestet: npm test 444, e2e, e2e:editor (neu: e2e/editor-bot.mjs), beide Test-Agenten</p></div></li>
+<li class="stage"><span class="nr">10</span><div><p>KI-Varianten nebeneinander <span class="chip s-ok">fertig</span></p>
+  <p class="meta">fertig: Knopf/Taste Y, bis 4 Varianten per Mehrfach-Dateiwahl, Kacheln mit Vorschau, Zahlen, Prüferstand, Unterschied; Übernehmen mit Strg+Z (Electron ungetestet; Varianten nur über den Dateidialog, kein Ordner levels/varianten/; Kacheln scrollen waagerecht ohne sichtbare Leiste) · getestet: npm test 451, e2e, e2e:editor (neu: e2e/editor-varianten.mjs), beide Test-Agenten</p></div></li>
+<li class="stage"><span class="nr">11</span><div><p>Abschluss <span class="chip s-ok">fertig</span></p>
+  <p class="meta">fertig: EDITOR.md vollständig, PROTOTYPEN nachgezogen, Gesamtprüfung beider Test-Agenten, Fehler behoben (Electron ungetestet) · getestet: npm test 453, e2e, e2e:editor, beide Test-Agenten</p></div></li></ol>
   <h3 class="sub2">Offene Fragen zum Editor</h3>
   <ul class="plain"><li>Robins Bestätigung der Punkte „auf Vorbehalt“ (Tileset = Aussehen, v0.2-Themen als Platzhalter, Gegner als</li></ul>
 </section>
