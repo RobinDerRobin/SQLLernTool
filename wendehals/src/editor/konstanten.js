@@ -25,6 +25,7 @@ export const MIN_TEIL = RASTER; // kleinste Länge/Breite eines Teils (E)
 export const KOPIE_VERSATZ = 40; // Versatz einer Kopie, wenn keine Zielstelle bekannt ist (E)
 export const MIN_GANG_LAENGE = RASTER; // kürzere Gänge entstehen beim Ziehen nicht
 export const FANG_PX = 12; // Fangradius für Knoten und Gänge beim Ziehen/Setzen (Bildschirmpixel, wird mit dem Zoom in E umgerechnet)
+export const MAX_VARIANTEN = 4; // so viele Varianten liegen höchstens neben dem aktuellen Gebiet
 export const MAX_KOORD = 20000; // größte erlaubte Koordinate/Maßzahl (E)
 export const VERLAUF_MAX = 200; // Schritte, die Rückgängig zurückgehen kann
 
@@ -66,6 +67,7 @@ export const KUERZEL = {
   oeffnen: 'KeyO', // mit Strg/Cmd
   spielen: 'KeyP', // Spielen ab hier
   bezeichnung: 'KeyN', // Bezeichnung kopieren
+  varianten: 'KeyY', // Varianten-Fenster (Stufe 10; mit Strg ist Y Wiederholen)
   bot: 'KeyZ', // Bot-Spieltest (ohne Strg; mit Strg ist Z Rückgängig)
   fahrtStart: 'Space',
   fahrtVor: 'BracketRight',

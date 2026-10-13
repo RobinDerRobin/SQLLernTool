@@ -1,6 +1,6 @@
 # Level-Editor (Paket 13) – Aufbau und „so ändere ich X“
 
-> Stand: Stufe 7b (Bedienung wie Lunar Magic). Wird in Stufe 11 vervollständigt. Bau-Brief: [`editor/BRIEF.md`](editor/BRIEF.md), Stand:
+> Stand: Stufe 10 (Bedienung wie Lunar Magic). Wird in Stufe 11 vervollständigt. Bau-Brief: [`editor/BRIEF.md`](editor/BRIEF.md), Stand:
 > [`editor/STAND.md`](editor/STAND.md), Entscheidungen: [`LEVELDESIGN.md`](LEVELDESIGN.md).
 
 ## Starten
@@ -91,6 +91,16 @@ ungespeicherte Gebiete und ihre Übergänge bleiben draußen).
   zusammen mit dem Gebiet, wenn sie sich geändert hat; Electron erlaubt den Pfad `stempel.json` zusätzlich. Die Datei ist auch Material für Claude Code
   („setze einen Stempel wie `Enge Schleuse` an die Stelle …“). Kaputte Datei → Meldung, die eingebauten Stände bleiben.
 
+## Varianten nebeneinander (Stufe 10)
+
+Knopf „Varianten“ unten (Taste `Y`, Esc schließt) öffnet ein Fenster mit einer Kachel „Aktuell“ und bis zu 4 (`MAX_VARIANTEN`) geladenen **Varianten** des offenen Gebiets
+(z. B. von der KI erzeugte Gebietsdateien). „Varianten laden …“ nimmt eine oder mehrere Dateien (Chrome/Edge: Dateidialog mit Mehrfachauswahl, sonst Dateifeld);
+ungültige Dateien werden mit Grund gemeldet, die übrigen kommen trotzdem. Jede Kachel zeigt das Spielbild des Gebiets, die Zahlen (Knoten, Gänge, Formteile,
+Objekte, Gegner, Notizen), den Prüferstand und den **Unterschied zum aktuellen Gebiet** nach IDs („+2 Gänge, −1 Knoten, 3 geändert“).
+**Übernehmen** gibt dem offenen Gebiet den Inhalt der Variante (ID und Name bleiben, damit Datei und Bezeichnungen stimmen); das ist ein normaler Schritt mit
+Strg+Z/Strg+Y. Gespeichert wird erst mit Strg+S. Varianten sind nur Ansicht: sie liegen nicht in `welt.json`, ändern keine Daten und gehören zum Gebiet
+(Gebietswechsel leert die Liste). Code: `src/editor/varianten.js` (reine Rechnung), Fenster in `main.js` (`variantenZeigen`).
+
 ## Dateien
 
 ```
@@ -104,6 +114,7 @@ src/editor/ansicht.js         Kamera: Mitte, stufenloser Zoom (in Bildschirmen),
 src/editor/level.js           Levelinhalt (Levelansicht) und spielbare Karte um einen Gang (reine Geometrie)
 src/editor/mehrfach.js        Mehrfachauswahl: Rahmen, gemeinsam verschieben/kopieren/einfügen/löschen/drehen
 src/editor/ebenen.js          sperrbare Ebenen: Zuordnung der Dinge und Werkzeuge
+src/editor/varianten.js       Varianten: laden, Unterschied, Übernehmen (reine Rechnung)
 src/editor/stempel.js         Stempel: anlegen, prüfen, laden/formatieren, als Zwischenablage (reine Daten)
 src/editor/werkzeuge/notiz.js, stempel.js  Rechtsklick-Werkzeuge M und U
 src/editor/werkzeuge/auswahl.js  linke Maustaste: wählen, ziehen, Auswahlrahmen, Hervorhebung
@@ -139,6 +150,7 @@ zusätzlicher Boden, **Wand-Objekte** schneiden Boden aus. Gespeichert wird imme
 | anderes Aussehen eines Typs im Plan | `src/editor/zeichnen.js` |
 | neue Prüfregel (Gebiet) / (Welt) | `src/editor/regeln.js` / `pruefeWelt()` in `src/editor/welt.js` |
 | Notiz-Länge/-Standardtext, Stempel-Höchstzahl, Dateiname der Stempel | `NOTIZ_*`, `STEMPEL_*` in `src/editor/konstanten.js` |
+| Höchstzahl der Varianten, Taste des Fensters | `MAX_VARIANTEN`, `KUERZEL.varianten` in `src/editor/konstanten.js` |
 | neues Werkzeug | neue Datei in `src/editor/werkzeuge/` und ein Eintrag in der Werkzeugliste (ab Stufe 2a) |
 | was „Spielen ab hier“ kann / meldet | `spielbarkeit()`/`baueKarte()` in `src/editor/spielen.js` |
 | Anzeigen rechts/unten | `eigenschaften()`/`refreshFahrt()` in `src/editor/main.js` |

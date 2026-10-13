@@ -25,6 +25,7 @@ import auswahlWerkzeug from './werkzeuge/auswahl.js';
 import { EBENEN, ebeneVon, WERKZEUG_EBENEN } from './ebenen.js';
 import weltWerkzeug, { weltTreffer } from './werkzeuge/welt-ansicht.js';
 import { zeichneWelt } from './zeichnen-welt.js';
+import { kennzahlen as kennzahlenVon, nimmAuf, unterschied, unterschiedText, uebernehmeVariante, vorschauRahmen } from './varianten.js';
 
 const fmt = (n, d = 1) => n.toFixed(d).replace('.', ',');
 /** Zoom-Anzeige: zwei Stellen bei kleinen, eine bei großen Werten, Komma als Dezimalzeichen. */
@@ -49,6 +50,14 @@ html, body { margin: 0; height: 100%; background: #14121a; color: #e8e6ee; font:
 #tf-inhalt { overflow: auto; padding: 6px 8px 8px; }
 #tf-inhalt .palette-titel { font-size: 13px; margin: 6px 0 4px; }
 #botfeld { position: absolute; bottom: 8px; right: 8px; width: 440px; max-width: calc(100% - 16px); max-height: 45%; overflow: auto; background: rgba(34,31,43,.96); border: 1px solid #4b4560; border-radius: 6px; padding: 6px 8px; box-sizing: border-box; z-index: 4; }
+#variantenfeld { position: absolute; top: 8px; left: 8px; right: 8px; max-height: calc(100% - 16px); overflow: auto; background: rgba(34,31,43,.97); border: 1px solid #4b4560; border-radius: 6px; padding: 8px 10px; box-sizing: border-box; z-index: 5; }
+#variantenfeld h3 { font-size: 13px; margin: 0 0 6px; } #variantenfeld .vkopf { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+#variantenfeld .vreihe { display: flex; gap: 10px; align-items: flex-start; overflow-x: auto; padding-bottom: 4px; }
+#variantenfeld .vkachel { flex: 0 0 auto; width: 280px; border: 1px solid #4b4560; border-radius: 6px; padding: 6px; background: #2a2636; } #variantenfeld .vkachel.aktuell { border-color: #6bbf86; }
+#variantenfeld .vkachel canvas { display: block; width: 280px; height: 170px; border-radius: 4px; } #variantenfeld .vkachel .vname { font-weight: bold; margin: 4px 0 2px; word-break: break-all; }
+#variantenfeld .vkachel .vzahlen, #variantenfeld .vkachel .vdiff { font-size: 12px; color: #c4bfd8; margin: 2px 0; } #variantenfeld .vkachel .vdiff { color: #ffd36b; }
+#variantenfeld .vkachel .muss { color: #ff8a7a; } #variantenfeld .vkachel .gut { color: #7fd69a; } #variantenfeld .vkachel .vknoepfe { display: flex; gap: 6px; margin-top: 4px; }
+#b-varianten.an { background: #4a4170; }
 #botfeld h3 { font-size: 13px; margin: 0 0 4px; }
 #botfeld .bm { display: block; width: 100%; text-align: left; white-space: normal; margin: 2px 0; }
 #botfeld .bm.ok { border-color: #3f9d5e; } #botfeld .bm.tod, #botfeld .bm.stecken, #botfeld .bm.zeit { border-color: #ff6a5a; } #botfeld .bm.nicht-spielbar { border-color: #6b6780; color: #a9a5bd; }
@@ -136,6 +145,9 @@ export function startEditor() {
     stempelId: null, // der Stempel, den das Stempel-Werkzeug setzt
     stempelName: '', // Name für den nächsten Stempel (Eingabefeld rechts)
     stempelKaputt: false, // stempel.json war beim Laden ungültig: nicht überschreiben
+    varianten: [], // Varianten des offenen Gebiets (nur Ansicht, Stufe 10): [{ id, name, datei, gebiet, kennzahlen }]
+    variantenOffen: false, // Varianten-Fenster sichtbar
+    variantenZaehler: 0,
     notizFokus: null, // ID einer eben gesetzten Notiz: der Cursor springt in ihr Textfeld
   };
   const ansicht = new Ansicht();
@@ -267,10 +279,14 @@ export function startEditor() {
   prueferFeld.style.display = 'none';
   plan.append(prueferFeld);
   const botKnopf = knopf('Bot-Spieltest', 'Ein Bot fliegt jedes Level des Gebiets im Fenster-Prototyp ab und meldet Tod, Steckenbleiben und nicht spielbare Level mit Bezeichnung (Klick auf eine Meldung springt zur Stelle)', () => botSpieltest(), 'b-bot');
+  const variantenFeld = el('div', { id: 'variantenfeld' });
+  variantenFeld.style.display = 'none';
+  plan.append(variantenFeld);
+  const variantenKnopf = knopf('Varianten', 'Mehrere Fassungen dieses Gebiets nebeneinander ansehen und eine übernehmen (Y)', () => variantenUmschalten(), 'b-varianten');
   const botFeld = el('div', { id: 'botfeld' });
   botFeld.style.display = 'none';
   plan.append(botFeld);
-  const unten = el('div', { id: 'unten', class: 'leiste' }, [play, schieber, fahrtText, prueferKnopf, botKnopf, spielKnopf, bezKnopf, bezFeld, melden]);
+  const unten = el('div', { id: 'unten', class: 'leiste' }, [play, schieber, fahrtText, prueferKnopf, botKnopf, variantenKnopf, spielKnopf, bezKnopf, bezFeld, melden]);
   const wurzel = el('div', { id: 'editor' }, [oben, werk, hinweisZeile, plan, rechts, unten]);
   document.body.append(wurzel);
 
@@ -300,6 +316,7 @@ export function startEditor() {
       state.kameras.welt = kamera();
       state.ansichtArt = 'gebiet';
     }
+    if (id !== state.gebietId) state.varianten = []; // Varianten gehören zu einem Gebiet
     bezFeld.style.display = 'none'; // die kopierte Bezeichnung gehörte zum alten Gebiet
     melde('');
     state.gebietId = id;
@@ -597,6 +614,94 @@ export function startEditor() {
         b.addEventListener('click', () => botSpringe(r));
         return b;
       }),
+    );
+  }
+
+  // ---------------------------------------------------------------- Varianten (Stufe 10)
+  function variantenUmschalten() {
+    if (state.ansichtArt === 'welt') return melde('Varianten: erst ein Gebiet öffnen (Doppelklick in der Welt).', 'fehler');
+    state.variantenOffen = !state.variantenOffen;
+    refresh();
+  }
+  /** Mehrere Dateien wählen und als Varianten des offenen Gebiets danebenlegen. Ungültige Dateien werden gemeldet, die übrigen trotzdem aufgenommen. */
+  async function variantenLaden() {
+    let dateien;
+    try {
+      dateien = await state.speicher.ladeMehrere();
+    } catch (e) {
+      return melde(e.message, 'fehler');
+    }
+    variantenAufnehmen(dateien);
+  }
+  function variantenAufnehmen(dateien) {
+    const probleme = [];
+    for (const d of dateien) {
+      try {
+        state.varianten = nimmAuf(state.varianten, d.text, d.name, ++state.variantenZaehler);
+      } catch (e) {
+        probleme.push(`„${d.name}“: ${e.message}`);
+      }
+    }
+    state.variantenOffen = true;
+    if (probleme.length) melde('Nicht als Variante geladen (das Gebiet bleibt unverändert):\n' + probleme.join('\n'), 'fehler');
+    else if (dateien.length) melde('');
+    refresh();
+  }
+  function variantEntfernen(id) {
+    state.varianten = state.varianten.filter((v) => v.id !== id);
+    refresh();
+  }
+  /** Das offene Gebiet bekommt den Inhalt der Variante (ID und Name bleiben). Ein Schritt, mit Strg+Z zurückzunehmen. */
+  function variantUebernehmen(id) {
+    const v = state.varianten.find((x) => x.id === id);
+    if (!v) return;
+    if (unterschied(gebiet(), v.gebiet).gleich) return melde(`„${v.name}“ ist mit dem aktuellen Gebiet identisch – nichts zu übernehmen.`);
+    const erg = aendere(`Variante „${v.name}“ übernehmen`, (g) => uebernehmeVariante(g, v.gebiet));
+    if (erg === true) {
+      state.auswahl = null;
+      state.mehrfach = [];
+      state.fahrt = null;
+      const g = gebiet();
+      if (g.gaenge.length) waehle({ art: 'gang', id: g.gaenge[0].id });
+      alles();
+      melde(`Variante „${v.name}“ übernommen (Strg+Z nimmt sie zurück). Speichern schreibt sie in ${g.id}.json.`);
+    }
+    return erg;
+  }
+  function vorschauCanvas(g) {
+    const c = el('canvas', { width: 280, height: 170 });
+    const a = new Ansicht(280, 170);
+    a.einpassen(vorschauRahmen(g));
+    zeichnePlan(c.getContext('2d'), g, a, { beschriftung: false, look: state.look === 'tileset' ? tilesetFarben(g.tileset) : undefined }, 1);
+    return c;
+  }
+  function kachel(titel, g, zahlen, extra, aktuell) {
+    const k = zahlen;
+    return el('div', { class: 'vkachel' + (aktuell ? ' aktuell' : ''), 'data-variante': aktuell ? 'aktuell' : extra.id }, [
+      vorschauCanvas(g),
+      el('div', { class: 'vname', text: titel }),
+      el('div', { class: 'vzahlen', text: `${k.knoten} Knoten · ${k.gaenge} Gänge · ${k.formteile} Formteile · ${k.objekte} Objekte · ${k.gegner} Gegner · ${k.notizen} Notizen` }),
+      el('div', { class: 'vzahlen ' + (k.muss ? 'muss' : 'gut'), text: k.muss || k.soll ? `Prüfer: ${k.muss} MUSS · ${k.soll} SOLL` : 'Prüfer: ✓ in Ordnung' }),
+      ...(aktuell ? [] : [el('div', { class: 'vdiff', text: 'Unterschied zum aktuellen Gebiet: ' + unterschiedText(unterschied(gebiet(), g)) }), el('div', { class: 'vknoepfe' }, [
+        knopf('Übernehmen', 'Das aktuelle Gebiet bekommt den Inhalt dieser Variante (Strg+Z nimmt es zurück)', () => variantUebernehmen(extra.id), 'b-v-uebernehmen-' + extra.id),
+        knopf('Entfernen', 'Variante aus dem Vergleich nehmen (die Datei bleibt)', () => variantEntfernen(extra.id), 'b-v-entfernen-' + extra.id),
+      ])]),
+    ]);
+  }
+  function variantenZeigen() {
+    variantenKnopf.classList.toggle('an', state.variantenOffen && state.ansichtArt !== 'welt');
+    const offen = state.variantenOffen && state.ansichtArt !== 'welt';
+    variantenFeld.style.display = offen ? '' : 'none';
+    if (!offen) return;
+    const g = gebiet();
+    variantenFeld.replaceChildren(
+      el('h3', { text: `Varianten von „${g.name}“ – ${state.varianten.length} neben dem aktuellen Stand` }),
+      el('div', { class: 'vkopf' }, [
+        knopf('Varianten laden …', 'Eine oder mehrere Gebietsdateien wählen und danebenlegen', () => variantenLaden(), 'b-v-laden'),
+        knopf('Schließen', 'Varianten-Fenster zu (die geladenen Varianten bleiben)', () => variantenUmschalten(), 'b-v-zu'),
+        el('span', { class: 'grau', text: 'Varianten ändern nichts, bis „Übernehmen“ gedrückt wird.' }),
+      ]),
+      el('div', { class: 'vreihe' }, [kachel('Aktuell: ' + g.name, g, kennzahlenVon(g), null, true), ...state.varianten.map((v) => kachel(v.name + (v.datei !== v.name + '.json' ? ` (${v.datei})` : ''), v.gebiet, v.kennzahlen, v, false))]),
     );
   }
 
@@ -1621,7 +1726,7 @@ export function startEditor() {
         state.notizFokus = null;
       }
     }
-    rechts.append(el('p', { class: 'grau', text: 'Linksklick wählt (Strg+Klick ergänzt, Ziehen im Leeren = Rahmen, Strg+A alles), Ziehen und Pfeile (Umschalt ×5) verschieben die Auswahl. Rechtsklick setzt das Element, das du mit G K B W H X M U A oder in der Palette wählst; ist etwas gewählt, kopiert er es. Mittlere Taste oder Shift+Ziehen verschiebt den Plan, das Mausrad zoomt (+ − 1 2, Pos1 = alles). Doppelklick oder Enter öffnet das Level, Esc geht eine Ebene hoch. R dreht ein Teil, Strg+C/V/D, nur Entf löscht, Strg+Z/Y Rückgängig/Wiederholen, Strg+S Speichern, P Spielen ab hier (Esc zurück), N Bezeichnung kopieren, Z Bot-Spieltest, Q/E drehen die Ansicht, 0 Norden, F wie im Spiel, J Look, T Welt, Leertaste Fahrt.' }));
+    rechts.append(el('p', { class: 'grau', text: 'Linksklick wählt (Strg+Klick ergänzt, Ziehen im Leeren = Rahmen, Strg+A alles), Ziehen und Pfeile (Umschalt ×5) verschieben die Auswahl. Rechtsklick setzt das Element, das du mit G K B W H X M U A oder in der Palette wählst; ist etwas gewählt, kopiert er es. Mittlere Taste oder Shift+Ziehen verschiebt den Plan, das Mausrad zoomt (+ − 1 2, Pos1 = alles). Doppelklick oder Enter öffnet das Level, Esc geht eine Ebene hoch. R dreht ein Teil, Strg+C/V/D, nur Entf löscht, Strg+Z/Y Rückgängig/Wiederholen, Strg+S Speichern, P Spielen ab hier (Esc zurück), N Bezeichnung kopieren, Z Bot-Spieltest, Y Varianten nebeneinander, Q/E drehen die Ansicht, 0 Norden, F wie im Spiel, J Look, T Welt, Leertaste Fahrt.' }));
   }
   function refreshFahrt() {
     if (state.ansichtArt === 'welt') {
@@ -1659,6 +1764,7 @@ export function startEditor() {
     redoKnopf.textContent = v.kannVor ? `Wiederholen: ${v.naechsteAktion}` : 'Wiederholen';
     const au = state.auswahl;
     botKnopf.disabled = inWelt;
+    variantenKnopf.disabled = inWelt;
     spielKnopf.disabled = inWelt || !(au?.art === 'gang' && state.fahrt);
     bezKnopf.disabled = inWelt || !(au?.art === 'gang' || au?.art === 'knoten');
     for (const w of WERKZEUGE) document.getElementById('t-' + w.id)?.classList.toggle('an', !inWelt && w.id === state.werkzeug);
@@ -1667,6 +1773,7 @@ export function startEditor() {
     for (const eb of EBENEN) document.getElementById('l-' + eb.id)?.classList.toggle('an', state.gesperrt.has(eb.id));
     prueferZeigen();
     botZeigen();
+    variantenZeigen();
     tilesetFensterZeigen();
     loeschKnopf.disabled = inWelt ? state.weltAuswahl?.art !== 'uebergang' : !(au && (au.art === 'gang' || au.art === 'knoten' || istTeilArt(au.art)));
     const offen = inWelt ? weltUngespeichert() : ungespeichert() || weltUngespeichert() || stempelUngespeichert();
@@ -1819,6 +1926,7 @@ export function startEditor() {
     else if (c === KUERZEL.spielen) spielenAb();
     else if (c === KUERZEL.bezeichnung) kopiereBezeichnung();
     else if (c === KUERZEL.bot) botSpieltest();
+    else if (c === KUERZEL.varianten) variantenUmschalten();
     else if (c === KUERZEL.fahrtStart) fahrtUmschalten();
     else if (c === KUERZEL.fahrtVor) setzeFahrt((state.fahrt?.s || 0) + 20);
     else if (c === KUERZEL.fahrtZurueck) setzeFahrt((state.fahrt?.s || 0) - 20);
@@ -1848,6 +1956,8 @@ export function startEditor() {
       abbrechen(); // ein laufender Zug (Ziehen, Aufziehen) wird verworfen, nichts ändert sich
       if (lief) {
         /* nur der Zug endet */
+      } else if (state.variantenOffen && state.ansichtArt !== 'welt') {
+        variantenUmschalten(); // Esc schließt zuerst das Varianten-Fenster
       } else if (state.ansichtArt === 'welt') {
         if (state.weltAuswahl) weltWaehle(null);
       } else if (state.levelGang) {
@@ -1924,6 +2034,10 @@ export function startEditor() {
     pruefer,
     prueferUmschalten,
     botSpieltest,
+    variantenUmschalten,
+    variantenAufnehmen,
+    variantUebernehmen,
+    variantEntfernen,
     botErgebnis: () => botLauf,
     springe,
     kopiereBezeichnung,
