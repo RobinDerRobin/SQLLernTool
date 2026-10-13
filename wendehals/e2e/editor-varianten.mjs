@@ -74,7 +74,7 @@ await fc.setFiles([
 await page.waitForTimeout(300);
 k = await kacheln();
 check(k.length === 3 && k.map((x) => x.name).join('|').includes('mit-wand') && k.map((x) => x.name).join('|').includes('ohne-gang'), 'zwei gültige Varianten liegen neben dem aktuellen Stand', JSON.stringify(k));
-const meldung = await page.locator('#melden').textContent();
+const meldung = await page.locator('#vmeldung').textContent(); // steht im Fenster selbst (die untere Leiste ist zu schmal)
 check(meldung.includes('kaputt.json') && meldung.includes('kein gültiges JSON'), 'kaputte Datei: verständliche Meldung, die anderen sind trotzdem da', meldung);
 check((await gebietJetzt()) === original, 'Laden und Ansehen ändert keine Daten');
 check(k[1].diff.includes('+1 Objekte') && k[2].diff.includes('−1 Gänge'), 'Unterschied zum aktuellen Gebiet steht an der Kachel', k.map((x) => x.diff).join(' / '));
@@ -100,6 +100,25 @@ check((await kacheln()).length === 2, 'Entfernen nimmt die Kachel heraus');
 check((await gebietJetzt()) === original, 'Entfernen ändert keine Daten');
 await ed((e) => e.wechsle('beispiel'));
 check((await kacheln()).length === 1, 'Gebietswechsel: Varianten gehören zum Gebiet und sind weg');
+
+// ---- Fenster ist modal: Strg+A und Entf wirken nicht auf das verdeckte Gebiet; die Meldung steht im Fenster
+const vorTasten = await gebietJetzt();
+await page.keyboard.press('Control+KeyA');
+await page.keyboard.press('Delete');
+await page.keyboard.press('KeyG');
+check((await gebietJetzt()) === vorTasten, 'bei offenem Fenster ändern Strg+A, Entf und G nichts am Gebiet');
+check((await page.locator('#vmeldung').textContent()).includes('Varianten-Fenster ist offen'), 'Hinweis steht im Fenster selbst');
+// ---- kaputte Datei bei vollen Plätzen: richtige Ursache, Meldung im Fenster
+await ed((e) => {
+  const t = JSON.stringify(e.gebiet());
+  for (let i = 0; i < 6; i++) e.variantenAufnehmen([{ name: `fuell${i}.json`, text: t }]);
+  e.variantenAufnehmen([{ name: 'kaputt2.json', text: '{ kaputt' }]);
+});
+const vm = await page.locator('#vmeldung').textContent();
+check(vm.includes('kaputt2.json') && vm.includes('kein gültiges JSON'), 'kaputte Datei bei vollen Plätzen: Ursache ist die Datei, nicht die Grenze', vm);
+check((await kacheln()).length === 5, 'höchstens 4 Varianten neben dem aktuellen Stand');
+check(await page.evaluate(() => document.querySelector('#variantenfeld .vkachel:nth-child(2) button').disabled), 'Übernehmen ist bei identischer Variante aus');
+while ((await kacheln()).length > 1) await page.click('#variantenfeld .vkachel:nth-child(2) button:has-text("Entfernen")');
 
 // ---- Übergangsknoten: Hinweis an der Kachel und Warnung nach dem Übernehmen (beispiel/K5 hat einen Übergang)
 await ed((e) => {

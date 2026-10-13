@@ -52,6 +52,7 @@ html, body { margin: 0; height: 100%; background: #14121a; color: #e8e6ee; font:
 #botfeld { position: absolute; bottom: 8px; right: 8px; width: 440px; max-width: calc(100% - 16px); max-height: 45%; overflow: auto; background: rgba(34,31,43,.96); border: 1px solid #4b4560; border-radius: 6px; padding: 6px 8px; box-sizing: border-box; z-index: 4; }
 #variantenfeld { position: absolute; top: 8px; left: 8px; right: 8px; max-height: calc(100% - 16px); overflow: auto; background: rgba(34,31,43,.97); border: 1px solid #4b4560; border-radius: 6px; padding: 8px 10px; box-sizing: border-box; z-index: 5; }
 #variantenfeld h3 { font-size: 13px; margin: 0 0 6px; } #variantenfeld .vkopf { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+#variantenfeld .vmeldung { white-space: pre-wrap; color: #ffb4a8; background: #3a2a2e; border: 1px solid #8c3b3b; border-radius: 4px; padding: 4px 8px; margin-bottom: 8px; font-size: 12px; } #variantenfeld .vkachel button:disabled { opacity: .45; }
 #variantenfeld .vreihe { display: flex; gap: 10px; align-items: flex-start; overflow-x: auto; padding-bottom: 4px; }
 #variantenfeld .vkachel { flex: 0 0 auto; width: 280px; border: 1px solid #4b4560; border-radius: 6px; padding: 6px; background: #2a2636; } #variantenfeld .vkachel.aktuell { border-color: #6bbf86; }
 #variantenfeld .vkachel canvas { display: block; width: 280px; height: 170px; border-radius: 4px; } #variantenfeld .vkachel .vname { font-weight: bold; margin: 4px 0 2px; word-break: break-all; }
@@ -148,6 +149,7 @@ export function startEditor() {
     varianten: [], // Varianten des offenen Gebiets (nur Ansicht, Stufe 10): [{ id, name, datei, gebiet, kennzahlen }]
     variantenOffen: false, // Varianten-Fenster sichtbar
     variantenZaehler: 0,
+    variantenMeldung: '', // Ladefehler und Hinweise, im Varianten-Fenster selbst gezeigt (die untere Leiste ist zu schmal)
     notizFokus: null, // ID einer eben gesetzten Notiz: der Cursor springt in ihr Textfeld
   };
   const ansicht = new Ansicht();
@@ -316,7 +318,10 @@ export function startEditor() {
       state.kameras.welt = kamera();
       state.ansichtArt = 'gebiet';
     }
-    if (id !== state.gebietId) state.varianten = []; // Varianten gehören zu einem Gebiet
+    if (id !== state.gebietId && state.varianten.length) {
+      state.varianten = []; // Varianten gehören zu einem Gebiet
+      state.variantenMeldung = 'Varianten gehören zum Gebiet und wurden beim Wechsel entfernt (die Dateien sind unverändert).';
+    }
     bezFeld.style.display = 'none'; // die kopierte Bezeichnung gehörte zum alten Gebiet
     melde('');
     state.gebietId = id;
@@ -621,6 +626,7 @@ export function startEditor() {
   function variantenUmschalten() {
     if (state.ansichtArt === 'welt') return melde('Varianten: erst ein Gebiet öffnen (Doppelklick in der Welt).', 'fehler');
     state.variantenOffen = !state.variantenOffen;
+    if (!state.variantenOffen) state.variantenMeldung = '';
     refresh();
   }
   /** Mehrere Dateien wählen und als Varianten des offenen Gebiets danebenlegen. Ungültige Dateien werden gemeldet, die übrigen trotzdem aufgenommen. */
@@ -643,12 +649,13 @@ export function startEditor() {
       }
     }
     state.variantenOffen = true;
-    if (probleme.length) melde('Nicht als Variante geladen (das Gebiet bleibt unverändert):\n' + probleme.join('\n'), 'fehler');
-    else if (dateien.length) melde('');
+    if (probleme.length) state.variantenMeldung = 'Nicht als Variante geladen (das Gebiet bleibt unverändert):\n' + probleme.join('\n');
+    else if (dateien.length) state.variantenMeldung = '';
     refresh();
   }
   function variantEntfernen(id) {
     state.varianten = state.varianten.filter((v) => v.id !== id);
+    state.variantenMeldung = '';
     refresh();
   }
   /** Das offene Gebiet bekommt den Inhalt der Variante (ID und Name bleiben). Ein Schritt, mit Strg+Z zurückzunehmen. */
@@ -694,7 +701,11 @@ export function startEditor() {
       el('div', { class: 'vzahlen', text: `${k.knoten} Knoten · ${k.gaenge} Gänge · ${k.formteile} Formteile · ${k.objekte} Objekte · ${k.gegner} Gegner · ${k.notizen} Notizen` }),
       el('div', { class: 'vzahlen ' + (k.muss ? 'muss' : 'gut'), text: k.muss || k.soll ? `Prüfer: ${k.muss} MUSS · ${k.soll} SOLL` : 'Prüfer: ✓ in Ordnung' }),
       ...(aktuell ? [] : [el('div', { class: 'vdiff', text: 'Unterschied zum aktuellen Gebiet: ' + unterschiedText(unterschied(gebiet(), g)) + uebergangsHinweis(g) }), el('div', { class: 'vknoepfe' }, [
-        knopf('Übernehmen', 'Das aktuelle Gebiet bekommt den Inhalt dieser Variante (Strg+Z nimmt es zurück)', () => variantUebernehmen(extra.id), 'b-v-uebernehmen-' + extra.id),
+        (() => {
+          const b = knopf('Übernehmen', 'Das aktuelle Gebiet bekommt den Inhalt dieser Variante (Strg+Z nimmt es zurück)', () => variantUebernehmen(extra.id), 'b-v-uebernehmen-' + extra.id);
+          b.disabled = unterschied(gebiet(), g).gleich; // identisch: nichts zu übernehmen
+          return b;
+        })(),
         knopf('Entfernen', 'Variante aus dem Vergleich nehmen (die Datei bleibt)', () => variantEntfernen(extra.id), 'b-v-entfernen-' + extra.id),
       ])]),
     ]);
@@ -712,6 +723,7 @@ export function startEditor() {
         knopf('Schließen', 'Varianten-Fenster zu (die geladenen Varianten bleiben)', () => variantenUmschalten(), 'b-v-zu'),
         el('span', { class: 'grau', text: 'Varianten ändern nichts, bis „Übernehmen“ gedrückt wird.' }),
       ]),
+      ...(state.variantenMeldung ? [el('div', { class: 'vmeldung', id: 'vmeldung', text: state.variantenMeldung })] : []),
       el('div', { class: 'vreihe' }, [kachel('Aktuell: ' + g.name, g, kennzahlenVon(g), null, true), ...state.varianten.map((v) => kachel(v.name + (v.datei !== v.name + '.json' ? ` (${v.datei})` : ''), v.gebiet, v.kennzahlen, v, false))]),
     );
   }
@@ -1900,6 +1912,19 @@ export function startEditor() {
   );
   window.addEventListener('keydown', (e) => {
     if (state.spielen?.aktiv) return; // im Spielmodus gehören die Tasten dem Spiel
+    if (state.variantenOffen && state.ansichtArt !== 'welt' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLSelectElement) && !(e.target instanceof HTMLTextAreaElement)) {
+      // Das Varianten-Fenster verdeckt den Plan: nur Schließen (Y, Esc) und Strg+Z/Y/S gehen durch, alles andere wirkte sonst unsichtbar auf das Gebiet dahinter
+      const mit = (e.ctrlKey || e.metaKey) && !e.altKey;
+      const erlaubt = mit ? [KUERZEL.rueckgaengig, KUERZEL.wiederholen, KUERZEL.speichern].includes(e.code) : [KUERZEL.varianten, 'Escape'].includes(e.code);
+      if (!erlaubt) {
+        if (!e.repeat && !['ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight'].includes(e.code)) {
+          state.variantenMeldung = 'Das Varianten-Fenster ist offen – Y oder Esc schließt es, dann gelten die Tasten wieder für das Gebiet.';
+          variantenZeigen();
+        }
+        e.preventDefault();
+        return;
+      }
+    }
     const textFeld = (e.target instanceof HTMLInputElement && !['range', 'checkbox', 'button'].includes(e.target.type) && !e.target.readOnly) || e.target instanceof HTMLTextAreaElement;
     const imFeld = e.target instanceof HTMLSelectElement || textFeld; // Schieber, Knöpfe und das schreibgeschützte Bezeichnungsfeld nehmen keine Kürzel weg
     if ((e.ctrlKey || e.metaKey) && !e.altKey) {

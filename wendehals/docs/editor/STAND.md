@@ -2,7 +2,7 @@
 
 > Wird von jedem Bau-Lauf gepflegt (Brief: [`BRIEF.md`](BRIEF.md), Abschnitt 7). Zeiten in Europe/Berlin.
 
-**Sperre:** belegt seit 13.10.2026 02:45, Lauf 12 (Sonnet 5.5, Session 01UDCjzuRfJqVss4PzEeoauo)
+**Sperre:** frei
 
 ## Stufen
 
@@ -19,7 +19,7 @@
 | 7b | Bedienung (Brief: BRIEF-7b-bedienung.md) | fertig: A0–A8 und Fehler „Spielen ab hier“ erfüllt (Electron ungetestet; obere Leisten bei 1280 px scrollen waagerecht) | npm test 422, e2e, e2e:editor (neu: e2e/editor-bedienung.mjs), beide Test-Agenten | Lauf 9 |
 | 8 | Notizen und Stempel | fertig (Electron ungetestet; Stempel nur per Rechtsklick, kein Vorschaubild in der Liste) | npm test 435, e2e, e2e:editor (neu: e2e/editor-notizen.mjs), beide Test-Agenten | Lauf 10 |
 | 9 | Bot-Spieltest | fertig: Knopf/Taste Z, Liste mit Bezeichnung, Sprung zur Stelle (Electron ungetestet; Bot fliegt nur Hinweg, kein Rückweg; weicht nicht in Nischen außerhalb des Gangs aus; Diagonalen nicht spielbar) | npm test 444, e2e, e2e:editor (neu: e2e/editor-bot.mjs), beide Test-Agenten | Lauf 11 |
-| 10 | KI-Varianten nebeneinander | offen | – | – |
+| 10 | KI-Varianten nebeneinander | fertig: Knopf/Taste Y, bis 4 Varianten per Mehrfach-Dateiwahl, Kacheln mit Vorschau, Zahlen, Prüferstand, Unterschied; Übernehmen mit Strg+Z (Electron ungetestet; Varianten nur über den Dateidialog, kein Ordner `levels/varianten/`; Kacheln scrollen waagerecht ohne sichtbare Leiste) | npm test 451, e2e, e2e:editor (neu: e2e/editor-varianten.mjs), beide Test-Agenten | Lauf 12 |
 | 11 | Abschluss | offen | – | – |
 
 ## Verbindliche Anforderungen von Robin – gelten für jeden Lauf (Liste: BRIEF.md Abschnitt 9)
@@ -142,6 +142,7 @@ umsetzen** (höchste Priorität), danach weiter mit den Stufen. **Fehler zuerst 
 | 12.10.2026 18:34 | Lauf 9 (Sonnet 5.5, Bau-Session 7b) | Stufe 7b gebaut (A0–A8), Agenten-Befunde behoben, gepusht |
 | 13.10.2026 01:12 | Lauf 10 (Sonnet 5.5) | Stufe 8 gebaut (Notizen, Stempel), Prüfkette grün, Agenten-Befunde (Fehler) behoben, gepusht |
 | 13.10.2026 01:47 | Lauf 11 (Sonnet 5.5) | Stufe 9 gebaut (Bot-Spieltest), Kette grün, Agenten ohne Fehler; Hinweise teils behoben. Einmaliger e2e-Smoke-Fehler (Drehscheibe) trat 2× auf, danach 3× grün, ohne Basisvergleich eindeutig: Flake |
+| 13.10.2026 02:38 | Lauf 12 (Sonnet 5.5) | Stufe 10 gebaut (Varianten), Kette grün, Agenten-Befunde behoben (Übergangsknoten-Warnung, Vergleich nach Reihenfolge/unbekannten Feldern, Fenster modal, Meldung im Fenster). P3-Branch nicht gemergt: unverbundene Historie, Editor-Branch enthält ihn schon |
 
 ## Auf Vorbehalt entschieden (Stufe 7b)
 
@@ -175,3 +176,13 @@ umsetzen** (höchste Priorität), danach weiter mit den Stufen. **Fehler zuerst 
 ## Offen aus Stufe 9
 
 - Kein Rückweg, keine Gegner, Ausweichen in Nischen außerhalb des Gangs fehlt; Liste ohne Schließen-Kreuz, verdeckt Plan unten rechts; Lauf blockiert synchron (Netz ≈ 0,5 s).
+
+## Auf Vorbehalt entschieden (Stufe 10)
+
+- Variante = Gebietsdatei, per Dateidialog (Mehrfachauswahl) geladen; liegt nur in der Ansicht (`state.varianten`), nie in `welt.json`; Gebietswechsel leert sie mit Hinweis. Höchstens 4 (`MAX_VARIANTEN`). Taste `Y`, Fenster ist modal (nur Y, Esc, Strg+Z/Y/S gehen durch).
+- Übernehmen = Inhalt der Variante ins offene Gebiet, **ID und Name bleiben**; ein Rückgängig-Schritt. Vergleich nach IDs, mit Reihenfolge und allen Feldern. Warnung, wenn ein Knoten mit Übergang geändert würde.
+- P3-Branch (`claude/wendehals-p3-45grad`): `git merge` meldet „unrelated histories“ (Historie neu aufgebaut); nicht gemergt, nichts am Spiel geändert.
+
+## Offen aus Stufe 10
+
+- Kein Ordner `levels/varianten/` (Electron-Preload erlaubt nur bekannte Pfade); Bot-Ergebnis je Variante fehlt; Kacheln: kein sichtbares Scrollzeichen; Fenster wird bei jedem `refresh()` neu aufgebaut (Scrollposition der Kachelreihe geht verloren); Varianten-Fenster bleibt beim Wechsel in die Welt als „offen“ gemerkt.

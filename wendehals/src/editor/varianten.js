@@ -92,8 +92,9 @@ export function uebernehmeVariante(g, variante) {
 
 /** Variante in die Liste aufnehmen (höchstens MAX_VARIANTEN). Gibt die neue Liste zurück oder wirft einen Error. */
 export function nimmAuf(liste, text, datei, zaehler) {
+  const neu = ladeVariante(text, datei, zaehler); // erst die Datei prüfen: eine kaputte Datei heißt „kaputt“, auch wenn die Plätze voll sind
   if (liste.length >= MAX_VARIANTEN) throw new Error(`Höchstens ${MAX_VARIANTEN} Varianten nebeneinander – erst eine entfernen.`);
-  return [...liste, ladeVariante(text, datei, zaehler)];
+  return [...liste, neu];
 }
 
 /** Ausdehnung zum Einpassen der Kachelvorschau (leeres Gebiet: kleiner Standardausschnitt). */
