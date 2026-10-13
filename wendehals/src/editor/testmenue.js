@@ -49,7 +49,7 @@ export function startTestmenue({ gebiete = GEBIETE, welt = WELT } = {}) {
   const liste = eintraege(gebiete, welt);
   const wurzel = document.createElement('div');
   wurzel.id = 'testmenue';
-  wurzel.style.cssText = 'position:fixed;inset:0;background:#15131c;color:#e8e6f0;font:18px system-ui,sans-serif;overflow:auto;padding:16px 24px;box-sizing:border-box';
+  wurzel.style.cssText = 'position:fixed;inset:0;background:#15131c;color:#e8e6f0;font:18px system-ui,sans-serif;overflow:auto;padding:16px 24px 64px;box-sizing:border-box;scroll-padding-bottom:64px';
   const kopf = document.createElement('div');
   kopf.textContent = 'Testmenü – Pfeile/Stick wählen · Enter/A startet · Esc/Start im Spiel zurück';
   kopf.style.cssText = 'color:#a9a5bd;margin-bottom:12px;font-size:15px';
@@ -57,7 +57,7 @@ export function startTestmenue({ gebiete = GEBIETE, welt = WELT } = {}) {
   ul.style.cssText = 'list-style:none;margin:0;padding:0';
   const meldung = document.createElement('div');
   meldung.id = 'testmenue-meldung';
-  meldung.style.cssText = 'position:fixed;left:24px;right:24px;bottom:12px;color:#ffb48a;font-size:15px';
+  meldung.style.cssText = 'position:fixed;left:0;right:0;bottom:0;padding:10px 24px;background:#15131c;color:#ffb48a;font-size:15px';
   wurzel.append(kopf, ul, meldung);
   document.body.append(wurzel);
   const zeilen = liste.map((e) => {

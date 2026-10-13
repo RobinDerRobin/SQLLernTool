@@ -1011,7 +1011,9 @@ export function startEditor() {
     const neu = {};
     for (const eintrag of welt.gebiete) {
       try {
-        neu[eintrag.id] = ladeGebiet(alle.gebiete[eintrag.id]);
+        const geladen = ladeGebiet(alle.gebiete[eintrag.id]);
+        if (geladen.id !== eintrag.id) throw new Error(`Die Datei trägt die ID „${geladen.id}“, welt.json nennt „${eintrag.id}“ – übersprungen.`);
+        neu[eintrag.id] = geladen;
       } catch (e) {
         probleme.push(`${eintrag.id}: ${e.message}`);
       }

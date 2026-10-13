@@ -112,6 +112,7 @@ export const PALETTE_PX = 56; // Kantenlänge eines Palettenbilds (Bildschirmpix
 export const KNOTEN_RADIUS_PX = 7; // Knotenmarke (Bildschirmpixel, unabhängig vom Zoom)
 
 // Prüfer (Stufe 4): Abtastung der Regeln in regeln.js
+export const MAX_MESSSTELLEN = 2000; // Obergrenze der Messstellen je Gang (Prüfer M2), damit riesige Dateien den Editor nicht einfrieren
 export const PRUEF_SCHRITT = 20; // Abstand der Messstellen entlang eines Gangs (E)
 export const PRUEF_QUER = 10; // Abstand der Messpunkte quer zum Gang (E)
 export const PRUEF_RAND = 2; // Toleranz am Rand des Bodens (E): Ecken dürfen so weit danebenliegen (Rundung, Raster)

@@ -2,7 +2,7 @@
 
 > Wird von jedem Bau-Lauf gepflegt (Brief: [`BRIEF.md`](BRIEF.md), Abschnitt 7). Zeiten in Europe/Berlin.
 
-**Sperre:** belegt seit 13.10.2026 03:12, Lauf https://claude.ai/code/session_011ZEukSq4Vbt4BqHBGHetRT
+**Sperre:** frei
 
 ## Stufen
 
@@ -20,7 +20,7 @@
 | 8 | Notizen und Stempel | fertig (Electron ungetestet; Stempel nur per Rechtsklick, kein Vorschaubild in der Liste) | npm test 435, e2e, e2e:editor (neu: e2e/editor-notizen.mjs), beide Test-Agenten | Lauf 10 |
 | 9 | Bot-Spieltest | fertig: Knopf/Taste Z, Liste mit Bezeichnung, Sprung zur Stelle (Electron ungetestet; Bot fliegt nur Hinweg, kein Rückweg; weicht nicht in Nischen außerhalb des Gangs aus; Diagonalen nicht spielbar) | npm test 444, e2e, e2e:editor (neu: e2e/editor-bot.mjs), beide Test-Agenten | Lauf 11 |
 | 10 | KI-Varianten nebeneinander | fertig: Knopf/Taste Y, bis 4 Varianten per Mehrfach-Dateiwahl, Kacheln mit Vorschau, Zahlen, Prüferstand, Unterschied; Übernehmen mit Strg+Z (Electron ungetestet; Varianten nur über den Dateidialog, kein Ordner `levels/varianten/`; Kacheln scrollen waagerecht ohne sichtbare Leiste) | npm test 451, e2e, e2e:editor (neu: e2e/editor-varianten.mjs), beide Test-Agenten | Lauf 12 |
-| 11 | Abschluss | offen | – | – |
+| 11 | Abschluss | fertig: EDITOR.md vollständig, PROTOTYPEN nachgezogen, Gesamtprüfung beider Test-Agenten, Fehler behoben (Electron ungetestet) | npm test 453, e2e, e2e:editor, beide Test-Agenten | Lauf 13 |
 
 ## Verbindliche Anforderungen von Robin – gelten für jeden Lauf (Liste: BRIEF.md Abschnitt 9)
 
@@ -186,3 +186,9 @@ umsetzen** (höchste Priorität), danach weiter mit den Stufen. **Fehler zuerst 
 ## Offen aus Stufe 10
 
 - Kein Ordner `levels/varianten/` (Electron-Preload erlaubt nur bekannte Pfade); Bot-Ergebnis je Variante fehlt; Kacheln: kein sichtbares Scrollzeichen; Fenster wird bei jedem `refresh()` neu aufgebaut (Scrollposition der Kachelreihe geht verloren); Varianten-Fenster bleibt beim Wechsel in die Welt als „offen“ gemerkt.
+
+| 13.10.2026 03:12 | Lauf 13 (Sonnet 5.5) | Stufe 11 fertig: Doku, Gesamtprüfung. Behoben: riesige Koordinaten beim Laden (Obergrenze + M2-Messstellen begrenzt), welt.json-ID passt nicht zur Datei (wird übersprungen, mit Meldung), M7 springt zur Stelle, Testmenü scrollt/Statuszeile überlappt nicht mehr. **Editor fertig.** |
+
+## Offen aus Stufe 11 (Hinweise der Gesamtprüfung)
+
+- Stempel anlegen/löschen/umbenennen nicht im Rückgängig-Verlauf; Zahlenfelder nehmen Werte abseits des 20-E-Rasters an; Testmenü zeigt gleichnamige Level (P1c „Netz“: nord/sued/west/ost mehrfach) ohne Unterscheidung; geteilte Gänge heißen beide „Gang 1“; Überschrift in der Welt-Ansicht mit doppelten Anführungszeichen; kein Knopf „Neues Gebiet“; frisch geöffnete identische Datei zählt als „ungespeichert“; Bot-Zeit weicht von der Editor-Flugzeit ab (Startversatz?); Speichern meldet bei Fehler in welt.json/stempel.json „Nicht gespeichert“, obwohl das Gebiet geschrieben ist; Overlaps in der Welt-Ansicht (Beschriftungen). Electron nicht getestet. Smoke-Test `npm run e2e` kann sporadisch rot sein (v0.2-Prüfungen, nicht Editor).
