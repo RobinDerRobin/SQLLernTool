@@ -25,12 +25,19 @@ export const MIN_TEIL = RASTER; // kleinste Länge/Breite eines Teils (E)
 export const KOPIE_VERSATZ = 40; // Versatz einer Kopie, wenn keine Zielstelle bekannt ist (E)
 export const MIN_GANG_LAENGE = RASTER; // kürzere Gänge entstehen beim Ziehen nicht
 export const FANG_PX = 12; // Fangradius für Knoten und Gänge beim Ziehen/Setzen (Bildschirmpixel, wird mit dem Zoom in E umgerechnet)
+export const MAX_VARIANTEN = 4; // so viele Varianten liegen höchstens neben dem aktuellen Gebiet
 export const MAX_KOORD = 20000; // größte erlaubte Koordinate/Maßzahl (E)
 export const VERLAUF_MAX = 200; // Schritte, die Rückgängig zurückgehen kann
 
-/** Zoomstufen als „Bildschirme in der Breite des Plans“. Normalansicht ≈ 2,2 Bildschirme (Brief Abschnitt 1). */
-export const ZOOM_BILDSCHIRME = [0.5, 1, 2.2, 4, 8, 16, 32, 64, 128];
-export const ZOOM_START = 2;
+/** Zoom stufenlos, gemessen in „Bildschirmen in der Breite des Plans“. Normalansicht ≈ 2,2 Bildschirme (Brief Abschnitt 1). */
+export const ZOOM_MIN = 0.25;
+export const ZOOM_MAX = 160;
+export const ZOOM_START = 2.2;
+export const ZOOM_RAD_FAKTOR = 1.15; // eine Mausrad-Raste (deltaY 100) ändert den Maßstab um diesen Faktor (A2: ca. 15 %)
+export const ZOOM_RAD_MAX = 400; // größte Wirkung eines einzelnen Radereignisses (deltaY), schützt vor Sprüngen
+export const ZOOM_TASTE_FAKTOR = 1.25; // Tasten + und − (und die Knöpfe)
+export const ZOOM_FESTWERTE = { eins: 1, normal: 2.2 }; // Tasten 1 und 2
+export const EINPASS_RAND = 1.05; // „Alles“ lässt rundum 5 % Rand
 
 /** Tastenkürzel (KeyboardEvent.code). */
 export const KUERZEL = {
@@ -40,22 +47,28 @@ export const KUERZEL = {
   wieImSpiel: 'KeyF',
   zoomPlus: ['Equal', 'NumpadAdd'],
   zoomMinus: ['Minus', 'NumpadSubtract'],
+  zoomEins: 'Digit1', // 1 Bildschirm (so groß wie im Spiel)
+  zoomNormal: 'Digit2', // Normalansicht 2,2 Bildschirme
   beschriftung: 'KeyL',
   alles: 'Home',
-  werkzeug: { auswahl: 'KeyV', gang: 'KeyG', knoten: 'KeyK', formteil: 'KeyB', wand: 'KeyW', hindernis: 'KeyH', gegner: 'KeyX', bereich: 'KeyA' },
+  werkzeug: { auswahl: 'KeyV', gang: 'KeyG', knoten: 'KeyK', formteil: 'KeyB', wand: 'KeyW', hindernis: 'KeyH', gegner: 'KeyX', notiz: 'KeyM', stempel: 'KeyU', bereich: 'KeyA' },
+  tilesetFenster: 'KeyI', // Tileset-Fenster (A8) ein-/ausblenden
   look: 'KeyJ', // Look umschalten: Prototyp-Farben ↔ Tileset des Gebiets
   welt: 'KeyT', // zwischen Gebiet- und Welt-Ansicht umschalten
   teilDrehen: 'KeyR', // ohne Umschalt 45° rechtsherum, mit Umschalt linksherum
+  alleWaehlen: 'KeyA', // mit Strg/Cmd (ohne Strg ist A das Bereich-Werkzeug)
   kopieren: 'KeyC', // mit Strg/Cmd
   einfuegen: 'KeyV', // mit Strg/Cmd
   duplizieren: 'KeyD', // mit Strg/Cmd
-  loeschen: ['Delete', 'Backspace'],
+  loeschen: ['Delete'], // nur Entf (Backspace löscht nicht mehr, A5)
   rueckgaengig: 'KeyZ', // mit Strg/Cmd; mit Umschalt = Wiederholen
   wiederholen: 'KeyY', // mit Strg/Cmd
   speichern: 'KeyS', // mit Strg/Cmd
   oeffnen: 'KeyO', // mit Strg/Cmd
   spielen: 'KeyP', // Spielen ab hier
   bezeichnung: 'KeyN', // Bezeichnung kopieren
+  varianten: 'KeyY', // Varianten-Fenster (Stufe 10; mit Strg ist Y Wiederholen)
+  bot: 'KeyZ', // Bot-Spieltest (ohne Strg; mit Strg ist Z Rückgängig)
   fahrtStart: 'Space',
   fahrtVor: 'BracketRight',
   fahrtZurueck: 'BracketLeft',
@@ -64,14 +77,19 @@ export const KUERZEL = {
   hoch: 'ArrowUp',
   runter: 'ArrowDown',
 };
-export const PFEIL_SCHRITT_PX = 60; // Verschieben mit Pfeiltasten (Bildschirmpixel)
-export const KLICK_TOLERANZ_PX = 5; // Bewegung unter dieser Strecke gilt als Klick, darüber als Verschieben
+export const PFEIL_SCHRITT_PX = 60; // Plan verschieben mit Pfeiltasten (Bildschirmpixel), wenn nichts Bewegbares gewählt ist
+export const PFEIL_GROSS = 5; // Umschalt+Pfeil verschiebt die Auswahl um so viele Rasterschritte
+export const KLICK_TOLERANZ_PX = 8; // Bewegung unter dieser Strecke gilt als Klick, erst darüber beginnt ein Ziehen (A5)
+/** Maustasten (MouseEvent.button): links wählt und zieht, rechts setzt das aktuelle Element, Mitte (und Shift+links) verschiebt den Plan (A1). */
+export const MAUS = { waehlen: 0, verschieben: 1, setzen: 2 };
 
 /** Farben der Bedienelemente im Plan (das Spielbild selbst nutzt FLOOR/FLOOR2/WALL des Prototyps). */
 export const FARBEN = {
   rahmen: '#ffd24a',
   rahmenAussen: 'rgba(0,0,0,0.38)',
   auswahl: '#4ad0ff',
+  hover: 'rgba(255,255,255,0.85)', // Umriss des Dings unter der Maus
+  rahmenAuswahl: '#7fd4ff', // Auswahlrahmen (Linksziehen im Leeren); gestrichelt, wenn Alt = „auch berühren“
   vorschau: '#8dffb0',
   vorschauFalsch: '#ff7a6a',
   knoten: { speicher: '#5be07a', kreuzung: '#e8e8f0', raum: '#c89bff', ende: '#9aa0aa', boss: '#ff6b5e' },
@@ -84,11 +102,17 @@ export const FARBEN = {
   bereich: '#7fb3ff', // Rahmen des Gebiets-Bereichs im Plan
   uebergang: '#ff8ad8', // Übergang zwischen Gebieten
 };
+export const NOTIZ_STANDARD = 'Neue Notiz'; // Text einer neu gesetzten Notiz (Stufe 8)
+export const NOTIZ_MAX = 200; // längster Notiztext (Zeichen)
+export const NOTIZ_ANZEIGE = 48; // im Plan werden längere Texte gekürzt (Zeichen)
+export const STEMPEL_DATEI = 'stempel.json'; // Stempel-Vorlagen in levels/ (Stufe 8)
+export const STEMPEL_MAX = 200; // so viele Stempel höchstens
 export const GEGNER_RADIUS = 14; // Trefferradius eines Gegner-Platzhalters (E)
 export const PALETTE_PX = 56; // Kantenlänge eines Palettenbilds (Bildschirmpixel)
 export const KNOTEN_RADIUS_PX = 7; // Knotenmarke (Bildschirmpixel, unabhängig vom Zoom)
 
 // Prüfer (Stufe 4): Abtastung der Regeln in regeln.js
+export const MAX_MESSSTELLEN = 2000; // Obergrenze der Messstellen je Gang (Prüfer M2), damit riesige Dateien den Editor nicht einfrieren
 export const PRUEF_SCHRITT = 20; // Abstand der Messstellen entlang eines Gangs (E)
 export const PRUEF_QUER = 10; // Abstand der Messpunkte quer zum Gang (E)
 export const PRUEF_RAND = 2; // Toleranz am Rand des Bodens (E): Ecken dürfen so weit danebenliegen (Rundung, Raster)

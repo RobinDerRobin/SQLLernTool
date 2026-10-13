@@ -183,3 +183,23 @@ test('Prüfzeit: 300 Objekte auf 10 Gängen in unter 300 ms', () => {
   pruefeGebiet(g);
   assert.ok(performance.now() - t < 300, `${(performance.now() - t).toFixed(0)} ms`);
 });
+
+test('Stufe 11: M7 springt zur Stelle (Gang mit Ort)', () => {
+  const g = ell();
+  g.knoten[2] = { id: 'K3', typ: 'ende', x: 1200 + 400, y: 800 };
+  const m = von(g, 'M7');
+  assert.ok(m.length > 0);
+  assert.ok(m.every((x) => x.ort && Number.isFinite(x.ort.x)), JSON.stringify(m));
+});
+
+test('Stufe 11: riesige Koordinaten werden beim Laden abgelehnt, M2 bleibt schnell', async () => {
+  const { pruefeFormat } = await import('../src/editor/daten.js');
+  const g = ell();
+  g.knoten[2].x = 3e7;
+  assert.ok(pruefeFormat(g).some((t) => t.includes('Obergrenze')));
+  g.knoten[2].x = 1200; // Format ok, aber M2 mit sehr langem Gang direkt prüfen
+  g.knoten[1].x = 19000;
+  const t0 = Date.now();
+  von(g, 'M2');
+  assert.ok(Date.now() - t0 < 2000);
+});

@@ -1,7 +1,7 @@
 // Datenmodell des Editors: Gebiet laden/prüfen/formatieren, Geometrie von Gängen, Knoten und Formteilen.
 // Reine Daten und Geometrie – kein DOM, läuft auch unter Node (Tests). Einheiten E, x nach Osten, y nach Süden, Winkel in Grad.
 import { HEADINGS, DIR_VEC, headingAngle, HEADING_CODES, DIR_NAMES } from '../core/math.js';
-import { FORMAT, SCREEN_W, SCREEN_H, SPEED, WINKEL_SCHRITT, VERLAUF_MAX } from './konstanten.js';
+import { FORMAT, SCREEN_W, SCREEN_H, SPEED, WINKEL_SCHRITT, VERLAUF_MAX, MAX_KOORD } from './konstanten.js';
 import { KNOTENTYPEN, OBJEKTTYPEN, TILESETS, GEGNER } from './katalog.js';
 
 export const GEBIET_ID = /^(?!(?:con|prn|aux|nul|com\d|lpt\d)$)[a-z0-9][a-z0-9_-]*$/; // gültiger Dateiname (auch unter Windows)
@@ -13,7 +13,7 @@ export const SCHLUESSEL = {
   gebiet: ['format', 'id', 'name', 'tileset', 'bereich', 'knoten', 'gaenge', 'formteile', 'objekte', 'notizen'],
   bereich: ['x0', 'y0', 'x1', 'y1'],
   knoten: ['id', 'typ', 'form', 'x', 'y', 'w', 'h', 'seite'],
-  gang: ['id', 'name', 'von', 'nach', 'breite'],
+  gang: ['id', 'name', 'von', 'nach', 'breite', 'ansicht'], // ansicht: Ausgangsperspektive (A3), fehlt = Norden oben
   formteil: ['id', 'x', 'y', 'laenge', 'breite', 'winkel'],
   objekt: ['id', 'typ', 'art', 'x', 'y', 'laenge', 'breite', 'winkel', 'platzhalter'],
   notiz: ['id', 'x', 'y', 'text'],
@@ -57,6 +57,7 @@ export function pruefeFormat(g) {
   const b = g.bereich;
   if (!b || typeof b !== 'object' || !['x0', 'y0', 'x1', 'y1'].every((k) => zahl0(b[k]))) f('Feld „bereich“ braucht x0, y0, x1, y1 als Zahlen.');
   if (b && zahl0(b.x0) && zahl0(b.x1) && zahl0(b.y0) && zahl0(b.y1) && !(b.x1 > b.x0 && b.y1 > b.y0)) f('Der Bereich ist leer (x1 muss größer als x0 sein, y1 größer als y0).');
+  if (b && ['x0', 'y0', 'x1', 'y1'].some((k) => zahl0(b[k]) && Math.abs(b[k]) > MAX_KOORD * 4)) f(`Der Bereich liegt über der Obergrenze von ${MAX_KOORD * 4} E.`);
   if (typeof g.tileset === 'string' && !Object.hasOwn(TILESETS, g.tileset)) f(`Unbekanntes Tileset „${g.tileset}“.`);
   if (fehler.length) return fehler;
   const zahl = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -70,6 +71,7 @@ export function pruefeFormat(g) {
       else ids.add(o.id);
       const zahlen = { knoten: ['x', 'y'], gang: ['breite'], formteil: ['x', 'y', 'laenge', 'breite', 'winkel'], objekt: ['x', 'y'], notiz: ['x', 'y'] }[art];
       for (const k of zahlen) if (!zahl(o[k])) f(`${wo} (${o.id}): „${k}“ ist keine Zahl.`);
+      for (const k of ['x', 'y', 'w', 'h', 'seite', 'laenge', 'breite']) if (zahl(o[k]) && Math.abs(o[k]) > MAX_KOORD) f(`${wo} (${o.id}): „${k}“ = ${o[k]} liegt über der Obergrenze von ${MAX_KOORD} E.`);
       if (art === 'knoten' && !Object.hasOwn(KNOTENTYPEN, o.typ)) f(`${wo} (${o.id}): unbekannter Knotentyp „${o.typ}“.`);
       if (art === 'knoten' && KNOTENTYPEN[o.typ]?.hatMasse && !(o.w > 0 && o.h > 0)) f(`${wo} (${o.id}): ${KNOTENTYPEN[o.typ].name} braucht Maße w und h (> 0).`);
       if (art === 'knoten' && o.form === 'achteck' && !(o.seite > 0)) f(`${wo} (${o.id}): Achteck braucht „seite“ (> 0).`);
@@ -79,6 +81,7 @@ export function pruefeFormat(g) {
       if (art === 'objekt' && o.typ === 'gegner' && !GEGNER.includes(o.art)) f(`${wo} (${o.id}): unbekannte Gegnerart „${o.art}“.`);
       if (art === 'objekt' && OBJEKTTYPEN[o.typ]?.hatMasse) for (const k of ['laenge', 'breite', 'winkel']) if (!zahl(o[k])) f(`${wo} (${o.id}): „${k}“ ist keine Zahl.`);
       if (art === 'gang') for (const k of ['von', 'nach']) if (typeof o[k] !== 'string') f(`${wo} (${o.id}): „${k}“ fehlt.`);
+      if (art === 'gang' && 'ansicht' in o && !HEADING_CODES.includes(o.ansicht)) f(`${wo} (${o.id}): „ansicht“ muss eine Richtung sein (${HEADING_CODES.join(', ')}), nicht ${JSON.stringify(o.ansicht)}.`);
       if ((art === 'formteil' || (art === 'objekt' && OBJEKTTYPEN[o.typ]?.hatMasse)) && zahl(o.winkel) && Math.abs(o.winkel / WINKEL_SCHRITT - Math.round(o.winkel / WINKEL_SCHRITT)) > EPS) {
         f(`${wo} (${o.id}): Winkel ${o.winkel}° liegt nicht im ${WINKEL_SCHRITT}°-Raster.`);
       }
@@ -258,25 +261,34 @@ export class Verlauf {
     this.max = max;
     this.zurueck = [];
     this.vor = [];
+    this.namenZurueck = []; // Name der Aktion zu jedem Eintrag in `zurueck` (für „Rückgängig: Wand setzen“)
+    this.namenVor = [];
   }
 
-  /** Vor einer Änderung aufrufen (`vorher` = Zustand als Text). Löscht die Wiederholen-Liste. */
-  merke(vorher) {
+  /** Vor einer Änderung aufrufen (`vorher` = Zustand als Text, `name` = was geändert wird). Löscht die Wiederholen-Liste. */
+  merke(vorher, name = 'Änderung') {
     this.zurueck.push(vorher);
-    if (this.zurueck.length > this.max) this.zurueck.shift();
+    this.namenZurueck.push(name);
+    if (this.zurueck.length > this.max) {
+      this.zurueck.shift();
+      this.namenZurueck.shift();
+    }
     this.vor = [];
+    this.namenVor = [];
   }
 
   /** Gibt den vorigen Zustand zurück (oder null) und merkt `aktuell` zum Wiederholen. */
   rueckgaengig(aktuell) {
     if (!this.zurueck.length) return null;
     this.vor.push(aktuell);
+    this.namenVor.push(this.namenZurueck.pop());
     return this.zurueck.pop();
   }
 
   wiederholen(aktuell) {
     if (!this.vor.length) return null;
     this.zurueck.push(aktuell);
+    this.namenZurueck.push(this.namenVor.pop());
     return this.vor.pop();
   }
 
@@ -286,6 +298,16 @@ export class Verlauf {
 
   get kannVor() {
     return this.vor.length > 0;
+  }
+
+  /** Name der Aktion, die Rückgängig zurücknimmt (oder null). */
+  get letzteAktion() {
+    return this.namenZurueck.at(-1) ?? null;
+  }
+
+  /** Name der Aktion, die Wiederholen wieder ausführt (oder null). */
+  get naechsteAktion() {
+    return this.namenVor.at(-1) ?? null;
   }
 }
 

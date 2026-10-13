@@ -24,7 +24,7 @@ function berechne(k, p) {
 export default {
   id: 'gang',
   name: 'Gang',
-  hinweis: 'Ziehen: Gang zeichnen (rastet auf 8 Richtungen und 20 E). Anfang/Ende an einem Knoten oder Gang verbindet. Mittlere/rechte Maustaste verschiebt den Plan.',
+  hinweis: 'Rechts ziehen: Gang zeichnen (rastet auf 8 Richtungen und 20 E). Anfang/Ende an einem Knoten oder Gang verbindet. Linksklick wählt, mittlere Taste verschiebt den Plan.',
   down(k, p) {
     entwurf = { start: { x: p.x, y: p.y }, von: null, ziel: null };
     berechne(k, p);

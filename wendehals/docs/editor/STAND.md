@@ -16,12 +16,20 @@
 | 5 | Gebiete und Übergänge | fertig (Electron ungetestet; „Level zuordnen“ = Gebietsdatei, kein Verschieben von Gängen zwischen Gebieten) | npm test 401, e2e, e2e:editor, beide Test-Agenten | Lauf 6 |
 | 6 | Tilesets und Spielgrafik | fertig (Electron ungetestet; Tileset-Look nur im Editor, „Spielen ab hier“ nutzt weiter Prototyp-Farben) | npm test 406, e2e, e2e:editor, beide Test-Agenten | Lauf 7 |
 | 7 | Testmenü am Deck | fertig (`?testmenue` / `WENDEHALS_TESTMENUE=1`; Electron und echtes Gamepad ungetestet) | npm test 410, e2e, e2e:editor, beide Test-Agenten | Lauf 8 |
-| 8 | Notizen und Stempel | offen | – | – |
-| 9 | Bot-Spieltest | offen | – | – |
-| 10 | KI-Varianten nebeneinander | offen | – | – |
-| 11 | Abschluss | offen | – | – |
+| 7b | Bedienung (Brief: BRIEF-7b-bedienung.md) | fertig: A0–A8 und Fehler „Spielen ab hier“ erfüllt (Electron ungetestet; obere Leisten bei 1280 px scrollen waagerecht) | npm test 422, e2e, e2e:editor (neu: e2e/editor-bedienung.mjs), beide Test-Agenten | Lauf 9 |
+| 8 | Notizen und Stempel | fertig (Electron ungetestet; Stempel nur per Rechtsklick, kein Vorschaubild in der Liste) | npm test 435, e2e, e2e:editor (neu: e2e/editor-notizen.mjs), beide Test-Agenten | Lauf 10 |
+| 9 | Bot-Spieltest | fertig: Knopf/Taste Z, Liste mit Bezeichnung, Sprung zur Stelle (Electron ungetestet; Bot fliegt nur Hinweg, kein Rückweg; weicht nicht in Nischen außerhalb des Gangs aus; Diagonalen nicht spielbar) | npm test 444, e2e, e2e:editor (neu: e2e/editor-bot.mjs), beide Test-Agenten | Lauf 11 |
+| 10 | KI-Varianten nebeneinander | fertig: Knopf/Taste Y, bis 4 Varianten per Mehrfach-Dateiwahl, Kacheln mit Vorschau, Zahlen, Prüferstand, Unterschied; Übernehmen mit Strg+Z (Electron ungetestet; Varianten nur über den Dateidialog, kein Ordner `levels/varianten/`; Kacheln scrollen waagerecht ohne sichtbare Leiste) | npm test 451, e2e, e2e:editor (neu: e2e/editor-varianten.mjs), beide Test-Agenten | Lauf 12 |
+| 11 | Abschluss | fertig: EDITOR.md vollständig, PROTOTYPEN nachgezogen, Gesamtprüfung beider Test-Agenten, Fehler behoben (Electron ungetestet) | npm test 453, e2e, e2e:editor, beide Test-Agenten | Lauf 13 |
+
+## Verbindliche Anforderungen von Robin – gelten für jeden Lauf (Liste: BRIEF.md Abschnitt 9)
+
+Stand 12.10.2026: A0–A8 (Grundsatz Lunar Magic, Rechtsklick bei Auswahl = Kopie, Tileset-Fenster) und A1–A6 (Maus wie Lunar Magic + Shift-Ziehen verschiebt, stufenloser Zoom, Karten-/Levelansicht mit Ausgangsperspektive, Auswahl, Schutz + Strg+Z/Y, kein Feinraster). **Vor jeder neuen Stufe
+umsetzen** (höchste Priorität), danach weiter mit den Stufen. **Fehler zuerst beheben:** „Spielen ab hier“ lehnt einen geraden Gang ab, sobald ein anderer Gang im Gebiet diagonal ist (UX-Bericht). Weitere UX-Vorschläge des Experten (S1–S7, K1–K5)
+(`docs/forschung/2026-10-12-editor-ux-1-ux-experte.md`) sind **keine** Anforderungen, bis Robin sie bestätigt.
 
 ## Fragen an Robin
+
 
 - (keine offen) – Weg der Dateien beantwortet am 11.10.2026: lokaler Klon in einer VM mit Claude Desktop, Editor
   speichert direkt in `wendehals/levels/` (Brief Abschnitt 4).
@@ -102,6 +110,22 @@
 
 - Testmenü als eigener Start `?testmenue` (Electron `WENDEHALS_TESTMENUE=1`), nicht im Spiel-Titel. Je Gang und je Knoten ein Eintrag; Knoten am Gangende: Dackel 120 E vor dem Knoten (Rahmen auf dem Knoten). Im Spiel steht noch der Hinweis „zurück zum Editor“ (kosmetisch). Stick hat kein Auto-Repeat in langen Listen.
 
+## Auf Vorbehalt entschieden (Stufe 8)
+
+- Notiz = neue Dingart `notiz` (eigene sperrbare Ebene „Notizen“), wählbar/verschiebbar/kopierbar/löschbar wie ein Teil; Strg+A und Auswahlrahmen nehmen sie mit. **Dafür zwei bestehende Zähl-Erwartungen um `+ notizen` ergänzt** (`tests/editor-bedienung.tests.mjs` „A4 Auswahlrahmen“, `e2e/editor-bedienung.mjs` „Strg+A wählt alles“) – die Prüfungen sind sonst unverändert und gelten weiter für alle anderen Arten. Notizen ändern nichts am Spiel; „Spielen ab hier“ und Prüfer ignorieren sie.
+- Notiztext: eine Zeile (Zeilenumbrüche werden zu Leerzeichen), höchstens 200 Zeichen; Eingabe rechts, Cursor springt nach dem Setzen dorthin. Kürzel M (Notiz), U (Stempel).
+- Stempel = benannte Zwischenablage (`merkeDinge`), Datei `levels/stempel.json`, wird mit Strg+S (Gebiets-Speichern) mitgeschrieben; Welt-Ansicht-Speichern schreibt sie nicht. Stempel wählen → Rechtsklick setzt (A7 bleibt: bei Auswahl kopiert Rechtsklick die Auswahl; Stempel wählen hebt sie auf). Electron: Pfad `stempel.json` zusätzlich erlaubt.
+- Das Notiz-Bild liegt im Abschnitt „Notiz“ über der Stempelliste, nicht in der Palette (die Palette-Tests zählen 3 Teile + 11 Gegner).
+
+## Offen aus Stufe 8 (Agenten-Prüfung, Hinweise)
+
+- Stempel anlegen/löschen/umbenennen sind nicht mit Strg+Z rückgängig (Datei bleibt bis Strg+S unverändert; Auf Vorbehalt, ob A5 das umfasst – Frage an Robin unten). Ist `stempel.json` beim Laden ungültig, wird sie nicht überschrieben. Stempel wird nur mit einem gültigen Gebiet gespeichert; in der Welt-Ansicht schreibt Strg+S ihn nicht und die „ungespeichert“-Anzeige ignoriert ihn.
+- Stempel-Liste liegt tief im rechten Feld (bei 720 px scrollen); keine Meldung beim Umbenennen/Löschen/Setzen; Listeneintrag abgeschnitten; Notiztexte überdecken Beschriftungen; Prüfer-Zahl steigt mit gesetzten Stempeln (SOLL S2 Gegner); M/U in der Welt-Ansicht wechseln still zurück ins Gebiet; Notiz-Länge wird nur in `setzeTeil` erzwungen, nicht beim Laden von Gebieten.
+
+## Fragen an Robin (Stufe 8)
+
+- Sollen Stempel (anlegen, löschen, umbenennen) mit Strg+Z rückgängig zu machen sein? (Bisher nein: sie sind eine eigene Datei, ✕ löscht bis Strg+S nur im Editor.)
+
 ## Laufprotokoll
 
 | Start | Lauf | Ergebnis |
@@ -115,3 +139,56 @@
 | 12.10.2026 06:35 | Sonnet 5.5, Lauf 6 | Stufe 5 gebaut, Agenten-Befunde (Fehler) behoben, gepusht |
 | 12.10.2026 07:06 | Sonnet 5.5, Lauf 7 | Stufe 6 gebaut, Agenten-Befund (Leisten abgeschnitten) behoben, gepusht |
 | 12.10.2026 07:42 | Lauf 8 (Sonnet 5.5) | Stufe 7 fertig, grün |
+| 12.10.2026 18:34 | Lauf 9 (Sonnet 5.5, Bau-Session 7b) | Stufe 7b gebaut (A0–A8), Agenten-Befunde behoben, gepusht |
+| 13.10.2026 01:12 | Lauf 10 (Sonnet 5.5) | Stufe 8 gebaut (Notizen, Stempel), Prüfkette grün, Agenten-Befunde (Fehler) behoben, gepusht |
+| 13.10.2026 01:47 | Lauf 11 (Sonnet 5.5) | Stufe 9 gebaut (Bot-Spieltest), Kette grün, Agenten ohne Fehler; Hinweise teils behoben. Einmaliger e2e-Smoke-Fehler (Drehscheibe) trat 2× auf, danach 3× grün, ohne Basisvergleich eindeutig: Flake |
+| 13.10.2026 02:38 | Lauf 12 (Sonnet 5.5) | Stufe 10 gebaut (Varianten), Kette grün, Agenten-Befunde behoben (Übergangsknoten-Warnung, Vergleich nach Reihenfolge/unbekannten Feldern, Fenster modal, Meldung im Fenster). P3-Branch nicht gemergt: unverbundene Historie, Editor-Branch enthält ihn schon |
+
+## Auf Vorbehalt entschieden (Stufe 7b)
+
+- Maus: Die linke Taste ist immer „Auswählen/Ziehen“; die Werkzeugknöpfe und -tasten wählen das „aktuelle Element“ für den Rechtsklick (`Auswahl (V)` = keines). In der Welt-Ansicht setzt Rechtsklick nichts (links ziehen im Leeren verschiebt dort weiter den Plan). Ziehschwelle 8 px für alles.
+- Zoom: ×1,15 je Rasten (deltaY 100), Strg+Rad ×4, Tasten +/− ×1,25, `1` = 1 Bildschirm, `2` = 2,2, Pos1 = alles (5 % Rand), Bereich 0,25–160; waagerechtes Rad schiebt seitlich.
+- Esc: erst Auswahl aufheben, dann eine Ebene hoch (Level → Karte → Welt); in der Levelansicht zählt das Level selbst als „nichts gewählt“; in der Welt gibt es keine höhere Ebene (früher führte Esc dort ins Gebiet). Bild↑/↓ wechselt das Level.
+- Level = Gang + zwei Knoten + Teile, die diese Flächen berühren (aus der Geometrie, `level.js`); das Gewählte bleibt sichtbar; im Level ist das Level immer gewählt. Die Rechtsklick-Werkzeuge arbeiten dort auf dem ganzen Gebiet (können an unsichtbare Knoten/Gänge anschließen).
+- Feld `ansicht` am Gang: Richtung (`E`…`NE`), die im Plan nach rechts zeigt; `E` = Norden oben = Standard, wird nicht gespeichert. Auswahlfeld und „Ansicht merken“ rechts.
+- Ebenen (5): Knoten, Gänge, Formteile, Wände/Hindernisse, Gegner. Gesperrt = nicht wählbar, nicht per Rahmen/Strg+A, und Setzen/Kopieren/Einfügen dorthin wird abgelehnt (Meldung). Gang-/Knoten-Werkzeug brauchen beide Ebenen.
+- A7: Kopie bei gewählten Teilen/Knoten (auch gemischt mit Gängen); ein Gang allein (und das Level in der Levelansicht) zählt nicht → Palettenelement. Ein Element wählen (Taste, Palette, Tileset-Fenster, Knotentyp-Liste) hebt die Auswahl auf; V behält sie. Rechts ziehen bei Auswahl setzt nichts (Meldung).
+- Mehrfach: Gruppe verschiebt im Raster (100 E mit Knoten/Gängen, sonst 20 E), ein einzelnes Ding rastet absolut wie bisher; Gang ziehen = seine zwei Knoten. Pfeile: nächste Kartenachse zur Bildschirmrichtung, Umschalt ×5; bei nur einem Gang oder ohne Auswahl wandert der Plan. Duplizieren +40 E (mit Knoten +100 E). Kollision mit vorhandenem Knoten lehnt die ganze Aktion ab. Rahmen: ganz drin, Alt = berührend, Strg ergänzt. Drehen mehrerer: jedes um die eigene Mitte.
+- Tileset-Fenster (Taste I, anfangs aus, in der Welt-Ansicht aus): Aufbau (Gang, Knotentypen), Boden/Wand/Hindernis, Gegner (Tileset zuerst). Die Palette rechts bleibt.
+- „Spielen ab hier“ und Testmenü prüfen die Karte um den gewählten Gang (`spielbarkeit(g, gangId)`); der Prüfer M7 prüft weiter das ganze Gebiet.
+- Speichern/Öffnen stehen jetzt vorn in der zweiten Leiste (waren abgeschnitten).
+
+## Offen aus Stufe 7b (Agenten-Prüfung, Hinweise)
+
+- Obere Leisten bei 1280 px noch breiter als das Fenster (scrollen); Hinweiszeile abgeschnitten; Beschriftungen überlappen („Ostgang“/Notiz); Wände im Leeren unsichtbar (Wandfarbe = Hintergrund). UX-Vorschläge S1–S7, K1–K5 nicht umgesetzt.
+- Drehen mit Q/E passt den Zoom nicht an; jeder Pfeildruck ist ein eigener Rückgängig-Schritt; Eigenschaftenfelder x/y nehmen Werte abseits des 20-E-Rasters an (A6 gilt für Maus, Pfeile, Einfügen); „Hier teilen“ und Prüfer-Sprung umgehen die Ebenen-Sperre; `state.zeiger` ist nach Tastenzoom veraltet (Strg+V an alter Stelle); Esc hält eine laufende Fahrt nicht an; Strg+C nach „Bezeichnung kopieren“ wird abgefangen (schon vor 7b); Mehrfachauswahl zeigt rechts nur Anzahlen, keine gemeinsamen Felder.
+- Electron und echtes Speichern-Dialog-Verhalten nicht ausführbar getestet.
+
+## Fragen an Robin (7b)
+
+- (keine neuen)
+
+## Auf Vorbehalt entschieden (Stufe 9)
+
+- Bot (`src/editor/bot.js`) = Wegfinder aus `tests/helpers/netz-bot.mjs` (Kopie, weil der Build nichts aus tests/ nimmt), plus Quersteuerung am Weg (Hindernisse im Gang umfliegen) und Fallback auf 16 E Wandabstand. Je Gang: Start am Gang-Anfang, Ziel 30 E vor dem Ende; Meldungen ok/tod/stecken/zeit/nicht spielbar; Bezeichnung nennt die Stelle des Fehlers. Knopf „Bot-Spieltest“ und Taste Z (Strg+Z bleibt Rückgängig); nur im Gebiet, nicht in der Welt-Ansicht.
+- **Fund:** `FensterScene.pickTarget` lief bei einer Karte mit nur einem Knochen endlos (Editor-Karten, auch „Spielen ab hier“). Guard in `src/proto/fenster.js` (Verhalten ab zwei Knochen unverändert, Golden Master grün) – berührt eine Prototyp-Datei, bitte bei Gelegenheit ansehen.
+
+## Offen aus Stufe 9
+
+- Kein Rückweg, keine Gegner, Ausweichen in Nischen außerhalb des Gangs fehlt; Liste ohne Schließen-Kreuz, verdeckt Plan unten rechts; Lauf blockiert synchron (Netz ≈ 0,5 s).
+
+## Auf Vorbehalt entschieden (Stufe 10)
+
+- Variante = Gebietsdatei, per Dateidialog (Mehrfachauswahl) geladen; liegt nur in der Ansicht (`state.varianten`), nie in `welt.json`; Gebietswechsel leert sie mit Hinweis. Höchstens 4 (`MAX_VARIANTEN`). Taste `Y`, Fenster ist modal (nur Y, Esc, Strg+Z/Y/S gehen durch).
+- Übernehmen = Inhalt der Variante ins offene Gebiet, **ID und Name bleiben**; ein Rückgängig-Schritt. Vergleich nach IDs, mit Reihenfolge und allen Feldern. Warnung, wenn ein Knoten mit Übergang geändert würde.
+- P3-Branch (`claude/wendehals-p3-45grad`): `git merge` meldet „unrelated histories“ (Historie neu aufgebaut); nicht gemergt, nichts am Spiel geändert.
+
+## Offen aus Stufe 10
+
+- Kein Ordner `levels/varianten/` (Electron-Preload erlaubt nur bekannte Pfade); Bot-Ergebnis je Variante fehlt; Kacheln: kein sichtbares Scrollzeichen; Fenster wird bei jedem `refresh()` neu aufgebaut (Scrollposition der Kachelreihe geht verloren); Varianten-Fenster bleibt beim Wechsel in die Welt als „offen“ gemerkt.
+
+| 13.10.2026 03:12 | Lauf 13 (Sonnet 5.5) | Stufe 11 fertig: Doku, Gesamtprüfung. Behoben: riesige Koordinaten beim Laden (Obergrenze + M2-Messstellen begrenzt), welt.json-ID passt nicht zur Datei (wird übersprungen, mit Meldung), M7 springt zur Stelle, Testmenü scrollt/Statuszeile überlappt nicht mehr. **Editor fertig.** |
+
+## Offen aus Stufe 11 (Hinweise der Gesamtprüfung)
+
+- Stempel anlegen/löschen/umbenennen nicht im Rückgängig-Verlauf; Zahlenfelder nehmen Werte abseits des 20-E-Rasters an; Testmenü zeigt gleichnamige Level (P1c „Netz“: nord/sued/west/ost mehrfach) ohne Unterscheidung; geteilte Gänge heißen beide „Gang 1“; Überschrift in der Welt-Ansicht mit doppelten Anführungszeichen; kein Knopf „Neues Gebiet“; frisch geöffnete identische Datei zählt als „ungespeichert“; Bot-Zeit weicht von der Editor-Flugzeit ab (Startversatz?); Speichern meldet bei Fehler in welt.json/stempel.json „Nicht gespeichert“, obwohl das Gebiet geschrieben ist; Overlaps in der Welt-Ansicht (Beschriftungen). Electron nicht getestet. Smoke-Test `npm run e2e` kann sporadisch rot sein (v0.2-Prüfungen, nicht Editor).

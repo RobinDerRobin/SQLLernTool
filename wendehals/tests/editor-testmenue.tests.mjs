@@ -25,7 +25,7 @@ test('Testmenü: spielbare Einträge starten eine Szene, nicht spielbare melden 
   let spielbar = 0;
   let gesperrt = 0;
   for (const e of eintraege()) {
-    const geht = spielbarkeit(GEBIETE[e.gebiet]).probleme.length === 0;
+    const geht = spielbarkeit(GEBIETE[e.gebiet], e.gang).probleme.length === 0; // je Gang, wie „Spielen ab hier“
     if (geht) {
       assert.equal(e.grund, null);
       const sc = szeneFuer(e);

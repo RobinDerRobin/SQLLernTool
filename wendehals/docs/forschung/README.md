@@ -37,3 +37,9 @@ stehen jeweils am Ende der Berichte.
 | Datei | Rolle | Frage |
 |---|---|---|
 | [2026-10-11-drehstufen-tastenbelegung.md](2026-10-11-drehstufen-tastenbelegung.md) | Game-Designer | Braucht es 45° und 90° als eigene Tasten? Robins Shift-Akkord (Erkennung, Fenster in Frames) und Controller-Gegenstück |
+
+## 12.10.2026 – Editor-Bedienung (Paket 13)
+
+| Datei | Rolle | Frage |
+|---|---|---|
+| [2026-10-12-editor-ux-1-ux-experte.md](2026-10-12-editor-ux-1-ux-experte.md) | UX-Experte | Wie wird der Editor bedienbar wie Lunar Magic? Befunde und priorisierte Vorschläge (Zoom, Rechtsklick platziert, Karten-/Levelansicht, Auswahl, Anzeige) |

@@ -1,7 +1,7 @@
 // Zeichnet den Plan im Spielbild: Boden und Wand mit den Farben des Prototyps (fenster-draw.js), darüber Bedienhilfen
 // (Knoten, Beschriftung, Auswahl, Bildschirmrahmen mit Dackel, Maßstab). Nur Zeichnen – ändert keine Daten.
 import { drawDackel, drawEnemy } from '../render/sprites.js';
-import { FLOOR, FLOOR2, WALL, GRID, SCREEN_W, SCREEN_H, FARBEN, KNOTEN_RADIUS_PX, GEGNER_RADIUS } from './konstanten.js';
+import { FLOOR, FLOOR2, WALL, GRID, SCREEN_W, SCREEN_H, FARBEN, KNOTEN_RADIUS_PX, GEGNER_RADIUS, NOTIZ_ANZEIGE } from './konstanten.js';
 import { bodenPolygone, wandPolygone, knotenMap, gangMasse, gangPolygon, rahmenEcken, rechteck } from './daten.js';
 import { KNOTENTYPEN } from './katalog.js';
 import { teilFinden, hatMasse, teilEcken } from './teile.js';
@@ -40,6 +40,44 @@ export function zeichneGegner(ctx, art, x, y, zeit = 0, skala = 1) {
   ctx.scale(skala, skala);
   drawEnemy(ctx, { kind: art, idx: 0, ang: 0, r: 12, rang: 0, t: zeit, chatter: 0, splitting: 0, dormant: 0 }, zeit);
   ctx.restore();
+}
+
+/**
+ * Fügt den Umriss eines Dings (Gang, Knoten, Formteil, Wand, Hindernis, Gegner) um (dx, dy) versetzt als Pfad an und zeichnet ihn mit dem
+ * eingestellten Strich (der Aufrufer setzt Farbe und Breite). `s` = Maßstab (Bildschirmpixel je E) für Marken fester Pixelgröße.
+ */
+export function zeichneUmriss(ctx, g, ding, s, dx = 0, dy = 0, km = knotenMap(g), ring = true) {
+  const versetzt = (poly) => poly.map(([x, y]) => [x + dx, y + dy]);
+  if (ding.art === 'gang') {
+    const gang = g.gaenge.find((x) => x.id === ding.id);
+    const p = gang && gangPolygon(g, gang, km);
+    if (p) {
+      pfad(ctx, [versetzt(p)]);
+      ctx.stroke();
+    }
+  } else if (ding.art === 'knoten') {
+    const k = km.get(ding.id);
+    if (!k) return;
+    if (k.w && k.h) {
+      pfad(ctx, [versetzt(rechteck(k.x, k.y, k.w, k.h, 0))]);
+      ctx.stroke();
+    }
+    if (ring) {
+      ctx.beginPath();
+      ctx.arc(k.x + dx, k.y + dy, (KNOTEN_RADIUS_PX + 4) / s, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  } else if (ding.art === 'formteil' || ding.art === 'objekt' || ding.art === 'notiz') {
+    const o = teilFinden(g, ding.art, ding.id);
+    if (o && hatMasse(ding.art, o)) {
+      pfad(ctx, [versetzt(teilEcken(o))]);
+      ctx.stroke();
+    } else if (o) {
+      ctx.beginPath();
+      ctx.arc(o.x + dx, o.y + dy, GEGNER_RADIUS + 4, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
 }
 
 /**
@@ -109,35 +147,12 @@ export function zeichnePlan(ctx, g, ansicht, z = {}, dpr = 1) {
   const km = knotenMap(g);
   const au = z.auswahl;
 
-  // Auswahl: Umriss
-  if (au) {
-    ctx.lineWidth = 3 / s;
-    ctx.strokeStyle = FARBEN.auswahl;
-    if (au.art === 'gang') {
-      const gang = g.gaenge.find((x) => x.id === au.id);
-      const p = gang && gangPolygon(g, gang, km);
-      if (p) {
-        pfad(ctx, [p]);
-        ctx.stroke();
-      }
-    } else if (au.art === 'knoten') {
-      const k = km.get(au.id);
-      if (k && k.w && k.h) {
-        pfad(ctx, [rechteck(k.x, k.y, k.w, k.h, 0)]);
-        ctx.stroke();
-      }
-    } else if (au.art === 'formteil' || au.art === 'objekt') {
-      const o = teilFinden(g, au.art, au.id);
-      if (o && hatMasse(au.art, o)) {
-        pfad(ctx, [teilEcken(o)]);
-        ctx.stroke();
-      } else if (o) {
-        ctx.beginPath();
-        ctx.arc(o.x, o.y, 18, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    }
-  }
+  // Auswahl: Umriss (alle gewählten Dinge; `auswahlen` = die ganze Auswahl, `auswahl` = das zuletzt gewählte)
+  const liste = z.auswahlen ?? (au ? [au] : []);
+  const gewaehlt = (art, id) => liste.some((d) => d.art === art && d.id === id);
+  ctx.lineWidth = 3 / s;
+  ctx.strokeStyle = FARBEN.auswahl;
+  for (const d of liste) zeichneUmriss(ctx, g, d, s, 0, 0, km, false); // Knoten bekommen ihren Auswahlring in der Bildschirm-Überlagerung unten
 
   // Gegner: Spielgrafik des v0.2-Gegners, darum ein orangefarbener Ring = Platzhalter (Verhalten im Fenster ungeprüft)
   for (const o of g.objekte) {
@@ -236,7 +251,7 @@ export function zeichnePlan(ctx, g, ansicht, z = {}, dpr = 1) {
     const m = gangMasse(g, gang, km);
     if (!m) continue;
     const [px, py] = ansicht.weltZuBild((m.a.x + m.b.x) / 2, (m.a.y + m.b.y) / 2);
-    if (sichtbarPx(px, py) && m.laenge * s > 60) text(ctx, gang.name || gang.id, px, py, z.auswahl?.art === 'gang' && z.auswahl.id === gang.id ? FARBEN.auswahl : '#fff');
+    if (sichtbarPx(px, py) && m.laenge * s > 60) text(ctx, gang.name || gang.id, px, py, gewaehlt('gang', gang.id) ? FARBEN.auswahl : '#fff');
   }
   for (const k of g.knoten) {
     const [px, py] = ansicht.weltZuBild(k.x, k.y);
@@ -246,8 +261,8 @@ export function zeichnePlan(ctx, g, ansicht, z = {}, dpr = 1) {
     ctx.arc(px, py, KNOTEN_RADIUS_PX, 0, Math.PI * 2);
     ctx.fillStyle = typ ? farbeVon(typ.farbe) : '#f0f';
     ctx.fill();
-    ctx.lineWidth = z.auswahl?.art === 'knoten' && z.auswahl.id === k.id ? 3 : 1.5;
-    ctx.strokeStyle = z.auswahl?.art === 'knoten' && z.auswahl.id === k.id ? FARBEN.auswahl : '#000';
+    ctx.lineWidth = gewaehlt('knoten', k.id) ? 3 : 1.5;
+    ctx.strokeStyle = gewaehlt('knoten', k.id) ? FARBEN.auswahl : '#000';
     ctx.stroke();
     text(ctx, k.id, px, py - KNOTEN_RADIUS_PX - 8);
   }
@@ -278,7 +293,8 @@ export function zeichnePlan(ctx, g, ansicht, z = {}, dpr = 1) {
     if (!sichtbarPx(px, py)) continue;
     ctx.fillStyle = FARBEN.notiz;
     ctx.fillRect(px - 5, py - 5, 10, 10);
-    text(ctx, n.text, px + 10, py, FARBEN.notiz, 'left');
+    const kurz = n.text.length > NOTIZ_ANZEIGE ? n.text.slice(0, NOTIZ_ANZEIGE - 1) + '…' : n.text;
+    text(ctx, kurz, px + 10, py, gewaehlt('notiz', n.id) ? FARBEN.auswahl : FARBEN.notiz, 'left');
   }
 
   // Maßstab: größte „runde“ Länge, die höchstens ein Drittel der Breite einnimmt

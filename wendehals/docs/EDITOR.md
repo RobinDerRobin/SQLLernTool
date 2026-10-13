@@ -1,6 +1,6 @@
 # Level-Editor (Paket 13) – Aufbau und „so ändere ich X“
 
-> Stand: Stufe 5 (Gebiete und Übergänge). Wird in Stufe 11 vervollständigt. Bau-Brief: [`editor/BRIEF.md`](editor/BRIEF.md), Stand:
+> Stand: Stufe 11 (alle Stufen gebaut, Bedienung wie Lunar Magic). Bau-Brief: [`editor/BRIEF.md`](editor/BRIEF.md), Stand:
 > [`editor/STAND.md`](editor/STAND.md), Entscheidungen: [`LEVELDESIGN.md`](LEVELDESIGN.md).
 
 ## Starten
@@ -11,13 +11,31 @@
 | Browser | `npm run build`, dann `dist/index.html?editor` öffnen |
 | Automatischer Test | `npm run e2e:editor` (echtes Chromium, klickt/zieht/tippt, misst Pixel) |
 
-## Bedienung (Stufe 1)
+## Bedienung (Stufe 7b, Robins Anforderungen A0–A8)
 
-Klick wählt Gang oder Knoten, Ziehen verschiebt, Mausrad zoomt (9 Stufen, Normalansicht 2,2 Bildschirme breit).
-`Q`/`E` drehen in 45°-Schritten, `0` Norden oben, `F` „wie im Spiel“ (Flugrichtung des gewählten Gangs nach rechts),
-`L` Beschriftung aus/an, Pfeiltasten verschieben, `+`/`−` zoomen. Der **gelbe Rahmen** ist der Bildschirm (480 × 270 E) mit
-dem Dackel; der Fahrt-Schieber unten (oder Leertaste) fährt ihn mit 70 E/s durch den Gang. Angezeigt werden Länge in E,
-Bildschirmen und Sekunden.
+Grundsatz **A0**: wo nichts festgelegt ist, so wie Lunar Magic. Die Maus-Belegung steht an einer Stelle: `MAUS` in `src/editor/konstanten.js`.
+
+| Eingabe | Wirkung |
+|---|---|
+| **Linksklick** | wählt (Strg+Klick ergänzt oder entfernt). Linksklick **setzt nie etwas**. |
+| **Links ziehen** (ab 8 px) auf einem Ding | verschiebt die ganze Auswahl (Knoten 100 E, Teile 20 E; Gänge nehmen ihre Knoten mit) |
+| **Links ziehen** im Leeren | Auswahlrahmen: wählt, was ganz drin liegt; **Alt** beim Loslassen: auch, was nur hineinragt; **Strg** ergänzt |
+| **Rechtsklick** | setzt das aktuelle Element (Knoten, Formteil, Wand, Hindernis, Gegner; Gang und Bereich per Rechts-Ziehen). Ist ein Objekt oder Knoten **gewählt**, setzt er stattdessen eine **Kopie der Auswahl** (A7). Ein Element wählen (G K B W H X A, Palette, Tileset-Fenster) hebt die Auswahl auf. Kein Browser-Menü. |
+| **Mittlere Taste** oder **Shift+Ziehen** | verschiebt den Plan |
+| **Mausrad** | zoomt stufenlos um den Mauszeiger (15 % je Raste, Touchpad anteilig); waagerechtes Rad schiebt seitlich |
+| **Doppelklick** / **Enter** auf einem Gang | öffnet das Level (siehe unten); **Esc**: eine Ebene höher |
+
+Tasten: `+`/`−` zoomen (×1,25), `1` = ein Bildschirm, `2` = Normalansicht 2,2, `Pos1` = alles einpassen; das Zoomfeld oben nimmt eine Zahl in Bildschirmen an.
+`Q`/`E` drehen die Ansicht in 45°-Schritten, `0` Norden oben, `F` „wie im Spiel“, `L` Beschriftung, `J` Look, `T` Welt-Ansicht, `I` Tileset-Fenster.
+`Strg+A` wählt alles in der Ansicht, **Pfeiltasten** verschieben die Auswahl (Umschalt ×5; ohne Auswahl oder bei nur einem Gang den Plan), `R` dreht gewählte Teile, `Strg+C`/`V`/`D` kopieren, einfügen, duplizieren (auch mehrere, Gänge samt Knoten),
+**Entf** löscht (Backspace nicht), `Strg+Z`/`Strg+Y` (auch `Strg+Umschalt+Z`) Rückgängig/Wiederholen – für jede Aktion, in jeder Ansicht, mit jedem Fokus außer im Textfeld; die Knöpfe nennen die Aktion („Rückgängig: Wand setzen“).
+Ziehen beginnt erst ab 8 px. **Ebenen sperren** (Leiste „Sperren“: Knoten, Gänge, Formteile, Wände/Hindernisse, Gegner): gesperrte Ebenen sind nicht wählbar, nicht verschiebbar, und es lässt sich nichts hineinsetzen.
+Der **gelbe Rahmen** ist der Bildschirm (480 × 270 E) mit dem Dackel; der Fahrt-Schieber unten (oder Leertaste) fährt ihn mit 70 E/s durch den Gang. Angezeigt werden Länge in E, Bildschirmen und Sekunden.
+
+**Ebenen Welt → Karte → Level (A3).** Die Brotkrume oben links zeigt `Welt › Gebiet › Level „Name“ (K1 → K2)`; jeder Teil außer dem letzten ist anklickbar. Die **Levelansicht** zeigt nur den Gang, seine zwei Knoten und alle Teile, die diese Flächen berühren (`src/editor/level.js: levelInhalt`, aus der Geometrie berechnet; das Datenformat kennt kein „Level“-Objekt). Alles andere ist ausgeblendet und nicht wählbar; das gerade Gewählte bleibt sichtbar. `Bild↑`/`Bild↓` wechseln das Level. In der Karte hebt das erste `Esc` die Auswahl auf, das zweite geht in die Welt.
+**Ausgangsperspektive:** Feld `ansicht` am Gang (`"E"`, `"SE"`, `"S"` … = die Richtung, die im Plan nach rechts zeigt; fehlt das Feld, ist Norden oben). Beim Öffnen des Levels wird sie angewendet. Rechts im Gang: Auswahlfeld „Ausgangsansicht“ und „Ansicht merken“ (speichert die aktuelle Drehung); beides mit Rückgängig.
+
+**Tileset-Fenster (A8, Taste `I` oder Knopf „Tileset“):** verschiebbares Fenster (am Titel ziehen) mit allen Elementen des Gebiets als Bilder – Gang, die fünf Knotentypen, Formteil, Wand, Hindernis, die Gegner des Tilesets (dann die übrigen). Klick wählt das aktuelle Element für den Rechtsklick. Die Palette rechts zeigt Formteil/Wand/Hindernis/Gegner wie bisher.
 
 ## Spielen ab hier und Bezeichnung (Stufe 3)
 
@@ -28,7 +46,7 @@ kopieren“) kopiert `Wendehals-Level <gebiet>/<gang>@<stelle>` bzw. `<gebiet>/<
 der Text markiert in einem Feld unten.
 
 **Was der Fenster-Prototyp (noch) nicht kann**, meldet „Spielen“ vorher als „Noch nicht spielbar: …“ und startet nichts:
-Gänge außerhalb von Ost-West/Nord-Süd (Diagonalen), Achteck-Knoten, Teile mit Winkel ≠ 0°/90°. Gegner werden nicht gespielt
+Gänge außerhalb von Ost-West/Nord-Süd (Diagonalen), Achteck-Knoten, Teile mit Winkel ≠ 0°/90°. Geprüft wird die Karte **um den gewählten Gang** (`spielbarkeit(g, gangId)`: der Gang und alles, was über gerade Gänge an ihm hängt, samt berührender Teile): ein gerader Gang startet auch, wenn irgendwo im Gebiet ein diagonaler Gang liegt (er steht dann als Hinweis dabei); der diagonale Gang selbst bleibt „noch nicht spielbar“. Die Prüfregel M7 und das Testmenü nutzen dieselbe Funktion. Gegner werden nicht gespielt
 (Hinweis). Die Prüfung steht in `spielbarkeit()` (`src/editor/spielen.js`); die Prüfregel M7 (Stufe 4) ruft dieselbe Funktion auf.
 Die Karte baut `baueKarte()` aus den Editor-Daten (Gänge → Rechtecke, Knotenflächen und Formteile → Boden, Wände und Hindernisse →
 feste Blöcke) über `src/proto/editor-karte.js`; Kamera, Drehen und Tod bleiben unverändert in `FensterScene`.
@@ -59,15 +77,91 @@ Welt-Plan nicht · W3 SOLL alle Gebiete hängen über Übergänge zusammen · W4
 `formatiereWelt()` (ein Gebiet und ein Übergang je Zeile). Geschrieben wird nur, was es als Datei gibt (neu geöffnete, noch
 ungespeicherte Gebiete und ihre Übergänge bleiben draußen).
 
+## Notizen und Stempel (Stufe 8)
+
+- **Notiz** (Werkzeug M): Rechtsklick setzt eine Notiz (Lage auf 20 E, Text „Neue Notiz“); der Cursor springt ins Textfeld rechts, Enter übernimmt.
+  Notizen sind wählbar (Linksklick, Rahmen, Strg+A), verschiebbar (Pfeile, Ziehen), kopierbar (Strg+C/V/D, Rechtsklick bei Auswahl), löschbar
+  (Entf) und haben eine eigene sperrbare Ebene „Notizen“. Sie ändern nichts am Spiel und werden von „Spielen ab hier“ und dem Prüfer ignoriert.
+  Ein Text ist eine Zeile, höchstens 200 Zeichen (`NOTIZ_MAX`); im Plan werden längere gekürzt (`NOTIZ_ANZEIGE`).
+- **Stempel** (Werkzeug U): Auswahl wählen → rechts unter „Stempel“ optional einen Namen tippen → „Auswahl als Stempel“. Der Stempel merkt Knoten,
+  Gänge, Formteile, Wände, Hindernisse, Gegner und Notizen (wie die Zwischenablage, aber benannt und dauerhaft). Stempel in der Liste anklicken wählt
+  ihn als aktuelles Element: Rechtsklick setzt ihn an die Mausstelle (Raster wie beim Einfügen; Knoten rasten auf 100 E, steht dort schon ein Knoten, passiert
+  nichts und es gibt eine Meldung), ein Strg+Z nimmt ihn in einem Schritt zurück. Die Vorlage bleibt dabei unverändert. „✕“ löscht, „Umbenennen“ nimmt den Namen aus dem Feld.
+- **Datei:** `levels/stempel.json` (`{ "format": 1, "stempel": [{ id, name, bezug, knoten, gaenge, teile: [{ art, teil }] }] }`). Strg+S schreibt sie
+  zusammen mit dem Gebiet, wenn sie sich geändert hat; Electron erlaubt den Pfad `stempel.json` zusätzlich. Die Datei ist auch Material für Claude Code
+  („setze einen Stempel wie `Enge Schleuse` an die Stelle …“). Kaputte Datei → Meldung, die eingebauten Stände bleiben.
+
+## Varianten nebeneinander (Stufe 10)
+
+Knopf „Varianten“ unten (Taste `Y`, Esc schließt) öffnet ein Fenster mit einer Kachel „Aktuell“ und bis zu 4 (`MAX_VARIANTEN`) geladenen **Varianten** des offenen Gebiets
+(z. B. von der KI erzeugte Gebietsdateien). „Varianten laden …“ nimmt eine oder mehrere Dateien (Chrome/Edge: Dateidialog mit Mehrfachauswahl, sonst Dateifeld);
+ungültige Dateien werden mit Grund gemeldet, die übrigen kommen trotzdem. Jede Kachel zeigt das Spielbild des Gebiets, die Zahlen (Knoten, Gänge, Formteile,
+Objekte, Gegner, Notizen), den Prüferstand und den **Unterschied zum aktuellen Gebiet** nach IDs („+2 Gänge, −1 Knoten, 3 geändert“).
+**Übernehmen** gibt dem offenen Gebiet den Inhalt der Variante (ID und Name bleiben, damit Datei und Bezeichnungen stimmen); das ist ein normaler Schritt mit
+Strg+Z/Strg+Y. Gespeichert wird erst mit Strg+S. Varianten sind nur Ansicht: sie liegen nicht in `welt.json`, ändern keine Daten und gehören zum Gebiet
+(Gebietswechsel leert die Liste). Code: `src/editor/varianten.js` (reine Rechnung), Fenster in `main.js` (`variantenZeigen`).
+
+## Bauen (Stufen 2a/2b)
+
+Alles Bauen geschieht mit **Rechtsklick** (A1): Werkzeug wählen (Knöpfe oder Tasten `G` Gang, `K` Knoten, `B` Formteil, `W` Wand, `H` Hindernis, `X` Gegner, `M` Notiz, `U` Stempel, `A` Bereich; `V` = nichts), dann rechts klicken oder (Gang, Bereich) rechts ziehen.
+Gänge rasten auf 8 Richtungen und 20 E; im Leeren entsteht am Ende ein Knoten, nahe einem vorhandenen Knoten wird verbunden. „Hier teilen“ (rechts am Gang) macht eine T-Kreuzung und behält alle übrigen Daten.
+Raumgröße (`w`/`h`), Breite, Lage und Winkel stehen als Zahlenfelder rechts (A6 gilt für Maus, Pfeile und Einfügen; die Zahlenfelder nehmen auch Werte abseits des 20-E-Rasters an – siehe STAND „Offen“). Jede Aktion ist ein Rückgängig-Schritt; Laden → Speichern ergibt dieselben Bytes; ungültige Dateien werden mit Grund abgelehnt, der bisherige Stand bleibt.
+
+## Prüfer (Stufe 4)
+
+Leiste unten (Knopf „Prüfer“): `regeln.js` liefert Meldungen `{ text, ort }`; ein Klick springt zur Stelle, Marken im Plan zeigen die Engstellen (nur bei offener Liste).
+MUSS: **M1** 45°-Raster · **M2** Gang passierbar (≥ 60 E freier Querweg, Formteile zählen als Boden) · **M3** Drehzone (160 E vor Kreuzungen) frei · **M4** Objekte im Boden · **M5** Knoten haben Gänge, Gebiet hat Speicherort · **M6** IDs eindeutig, Gänge verweisen auf Knoten · **M7** „noch nicht spielbar“ (`spielbarkeit()`).
+SOLL: **S1** Gang ≥ 1 Bildschirm · **S2** Gegner sind Platzhalter. Eine abstürzende Regel erscheint als MUSS-Meldung, nie still. Neue Regel = ein Eintrag in `regeln.js` plus ein Test mit gutem und schlechtem Beispiel (`tests/editor-pruefer.tests.mjs`).
+
+## Tilesets, Look und Spielgrafik (Stufe 6)
+
+Jedes Gebiet hat ein `tileset` (Platzhalter: die v0.2-Themen aus `src/data/themes.js`). `J` schaltet den Plan zwischen Prototyp-Farben und Tileset-Look um. Gegner und Hindernisse werden mit den Zeichenfunktionen des Spiels gezeichnet (`sprites.js`); Gegner sind **Platzhalter** (`platzhalter: true`, deutlich markiert).
+„Spielen ab hier“ nutzt weiter die Prototyp-Farben (Tileset-Look nur im Editor).
+
+## Testmenü am Deck (Stufe 7)
+
+`dist/index.html?testmenue` (Electron: `WENDEHALS_TESTMENUE=1`): listet Gebiete, Level und Knoten aus den Leveldateien im Build und startet sie direkt im Fenster-Prototyp; bedienbar mit Tastatur und Controller (Pfeile/Stick wählen, Enter/A startet, Esc/Start im Spiel zurück). Nicht spielbare Einträge bleiben sichtbar, mit Grund statt Start. Code: `src/editor/testmenue.js`.
+
+## Bot-Spieltest (Stufe 9)
+
+Knopf „Bot-Spieltest“ oder Taste `Z` (ohne Strg): ein Bot (`src/editor/bot.js`) fliegt jeden spielbaren Gang des Gebiets im Fenster-Prototyp ab und meldet je Gang `ok`, `tod`, `stecken`, `zeit` oder `nicht spielbar` mit **Bezeichnung** der Fehlerstelle; Klick in der Liste springt dorthin.
+Grenzen: nur Hinweg, keine Gegner, kein Ausweichen in Nischen außerhalb des Gangs, Diagonalen nicht spielbar; der Lauf blockiert kurz (Netz ≈ 0,5 s).
+
+## Testen
+
+| Befehl | Prüft |
+|---|---|
+| `npm test` | alle Einheitentests (`tests/editor-*.tests.mjs`) und Prototyp-/Spiel-Tests, Golden Master der v0.2-Welt unverändert |
+| `npm run e2e` | Smoke-Test des Spiels im Chromium |
+| `npm run e2e:editor` | baut und fährt `e2e/editor.mjs`, `editor-bedienung.mjs`, `editor-notizen.mjs`, `editor-bot.mjs`, `editor-varianten.mjs` im echten Chromium (klicken, ziehen, tippen, Pixel und Daten messen) |
+
+Vor jedem Push als eine Kette: `npm test && npm run e2e && npm run e2e:editor`.
+
+## Bekannte Grenzen (Stand Stufe 11)
+
+- Electron-Start und der echte Speichern-/Öffnen-Dialog sind nur im Chromium geprüft, nicht in Electron.
+- Diagonale Gänge, Achteck-Knoten und Teile mit Winkel ≠ 0°/90° sind im Fenster-Prototyp (noch) nicht spielbar; der Editor meldet das vorher.
+- Gegner sind Platzhalter; Schlösser nur als ausgegrauter Platz.
+- Varianten (Stufe 10) nur über den Dateidialog, kein Ordner `levels/varianten/`.
+- Offene Hinweise und UX-Vorschläge des Experten (S1–S7, K1–K5, nicht bestätigt) stehen in [`editor/STAND.md`](editor/STAND.md).
+
 ## Dateien
 
 ```
 levels/welt.json              Liste der Gebiete, ihre Lage, die Übergänge
 levels/gebiete/<id>.json      ein Gebiet: Knoten, Gänge, Formteile, Objekte, Notizen  (Quelle der Wahrheit)
-src/editor/konstanten.js      alle Zahlen, Tastenkürzel, Farben, Zoomstufen
+levels/stempel.json           Stempel-Vorlagen (Stufe 8)
+src/editor/konstanten.js      alle Zahlen, Tastenkürzel, Farben, Zoom, Maus-Belegung
 src/editor/katalog.js         Knotentypen, Objekttypen, Tilesets, Gegner-Platzhalter, Schloss-Platz
 src/editor/daten.js           Format prüfen/formatieren, Geometrie (Gang, Rahmen, Boden), Bezeichnung
-src/editor/ansicht.js         Kamera: Mitte, Zoomstufe, Drehung (blick = Richtung, die nach rechts zeigt)
+src/editor/ansicht.js         Kamera: Mitte, stufenloser Zoom (in Bildschirmen), Drehung (blick = Richtung, die nach rechts zeigt)
+src/editor/level.js           Levelinhalt (Levelansicht) und spielbare Karte um einen Gang (reine Geometrie)
+src/editor/mehrfach.js        Mehrfachauswahl: Rahmen, gemeinsam verschieben/kopieren/einfügen/löschen/drehen
+src/editor/ebenen.js          sperrbare Ebenen: Zuordnung der Dinge und Werkzeuge
+src/editor/varianten.js       Varianten: laden, Unterschied, Übernehmen (reine Rechnung)
+src/editor/stempel.js         Stempel: anlegen, prüfen, laden/formatieren, als Zwischenablage (reine Daten)
+src/editor/werkzeuge/notiz.js, stempel.js  Rechtsklick-Werkzeuge M und U
+src/editor/werkzeuge/auswahl.js  linke Maustaste: wählen, ziehen, Auswahlrahmen, Hervorhebung
 src/editor/zeichnen.js        Plan im Spielbild (Farben und Schachbrett wie der Prototyp), Rahmen, Beschriftung
 src/editor/startdaten.js      bettet levels/*.json in den Build ein
 src/editor/welt.js            Bereich, Lage, Übergänge, welt.json laden/formatieren, Welt-Prüfer (W1–W4)
@@ -77,12 +171,12 @@ src/editor/spielmodus.js      Oberfläche „Spielen ab hier“ (eigene Eingabe,
 src/proto/editor-karte.js     Karte mit Boden ohne Kreuzungswirkung und festen Blöcken
 src/editor/main.js            Oberfläche und Eingabe, `window.__editor` für Tests
 tools/gen-editor-start.mjs    erzeugt proto-netz/proto-achteck aus den Prototyp-Karten (einmalig; danach sind die Dateien maßgeblich)
-tests/editor-daten.tests.mjs  Einheitentests; e2e/editor.mjs  Browser-Test
+tests/editor-daten.tests.mjs  Einheitentests; e2e/editor.mjs  Browser-Test; tests/editor-notizen.tests.mjs, e2e/editor-notizen.mjs  Stufe 8
 ```
 
 ## Datenformat (Version 1)
 
-Siehe Brief Abschnitt 4. Einheiten E, x nach Osten, y nach Süden, Winkel in Grad (Vielfache von 45). Ein **Gang** ist das
+Siehe Brief Abschnitt 4. Ein Gang hat optional `ansicht` (Ausgangsperspektive, Richtung als Code `E`…`NE`, fehlt = Norden oben). Einheiten E, x nach Osten, y nach Süden, Winkel in Grad (Vielfache von 45). Ein **Gang** ist das
 Rechteck von Knoten `von` zu Knoten `nach` mit `breite`. Ein **Knoten** mit `w`/`h` hat zusätzlich ein Rechteck als Boden
 (Raum, Kreuzungsquadrat), mit `form: "achteck"` und `seite` ein regelmäßiges Achteck (die 45°-Kreuzung). **Formteile** sind
 zusätzlicher Boden, **Wand-Objekte** schneiden Boden aus. Gespeichert wird immer im Standardformat (`formatiere` in `daten.js`):
@@ -92,10 +186,15 @@ zusätzlicher Boden, **Wand-Objekte** schneiden Boden aus. Gespeichert wird imme
 
 | Wunsch | Wo |
 |---|---|
-| Tastenkürzel, Raster, Zoomstufen, Farben, Tempo, Maße | `src/editor/konstanten.js` |
+| Tastenkürzel, Maus-Belegung (`MAUS`), Raster, Zoom (`ZOOM_*`), Ziehschwelle (`KLICK_TOLERANZ_PX`), Farben, Tempo, Maße | `src/editor/konstanten.js` |
+| welche Ebenen sich sperren lassen / welches Werkzeug in welche schreibt | `src/editor/ebenen.js` |
+| Verhalten von Auswahl, Rahmen, Kopieren mehrerer Dinge | `src/editor/mehrfach.js`, `src/editor/werkzeuge/auswahl.js` |
+| was das Level zeigt / was „Spielen ab hier“ mitnimmt | `src/editor/level.js` |
 | neuer Knoten-/Objekttyp, Gegner, Tileset | `src/editor/katalog.js` |
 | anderes Aussehen eines Typs im Plan | `src/editor/zeichnen.js` |
 | neue Prüfregel (Gebiet) / (Welt) | `src/editor/regeln.js` / `pruefeWelt()` in `src/editor/welt.js` |
+| Notiz-Länge/-Standardtext, Stempel-Höchstzahl, Dateiname der Stempel | `NOTIZ_*`, `STEMPEL_*` in `src/editor/konstanten.js` |
+| Höchstzahl der Varianten, Taste des Fensters | `MAX_VARIANTEN`, `KUERZEL.varianten` in `src/editor/konstanten.js` |
 | neues Werkzeug | neue Datei in `src/editor/werkzeuge/` und ein Eintrag in der Werkzeugliste (ab Stufe 2a) |
 | was „Spielen ab hier“ kann / meldet | `spielbarkeit()`/`baueKarte()` in `src/editor/spielen.js` |
 | Anzeigen rechts/unten | `eigenschaften()`/`refreshFahrt()` in `src/editor/main.js` |

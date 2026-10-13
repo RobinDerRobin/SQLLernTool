@@ -132,7 +132,7 @@ export class FensterScene {
   pickTarget(not) {
     let t;
     do t = this.rng.int(0, this.map.bones.length - 1);
-    while (t === not);
+    while (t === not && this.map.bones.length > 1); // Editor-Karten können nur einen Knochen haben (sonst Endlosschleife)
     this.target = t;
   }
 

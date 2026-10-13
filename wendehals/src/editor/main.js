@@ -2,25 +2,34 @@
 // Stufe 1: Ansehen – Plan im Spielbild, Zoom/Verschieben/Drehen, Gang anklicken, Bildschirmrahmen mit Fahrt-Schieber.
 // Stufe 2a: Bauen – Werkzeuge (Auswahl, Gang, Knoten), Eigenschaften ändern, Rückgängig/Wiederholen, Speichern/Laden.
 // Stufe 2b: Formteile, Wände, Hindernisse – setzen, verschieben, drehen, kopieren, löschen, Eigenschaften.
-import { HEADINGS, DIR_NAMES, E } from '../core/math.js';
-import { Ansicht } from './ansicht.js';
+import { HEADINGS, HEADING_CODES, DIR_NAMES, DIR_VEC, CARDINALS, E } from '../core/math.js';
+import { Ansicht, radFaktor } from './ansicht.js';
 import { zeichnePlan, zeichneGegner } from './zeichnen.js';
-import { WELT, GEBIETE } from './startdaten.js';
-import { kopie, bezeichnung, knotenMap, gangMasse, gangPolygon, knotenPolygon, punktInPolygon, ausdehnung, rahmenEcken, formatiere, ladeGebiet, pruefeFormat, Verlauf } from './daten.js';
+import { WELT, GEBIETE, STEMPEL } from './startdaten.js';
+import { ladeStempel, formatiereStempel, stempelAnlegen, stempelLoeschen as stempelEntfernen, stempelUmbenennen, stempelInhalt } from './stempel.js';
+import { kopie, bezeichnung, knotenMap, gangMasse, gangPunkt, gangPolygon, knotenPolygon, punktInPolygon, ausdehnung, rahmenEcken, formatiere, ladeGebiet, pruefeFormat, Verlauf } from './daten.js';
 import { formatiereWelt, ladeWelt, pruefeWelt, weltLagen, weltAusdehnung, lageSetzen, bereichFeld, bereichAnpassen, bereichMasse, uebergangAnlegen, uebergangLoeschen, uebergaengeVon, uebergaengeAn, andereSeite, teileEnde, ausserhalb } from './welt.js';
 import { KNOTENTYPEN, TILESETS, GEGNER, gegnerFuer, tilesetFarben } from './katalog.js';
-import { KUERZEL, WINKEL_SCHRITT, SCREEN_W, SCREEN_H, SPEED, ZOOM_BILDSCHIRME, PFEIL_SCHRITT_PX, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX, FLOOR, FLOOR2, WALL, FARBEN, PALETTE_PX } from './konstanten.js';
+import { KUERZEL, MAUS, WINKEL_SCHRITT, SCREEN_W, SCREEN_H, SPEED, ZOOM_TASTE_FAKTOR, ZOOM_FESTWERTE, PFEIL_SCHRITT_PX, PFEIL_GROSS, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX, FLOOR, FLOOR2, WALL, FARBEN, PALETTE_PX, NOTIZ_MAX, STEMPEL_DATEI } from './konstanten.js';
 import { gangTeilen, loesche, setze, gesperrteIds } from './befehle.js';
-import { teilBei, teilFinden, teilDrehen, teilMerken, teilEinfuegen, loescheTeil, setzeTeil, istTeilArt, hatMasse, teilName, liste as teilListe } from './teile.js';
+import { teilBei, teilFinden, setzeTeil, istTeilArt, hatMasse, teilName, liste as teilListe } from './teile.js';
 import { erzeugeSpeicher } from './speicher.js';
 import { spielbarkeit, erzeugeSzene } from './spielen.js';
 import { pruefeGebiet, zusammenfassung } from './pruefer.js';
+import { fliegeGebiet, STATUS_TEXT } from './bot.js';
 import { SpielModus } from './spielmodus.js';
+import { levelInhalt } from './level.js';
+import { alleDinge, inRahmen, schrittFuer, verschiebeDinge, merkeDinge, fuegeDingeEin, fuegeDingeAn, loescheDinge, dreheDinge, duplikatVersatz, gleichesDing, dingFinden } from './mehrfach.js';
 import { WERKZEUGE } from './werkzeuge/index.js';
+import auswahlWerkzeug from './werkzeuge/auswahl.js';
+import { EBENEN, ebeneVon, WERKZEUG_EBENEN } from './ebenen.js';
 import weltWerkzeug, { weltTreffer } from './werkzeuge/welt-ansicht.js';
 import { zeichneWelt } from './zeichnen-welt.js';
+import { kennzahlen as kennzahlenVon, nimmAuf, unterschied, unterschiedText, uebernehmeVariante, vorschauRahmen } from './varianten.js';
 
 const fmt = (n, d = 1) => n.toFixed(d).replace('.', ',');
+/** Zoom-Anzeige: zwei Stellen bei kleinen, eine bei großen Werten, Komma als Dezimalzeichen. */
+const fmtZoom = (b) => String(b >= 20 ? Math.round(b * 10) / 10 : Math.round(b * 100) / 100).replace('.', ',');
 const hat = (liste, code) => (Array.isArray(liste) ? liste.includes(code) : liste === code);
 
 const CSS = `
@@ -35,6 +44,25 @@ html, body { margin: 0; height: 100%; background: #14121a; color: #e8e6ee; font:
 #plan { position: relative; overflow: hidden; background: #1c1822; }
 #plan canvas { display: block; width: 100%; height: 100%; cursor: grab; }
 #prueferfeld { position: absolute; top: 8px; right: 8px; width: 440px; max-width: calc(100% - 16px); max-height: 45%; overflow: auto; background: rgba(34,31,43,.96); border: 1px solid #4b4560; border-radius: 6px; padding: 6px 8px; box-sizing: border-box; }
+#tilesetfenster { position: absolute; top: 8px; left: 8px; width: 330px; max-height: calc(100% - 16px); overflow: hidden; display: flex; flex-direction: column; background: rgba(34,31,43,.97); border: 1px solid #4b4560; border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,.5); z-index: 5; }
+#tf-kopf { display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; background: #38334a; cursor: move; font-weight: 600; user-select: none; touch-action: none; }
+#tf-zu { padding: 0 7px; line-height: 18px; }
+#tf-inhalt { overflow: auto; padding: 6px 8px 8px; }
+#tf-inhalt .palette-titel { font-size: 13px; margin: 6px 0 4px; }
+#botfeld { position: absolute; bottom: 8px; right: 8px; width: 440px; max-width: calc(100% - 16px); max-height: 45%; overflow: auto; background: rgba(34,31,43,.96); border: 1px solid #4b4560; border-radius: 6px; padding: 6px 8px; box-sizing: border-box; z-index: 4; }
+#variantenfeld { position: absolute; top: 8px; left: 8px; right: 8px; max-height: calc(100% - 16px); overflow: auto; background: rgba(34,31,43,.97); border: 1px solid #4b4560; border-radius: 6px; padding: 8px 10px; box-sizing: border-box; z-index: 5; }
+#variantenfeld h3 { font-size: 13px; margin: 0 0 6px; } #variantenfeld .vkopf { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+#variantenfeld .vmeldung { white-space: pre-wrap; color: #ffb4a8; background: #3a2a2e; border: 1px solid #8c3b3b; border-radius: 4px; padding: 4px 8px; margin-bottom: 8px; font-size: 12px; } #variantenfeld .vkachel button:disabled { opacity: .45; }
+#variantenfeld .vreihe { display: flex; gap: 10px; align-items: flex-start; overflow-x: auto; padding-bottom: 4px; }
+#variantenfeld .vkachel { flex: 0 0 auto; width: 280px; border: 1px solid #4b4560; border-radius: 6px; padding: 6px; background: #2a2636; } #variantenfeld .vkachel.aktuell { border-color: #6bbf86; }
+#variantenfeld .vkachel canvas { display: block; width: 280px; height: 170px; border-radius: 4px; } #variantenfeld .vkachel .vname { font-weight: bold; margin: 4px 0 2px; word-break: break-all; }
+#variantenfeld .vkachel .vzahlen, #variantenfeld .vkachel .vdiff { font-size: 12px; color: #c4bfd8; margin: 2px 0; } #variantenfeld .vkachel .vdiff { color: #ffd36b; }
+#variantenfeld .vkachel .muss { color: #ff8a7a; } #variantenfeld .vkachel .gut { color: #7fd69a; } #variantenfeld .vkachel .vknoepfe { display: flex; gap: 6px; margin-top: 4px; }
+#b-varianten.an { background: #4a4170; }
+#botfeld h3 { font-size: 13px; margin: 0 0 4px; }
+#botfeld .bm { display: block; width: 100%; text-align: left; white-space: normal; margin: 2px 0; }
+#botfeld .bm.ok { border-color: #3f9d5e; } #botfeld .bm.tod, #botfeld .bm.stecken, #botfeld .bm.zeit { border-color: #ff6a5a; } #botfeld .bm.nicht-spielbar { border-color: #6b6780; color: #a9a5bd; }
+#b-bot.muss { background: #8c3b3b; } #b-bot.gut { background: #2f6b45; }
 #prueferfeld h3 { font-size: 13px; margin: 0 0 4px; }
 #prueferfeld .pm { display: block; width: 100%; text-align: left; white-space: normal; margin: 2px 0; }
 #prueferfeld .pm.MUSS { border-color: #ff6a5a; } #prueferfeld .pm.SOLL { border-color: #d9b43a; }
@@ -48,6 +76,7 @@ button:hover, select:hover { background: #4a4462; }
 button.an { background: #3b6b8c; }
 button:disabled { opacity: .45; cursor: default; }
 .titel { white-space: nowrap; font-weight: 600; margin-right: 8px; }
+.krume { cursor: pointer; color: #8fb8e8; font-weight: 400; } .krume:hover { text-decoration: underline; } .krume.jetzt { color: #fff; font-weight: 600; cursor: default; text-decoration: none; }
 .grau { color: #a49fb8; }
 #anzeige { margin-left: auto; white-space: nowrap; flex: none; }
 #fahrt { flex: 1; min-width: 120px; }
@@ -55,8 +84,10 @@ button:disabled { opacity: .45; cursor: default; }
 #melden.fehler { color: #ff9a8a; }
 #werkhinweis { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
 #stand.offen { color: #ffd24a; }
+#zoomfeld { width: 54px; flex: none; text-align: right; }
 input[type=text], input[type=number], #rechts select { width: 100%; box-sizing: border-box; background: #14121a; color: #e8e6ee; border: 1px solid #4b4560; border-radius: 4px; padding: 3px 6px; font: inherit; }
 #rechts .knoepfe { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+#stempel-feld { margin-top: 14px; } #stempel-feld input { width: 100%; box-sizing: border-box; margin-bottom: 6px; } .stempel-zeile { display: flex; gap: 4px; margin-bottom: 4px; } .stempel-zeile button:first-child { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .stempel-zeile.an button:first-child { border-color: #4ad0ff; }
 #palette { margin-top: 14px; } .palette-titel { font-size: 14px; font-weight: bold; margin-bottom: 6px; } .palette-raster { display: flex; flex-wrap: wrap; gap: 6px; } .palette-raster canvas { border: 2px solid #4b4560; border-radius: 4px; cursor: pointer; } .palette-raster canvas.aktiv { border-color: #4ad0ff; }
 `;
 
@@ -80,6 +111,7 @@ export function startEditor() {
   const state = {
     welt: kopie(WELT), // eine Arbeitskopie: der eingebaute Stand bleibt unverändert
     ansichtArt: 'gebiet', // 'gebiet' (ein Gebiet bearbeiten) oder 'welt' (Welt-Plan: Bereiche, Lage, Übergänge)
+    levelGang: null, // Levelansicht (A3): ID des Gangs, dessen Level allein gezeigt wird; null = Karte des ganzen Gebiets
     weltAuswahl: null, // in der Welt-Ansicht: { art: 'gebiet'|'uebergang', id }
     weltVerlauf: new Verlauf(), // Rückgängig/Wiederholen für welt.json (Lage, Übergänge)
     weltGespeichert: formatiereWelt(WELT), // zuletzt gespeicherter/geladener Text von welt.json
@@ -87,7 +119,8 @@ export function startEditor() {
     entwurf: null, // vorbelegter Anfang eines neuen Übergangs: { gebiet, knoten }
     gebiete: Object.fromEntries(Object.entries(GEBIETE).map(([id, g]) => [id, kopie(g)])),
     gebietId: WELT.gebiete[0].id,
-    auswahl: null, // { art: 'gang'|'knoten', id }
+    auswahl: null, // das zuletzt gewählte Ding { art: 'gang'|'knoten'|'formteil'|'objekt', id }
+    mehrfach: [], // die übrigen gewählten Dinge (Mehrfachauswahl, A4); die ganze Auswahl liefert auswahlListe()
     fahrt: null, // { gang, s, laeuft }
     zeit: 0,
     meldung: '',
@@ -95,25 +128,54 @@ export function startEditor() {
     look: 'proto', // 'proto' (Farben des Fenster-Prototyps) oder 'tileset' (Farben des Tilesets des Gebiets)
     gegnerArt: null, // Art, die das Gegner-Werkzeug setzt (null = erste der Liste)
     echtzeit: true, // false: Zeit und Fahrt laufen nur über tick() – für deterministische Tests
-    werkzeug: WERKZEUGE[0].id,
+    werkzeug: WERKZEUGE[0].id, // das aktuelle Element: das, was ein Rechtsklick setzt ('auswahl' = keines)
+    gesperrt: new Set(), // gesperrte Ebenen (ebenen.js): nicht wählbar, nicht verschiebbar, nicht bestückbar
     knotenTyp: 'kreuzung',
+    tilesetFenster: false, // Tileset-Fenster (A8) sichtbar
     prueferOffen: false, // Liste der Prüfer-Meldungen sichtbar (und Marken im Plan)
     spielen: null, // laufender SpielModus (Stufe 3) oder null
     bezeichnung: '', // zuletzt kopierte Bezeichnung
-    zwischen: null, // gemerktes Teil für Einfügen (Strg+C): { art, teil }
+    zwischen: null, // gemerkte Dinge für Einfügen (Strg+C, mehrfach.js merkeDinge): { knoten, gaenge, teile, bezug }
     zeiger: null, // letzte Mausstelle im Plan (Welt), Zielstelle für Einfügen
     verlauf: {}, // Gebiets-ID → Verlauf (Rückgängig/Wiederholen)
     gespeichert: Object.fromEntries(Object.entries(GEBIETE).map(([id, g]) => [id, formatiere(g)])), // zuletzt gespeicherter/geladener Text je Gebiet
     neueGebiete: new Set(), // geöffnete Gebiete, deren Datei noch nicht gespeichert ist (kommen erst danach in welt.json)
     speicher: erzeugeSpeicher(),
+    stempel: kopie(STEMPEL), // Stempel-Vorlagen (levels/stempel.json, Stufe 8): { format, stempel: [{ id, name, bezug, knoten, gaenge, teile }] }
+    stempelGespeichert: formatiereStempel(STEMPEL), // zuletzt gespeicherter/geladener Text von stempel.json
+    stempelId: null, // der Stempel, den das Stempel-Werkzeug setzt
+    stempelName: '', // Name für den nächsten Stempel (Eingabefeld rechts)
+    stempelKaputt: false, // stempel.json war beim Laden ungültig: nicht überschreiben
+    varianten: [], // Varianten des offenen Gebiets (nur Ansicht, Stufe 10): [{ id, name, datei, gebiet, kennzahlen }]
+    variantenOffen: false, // Varianten-Fenster sichtbar
+    variantenZaehler: 0,
+    variantenMeldung: '', // Ladefehler und Hinweise, im Varianten-Fenster selbst gezeigt (die untere Leiste ist zu schmal)
+    notizFokus: null, // ID einer eben gesetzten Notiz: der Cursor springt in ihr Textfeld
   };
   const ansicht = new Ansicht();
   const perf = { zeichnenMs: [] };
   let dirty = true;
   const gebiet = () => state.gebiete[state.gebietId];
+  let sichtMerk = null; // zwischengespeicherte Levelansicht, bis sich Daten oder Auswahl ändern (refresh)
+  /** Was der Plan zeigt: in der Levelansicht nur das Level (Gang, zwei Knoten, berührende Teile; das Gewählte bleibt sichtbar), sonst das Gebiet. */
+  function sicht() {
+    if (!state.levelGang || state.ansichtArt === 'welt') return gebiet();
+    sichtMerk ??= levelInhalt(gebiet(), state.levelGang, state.auswahl ? [state.auswahl, ...state.mehrfach].map((d) => d.id) : []);
+    return sichtMerk;
+  }
+  /** Ebene der Ansicht: 'welt' (alle Gebiete), 'karte' (ein Gebiet) oder 'level' (ein Gang). */
+  const ebene = () => (state.ansichtArt === 'welt' ? 'welt' : state.levelGang ? 'level' : 'karte');
   const werkzeug = () => WERKZEUGE.find((w) => w.id === state.werkzeug);
-  const aktiv = () => (state.ansichtArt === 'welt' ? weltWerkzeug : werkzeug()); // was die Maus gerade bedient
-  const kamera = () => ({ cx: ansicht.cx, cy: ansicht.cy, stufe: ansicht.stufe, blick: ansicht.blick });
+  const aktiv = () => (state.ansichtArt === 'welt' ? weltWerkzeug : werkzeug()); // dessen Hinweis zeigt die Hinweiszeile
+  /** Werkzeug der linken Maustaste: in der Welt-Ansicht die Welt, sonst immer das Auswählen/Ziehen (Linksklick setzt nie etwas, A1). */
+  const linksWerkzeug = () => (state.ansichtArt === 'welt' ? weltWerkzeug : auswahlWerkzeug);
+  /** Werkzeug der rechten Maustaste: das aktuelle Element ('auswahl' = keines, in der Welt-Ansicht gibt es nichts zu setzen). */
+  const rechtsWerkzeug = () => (state.ansichtArt === 'welt' || state.werkzeug === 'auswahl' ? null : werkzeug());
+  const abbrechen = () => {
+    zug = null;
+    for (const w of new Set([auswahlWerkzeug, werkzeug(), weltWerkzeug])) w.abbruch?.(kontext);
+  };
+  const kamera = () => ({ cx: ansicht.cx, cy: ansicht.cy, bildschirme: ansicht.bildschirme, blick: ansicht.blick });
 
   // ---------------------------------------------------------------- Oberfläche
   const canvas = el('canvas');
@@ -123,21 +185,31 @@ export function startEditor() {
     wechsle(wahl.value);
     wahl.blur(); // Kürzel sollen sofort wieder gelten
   });
+  const brotkrume = el('span', { id: 'brotkrume', class: 'titel' });
   const knopf = (text, titel, fn, id) => el('button', { text, title: titel, onclick: fn, ...(id ? { id } : {}) });
   const anzeige = el('span', { class: 'grau', id: 'anzeige' });
+  const zoomFeld = el('input', { id: 'zoomfeld', type: 'text', size: '5', title: 'Zoom in Bildschirmen (480 E) Breite – Zahl eintippen und Enter (1 = so groß wie im Spiel, 2,2 = Normalansicht)' });
+  zoomFeld.addEventListener('change', () => setzeZoom(zahlVon(zoomFeld.value)));
+  zoomFeld.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') zoomFeld.blur();
+    if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); // Kürzel gelten nicht beim Tippen
+  });
   const oben = el('div', { id: 'oben', class: 'leiste' }, [
-    el('span', { class: 'titel', text: 'Editor' }),
+    brotkrume,
     wahl,
     knopf('Welt', 'Welt-Plan: alle Gebiete, ihre Bereiche, Lage und Übergänge (T)', () => weltUmschalten(), 'b-welt'),
     knopf('Drehen ⟲', 'Ansicht 45° links drehen (Q)', () => drehen(-1), 'b-links'),
     knopf('Drehen ⟳', 'Ansicht 45° rechts drehen (E)', () => drehen(1), 'b-rechts'),
     knopf('Norden', 'Norden nach oben (0)', () => norden(), 'b-norden'),
     knopf('Wie im Spiel', 'In Flugrichtung des gewählten Gangs drehen (F)', () => wieImSpiel(), 'b-spiel'),
-    knopf('Zoom −', 'Herauszoomen (−)', () => zoom(1), 'b-minus'),
-    knopf('Zoom +', 'Hineinzoomen (+)', () => zoom(-1), 'b-plus'),
-    knopf('Alles', 'Ganzes Gebiet einpassen', () => alles(), 'b-alles'),
+    knopf('Zoom −', 'Herauszoomen (−; Mausrad: 15 % je Raste)', () => zoom(1 / ZOOM_TASTE_FAKTOR), 'b-minus'),
+    zoomFeld,
+    el('span', { class: 'grau', text: 'Bildschirme' }),
+    knopf('Zoom +', 'Hineinzoomen (+)', () => zoom(ZOOM_TASTE_FAKTOR), 'b-plus'),
+    knopf('Alles', 'Ganzes Gebiet einpassen (Pos1)', () => alles(), 'b-alles'),
     knopf('Beschriftung', 'Knoten, Namen und Maßstab ein-/ausblenden (L)', () => beschriften(), 'b-beschriftung'),
     knopf('Look', 'Farben umschalten: Prototyp ↔ Tileset des Gebiets (J)', () => lookUmschalten(), 'b-look'),
+    knopf('Tileset', 'Tileset-Fenster ein-/ausblenden: alle Elemente des Gebiets als Bilder, Klick wählt das Element für den Rechtsklick (I)', () => tilesetFensterUmschalten(), 'b-tileset'),
     anzeige,
   ]);
   const knopfW = (w) => el('button', { text: `${w.name} (${KUERZEL.werkzeug[w.id].replace('Key', '')})`, title: w.hinweis, id: 't-' + w.id, onclick: () => setzeWerkzeug(w.id) });
@@ -146,6 +218,7 @@ export function startEditor() {
   typWahl.addEventListener('change', () => {
     state.knotenTyp = typWahl.value;
     typWahl.blur();
+    waehle(null); // ein anderes Element gewählt: Rechtsklick setzt jetzt dieses, nicht eine Kopie der Auswahl
     dirty = true;
   });
   const undoKnopf = knopf('Rückgängig', 'Letzte Änderung zurücknehmen (Strg+Z)', () => rueckgaengig(), 'b-undo');
@@ -155,14 +228,16 @@ export function startEditor() {
   const hinweisZeile = el('div', { id: 'hinweiszeile' }, [werkHinweis]);
   const stand = el('span', { id: 'stand', class: 'grau' });
   const werk = el('div', { id: 'werk', class: 'leiste' }, [
+    knopf('Speichern', 'Gebiet speichern (Strg+S)', () => speichere(), 'b-speichern'),
+    knopf('Öffnen …', 'Leveldatei öffnen (Strg+O)', () => oeffne(), 'b-oeffnen'),
+    stand,
     ...WERKZEUGE.map(knopfW),
     typWahl,
     undoKnopf,
     redoKnopf,
     loeschKnopf,
-    knopf('Speichern', 'Gebiet speichern (Strg+S)', () => speichere(), 'b-speichern'),
-    knopf('Öffnen …', 'Leveldatei öffnen (Strg+O)', () => oeffne(), 'b-oeffnen'),
-    stand,
+    el('span', { class: 'grau', text: 'Sperren:' }),
+    ...EBENEN.map((eb) => knopf(eb.name, `Ebene „${eb.name}“ sperren: nicht mehr wählbar, nicht verschiebbar, nicht bestückbar (nochmal klicken entsperrt)`, () => sperreUmschalten(eb.id), 'l-' + eb.id)),
   ]);
   const rechts = el('div', { id: 'rechts' });
   const play = knopf('Fahrt', 'Rahmen mit Flugtempo durchs Level fahren lassen (Leertaste)', () => fahrtUmschalten(), 'b-fahrt');
@@ -176,10 +251,44 @@ export function startEditor() {
   const bezFeld = el('input', { id: 'bezeichnung', type: 'text', readonly: 'readonly', title: 'Bezeichnung zum Markieren und Kopieren', size: '34' });
   bezFeld.style.display = 'none';
   const prueferKnopf = knopf('Prüfer', 'Regeln prüfen: Liste der Meldungen zeigen/verbergen (Klick auf eine Meldung springt zur Stelle)', () => prueferUmschalten(), 'b-pruefer');
+  let tfSchluessel = null;
+  const tfTitel = el('span', { id: 'tf-titel' });
+  const tfInhalt = el('div', { id: 'tf-inhalt' });
+  const tfZu = el('button', { id: 'tf-zu', text: '×', title: 'Fenster schließen (Taste I)', onclick: () => tilesetFensterUmschalten() });
+  const tfKopf = el('div', { id: 'tf-kopf', title: 'Am Titel ziehen verschiebt das Fenster' }, [tfTitel, tfZu]);
+  const tfFenster = el('div', { id: 'tilesetfenster' }, [tfKopf, tfInhalt]);
+  tfFenster.style.display = 'none';
+  plan.append(tfFenster);
+  // Fenster am Titel verschieben (bleibt im Plan)
+  let tfZug = null;
+  tfKopf.addEventListener('pointerdown', (e) => {
+    if (e.target === tfZu) return;
+    tfKopf.setPointerCapture(e.pointerId);
+    tfZug = { dx: e.clientX - tfFenster.offsetLeft, dy: e.clientY - tfFenster.offsetTop };
+  });
+  tfKopf.addEventListener('pointermove', (e) => {
+    if (!tfZug) return;
+    const x = Math.max(0, Math.min(plan.clientWidth - tfFenster.offsetWidth, e.clientX - tfZug.dx));
+    const y = Math.max(0, Math.min(plan.clientHeight - 30, e.clientY - tfZug.dy));
+    tfFenster.style.left = x + 'px';
+    tfFenster.style.top = y + 'px';
+    tfFenster.style.right = 'auto';
+  });
+  const tfLos = () => { tfZug = null; };
+  tfKopf.addEventListener('pointerup', tfLos);
+  tfKopf.addEventListener('pointercancel', tfLos);
   const prueferFeld = el('div', { id: 'prueferfeld' });
   prueferFeld.style.display = 'none';
   plan.append(prueferFeld);
-  const unten = el('div', { id: 'unten', class: 'leiste' }, [play, schieber, fahrtText, prueferKnopf, spielKnopf, bezKnopf, bezFeld, melden]);
+  const botKnopf = knopf('Bot-Spieltest', 'Ein Bot fliegt jedes Level des Gebiets im Fenster-Prototyp ab und meldet Tod, Steckenbleiben und nicht spielbare Level mit Bezeichnung (Klick auf eine Meldung springt zur Stelle)', () => botSpieltest(), 'b-bot');
+  const variantenFeld = el('div', { id: 'variantenfeld' });
+  variantenFeld.style.display = 'none';
+  plan.append(variantenFeld);
+  const variantenKnopf = knopf('Varianten', 'Mehrere Fassungen dieses Gebiets nebeneinander ansehen und eine übernehmen (Y)', () => variantenUmschalten(), 'b-varianten');
+  const botFeld = el('div', { id: 'botfeld' });
+  botFeld.style.display = 'none';
+  plan.append(botFeld);
+  const unten = el('div', { id: 'unten', class: 'leiste' }, [play, schieber, fahrtText, prueferKnopf, botKnopf, variantenKnopf, spielKnopf, bezKnopf, bezFeld, melden]);
   const wurzel = el('div', { id: 'editor' }, [oben, werk, hinweisZeile, plan, rechts, unten]);
   document.body.append(wurzel);
 
@@ -204,9 +313,14 @@ export function startEditor() {
   }
   function wechsle(id) {
     if (!state.gebiete[id]) return;
+    state.levelGang = null;
     if (state.ansichtArt === 'welt') {
       state.kameras.welt = kamera();
       state.ansichtArt = 'gebiet';
+    }
+    if (id !== state.gebietId && state.varianten.length) {
+      state.varianten = []; // Varianten gehören zu einem Gebiet
+      state.variantenMeldung = 'Varianten gehören zum Gebiet und wurden beim Wechsel entfernt (die Dateien sind unverändert).';
     }
     bezFeld.style.display = 'none'; // die kopierte Bezeichnung gehörte zum alten Gebiet
     melde('');
@@ -215,23 +329,57 @@ export function startEditor() {
     state.auswahl = null;
     state.fahrt = null;
     state.zeiger = null;
-    werkzeug().abbruch?.(kontext);
+    abbrechen();
     const g = gebiet();
     if (g.gaenge.length) waehle({ art: 'gang', id: g.gaenge[0].id });
     alles();
     refresh();
   }
-  function waehle(auswahl) {
+  function waehle(auswahl, rest = [], bezeichnungBehalten = false) {
+    if (!auswahl && state.levelGang && gebiet().gaenge.some((x) => x.id === state.levelGang)) auswahl = { art: 'gang', id: state.levelGang }; // in der Levelansicht ist das Level immer gewählt
     state.auswahl = auswahl;
-    bezFeld.style.display = 'none';
+    state.mehrfach = auswahl ? rest : [];
+    if (rest.length) state.fahrt = null; // der Bildschirmrahmen gehört zu genau einem gewählten Gang
+    if (!bezeichnungBehalten) bezFeld.style.display = 'none';
     if (/^(Zum Kopieren|Zum Spielen)/.test(state.meldung)) melde('');
     if (!auswahl) state.fahrt = null; // nichts gewählt: kein Rahmen, keine Fahrt
     if (auswahl && auswahl.art === 'knoten') state.fahrt = null; // der Rahmen gehört zu Gängen
-    if (auswahl && auswahl.art === 'gang') {
+    if (auswahl && auswahl.art === 'gang' && !rest.length) {
       if (!state.fahrt || state.fahrt.gang !== auswahl.id) state.fahrt = { gang: auswahl.id, s: 0, laeuft: false };
     }
     refresh();
   }
+  /** Alle gewählten Dinge (die Hauptwahl zuletzt); Dinge, die es nicht mehr gibt, zählen nicht. */
+  function auswahlListe() {
+    if (!state.auswahl) return [];
+    const g = gebiet();
+    return [...state.mehrfach, state.auswahl].filter((d, i, a) => dingFinden(g, d) && a.findIndex((x) => gleichesDing(x, d)) === i);
+  }
+  /** Mehrere Dinge wählen (das letzte ist die Hauptwahl, auf die sich rechtes Feld, Rahmen und Fahrt beziehen). */
+  function setzeAuswahl(liste) {
+    const g = gebiet();
+    const gut = liste.filter((d, i, a) => dingFinden(g, d) && a.findIndex((x) => gleichesDing(x, d)) === i);
+    if (!gut.length) return waehle(null);
+    waehle(gut.at(-1), gut.slice(0, -1));
+  }
+  /** Strg+Klick: ein Ding zur Auswahl hinzufügen oder, wenn es schon gewählt ist, wieder entfernen. */
+  function schalteAuswahl(ding) {
+    const liste = auswahlListe();
+    if (liste.some((d) => gleichesDing(d, ding))) setzeAuswahl(liste.filter((d) => !gleichesDing(d, ding)));
+    else setzeAuswahl([...liste, ding]);
+  }
+  /** Strg+A: alles in der Ansicht (Karte bzw. Level) wählen, außer gesperrten Ebenen. */
+  function alleWaehlen() {
+    if (state.ansichtArt === 'welt') return;
+    const alle = alleDinge(sicht(), state.gesperrt);
+    setzeAuswahl(alle);
+    melde(alle.length ? `${alle.length} Dinge gewählt.` : 'Nichts zu wählen (alle Ebenen gesperrt oder leer).');
+  }
+  /** Gewählte Dinge, die sich bewegen, kopieren und einfügen lassen: nur ein Gang allein (z. B. das Level) zählt nicht. */
+  const bewegbareAuswahl = () => {
+    const l = auswahlListe();
+    return l.some((d) => d.art !== 'gang') ? l : [];
+  };
   function setzeFahrt(s) {
     const m = ganzMasse();
     if (!m) return;
@@ -269,10 +417,20 @@ export function startEditor() {
     if (m && m.richtung >= 0) ansicht.wieImSpiel(m.richtung);
     refresh();
   }
-  const zoom = (k, px, py) => {
-    ansicht.zoomen(k, px, py);
+  /** Um `faktor` hineinzoomen (> 1) oder heraus (< 1), um den Punkt (px, py) des Plans (sonst die Mitte). */
+  const zoom = (faktor, px, py) => {
+    ansicht.zoomen(faktor, px, py);
     refresh();
   };
+  /** Zoom auf eine Zahl Bildschirme Breite setzen (Eingabefeld, Tasten 1 und 2). */
+  function setzeZoom(b) {
+    if (!Number.isFinite(b) || b <= 0) {
+      melde('Bitte den Zoom als Zahl in Bildschirmen eingeben, z. B. 2,2.', 'fehler');
+      return refresh();
+    }
+    ansicht.setzeBildschirme(b);
+    refresh();
+  }
   function lookFarben() {
     return state.look === 'tileset' ? tilesetFarben(gebiet().tileset) : null;
   }
@@ -287,25 +445,31 @@ export function startEditor() {
     refresh();
   }
   function alles() {
-    ansicht.einpassen(state.ansichtArt === 'welt' ? weltAusdehnung(state.welt, state.gebiete) : ausdehnung(gebiet()));
+    ansicht.einpassen(state.ansichtArt === 'welt' ? weltAusdehnung(state.welt, state.gebiete) : ausdehnung(sicht()));
     refresh();
   }
 
   /** Was liegt unter dem Bildschirmpunkt? Knoten vor Gang. */
-  function treffer(px, py) {
-    const g = gebiet();
-    for (const k of g.knoten) {
-      const [kx, ky] = ansicht.weltZuBild(k.x, k.y);
-      if (Math.hypot(px - kx, py - ky) <= KNOTEN_RADIUS_PX + 3) return { art: 'knoten', id: k.id };
+  function treffer(px, py, ohneNotizen = false) {
+    const g = sicht();
+    const gesp = state.gesperrt;
+    if (!gesp.has('knoten')) {
+      for (const k of g.knoten) {
+        const [kx, ky] = ansicht.weltZuBild(k.x, k.y);
+        if (Math.hypot(px - kx, py - ky) <= KNOTEN_RADIUS_PX + 3) return { art: 'knoten', id: k.id };
+      }
     }
     const [wx, wy] = ansicht.bildZuWelt(px, py);
-    const teil = teilBei(g, wx, wy, 3 / ansicht.masstab);
+    const teil = teilBei(g, wx, wy, 3 / ansicht.masstab, (art, o) => !gesp.has(ebeneVon(art, o)) && !(ohneNotizen && art === 'notiz'));
     if (teil) return teil;
     const km = knotenMap(g);
-    for (const k of g.knoten) {
-      const poly = knotenPolygon(k);
-      if (poly && punktInPolygon(wx, wy, poly)) return { art: 'knoten', id: k.id };
+    if (!gesp.has('knoten')) {
+      for (const k of g.knoten) {
+        const poly = knotenPolygon(k);
+        if (poly && punktInPolygon(wx, wy, poly)) return { art: 'knoten', id: k.id };
+      }
     }
+    if (gesp.has('gaenge')) return null;
     for (const gang of g.gaenge) {
       const p = gangPolygon(g, gang, km);
       if (p && punktInPolygon(wx, wy, p)) return { art: 'gang', id: gang.id };
@@ -321,7 +485,7 @@ export function startEditor() {
     const au = state.auswahl;
     if (!au || au.art !== 'gang' || !state.fahrt) return melde('Zum Spielen erst einen Gang anklicken und den Rahmen an die Stelle fahren.', 'fehler');
     const g = gebiet();
-    const { probleme, hinweise } = spielbarkeit(g);
+    const { probleme, hinweise } = spielbarkeit(g, au.id);
     if (probleme.length) return melde('Noch nicht spielbar: ' + probleme.join(' · '), 'fehler');
     let szene;
     try {
@@ -330,7 +494,7 @@ export function startEditor() {
       return melde(e.message, 'fehler');
     }
     state.fahrt.laeuft = false;
-    werkzeug().abbruch?.(kontext);
+    abbrechen();
     zug = null;
     state.spielen = new SpielModus(szene, document.body, () => {
       melde(hinweise.length ? 'Zurück im Editor. ' + hinweise.join(' ') : 'Zurück im Editor.');
@@ -411,6 +575,159 @@ export function startEditor() {
     );
   }
 
+  // ---------------------------------------------------------------- Bot-Spieltest (Stufe 9)
+  /** Ergebnis des letzten Laufs: { gebietId, text (Gebietsstand beim Lauf), liste } – wird nach einer Änderung als veraltet gezeigt. */
+  let botLauf = null;
+  function botSpieltest() {
+    if (state.ansichtArt === 'welt') return melde('Bot-Spieltest: erst ein Gebiet öffnen (Doppelklick in der Welt).', 'fehler');
+    if (botLauf && botFeld.style.display !== 'none' && botLauf.gebietId === state.gebietId && botLauf.text === formatiere(gebiet())) {
+      botFeld.style.display = 'none'; // zweiter Klick auf den Knopf schließt die Liste
+      return;
+    }
+    const g = gebiet();
+    melde('Bot fliegt alle Level …');
+    botLauf = { gebietId: state.gebietId, text: formatiere(g), liste: fliegeGebiet(g) };
+    melde('');
+    botFeld.style.display = '';
+    refresh();
+  }
+  /** Springt zur Stelle einer Bot-Meldung (Gang wählen, Rahmen an die Stelle) – wie ein Klick im Prüfer. */
+  function botSpringe(r) {
+    const g = gebiet();
+    const gang = g.gaenge.find((x) => x.id === r.gang);
+    const m = gang && gangMasse(g, gang);
+    if (!m) return;
+    const p = gangPunkt(m, r.stelle);
+    springe({ ort: { art: 'gang', id: gang.id, s: Math.round(r.stelle), x: p.x, y: p.y } });
+  }
+  function botZeigen() {
+    botKnopf.classList.remove('muss', 'gut');
+    if (!botLauf) return;
+    if (botLauf.gebietId !== state.gebietId || state.ansichtArt === 'welt') {
+      botFeld.style.display = 'none'; // Ergebnis eines anderen Gebiets: Liste zu, Knopf neutral
+      return;
+    }
+    const fehler = botLauf.liste.filter((r) => r.status !== 'ok' && r.status !== 'nicht-spielbar').length;
+    botKnopf.classList.add(fehler ? 'muss' : 'gut');
+    if (botFeld.style.display === 'none') return;
+    const veraltet = botLauf.gebietId !== state.gebietId || botLauf.text !== formatiere(gebiet());
+    const ok = botLauf.liste.filter((r) => r.status === 'ok').length;
+    botFeld.replaceChildren(
+      el('h3', { text: `Bot-Spieltest – ${ok} von ${botLauf.liste.length} Leveln geflogen${fehler ? `, ${fehler} Fehler` : ''}${veraltet ? ' (veraltet: Gebiet wurde geändert – Knopf drücken zum Neuprüfen)' : ''}` }),
+      ...botLauf.liste.map((r) => {
+        const b = el('button', { class: 'bm ' + r.status, title: `${r.text} Klick springt zur Stelle.`, text: `${STATUS_TEXT[r.status]}: ${r.bezeichnung}${r.status === 'ok' ? ` (${r.sekunden.toFixed(0)} s)` : ` – ${r.text}`}` });
+        b.addEventListener('click', () => botSpringe(r));
+        return b;
+      }),
+    );
+  }
+
+  // ---------------------------------------------------------------- Varianten (Stufe 10)
+  function variantenUmschalten() {
+    if (state.ansichtArt === 'welt') return melde('Varianten: erst ein Gebiet öffnen (Doppelklick in der Welt).', 'fehler');
+    state.variantenOffen = !state.variantenOffen;
+    if (!state.variantenOffen) state.variantenMeldung = '';
+    refresh();
+  }
+  /** Mehrere Dateien wählen und als Varianten des offenen Gebiets danebenlegen. Ungültige Dateien werden gemeldet, die übrigen trotzdem aufgenommen. */
+  async function variantenLaden() {
+    let dateien;
+    try {
+      dateien = await state.speicher.ladeMehrere();
+    } catch (e) {
+      return melde(e.message, 'fehler');
+    }
+    variantenAufnehmen(dateien);
+  }
+  function variantenAufnehmen(dateien) {
+    const probleme = [];
+    for (const d of dateien) {
+      try {
+        state.varianten = nimmAuf(state.varianten, d.text, d.name, ++state.variantenZaehler);
+      } catch (e) {
+        probleme.push(`„${d.name}“: ${e.message}`);
+      }
+    }
+    state.variantenOffen = true;
+    if (probleme.length) state.variantenMeldung = 'Nicht als Variante geladen (das Gebiet bleibt unverändert):\n' + probleme.join('\n');
+    else if (dateien.length) state.variantenMeldung = '';
+    refresh();
+  }
+  function variantEntfernen(id) {
+    state.varianten = state.varianten.filter((v) => v.id !== id);
+    state.variantenMeldung = '';
+    refresh();
+  }
+  /** Das offene Gebiet bekommt den Inhalt der Variante (ID und Name bleiben). Ein Schritt, mit Strg+Z zurückzunehmen. */
+  function variantUebernehmen(id) {
+    const v = state.varianten.find((x) => x.id === id);
+    if (!v) return;
+    if (unterschied(gebiet(), v.gebiet).gleich) return melde(`„${v.name}“ ist mit dem aktuellen Gebiet identisch – nichts zu übernehmen.`);
+    const vorher = new Map(gebiet().knoten.map((k) => [k.id, JSON.stringify(k)]));
+    const erg = aendere(`Variante „${v.name}“ übernehmen`, (g) => uebernehmeVariante(g, v.gebiet));
+    if (erg === true) {
+      const g = gebiet();
+      const jetzt = new Map(g.knoten.map((k) => [k.id, JSON.stringify(k)]));
+      const betroffen = [...vorher].filter(([id, t]) => jetzt.get(id) !== t && uebergaengeAn(state.welt, g.id, id).length).map(([id]) => id);
+      state.auswahl = null;
+      state.mehrfach = [];
+      state.fahrt = null;
+      if (g.gaenge.length && !state.levelGang) waehle({ art: 'gang', id: g.gaenge[0].id });
+      alles();
+      const basis = `Variante „${v.name}“ übernommen (Strg+Z nimmt sie zurück). Speichern schreibt sie in ${g.id}.json.`;
+      if (betroffen.length) melde(`${basis}\nAchtung: Knoten mit Übergang geändert oder entfernt (${betroffen.join(', ')}) – der Welt-Prüfer (Taste T) meldet es (W1).`, 'fehler');
+      else melde(basis);
+    }
+    return erg;
+  }
+  /** Hinweis an der Kachel: würde Übernehmen einen Knoten mit Übergang ändern oder entfernen? */
+  function uebergangsHinweis(variante) {
+    const neu = new Map(variante.knoten.map((k) => [k.id, JSON.stringify(k)]));
+    const ids = gebiet().knoten.filter((k) => neu.get(k.id) !== JSON.stringify(k) && uebergaengeAn(state.welt, state.gebietId, k.id).length).map((k) => k.id);
+    return ids.length ? ` – Achtung: Übergangsknoten ${ids.join(', ')} würde sich ändern` : '';
+  }
+  function vorschauCanvas(g) {
+    const c = el('canvas', { width: 280, height: 170 });
+    const a = new Ansicht(280, 170);
+    a.einpassen(vorschauRahmen(g));
+    zeichnePlan(c.getContext('2d'), g, a, { beschriftung: false, look: state.look === 'tileset' ? tilesetFarben(g.tileset) : undefined }, 1);
+    return c;
+  }
+  function kachel(titel, g, zahlen, extra, aktuell) {
+    const k = zahlen;
+    return el('div', { class: 'vkachel' + (aktuell ? ' aktuell' : ''), 'data-variante': aktuell ? 'aktuell' : extra.id }, [
+      vorschauCanvas(g),
+      el('div', { class: 'vname', text: titel }),
+      el('div', { class: 'vzahlen', text: `${k.knoten} Knoten · ${k.gaenge} Gänge · ${k.formteile} Formteile · ${k.objekte} Objekte · ${k.gegner} Gegner · ${k.notizen} Notizen` }),
+      el('div', { class: 'vzahlen ' + (k.muss ? 'muss' : 'gut'), text: k.muss || k.soll ? `Prüfer: ${k.muss} MUSS · ${k.soll} SOLL` : 'Prüfer: ✓ in Ordnung' }),
+      ...(aktuell ? [] : [el('div', { class: 'vdiff', text: 'Unterschied zum aktuellen Gebiet: ' + unterschiedText(unterschied(gebiet(), g)) + uebergangsHinweis(g) }), el('div', { class: 'vknoepfe' }, [
+        (() => {
+          const b = knopf('Übernehmen', 'Das aktuelle Gebiet bekommt den Inhalt dieser Variante (Strg+Z nimmt es zurück)', () => variantUebernehmen(extra.id), 'b-v-uebernehmen-' + extra.id);
+          b.disabled = unterschied(gebiet(), g).gleich; // identisch: nichts zu übernehmen
+          return b;
+        })(),
+        knopf('Entfernen', 'Variante aus dem Vergleich nehmen (die Datei bleibt)', () => variantEntfernen(extra.id), 'b-v-entfernen-' + extra.id),
+      ])]),
+    ]);
+  }
+  function variantenZeigen() {
+    variantenKnopf.classList.toggle('an', state.variantenOffen && state.ansichtArt !== 'welt');
+    const offen = state.variantenOffen && state.ansichtArt !== 'welt';
+    variantenFeld.style.display = offen ? '' : 'none';
+    if (!offen) return;
+    const g = gebiet();
+    variantenFeld.replaceChildren(
+      el('h3', { text: `Varianten von „${g.name}“ – ${state.varianten.length} neben dem aktuellen Stand` }),
+      el('div', { class: 'vkopf' }, [
+        knopf('Varianten laden …', 'Eine oder mehrere Gebietsdateien wählen und danebenlegen', () => variantenLaden(), 'b-v-laden'),
+        knopf('Schließen', 'Varianten-Fenster zu (die geladenen Varianten bleiben)', () => variantenUmschalten(), 'b-v-zu'),
+        el('span', { class: 'grau', text: 'Varianten ändern nichts, bis „Übernehmen“ gedrückt wird.' }),
+      ]),
+      ...(state.variantenMeldung ? [el('div', { class: 'vmeldung', id: 'vmeldung', text: state.variantenMeldung })] : []),
+      el('div', { class: 'vreihe' }, [kachel('Aktuell: ' + g.name, g, kennzahlenVon(g), null, true), ...state.varianten.map((v) => kachel(v.name + (v.datei !== v.name + '.json' ? ` (${v.datei})` : ''), v.gebiet, v.kennzahlen, v, false))]),
+    );
+  }
+
   // ---------------------------------------------------------------- Bearbeiten (Stufe 2a)
   function melde(text, art = 'info') {
     state.meldung = text;
@@ -427,11 +744,18 @@ export function startEditor() {
   /** Nach Änderung, Rückgängig oder Laden: Auswahl und Fahrt gibt es vielleicht nicht mehr. */
   function bereinige() {
     const g = gebiet();
+    if (state.levelGang && !g.gaenge.some((x) => x.id === state.levelGang)) zuKarte(); // das Level gibt es nicht mehr (gelöscht oder rückgängig gemacht)
     const au = state.auswahl;
     const da = au && (au.art === 'gang' ? g.gaenge : au.art === 'knoten' ? g.knoten : istTeilArt(au.art) ? teilListe(g, au.art) : []).some((o) => o.id === au.id);
     if (au && !da) {
-      state.auswahl = null;
+      const rest = state.mehrfach.filter((d) => dingFinden(g, d));
+      state.auswahl = rest.at(-1) ?? null; // war die Hauptwahl weg, rückt ein anderes gewähltes Ding nach
+      state.mehrfach = rest.slice(0, -1);
       state.fahrt = null;
+    } else state.mehrfach = state.mehrfach.filter((d) => dingFinden(g, d));
+    if (state.levelGang && !state.auswahl) {
+      state.auswahl = { art: 'gang', id: state.levelGang };
+      state.fahrt = { gang: state.levelGang, s: 0, laeuft: false };
     }
     if (state.fahrt) {
       const m = ganzMasse();
@@ -457,7 +781,7 @@ export function startEditor() {
       return null;
     }
     if (JSON.stringify(g) === vorher) return erg ?? null;
-    verlaufVon(g.id).merke(vorher);
+    verlaufVon(g.id).merke(vorher, label);
     state.letzteAktion = label;
     melde('');
     bereinige();
@@ -481,9 +805,9 @@ export function startEditor() {
     if (t != null) nachVerlauf(t);
   }
   /** Eigenschaft im rechten Feld ändern; Fehlermeldung statt Änderung bei unzulässigen Werten. */
-  function setzeFeld(art, id, feld, wert) {
+  function setzeFeld(art, id, feld, wert, label = 'Eigenschaft ändern') {
     let fehler = null;
-    aendere('Eigenschaft ändern', (g) => {
+    aendere(label, (g) => {
       fehler = istTeilArt(art) ? setzeTeil(g, art, id, feld, wert) : setze(g, art, id, feld, wert);
     });
     if (fehler) melde(fehler, 'fehler');
@@ -491,50 +815,99 @@ export function startEditor() {
   }
   function loescheAuswahl() {
     if (state.ansichtArt === 'welt') return loescheUebergang();
-    const au = state.auswahl;
-    if (!au || (au.art !== 'gang' && au.art !== 'knoten' && !istTeilArt(au.art))) return;
+    const dinge = auswahlListe();
+    if (!dinge.length) return;
     const hatKnoten = (g) => new Set(g.knoten.map((k) => k.id));
     const vorher = hatKnoten(gebiet());
-    aendere('Löschen', (g) => (istTeilArt(au.art) ? loescheTeil(g, au.art, au.id) : loesche(g, au.art, au.id)));
+    aendere('Löschen', (g) => loescheDinge(g, dinge));
     const weg = [...vorher].filter((id) => !hatKnoten(gebiet()).has(id));
     const offen = weg.reduce((n, id) => n + uebergaengeAn(state.welt, state.gebietId, id).length, 0);
     if (offen) melde(`${offen === 1 ? 'Ein Übergang zeigt' : offen + ' Übergänge zeigen'} jetzt ins Leere – der Welt-Prüfer (Taste T) meldet es (W1).`, 'fehler');
   }
-  /** Gewähltes Teil (Formteil, Wand, Hindernis) oder null. */
-  const gewaehltesTeil = () => {
-    const au = state.auswahl;
-    return au && istTeilArt(au.art) ? teilFinden(gebiet(), au.art, au.id) ?? null : null;
-  };
+  /** Kurzer Name für Meldungen: „Wand“, „3 Dinge“. */
+  function dingeName(dinge) {
+    if (dinge.length === 1) {
+      const o = dingFinden(gebiet(), dinge[0]);
+      if (istTeilArt(dinge[0].art)) return teilName(dinge[0].art, o);
+      return dinge[0].art === 'knoten' ? `Knoten ${o.id}` : `Gang „${o.name || o.id}“`;
+    }
+    return `${dinge.length} Dinge`;
+  }
   function dreheTeil(k) {
     if (state.ansichtArt === 'welt') return; // Gebiet-Befehle gelten nur in der Gebiet-Ansicht
-    const au = state.auswahl;
-    const o = gewaehltesTeil();
-    if (!o) return;
-    if (!hatMasse(au.art, o)) return melde(`${teilName(au.art, o)} hat keinen Winkel.`, 'fehler');
-    aendere(`${teilName(au.art, o)} drehen`, (g) => teilDrehen(g, au.art, au.id, k));
+    const dinge = auswahlListe().filter((d) => istTeilArt(d.art));
+    if (!dinge.length) return;
+    const mitMass = dinge.filter((d) => hatMasse(d.art, dingFinden(gebiet(), d)));
+    if (!mitMass.length) return melde(`${dingeName(dinge)} ${dinge.length === 1 ? 'hat' : 'haben'} keinen Winkel.`, 'fehler');
+    aendere(dinge.length === 1 ? `${dingeName(dinge)} drehen` : 'Auswahl drehen', (g) => dreheDinge(g, dinge, k));
   }
   function kopiere() {
     if (state.ansichtArt === 'welt') return; // Gebiet-Befehle gelten nur in der Gebiet-Ansicht
-    const au = state.auswahl;
-    if (!gewaehltesTeil()) return melde('Zum Kopieren erst ein Formteil, eine Wand oder ein Hindernis wählen.', 'fehler');
-    state.zwischen = teilMerken(gebiet(), au.art, au.id);
-    melde(`${teilName(au.art, state.zwischen.teil)} kopiert. Strg+V fügt es an der Mausstelle ein.`);
+    const dinge = bewegbareAuswahl().length ? bewegbareAuswahl() : auswahlListe();
+    const clip = dinge.length ? merkeDinge(gebiet(), dinge) : null;
+    if (!clip) return melde('Zum Kopieren erst etwas wählen (Formteil, Wand, Hindernis, Gegner, Notiz, Knoten oder Gang).', 'fehler');
+    state.zwischen = clip;
+    melde(`${dingeName(dinge)} kopiert. Strg+V fügt ${dinge.length === 1 ? 'es' : 'sie'} an der Mausstelle ein.`);
     refresh();
+  }
+  /** Gemerkte Dinge an die Stelle (x, y) setzen; ein Fehler (z. B. Knoten schon da) lässt alles unverändert. */
+  function setzeKopie(clip, x, y, label) {
+    const gesp = [...clip.knoten.map(() => 'knoten'), ...clip.gaenge.map(() => 'gaenge'), ...clip.teile.map((t) => ebeneVon(t.art, t.teil))].find((e) => state.gesperrt.has(e));
+    if (gesp) return melde(`Die Ebene „${EBENEN.find((e) => e.id === gesp).name}“ ist gesperrt – erst entsperren, dann lässt sich dort etwas einfügen.`, 'fehler');
+    const neu = aendere(label, (g) => {
+      const r = fuegeDingeAn(g, clip, x, y);
+      if (r.fehler) throw new Error(r.fehler);
+      return r.dinge;
+    });
+    if (neu) {
+      if (neu.length === 1 && neu[0].art === 'notiz') state.notizFokus = neu[0].id; // eine kopierte Notiz: gleich Text eingeben können, ohne dass Tasten als Kürzel wirken
+      setzeAuswahl(neu);
+    }
   }
   function fuegeEin() {
     if (state.ansichtArt === 'welt') return; // Gebiet-Befehle gelten nur in der Gebiet-Ansicht
-    if (!state.zwischen) return melde('Nichts kopiert – erst ein Teil wählen und Strg+C drücken.', 'fehler');
+    if (!state.zwischen) return melde('Nichts kopiert – erst etwas wählen und Strg+C drücken.', 'fehler');
     const z = state.zeiger ?? { x: ansicht.cx, y: ansicht.cy }; // ohne Mausstelle: Mitte der Ansicht
-    const neu = aendere('Einfügen', (g) => teilEinfuegen(g, state.zwischen, z.x, z.y));
-    if (neu) waehle(neu);
+    setzeKopie(state.zwischen, z.x, z.y, 'Einfügen');
   }
   function dupliziere() {
     if (state.ansichtArt === 'welt') return; // Gebiet-Befehle gelten nur in der Gebiet-Ansicht
-    const au = state.auswahl;
-    if (!gewaehltesTeil()) return melde('Zum Duplizieren erst ein Formteil, eine Wand oder ein Hindernis wählen.', 'fehler');
-    const gemerkt = teilMerken(gebiet(), au.art, au.id);
-    const neu = aendere('Duplizieren', (g) => teilEinfuegen(g, gemerkt));
-    if (neu) waehle(neu);
+    const dinge = bewegbareAuswahl().length ? bewegbareAuswahl() : auswahlListe();
+    const clip = dinge.length ? merkeDinge(gebiet(), dinge) : null;
+    if (!clip) return melde('Zum Duplizieren erst etwas wählen (Formteil, Wand, Hindernis, Gegner, Knoten oder Gang).', 'fehler');
+    const [dx, dy] = duplikatVersatz(clip);
+    const neu = aendere('Duplizieren', (g) => {
+      const r = fuegeDingeEin(g, clip, dx, dy);
+      if (r.fehler) throw new Error(r.fehler);
+      return r.dinge;
+    });
+    if (neu) setzeAuswahl(neu);
+  }
+  /** Pfeiltasten verschieben die Auswahl: in Richtung der Taste auf dem Bildschirm (die nächste Achse der Karte), um ein Raster, mit Umschalt um PFEIL_GROSS. */
+  function bewegePfeil(dsx, dsy, gross) {
+    const dinge = bewegbareAuswahl();
+    const [ox, oy] = ansicht.weltZuBild(0, 0);
+    let beste = null;
+    let bestWert = -Infinity;
+    for (const richtung of CARDINALS) {
+      const [ax, ay] = DIR_VEC[richtung];
+      const [bx, by] = ansicht.weltZuBild(ax, ay);
+      const wert = (bx - ox) * dsx + (by - oy) * dsy;
+      if (wert > bestWert) {
+        bestWert = wert;
+        beste = [ax, ay];
+      }
+    }
+    const q = schrittFuer(gebiet(), dinge) * (gross ? PFEIL_GROSS : 1);
+    aendere('Auswahl verschieben', (g) => {
+      const fehler = verschiebeDinge(g, dinge, beste[0] * q, beste[1] * q);
+      if (fehler) throw new Error(fehler);
+    });
+  }
+  /** Rechtsklick bei gewählten Dingen (A7): eine Kopie der Auswahl an die Mausstelle setzen. */
+  function rechtsKopie(p) {
+    const clip = merkeDinge(gebiet(), bewegbareAuswahl());
+    if (clip) setzeKopie(clip, p.x, p.y, 'Kopie setzen');
   }
   function teileGang() {
     if (state.ansichtArt === 'welt') return; // Gebiet-Befehle gelten nur in der Gebiet-Ansicht
@@ -543,12 +916,26 @@ export function startEditor() {
     const neu = aendere('Gang teilen', (g) => gangTeilen(g, au.id, state.fahrt.s));
     if (neu) waehle({ art: 'knoten', id: neu.id });
   }
+  /** Ebene sperren oder entsperren (A5). Was in einer gesperrten Ebene gewählt war, wird abgewählt. */
+  function sperreUmschalten(id) {
+    if (state.gesperrt.has(id)) state.gesperrt.delete(id);
+    else state.gesperrt.add(id);
+    const gesperrtDing = (d) => state.gesperrt.has(ebeneVon(d.art, d.art === 'objekt' ? teilFinden(gebiet(), 'objekt', d.id) : null));
+    const liste = auswahlListe();
+    if (liste.some(gesperrtDing)) setzeAuswahl(liste.filter((d) => !gesperrtDing(d))); // gesperrte Dinge verlassen die ganze Auswahl, nicht nur die Hauptwahl
+    refresh();
+  }
+  /** Zeiger im Plan: normaler Pfeil, mit einem Element für den Rechtsklick das Fadenkreuz. */
+  function cursorSetzen() {
+    canvas.style.cursor = state.werkzeug === 'auswahl' || state.ansichtArt === 'welt' ? '' : 'crosshair';
+  }
   function setzeWerkzeug(id) {
     if (!WERKZEUGE.some((w) => w.id === id)) return;
     if (state.ansichtArt === 'welt') zuGebiet();
-    werkzeug().abbruch?.(kontext);
+    abbrechen();
     state.werkzeug = id;
-    canvas.style.cursor = id === 'auswahl' ? 'grab' : 'crosshair';
+    if (id !== 'auswahl') waehle(null, [], true); // ein Element gewählt: Rechtsklick setzt jetzt dieses, nicht eine Kopie der Auswahl (A7)
+    cursorSetzen();
     hinweis('');
     refresh();
   }
@@ -574,6 +961,15 @@ export function startEditor() {
           wo += ` und ${wr.wo}`;
         }
       }
+      if (state.stempelKaputt && stempelUngespeichert()) wo += ' (stempel.json nicht überschrieben: die Datei auf der Platte war ungültig – erst reparieren)';
+      else if (stempelUngespeichert()) {
+        const stText = formatiereStempel(state.stempel);
+        const sr = await state.speicher.sichere(STEMPEL_DATEI, stText);
+        if (sr) {
+          state.stempelGespeichert = stText;
+          wo += ` und ${sr.wo}`;
+        }
+      }
       melde(`Gespeichert: ${wo}`);
     } catch (e) {
       melde('Nicht gespeichert: ' + e.message, 'fehler');
@@ -589,7 +985,7 @@ export function startEditor() {
       melde(`„${name}“ wurde nicht geöffnet, der bisherige Stand bleibt unverändert.\n${e.message}`, 'fehler');
       return false;
     }
-    if (state.gebiete[g.id]) verlaufVon(g.id).merke(JSON.stringify(state.gebiete[g.id])); // lässt sich mit Rückgängig zurücknehmen
+    if (state.gebiete[g.id]) verlaufVon(g.id).merke(JSON.stringify(state.gebiete[g.id]), 'Datei öffnen'); // lässt sich mit Rückgängig zurücknehmen
     else {
       state.welt = { ...state.welt, gebiete: [...state.welt.gebiete, { id: g.id, name: g.name, datei: `gebiete/${g.id}.json` }] };
       state.neueGebiete.add(g.id);
@@ -615,7 +1011,9 @@ export function startEditor() {
     const neu = {};
     for (const eintrag of welt.gebiete) {
       try {
-        neu[eintrag.id] = ladeGebiet(alle.gebiete[eintrag.id]);
+        const geladen = ladeGebiet(alle.gebiete[eintrag.id]);
+        if (geladen.id !== eintrag.id) throw new Error(`Die Datei trägt die ID „${geladen.id}“, welt.json nennt „${eintrag.id}“ – übersprungen.`);
+        neu[eintrag.id] = geladen;
       } catch (e) {
         probleme.push(`${eintrag.id}: ${e.message}`);
       }
@@ -632,6 +1030,17 @@ export function startEditor() {
     state.verlauf = {};
     const geladen = welt.gebiete.filter((e) => neu[e.id]);
     wahl.replaceChildren(...geladen.map((e) => el('option', { value: e.id, text: e.name })));
+    if (typeof alle.stempel === 'string') {
+      try {
+        state.stempel = ladeStempel(alle.stempel);
+        state.stempelGespeichert = formatiereStempel(state.stempel);
+        state.stempelId = null;
+        state.stempelKaputt = false;
+      } catch (e) {
+        state.stempelKaputt = true; // die Datei auf der Platte bleibt unangetastet, bis sie repariert ist
+        probleme.push(`${STEMPEL_DATEI}: ${e.message}`);
+      }
+    }
     wechsle(geladen[0].id);
     if (probleme.length) melde('Einige Dateien wurden übersprungen:\n' + probleme.join('\n'), 'fehler');
   }
@@ -678,7 +1087,7 @@ export function startEditor() {
       return null;
     }
     if (JSON.stringify(w) === vorher) return erg ?? null;
-    state.weltVerlauf.merke(vorher);
+    state.weltVerlauf.merke(vorher, label);
     state.letzteAktion = label;
     state.welt = w;
     melde('');
@@ -711,7 +1120,8 @@ export function startEditor() {
   }
   function zuWelt() {
     if (state.ansichtArt === 'welt') return;
-    werkzeug().abbruch?.(kontext);
+    if (state.levelGang) zuKarte();
+    abbrechen();
     state.kameras.gebiet = kamera();
     state.ansichtArt = 'welt';
     state.auswahl = null;
@@ -725,7 +1135,7 @@ export function startEditor() {
   /** Zurück in die Gebiet-Ansicht; `id` = Gebiet, das geöffnet wird (sonst das zuletzt offene). */
   function zuGebiet(id = state.gebietId) {
     if (state.ansichtArt !== 'welt') return;
-    weltWerkzeug.abbruch?.(kontext);
+    abbrechen();
     state.kameras.welt = kamera();
     state.ansichtArt = 'gebiet';
     if (id !== state.gebietId || !state.kameras.gebiet) wechsle(id);
@@ -733,6 +1143,82 @@ export function startEditor() {
       Object.assign(ansicht, state.kameras.gebiet);
       refresh();
     }
+  }
+  // ---------------------------------------------------------------- Ebenen: Welt → Karte → Level (A3)
+  /** Die Ausgangsperspektive eines Gangs als Blickrichtung (0..7): Feld „ansicht“, fehlt es, Norden oben. */
+  const ausgangsBlick = (gang) => {
+    const i = HEADING_CODES.indexOf(gang?.ansicht);
+    return i < 0 ? E : i;
+  };
+  /** Öffnet die Levelansicht eines Gangs: nur dieses Level, in seiner Ausgangsperspektive, eingepasst. */
+  function oeffneLevel(gangId) {
+    if (state.ansichtArt === 'welt') return;
+    const gang = gebiet().gaenge.find((x) => x.id === gangId);
+    if (!gang) return;
+    abbrechen();
+    if (!state.levelGang) state.kameras.gebiet = kamera(); // die Kamera der Karte merken
+    state.levelGang = gangId;
+    sichtMerk = null;
+    state.auswahl = null; // waehle() setzt das Level
+    waehle({ art: 'gang', id: gangId });
+    state.fahrt = { gang: gangId, s: 0, laeuft: false };
+    ansicht.blick = ausgangsBlick(gang);
+    alles();
+  }
+  /** Zurück aus der Levelansicht in die Karte des Gebiets (Kamera wie vorher). */
+  function zuKarte() {
+    if (!state.levelGang) return;
+    const gangId = state.levelGang;
+    abbrechen();
+    state.levelGang = null;
+    sichtMerk = null;
+    if (state.kameras.gebiet) Object.assign(ansicht, state.kameras.gebiet);
+    if (gebiet().gaenge.some((x) => x.id === gangId)) waehle({ art: 'gang', id: gangId });
+    else state.auswahl = state.fahrt = null;
+    refresh();
+  }
+  /** Eine Ebene höher: Level → Karte → Welt. In der Welt gibt es nichts mehr darüber. */
+  function eineEbeneHoch() {
+    const e = ebene();
+    if (e === 'level') zuKarte();
+    else if (e === 'karte') zuWelt();
+  }
+  /** Brotkrume: direkt zu einer Ebene springen ('welt' | 'karte'). */
+  function geheZu(ziel) {
+    if (ziel === 'karte') {
+      if (state.ansichtArt === 'welt') zuGebiet();
+      else zuKarte();
+    } else if (ziel === 'welt') zuWelt();
+  }
+  /** Nächster/voriger Gang in der Levelansicht (Bild↑/Bild↓), ohne die Ebene zu verlassen. */
+  function nachbarLevel(schritt) {
+    const gaenge = gebiet().gaenge;
+    const i = gaenge.findIndex((x) => x.id === state.levelGang);
+    if (i < 0 || gaenge.length < 2) return;
+    oeffneLevel(gaenge[(i + schritt + gaenge.length) % gaenge.length].id);
+  }
+  /** Die aktuelle Drehung des Plans als Ausgangsperspektive des Levels speichern (mit Rückgängig). */
+  function ansichtMerken() {
+    const id = state.levelGang ?? (state.auswahl?.art === 'gang' ? state.auswahl.id : null);
+    if (!id) return melde('Zum Merken erst einen Gang wählen oder ein Level öffnen.', 'fehler');
+    setzeFeld('gang', id, 'ansicht', HEADING_CODES[ansicht.blick], 'Ausgangsansicht ändern');
+  }
+  /** Brotkrume oben links: Welt › Gebiet › Level, jeder Teil außer dem letzten ist anklickbar. */
+  function brotkrumeZeigen() {
+    const teile = [{ id: 'welt', text: 'Welt', ziel: 'welt' }];
+    if (ebene() !== 'welt') {
+      teile.push({ id: 'karte', text: gebiet().name, ziel: 'karte' });
+      const gang = state.levelGang && gebiet().gaenge.find((x) => x.id === state.levelGang);
+      if (gang) teile.push({ id: 'level', text: `Level „${gang.name || gang.id}“ (${gang.von} → ${gang.nach})`, ziel: null });
+    }
+    brotkrume.replaceChildren(
+      ...teile.flatMap((t, i) => {
+        const letzter = i === teile.length - 1;
+        const k = el('span', { class: 'krume' + (letzter ? ' jetzt' : ''), id: 'krume-' + t.id, text: t.text, title: letzter ? 'Hier bist du (Esc: eine Ebene höher)' : 'Zu dieser Ebene springen' });
+        if (!letzter) k.addEventListener('click', () => geheZu(t.ziel));
+        return letzter ? [k] : [k, el('span', { class: 'grau', text: ' › ' })];
+      }),
+    );
   }
   function weltUmschalten() {
     if (state.ansichtArt === 'welt') zuGebiet(state.weltAuswahl?.art === 'gebiet' && state.gebiete[state.weltAuswahl.id] ? state.weltAuswahl.id : state.gebietId);
@@ -821,6 +1307,11 @@ export function startEditor() {
     gebiet,
     treffer,
     waehle: (a) => waehle(a),
+    auswahlListe,
+    setzeAuswahl,
+    schalteAuswahl,
+    inRahmen: (r, beruehren = false) => inRahmen(sicht(), r, { beruehren, gesperrt: state.gesperrt }),
+    schrittFuer: (dinge) => schrittFuer(gebiet(), dinge),
     aendere,
     hinweis,
     melde: (t, art) => melde(t, art),
@@ -830,7 +1321,7 @@ export function startEditor() {
     },
     weltFertig: (vorher, label) => {
       if (JSON.stringify(state.welt) !== vorher) {
-        state.weltVerlauf.merke(vorher);
+        state.weltVerlauf.merke(vorher, label);
         state.letzteAktion = label;
       }
       refresh();
@@ -841,10 +1332,79 @@ export function startEditor() {
     },
     weltWaehle: (a) => weltWaehle(a),
     tolE: () => FANG_PX / ansicht.masstab,
+    setzeKopie: (clip, x, y, label) => setzeKopie(clip, x, y, label),
+    stempelAktuell: () => stempelAktuell(),
     zeichnen: () => {
       dirty = true;
     },
   };
+
+  // ---------------------------------------------------------------- Stempel (Stufe 8)
+  const stempelAktuell = () => state.stempel.stempel.find((x) => x.id === state.stempelId) ?? null;
+  const stempelUngespeichert = () => formatiereStempel(state.stempel) !== state.stempelGespeichert;
+  /** Die Auswahl (oder, ohne Auswahl, nichts) als Stempel merken. */
+  function stempelSpeichern(name = state.stempelName) {
+    if (state.ansichtArt === 'welt') return;
+    const dinge = bewegbareAuswahl().length ? bewegbareAuswahl() : auswahlListe();
+    const clip = dinge.length ? merkeDinge(gebiet(), dinge) : null;
+    if (!clip) return melde('Für einen Stempel erst etwas wählen (Knoten, Gänge, Teile, Gegner oder Notizen).', 'fehler');
+    const r = stempelAnlegen(state.stempel, clip, name);
+    if (r.fehler) return melde(r.fehler, 'fehler');
+    state.stempelId = r.stempel.id;
+    state.stempelName = '';
+    melde(`Stempel „${r.stempel.name}“ angelegt (${stempelInhalt(r.stempel)}). Mit Strg+S wird ${STEMPEL_DATEI} gespeichert; Rechtsklick setzt ihn (Stempel-Werkzeug U).`);
+    refresh();
+  }
+  function stempelWaehlen(id) {
+    if (!state.stempel.stempel.some((x) => x.id === id)) return;
+    state.stempelId = id;
+    if (state.werkzeug === 'stempel') refresh();
+    else setzeWerkzeug('stempel');
+  }
+  function stempelLoeschen(id = state.stempelId) {
+    if (!stempelEntfernen(state.stempel, id)) return;
+    if (state.stempelId === id) state.stempelId = null;
+    melde('Stempel gelöscht (noch nicht gespeichert – Strg+S).');
+    refresh();
+  }
+  function stempelBenennen(name) {
+    const fehler = state.stempelId && stempelUmbenennen(state.stempel, state.stempelId, name);
+    if (fehler) melde(fehler, 'fehler');
+    else state.stempelName = '';
+    refresh();
+  }
+  /** Rechte Spalte: Liste der Stempel, Knopf zum Anlegen aus der Auswahl. */
+  function stempelFeld() {
+    const notizKachel = { id: 'notiz', titel: 'Notiz (M): hält fest, was an der Stelle werden soll (ändert nichts am Spiel)', zeichne: (x) => { x.fillStyle = FARBEN.notiz; x.fillRect(PALETTE_PX / 2 - 8, PALETTE_PX / 2 - 8, 16, 16); x.strokeStyle = '#000'; x.lineWidth = 1.5; x.strokeRect(PALETTE_PX / 2 - 8, PALETTE_PX / 2 - 8, 16, 16); }, aktiv: state.werkzeug === 'notiz', bei: () => setzeWerkzeug('notiz') };
+    const f = el('div', { id: 'stempel-feld' }, [
+      el('div', { class: 'palette-titel', text: 'Notiz' }),
+      el('div', { class: 'palette-raster' }, [kachelBild('n-', notizKachel, kachelFarben())]),
+      el('div', { class: 'palette-titel', text: 'Stempel', style: 'margin-top:10px' }),
+    ]);
+    const name = el('input', { type: 'text', id: 'f-stempel-name', placeholder: 'Name des Stempels', value: state.stempelName, maxlength: '60' });
+    name.addEventListener('input', () => {
+      state.stempelName = name.value;
+    });
+    name.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') name.blur();
+      if (!(e.ctrlKey || e.metaKey)) e.stopPropagation();
+    });
+    f.append(name);
+    const knoepfe = el('div', { class: 'knoepfe' }, [knopf('Auswahl als Stempel', 'Die gewählten Dinge als Vorlage merken (landet in stempel.json)', () => stempelSpeichern(), 'b-stempel-neu')]);
+    if (stempelAktuell()) knoepfe.append(knopf('Umbenennen', 'Den gewählten Stempel so nennen, wie im Feld steht', () => stempelBenennen(name.value), 'b-stempel-umbenennen'));
+    f.append(knoepfe);
+    const liste = el('div', { class: 'stempel-liste' });
+    for (const x of state.stempel.stempel) {
+      const an = x.id === state.stempelId && state.werkzeug === 'stempel';
+      liste.append(el('div', { class: 'stempel-zeile' + (an ? ' an' : '') }, [
+        el('button', { text: `${x.name} – ${stempelInhalt(x)}`, title: 'Stempel wählen: Rechtsklick setzt ihn (U)', id: 'st-' + x.id, class: an ? 'aktiv' : '', onclick: () => stempelWaehlen(x.id) }),
+        el('button', { text: '✕', title: 'Stempel löschen', id: 'st-weg-' + x.id, onclick: () => stempelLoeschen(x.id) }),
+      ]));
+    }
+    if (!state.stempel.stempel.length) liste.append(el('p', { class: 'grau', text: 'Noch keine Stempel. Etwas wählen und „Auswahl als Stempel“ drücken.' }));
+    f.append(liste, el('p', { class: 'grau', text: `Stempel liegen in ${STEMPEL_DATEI} (Strg+S speichert sie mit) und sind Material für Claude Code.` }));
+    return f;
+  }
 
   // ---------------------------------------------------------------- Anzeigen
   function zeile(dl, name, wert) {
@@ -933,45 +1493,143 @@ export function startEditor() {
     }
     rechts.append(knoepfe);
   }
-  /** Palette mit Bildern: Boden/Wand-Farben des Tilesets, Formteil, Wand, Hindernis und die Gegner (zuerst die des Tilesets). Klick wählt das Werkzeug. */
-  function paletteFeld() {
+  /** Farben für die Bilder der Palette und des Tileset-Fensters (Tileset-Look oder Prototyp-Farben). */
+  const kachelFarben = () => ({ boden: FLOOR, boden2: FLOOR2, wand: WALL, hindernis: FARBEN.hindernis, ...(lookFarben() || {}) });
+  /** Ein Palettenbild (Canvas mit Klick): `def` = { id, titel, zeichne(x, farben), aktiv, bei }. */
+  function kachelBild(praefix, def, farben) {
+    const c = el('canvas', { width: String(PALETTE_PX * 2), height: String(PALETTE_PX * 2), title: def.titel, id: praefix + def.id, class: def.aktiv ? 'aktiv' : '' });
+    c.style.width = c.style.height = PALETTE_PX + 'px';
+    const x = c.getContext('2d');
+    x.scale(2, 2);
+    x.fillStyle = farben.wand;
+    x.fillRect(0, 0, PALETTE_PX, PALETTE_PX);
+    def.zeichne(x, farben);
+    c.addEventListener('click', def.bei);
+    return c;
+  }
+  const kachelBoden = (x, farben, r = [4, 4, PALETTE_PX - 8, PALETTE_PX - 8]) => {
+    x.fillStyle = farben.boden;
+    x.fillRect(...r);
+    x.fillStyle = farben.boden2;
+    x.fillRect(r[0], r[1], r[2] / 2, r[3] / 2);
+    x.fillRect(r[0] + r[2] / 2, r[1] + r[3] / 2, r[2] / 2, r[3] / 2);
+  };
+  /** Die Elemente des Tilesets, die ein Rechtsklick setzen kann: Boden/Wand/Hindernis und die Gegner (zuerst die des Tilesets). */
+  function teileKacheln() {
     const g = gebiet();
-    const farben = { boden: FLOOR, boden2: FLOOR2, wand: WALL, hindernis: FARBEN.hindernis, ...(lookFarben() || {}) };
-    const feldDiv = el('div', { id: 'palette' }, [el('div', { class: 'palette-titel', text: 'Palette' })]);
-    const raster = el('div', { class: 'palette-raster' });
-    const kachel = (id, titel, zeichneFn, aktivIst, bei) => {
-      const c = el('canvas', { width: String(PALETTE_PX * 2), height: String(PALETTE_PX * 2), title: titel, id: 'p-' + id, class: aktivIst ? 'aktiv' : '' });
-      c.style.width = c.style.height = PALETTE_PX + 'px';
-      const x = c.getContext('2d');
-      x.scale(2, 2);
-      x.fillStyle = farben.wand;
-      x.fillRect(0, 0, PALETTE_PX, PALETTE_PX);
-      zeichneFn(x);
-      c.addEventListener('click', bei);
-      raster.append(c);
-    };
-    const boden = (x, r = [4, 4, PALETTE_PX - 8, PALETTE_PX - 8]) => {
-      x.fillStyle = farben.boden;
-      x.fillRect(...r);
-      x.fillStyle = farben.boden2;
-      x.fillRect(r[0], r[1], r[2] / 2, r[3] / 2);
-      x.fillRect(r[0] + r[2] / 2, r[1] + r[3] / 2, r[2] / 2, r[3] / 2);
-    };
-    kachel('formteil', 'Formteil (B): erweitert den Boden', (x) => boden(x), state.werkzeug === 'formteil', () => setzeWerkzeug('formteil'));
-    kachel('wand', 'Wand (W): schneidet den Boden aus', (x) => { boden(x, [0, 0, PALETTE_PX, PALETTE_PX]); x.fillStyle = farben.wand; x.fillRect(14, 4, 28, PALETTE_PX - 8); }, state.werkzeug === 'wand', () => setzeWerkzeug('wand'));
-    kachel('hindernis', 'Hindernis (H)', (x) => { boden(x, [0, 0, PALETTE_PX, PALETTE_PX]); x.fillStyle = farben.hindernis; x.fillRect(16, 16, 24, 24); x.strokeStyle = '#000'; x.lineWidth = 1.5; x.strokeRect(16, 16, 24, 24); }, state.werkzeug === 'hindernis', () => setzeWerkzeug('hindernis'));
+    const voll = [0, 0, PALETTE_PX, PALETTE_PX];
+    const out = [
+      { gruppe: 'teile', id: 'formteil', titel: 'Formteil (B): erweitert den Boden', zeichne: (x, f) => kachelBoden(x, f), aktiv: state.werkzeug === 'formteil', bei: () => setzeWerkzeug('formteil') },
+      { gruppe: 'teile', id: 'wand', titel: 'Wand (W): schneidet den Boden aus', zeichne: (x, f) => { kachelBoden(x, f, voll); x.fillStyle = f.wand; x.fillRect(14, 4, 28, PALETTE_PX - 8); }, aktiv: state.werkzeug === 'wand', bei: () => setzeWerkzeug('wand') },
+      { gruppe: 'teile', id: 'hindernis', titel: 'Hindernis (H)', zeichne: (x, f) => { kachelBoden(x, f, voll); x.fillStyle = f.hindernis; x.fillRect(16, 16, 24, 24); x.strokeStyle = '#000'; x.lineWidth = 1.5; x.strokeRect(16, 16, 24, 24); }, aktiv: state.werkzeug === 'hindernis', bei: () => setzeWerkzeug('hindernis') },
+    ];
     const art = GEGNER.includes(state.gegnerArt) ? state.gegnerArt : null;
+    const pool = TILESETS[g.tileset]?.pool ?? [];
     for (const a of gegnerFuer(g.tileset)) {
-      kachel('gegner-' + a, `Gegner „${a}“ (X) – Platzhalter`, (x) => { boden(x, [0, 0, PALETTE_PX, PALETTE_PX]); zeichneGegner(x, a, PALETTE_PX / 2, PALETTE_PX / 2, 0, 1.4); }, state.werkzeug === 'gegner' && (art ?? GEGNER[0]) === a, () => {
-        state.gegnerArt = a;
-        setzeWerkzeug('gegner');
+      out.push({
+        gruppe: pool.includes(a) ? 'gegner' : 'gegner2', id: 'gegner-' + a, titel: `Gegner „${a}“ (X) – Platzhalter`,
+        zeichne: (x, f) => { kachelBoden(x, f, voll); zeichneGegner(x, a, PALETTE_PX / 2, PALETTE_PX / 2, 0, 1.4); },
+        aktiv: state.werkzeug === 'gegner' && (art ?? GEGNER[0]) === a,
+        bei: () => { state.gegnerArt = a; setzeWerkzeug('gegner'); },
       });
     }
-    feldDiv.append(raster, el('p', { class: 'grau', text: 'Bild anklicken = Werkzeug wählen. Gegner sind Platzhalter (Verhalten im Fenster ungeprüft); zuerst die Gegner des Tilesets.' }));
+    return out;
+  }
+  /** Palette mit Bildern: Boden/Wand-Farben des Tilesets, Formteil, Wand, Hindernis und die Gegner (zuerst die des Tilesets). Klick wählt das Werkzeug. */
+  function paletteFeld() {
+    const farben = kachelFarben();
+    const feldDiv = el('div', { id: 'palette' }, [el('div', { class: 'palette-titel', text: 'Palette' })]);
+    const raster = el('div', { class: 'palette-raster' });
+    for (const d of teileKacheln()) raster.append(kachelBild('p-', d, farben));
+    feldDiv.append(raster, el('p', { class: 'grau', text: 'Bild anklicken = Element wählen (Rechtsklick setzt es). Gegner sind Platzhalter (Verhalten im Fenster ungeprüft); zuerst die Gegner des Tilesets. Das Tileset-Fenster (Taste I) zeigt alles in einem Fenster.' }));
     return feldDiv;
+  }
+
+  // ---------------------------------------------------------------- Tileset-Fenster (A8, Vorbild „Add Objects“ in Lunar Magic)
+  /** Alle Elemente, die sich in diesem Gebiet setzen lassen, als Bilder in einem verschiebbaren Fenster: Aufbau (Gang, Knoten), Boden/Wand/Hindernis, Gegner. */
+  function tilesetFensterFuellen() {
+    const g = gebiet();
+    const farben = kachelFarben();
+    const ts = TILESETS[g.tileset];
+    const art = GEGNER.includes(state.gegnerArt) ? state.gegnerArt : null;
+    const schluessel = [g.tileset, state.look, state.werkzeug, state.knotenTyp, art, state.ansichtArt].join('|');
+    if (schluessel === tfSchluessel) return;
+    tfSchluessel = schluessel;
+    tfTitel.textContent = `Tileset „${ts?.name ?? g.tileset}“`;
+    const aufbau = [
+      { id: 'gang', titel: 'Gang (G): rechts ziehen zeichnet einen Gang', aktiv: state.werkzeug === 'gang', bei: () => setzeWerkzeug('gang'), zeichne: (x, f) => { x.fillStyle = f.boden; x.fillRect(0, 18, PALETTE_PX, 20); x.fillStyle = f.boden2; x.fillRect(0, 18, 14, 10); x.fillRect(14, 28, 14, 10); x.fillRect(28, 18, 14, 10); x.fillRect(42, 28, 14, 10); } },
+      ...Object.entries(KNOTENTYPEN).map(([id, t]) => ({
+        id: 'knoten-' + id, titel: `Knoten „${t.name}“ (K): Rechtsklick setzt ihn`, aktiv: state.werkzeug === 'knoten' && state.knotenTyp === id,
+        bei: () => {
+          state.knotenTyp = id;
+          typWahl.value = id;
+          setzeWerkzeug('knoten');
+        },
+        zeichne: (x, f) => {
+          if (t.hatMasse) { kachelBoden(x, f, [6, 10, PALETTE_PX - 12, PALETTE_PX - 20]); }
+          x.beginPath();
+          x.arc(PALETTE_PX / 2, PALETTE_PX / 2, 8, 0, Math.PI * 2);
+          x.fillStyle = FARBEN.knoten[id];
+          x.fill();
+          x.lineWidth = 1.5;
+          x.strokeStyle = '#000';
+          x.stroke();
+        },
+      })),
+    ];
+    const gruppen = [
+      ['Aufbau', aufbau],
+      ['Boden, Wand, Hindernis', teileKacheln().filter((d) => d.gruppe === 'teile')],
+      [`Gegner des Tilesets (Platzhalter)`, teileKacheln().filter((d) => d.gruppe === 'gegner')],
+      ['Weitere Gegner (Platzhalter)', teileKacheln().filter((d) => d.gruppe === 'gegner2')],
+    ];
+    tfInhalt.replaceChildren(
+      ...gruppen.filter(([, liste]) => liste.length).flatMap(([name, liste]) => [
+        el('div', { class: 'palette-titel', text: name }),
+        el('div', { class: 'palette-raster' }, liste.map((d) => kachelBild('tf-', d, farben))),
+      ]),
+      el('p', { class: 'grau', text: 'Bild anklicken = Element wählen; Rechtsklick im Plan setzt es. Fenster am Titel ziehen, Taste I blendet es ein und aus.' }),
+    );
+  }
+  function tilesetFensterZeigen() {
+    const zeigen = state.tilesetFenster && state.ansichtArt !== 'welt'; // in der Welt-Ansicht gibt es nichts zu setzen
+    tfFenster.style.display = zeigen ? '' : 'none';
+    document.getElementById('b-tileset')?.classList.toggle('an', !!state.tilesetFenster);
+    if (zeigen) tilesetFensterFuellen();
+  }
+  function tilesetFensterUmschalten() {
+    state.tilesetFenster = !state.tilesetFenster;
+    refresh();
+  }
+
+  /** Rechtes Feld bei mehreren gewählten Dingen: Anzahl je Art und die Befehle für alle zusammen. */
+  function mehrfachEigenschaften(liste) {
+    rechts.replaceChildren();
+    const g = gebiet();
+    const dl = el('dl');
+    rechts.append(el('h2', { text: `${liste.length} Dinge gewählt` }), dl);
+    const namen = { knoten: 'Knoten', gang: 'Gänge', formteil: 'Formteile', objekt: 'Wände, Hindernisse, Gegner', notiz: 'Notizen' };
+    for (const art of Object.keys(namen)) {
+      const n = liste.filter((d) => d.art === art).length;
+      if (n) zeile(dl, namen[art], n);
+    }
+    const drehbar = liste.some((d) => istTeilArt(d.art) && hatMasse(d.art, dingFinden(g, d)));
+    const knoepfe = el('div', { class: 'knoepfe' });
+    if (drehbar) {
+      knoepfe.append(knopf('⟲ 45°', 'Alle gewählten Teile um 45° linksherum drehen (Umschalt+R)', () => dreheTeil(-1), 'b-teil-links'), knopf('⟳ 45°', 'Alle gewählten Teile um 45° rechtsherum drehen (R)', () => dreheTeil(1), 'b-teil-rechts'));
+    }
+    knoepfe.append(
+      knopf('Duplizieren', 'Kopie neben die Auswahl setzen (Strg+D)', () => dupliziere(), 'b-teil-dup'),
+      knopf('Kopieren', 'Auswahl merken, Strg+V fügt sie an der Mausstelle ein (Strg+C)', () => kopiere(), 'b-teil-kopieren'),
+      knopf('Löschen', 'Alle gewählten Dinge löschen (Entf)', () => loescheAuswahl(), 'b-loeschen2'),
+    );
+    rechts.append(knoepfe, el('p', { class: 'grau', text: 'Ziehen verschiebt alle zusammen, Pfeiltasten auch. Strg+Klick ergänzt oder entfernt ein Ding, Esc hebt die Auswahl auf.' }));
+    rechts.append(paletteFeld());
+    rechts.append(stempelFeld());
   }
   function eigenschaften() {
     if (state.ansichtArt === 'welt') return weltEigenschaften();
+    if (auswahlListe().length > 1) return mehrfachEigenschaften(auswahlListe());
     rechts.replaceChildren();
     const g = gebiet();
     const au = state.auswahl;
@@ -990,6 +1648,19 @@ export function startEditor() {
       zeile(dl, 'Flugzeit', `${fmt(m.sekunden)} s`);
       feld(dl, 'Breite (E)', 'f-breite', gang.breite, (v) => setzeFeld('gang', gang.id, 'breite', v), 'number', { step: 20 });
       zeile(dl, 'Richtung', m.richtung >= 0 ? `${m.richtungName} (${m.code})` : 'nicht im 45°-Raster');
+      const av = el('select', { id: 'f-ansicht', title: 'Drehung des Plans beim Öffnen des Levels (Ausgangsperspektive); „Norden oben“ ist der Standard' }, HEADINGS.map((h) => el('option', { value: HEADING_CODES[h], text: h === E ? 'Norden oben (Standard)' : `${DIR_NAMES[h]} nach rechts` })));
+      av.value = HEADING_CODES[ausgangsBlick(gang)];
+      av.addEventListener('change', () => {
+        setzeFeld('gang', gang.id, 'ansicht', av.value, 'Ausgangsansicht ändern');
+        if (state.levelGang === gang.id) {
+          ansicht.blick = ausgangsBlick(gebiet().gaenge.find((x) => x.id === gang.id)); // im offenen Level sofort drehen
+          alles();
+        }
+        av.blur();
+      });
+      dl.append(el('dt', { text: 'Ausgangsansicht' }), el('dd', {}, [av]));
+      if (!state.levelGang) knoepfe.append(knopf('Level öffnen', 'Nur dieses Level zeigen, in seiner Ausgangsansicht (Doppelklick oder Enter)', () => oeffneLevel(gang.id), 'b-level-oeffnen'));
+      knoepfe.append(knopf('Ansicht merken', 'Die aktuelle Drehung des Plans als Ausgangsansicht dieses Levels speichern', () => ansichtMerken(), 'b-ansicht-merken'));
       knoepfe.append(knopf('Hier teilen', 'Gang an der Stelle des Bildschirmrahmens teilen (neue Kreuzung)', () => teileGang(), 'b-teilen'));
       knoepfe.append(knopf('Löschen', 'Gang löschen (Entf)', () => loescheAuswahl(), 'b-loeschen2'));
     } else if (au && au.art === 'knoten') {
@@ -997,7 +1668,10 @@ export function startEditor() {
       rechts.append(el('h2', { text: `Knoten ${k.id}` }), dl);
       const tw = el('select', { id: 'f-typ' }, Object.entries(KNOTENTYPEN).map(([id, t]) => el('option', { value: id, text: t.name })));
       tw.value = k.typ;
-      tw.addEventListener('change', () => setzeFeld('knoten', k.id, 'typ', tw.value));
+      tw.addEventListener('change', () => {
+        setzeFeld('knoten', k.id, 'typ', tw.value);
+        tw.blur(); // Kürzel gelten sofort wieder
+      });
       dl.append(el('dt', { text: 'Typ' }), el('dd', {}, [tw]));
       feld(dl, 'x (E)', 'f-x', k.x, (v) => setzeFeld('knoten', k.id, 'x', v), 'number', { step: 100 });
       feld(dl, 'y (E)', 'f-y', k.y, (v) => setzeFeld('knoten', k.id, 'y', v), 'number', { step: 100 });
@@ -1033,6 +1707,9 @@ export function startEditor() {
           knopf('⟲ 45°', 'Um 45° linksherum drehen (Umschalt+R)', () => dreheTeil(-1), 'b-teil-links'),
           knopf('⟳ 45°', 'Um 45° rechtsherum drehen (R)', () => dreheTeil(1), 'b-teil-rechts'),
         );
+      } else if (au.art === 'notiz') {
+        feld(dl, 'Text', 'f-text', o.text, (v) => setzeFeld('notiz', o.id, 'text', v, 'Notiztext ändern'), 'text', { maxlength: String(NOTIZ_MAX) });
+        zeile(dl, 'Hinweis', 'Nur für Menschen und die KI – ändert nichts am Spiel');
       } else if (o.platzhalter) zeile(dl, 'Hinweis', 'Platzhalter: Gegner-Verhalten im Fenster ungeprüft');
       knoepfe.append(
         knopf('Duplizieren', 'Kopie neben das Teil setzen (Strg+D)', () => dupliziere(), 'b-teil-dup'),
@@ -1048,6 +1725,7 @@ export function startEditor() {
         aendere('Tileset ändern', (gg) => {
           gg.tileset = wert;
         });
+        ts.blur();
       });
       dl.append(el('dt', { text: 'Tileset' }), el('dd', {}, [ts]));
       const bm = bereichMasse(g.bereich);
@@ -1064,7 +1742,16 @@ export function startEditor() {
     }
     rechts.append(knoepfe);
     rechts.append(paletteFeld());
-    rechts.append(el('p', { class: 'grau', text: 'V Auswahl, G Gang, K Knoten, B Formteil, W Wand, H Hindernis, X Gegner, J Look, A Bereich, T Welt-Ansicht · R dreht ein Teil (Umschalt: links), Strg+C/V/D kopieren, einfügen, duplizieren · Strg+Z/Y Rückgängig/Wiederholen · Strg+S Speichern · P Spielen ab hier (Esc zurück), N Bezeichnung kopieren · Q/E drehen, 0 Norden, F wie im Spiel, Leertaste Fahrt, Mausrad zoomt.' }));
+    rechts.append(stempelFeld());
+    if (state.notizFokus) {
+      const i = rechts.querySelector('#f-text');
+      if (i && au?.id === state.notizFokus) {
+        i.focus();
+        i.select();
+        state.notizFokus = null;
+      }
+    }
+    rechts.append(el('p', { class: 'grau', text: 'Linksklick wählt (Strg+Klick ergänzt, Ziehen im Leeren = Rahmen, Strg+A alles), Ziehen und Pfeile (Umschalt ×5) verschieben die Auswahl. Rechtsklick setzt das Element, das du mit G K B W H X M U A oder in der Palette wählst; ist etwas gewählt, kopiert er es. Mittlere Taste oder Shift+Ziehen verschiebt den Plan, das Mausrad zoomt (+ − 1 2, Pos1 = alles). Doppelklick oder Enter öffnet das Level, Esc geht eine Ebene hoch. R dreht ein Teil, Strg+C/V/D, nur Entf löscht, Strg+Z/Y Rückgängig/Wiederholen, Strg+S Speichern, P Spielen ab hier (Esc zurück), N Bezeichnung kopieren, Z Bot-Spieltest, Y Varianten nebeneinander, Q/E drehen die Ansicht, 0 Norden, F wie im Spiel, J Look, T Welt, Leertaste Fahrt.' }));
   }
   function refreshFahrt() {
     if (state.ansichtArt === 'welt') {
@@ -1086,24 +1773,35 @@ export function startEditor() {
       `Stelle ${fmt(s, 0)} E = ${fmt(s / SCREEN_W)} Bildschirme = ${fmt(s / SPEED)} s  ·  Gang ${fmt(m.laenge, 0)} E = ${fmt(m.bildschirme)} Bildschirme = ${fmt(m.sekunden)} s`;
   }
   function refresh() {
+    sichtMerk = null;
+    brotkrumeZeigen();
     gesperrteIds.clear();
     for (const m of uebergangsMarken()) gesperrteIds.add(m.knoten);
     const inWelt = state.ansichtArt === 'welt';
-    anzeige.textContent = `${inWelt ? 'Welt · ' : ''}${DIR_NAMES[ansicht.blick]} · ${fmt(ZOOM_BILDSCHIRME[ansicht.stufe], 1)} Bildschirme`;
+    anzeige.textContent = `${inWelt ? 'Welt · ' : ''}${DIR_NAMES[ansicht.blick]}`;
+    if (document.activeElement !== zoomFeld) zoomFeld.value = fmtZoom(ansicht.bildschirme);
     eigenschaften();
     refreshFahrt();
     const v = inWelt ? state.weltVerlauf : verlaufVon(state.gebietId);
     undoKnopf.disabled = !v.kannZurueck;
     redoKnopf.disabled = !v.kannVor;
+    undoKnopf.textContent = v.kannZurueck ? `Rückgängig: ${v.letzteAktion}` : 'Rückgängig';
+    redoKnopf.textContent = v.kannVor ? `Wiederholen: ${v.naechsteAktion}` : 'Wiederholen';
     const au = state.auswahl;
+    botKnopf.disabled = inWelt;
+    variantenKnopf.disabled = inWelt;
     spielKnopf.disabled = inWelt || !(au?.art === 'gang' && state.fahrt);
     bezKnopf.disabled = inWelt || !(au?.art === 'gang' || au?.art === 'knoten');
     for (const w of WERKZEUGE) document.getElementById('t-' + w.id)?.classList.toggle('an', !inWelt && w.id === state.werkzeug);
     document.getElementById('b-welt')?.classList.toggle('an', inWelt);
     typWahl.disabled = state.werkzeug !== 'knoten';
+    for (const eb of EBENEN) document.getElementById('l-' + eb.id)?.classList.toggle('an', state.gesperrt.has(eb.id));
     prueferZeigen();
+    botZeigen();
+    variantenZeigen();
+    tilesetFensterZeigen();
     loeschKnopf.disabled = inWelt ? state.weltAuswahl?.art !== 'uebergang' : !(au && (au.art === 'gang' || au.art === 'knoten' || istTeilArt(au.art)));
-    const offen = inWelt ? weltUngespeichert() : ungespeichert() || weltUngespeichert();
+    const offen = inWelt ? weltUngespeichert() : ungespeichert() || weltUngespeichert() || stempelUngespeichert();
     stand.textContent = offen ? '● ungespeichert' : '✓ gespeichert';
     stand.className = offen ? 'offen' : 'grau';
     document.title = `${offen ? '* ' : ''}Wendehals – Editor`;
@@ -1112,31 +1810,60 @@ export function startEditor() {
   }
 
   // ---------------------------------------------------------------- Eingabe
-  let zug = null; // laufende Mausbewegung: { modus: 'werkzeug' | 'plan', x, y, bewegt }
+  /** Laufende Mausbewegung: { modus: 'plan' | 'links' | 'leer' | 'rechts', werkzeug, erfasst, x, y (Bildschirm), bewegt, taste }. */
+  let zug = null;
   const zeigerPunkt = (e) => {
     const r = canvas.getBoundingClientRect();
     const px = e.clientX - r.left;
     const py = e.clientY - r.top;
     const [x, y] = ansicht.bildZuWelt(px, py);
-    return { px, py, x, y };
+    return { px, py, x, y, strg: e.ctrlKey || e.metaKey, alt: e.altKey, shift: e.shiftKey };
   };
-  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  /** Ist eine Ebene, in die das Werkzeug schreibt, gesperrt? Dann Meldung und true. */
+  function gesperrtFuer(werkzeugId) {
+    const zu = (WERKZEUG_EBENEN[werkzeugId] ?? []).find((id) => state.gesperrt.has(id));
+    if (!zu) return false;
+    melde(`Die Ebene „${EBENEN.find((x) => x.id === zu).name}“ ist gesperrt – erst entsperren (Leiste oben), dann kann hier etwas gesetzt werden.`, 'fehler');
+    return true;
+  }
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // Rechtsklick gehört dem Setzen, kein Browsermenü (A1)
   canvas.addEventListener('pointerdown', (e) => {
+    if (zug) return; // eine zweite Taste mitten im Zug stört nicht
+    const p = zeigerPunkt(e);
+    const planVerschieben = e.button === MAUS.verschieben || (e.button === MAUS.waehlen && e.shiftKey);
+    if (e.button !== MAUS.waehlen && e.button !== MAUS.verschieben && e.button !== MAUS.setzen) return;
     canvas.setPointerCapture(e.pointerId);
-    // linke Taste: Werkzeug; mittlere/rechte Taste verschiebt immer den Plan
-    const erfasst = e.button === 0 && aktiv().down?.(kontext, zeigerPunkt(e)) === true;
-    zug = { modus: erfasst ? 'werkzeug' : 'plan', x: e.clientX, y: e.clientY, bewegt: false, taste: e.button };
-    if (!erfasst) canvas.style.cursor = 'grabbing';
+    if (planVerschieben) {
+      zug = { modus: 'plan', x: e.clientX, y: e.clientY, bewegt: false, taste: e.button };
+      canvas.style.cursor = 'grabbing';
+    } else if (e.button === MAUS.setzen && state.ansichtArt !== 'welt' && bewegbareAuswahl().length) {
+      zug = { modus: 'kopie', x: e.clientX, y: e.clientY, bewegt: false, taste: e.button }; // A7: Rechtsklick kopiert die Auswahl an die Mausstelle
+    } else if (e.button === MAUS.setzen) {
+      const w = rechtsWerkzeug();
+      if (!w) {
+        if (state.ansichtArt !== 'welt') melde('Rechtsklick setzt das aktuelle Element – erst eines wählen (Leiste oder Palette: Gang, Knoten, Formteil, Wand, Hindernis, Gegner, Notiz, Stempel, Bereich).');
+        return;
+      }
+      if (gesperrtFuer(w.id)) return;
+      zug = { modus: 'rechts', werkzeug: w, erfasst: w.down?.(kontext, p) === true, x: e.clientX, y: e.clientY, bewegt: false, taste: e.button };
+    } else {
+      const w = linksWerkzeug();
+      const erfasst = w.down?.(kontext, p) === true;
+      zug = { modus: erfasst ? 'links' : 'leer', werkzeug: w, erfasst, x: e.clientX, y: e.clientY, bewegt: false, taste: e.button };
+    }
   });
   canvas.addEventListener('pointermove', (e) => {
     state.zeiger = zeigerPunkt(e);
-    if (!zug) return aktiv().schweben?.(kontext, state.zeiger);
-    if (zug.modus === 'werkzeug') return aktiv().move?.(kontext, zeigerPunkt(e));
+    if (!zug) {
+      linksWerkzeug().schweben?.(kontext, state.zeiger); // Hervorhebung unter der Maus
+      return bewegbareAuswahl().length ? undefined : rechtsWerkzeug()?.schweben?.(kontext, state.zeiger); // Geist des Elements, das ein Rechtsklick setzen würde
+    }
     const dx = e.clientX - zug.x;
     const dy = e.clientY - zug.y;
-    if (!zug.bewegt && Math.hypot(dx, dy) < KLICK_TOLERANZ_PX) return;
-    zug.bewegt = true;
-    ansicht.verschieben(dx, dy);
+    if (!zug.bewegt && Math.hypot(dx, dy) >= KLICK_TOLERANZ_PX) zug.bewegt = true;
+    if (zug.erfasst) return zug.werkzeug.move?.(kontext, zeigerPunkt(e));
+    if (zug.modus === 'rechts' || zug.modus === 'kopie' || !zug.bewegt) return;
+    ansicht.verschieben(dx, dy); // Plan mitziehen: mittlere Taste, Shift+links oder (vorerst) links im Leeren
     zug.x = e.clientX;
     zug.y = e.clientY;
     dirty = true;
@@ -1145,21 +1872,29 @@ export function startEditor() {
     if (!zug) return;
     const z = zug;
     zug = null;
-    canvas.style.cursor = state.werkzeug === 'auswahl' ? 'grab' : 'crosshair';
-    if (e.type === 'pointercancel') return aktiv().abbruch?.(kontext);
-    if (z.modus === 'werkzeug') aktiv().up?.(kontext, zeigerPunkt(e));
-    else if (!z.bewegt && z.taste === 0) aktiv().klick?.(kontext, zeigerPunkt(e));
+    cursorSetzen();
+    if (e.type === 'pointercancel') return abbrechen();
+    const p = zeigerPunkt(e);
+    if (z.modus === 'plan') return;
+    if (z.modus === 'kopie') return z.bewegt ? melde('Rechts ziehen setzt nichts, solange etwas gewählt ist: Rechtsklick kopiert die Auswahl. Zum Aufziehen erst Esc drücken oder das Element neu wählen (G K B W H X).') : rechtsKopie(p);
+    if (z.erfasst) return z.werkzeug.up?.(kontext, p);
+    if (!z.bewegt) z.werkzeug.klick?.(kontext, p); // Klick (links: wählen; rechts: Knoten und Gegner setzen)
   };
   canvas.addEventListener('pointerleave', () => {
     if (zug) return;
     state.zeiger = null;
-    aktiv().abbruch?.(kontext);
+    abbrechen();
   });
   canvas.addEventListener('dblclick', (e) => {
-    if (state.ansichtArt !== 'welt') return;
+    if (e.button !== MAUS.waehlen) return;
     const p = zeigerPunkt(e);
-    const t = weltTreffer(kontext, p.px, p.py);
-    if (t?.art === 'gebiet') zuGebiet(t.id);
+    if (state.ansichtArt === 'welt') {
+      const t = weltTreffer(kontext, p.px, p.py);
+      if (t?.art === 'gebiet') zuGebiet(t.id);
+    } else if (!state.levelGang) {
+      const t = treffer(p.px, p.py, true); // eine Notiz auf dem Gang verdeckt ihn nicht: Doppelklick meint den Gang darunter
+      if (t?.art === 'gang') oeffneLevel(t.id); // Doppelklick auf einen Gang öffnet sein Level
+    }
   });
   canvas.addEventListener('pointerup', loslassen);
   canvas.addEventListener('pointercancel', loslassen);
@@ -1168,23 +1903,42 @@ export function startEditor() {
     (e) => {
       e.preventDefault();
       const r = canvas.getBoundingClientRect();
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        ansicht.verschieben(-e.deltaX, 0); // waagerechtes Rad / Shift+Rad: Plan seitlich schieben
+        return refresh();
+      }
       if (!e.deltaY) return;
-      zoom(e.deltaY > 0 ? 1 : -1, e.clientX - r.left, e.clientY - r.top);
+      zoom(radFaktor(e.deltaY, e.deltaMode, e.ctrlKey), e.clientX - r.left, e.clientY - r.top);
     },
     { passive: false },
   );
   window.addEventListener('keydown', (e) => {
     if (state.spielen?.aktiv) return; // im Spielmodus gehören die Tasten dem Spiel
-    const imFeld = e.target instanceof HTMLSelectElement || (e.target instanceof HTMLInputElement && e.target.type !== 'range' && !e.target.readOnly) || e.target instanceof HTMLTextAreaElement; // Schieber und das schreibgeschützte Bezeichnungsfeld nehmen keine Kürzel weg
+    if (state.variantenOffen && state.ansichtArt !== 'welt' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLSelectElement) && !(e.target instanceof HTMLTextAreaElement)) {
+      // Das Varianten-Fenster verdeckt den Plan: nur Schließen (Y, Esc) und Strg+Z/Y/S gehen durch, alles andere wirkte sonst unsichtbar auf das Gebiet dahinter
+      const mit = (e.ctrlKey || e.metaKey) && !e.altKey;
+      const erlaubt = mit ? [KUERZEL.rueckgaengig, KUERZEL.wiederholen, KUERZEL.speichern].includes(e.code) : [KUERZEL.varianten, 'Escape'].includes(e.code);
+      if (!erlaubt) {
+        if (!e.repeat && !['ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight'].includes(e.code)) {
+          state.variantenMeldung = 'Das Varianten-Fenster ist offen – Y oder Esc schließt es, dann gelten die Tasten wieder für das Gebiet.';
+          variantenZeigen();
+        }
+        e.preventDefault();
+        return;
+      }
+    }
+    const textFeld = (e.target instanceof HTMLInputElement && !['range', 'checkbox', 'button'].includes(e.target.type) && !e.target.readOnly) || e.target instanceof HTMLTextAreaElement;
+    const imFeld = e.target instanceof HTMLSelectElement || textFeld; // Schieber, Knöpfe und das schreibgeschützte Bezeichnungsfeld nehmen keine Kürzel weg
     if ((e.ctrlKey || e.metaKey) && !e.altKey) {
       const c = e.code;
-      const tippt = imFeld && !(c === KUERZEL.speichern);
-      if (tippt) return; // in Eingabefeldern gilt das eingebaute Rückgängig des Feldes
+      const tippt = textFeld && !(c === KUERZEL.speichern);
+      if (tippt) return; // im Textfeld gilt das eingebaute Rückgängig des Feldes; sonst (auch mit Fokus auf Auswahlliste oder Schieber) das des Editors (A5)
       const fn =
         c === KUERZEL.rueckgaengig ? (e.shiftKey ? wiederholen : rueckgaengig)
         : c === KUERZEL.wiederholen ? wiederholen
         : c === KUERZEL.speichern ? speichere
         : c === KUERZEL.oeffnen ? oeffne
+        : c === KUERZEL.alleWaehlen ? alleWaehlen
         : c === KUERZEL.kopieren ? kopiere
         : c === KUERZEL.einfuegen ? fuegeEin
         : c === KUERZEL.duplizieren ? dupliziere
@@ -1203,32 +1957,53 @@ export function startEditor() {
     else if (c === KUERZEL.drehenRechts) drehen(1);
     else if (c === KUERZEL.norden) norden();
     else if (c === KUERZEL.wieImSpiel) wieImSpiel();
-    else if (e.key === '+' || hat(KUERZEL.zoomPlus, c)) zoom(-1);
-    else if (e.key === '-' || hat(KUERZEL.zoomMinus, c)) zoom(1);
+    else if (e.key === '+' || hat(KUERZEL.zoomPlus, c)) zoom(ZOOM_TASTE_FAKTOR);
+    else if (e.key === '-' || hat(KUERZEL.zoomMinus, c)) zoom(1 / ZOOM_TASTE_FAKTOR);
+    else if (c === KUERZEL.zoomEins) setzeZoom(ZOOM_FESTWERTE.eins);
+    else if (c === KUERZEL.zoomNormal) setzeZoom(ZOOM_FESTWERTE.normal);
     else if (c === KUERZEL.spielen) spielenAb();
     else if (c === KUERZEL.bezeichnung) kopiereBezeichnung();
+    else if (c === KUERZEL.bot) botSpieltest();
+    else if (c === KUERZEL.varianten) variantenUmschalten();
     else if (c === KUERZEL.fahrtStart) fahrtUmschalten();
     else if (c === KUERZEL.fahrtVor) setzeFahrt((state.fahrt?.s || 0) + 20);
     else if (c === KUERZEL.fahrtZurueck) setzeFahrt((state.fahrt?.s || 0) - 20);
-    else if (c === KUERZEL.links) ansicht.verschieben(schritt, 0);
-    else if (c === KUERZEL.rechts) ansicht.verschieben(-schritt, 0);
-    else if (c === KUERZEL.hoch) ansicht.verschieben(0, schritt);
-    else if (c === KUERZEL.runter) ansicht.verschieben(0, -schritt);
+    else if (c === KUERZEL.links || c === KUERZEL.rechts || c === KUERZEL.hoch || c === KUERZEL.runter) {
+      // Pfeile verschieben die Auswahl (A4); ist nichts Bewegbares gewählt, den Plan
+      const dsx = c === KUERZEL.links ? -1 : c === KUERZEL.rechts ? 1 : 0;
+      const dsy = c === KUERZEL.hoch ? -1 : c === KUERZEL.runter ? 1 : 0;
+      if (state.ansichtArt !== 'welt' && bewegbareAuswahl().length) bewegePfeil(dsx, dsy, e.shiftKey);
+      else ansicht.verschieben(-dsx * schritt, -dsy * schritt);
+    }
     else if (c === KUERZEL.teilDrehen) dreheTeil(e.shiftKey ? -1 : 1);
     else if (c === KUERZEL.beschriftung) beschriften();
     else if (c === KUERZEL.look) lookUmschalten();
+    else if (c === KUERZEL.tilesetFenster) tilesetFensterUmschalten();
     else if (c === KUERZEL.alles) alles();
     else if (hat(KUERZEL.loeschen, c)) loescheAuswahl();
     else if (Object.values(KUERZEL.werkzeug).includes(c)) setzeWerkzeug(Object.keys(KUERZEL.werkzeug).find((id) => KUERZEL.werkzeug[id] === c));
     else if (c === KUERZEL.welt) weltUmschalten();
-    else if (c === 'Enter' && state.ansichtArt === 'welt') weltOeffneAuswahl();
+    else if (c === 'Enter') {
+      if (state.ansichtArt === 'welt') weltOeffneAuswahl();
+      else if (!state.levelGang && state.auswahl?.art === 'gang') oeffneLevel(state.auswahl.id); // Enter öffnet das Level des gewählten Gangs
+      else getan = false;
+    } else if (c === 'PageDown' && state.levelGang) nachbarLevel(1);
+    else if (c === 'PageUp' && state.levelGang) nachbarLevel(-1);
     else if (c === 'Escape') {
-      aktiv().abbruch?.(kontext);
-      if (state.ansichtArt === 'welt') {
+      const lief = !!zug;
+      abbrechen(); // ein laufender Zug (Ziehen, Aufziehen) wird verworfen, nichts ändert sich
+      if (lief) {
+        /* nur der Zug endet */
+      } else if (state.variantenOffen && state.ansichtArt !== 'welt') {
+        variantenUmschalten(); // Esc schließt zuerst das Varianten-Fenster
+      } else if (state.ansichtArt === 'welt') {
         if (state.weltAuswahl) weltWaehle(null);
-        else zuGebiet();
-      }
-      else waehle(null);
+      } else if (state.levelGang) {
+        const au = state.auswahl;
+        if (au?.art === 'gang' && au.id === state.levelGang && !(state.fahrt?.laeuft)) eineEbeneHoch(); // nur das Level selbst gewählt: eine Ebene hoch
+        else waehle(null); // sonst zurück zum Level selbst
+      } else if (state.auswahl) waehle(null);
+      else eineEbeneHoch(); // nichts gewählt: Karte → Welt
     }
     else getan = false;
     if (getan) {
@@ -1238,11 +2013,22 @@ export function startEditor() {
     }
   });
 
+  /** Prüfer-Marken, die im Plan zu sehen sind: in der Levelansicht nur die, deren Ding zum Level gehört. */
+  function sichtbareMarken() {
+    const alle = pruefer().meldungen;
+    if (!state.levelGang) return alle;
+    const g = sicht();
+    const da = { gang: g.gaenge, knoten: g.knoten, formteil: g.formteile, objekt: g.objekte, notiz: g.notizen };
+    return alle.filter((m) => m.ort && (da[m.ort.art] ?? []).some((x) => x.id === m.ort.id));
+  }
+
   // ---------------------------------------------------------------- Schleife
   function zeichne() {
     const t0 = performance.now();
     if (state.ansichtArt === 'welt') zeichneWelt(ctx, { welt: state.welt, gebiete: state.gebiete, auswahl: state.weltAuswahl, aktuell: state.gebietId, marken: state.prueferOffen ? weltPruefer().meldungen : null, beschriftung: state.beschriftung }, ansicht, canvas.width / ansicht.w);
-    else zeichnePlan(ctx, gebiet(), ansicht, { auswahl: state.auswahl, fahrt: state.fahrt, zeit: state.zeit, beschriftung: state.beschriftung, look: lookFarben(), marken: state.prueferOffen ? pruefer().meldungen : null, uebergaenge: uebergangsMarken(), vorschau: (c) => werkzeug().vorschau?.(c, kontext) }, canvas.width / ansicht.w);
+    else zeichnePlan(ctx, sicht(), ansicht, { auswahl: state.auswahl, auswahlen: auswahlListe(), fahrt: state.fahrt, zeit: state.zeit, beschriftung: state.beschriftung, look: lookFarben(), marken: state.prueferOffen ? sichtbareMarken() : null, uebergaenge: uebergangsMarken().filter((m) => !state.levelGang || sicht().knoten.some((k) => k.id === m.knoten)), vorschau: (c) => {
+      for (const w of new Set([auswahlWerkzeug, werkzeug()])) w.vorschau?.(c, kontext);
+    } }, canvas.width / ansicht.w);
     perf.zeichnenMs.push(performance.now() - t0);
     if (perf.zeichnenMs.length > 600) perf.zeichnenMs.shift();
     dirty = false;
@@ -1262,7 +2048,7 @@ export function startEditor() {
   setzeWerkzeug(state.werkzeug);
   requestAnimationFrame(frame);
   window.addEventListener('beforeunload', (e) => {
-    if (Object.keys(state.gebiete).some((id) => ungespeichert(id)) || weltUngespeichert()) e.preventDefault(); // Rückfrage statt stillem Verlust
+    if (Object.keys(state.gebiete).some((id) => ungespeichert(id)) || weltUngespeichert() || stempelUngespeichert()) e.preventDefault(); // Rückfrage statt stillem Verlust
   });
   // Electron: die Leveldateien frisch von der Platte lesen (die eingebauten Stände sind nur der Rückfall)
   state.speicher
@@ -1278,10 +2064,19 @@ export function startEditor() {
     gebiet,
     wechsle,
     waehle,
+    auswahlListe,
+    setzeAuswahl,
+    alleWaehlen,
     setzeFahrt,
     spielenAb,
     pruefer,
     prueferUmschalten,
+    botSpieltest,
+    variantenUmschalten,
+    variantenAufnehmen,
+    variantUebernehmen,
+    variantEntfernen,
+    botErgebnis: () => botLauf,
     springe,
     kopiereBezeichnung,
     bezeichnungText,
@@ -1294,6 +2089,12 @@ export function startEditor() {
     wiederholen,
     setzeFeld,
     setzeWerkzeug,
+    stempelSpeichern,
+    stempelWaehlen,
+    stempelLoeschen,
+    stempelBenennen,
+    stempelAktuell,
+    stempelUngespeichert,
     loescheAuswahl,
     dreheTeil,
     kopiere,
@@ -1330,6 +2131,15 @@ export function startEditor() {
     norden,
     wieImSpiel,
     zoom,
+    setzeZoom,
+    tilesetFensterUmschalten,
+    ebene,
+    sicht,
+    oeffneLevel,
+    zuKarte,
+    eineEbeneHoch,
+    geheZu,
+    ansichtMerken,
     rahmenEcken: () => {
       const m = ganzMasse();
       return m ? rahmenEcken(m, state.fahrt.s) : null;

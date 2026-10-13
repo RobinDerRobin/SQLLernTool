@@ -173,8 +173,32 @@ tests/editor-*.tests.mjs, e2e/editor*.mjs
    „Auf Vorbehalt entschieden“ eintragen. **Groß** (Robins Regeln, Bauform, Datenformat-Grundsatz, Änderungen am Spiel
    oder Prototyp-Verhalten) → unter „Fragen an Robin“ eintragen, an anderer Stufe weiterarbeiten.
 9. Sind alle Stufen fertig: nur „fertig“ melden, nichts ändern.
+10. **Projektregeln gelten für jeden Lauf** (Robin, 12.10.2026): `wendehals/CLAUDE.md` „Regeln für jede Prototyp-Arbeit“
+    1–9, vor allem Regel 1 „Erst validieren, dann bauen“. Steht in STAND.md eine **offene Rückmeldung von Robin**,
+    wird nichts gebaut, was sie berührt, bis Robin die Deutung und den Lösungsansatz bestätigt hat; nur Arbeit, die sie
+    nicht berührt. **Robins Anforderungen in Abschnitt 9 sind dagegen bestätigt** und werden automatisch umgesetzt.
+11. **Anforderungen zuerst:** Erfüllt der Editor eine Anforderung aus Abschnitt 9 noch nicht, wird das vor der nächsten
+    Stufe umgesetzt (mit Test aus Nutzersicht). Jede neue Arbeit muss alle Anforderungen erfüllen.
 
 ## 8. Auf Vorbehalt (Robins Antworten stehen aus; Empfehlungen, denen Robin nicht widersprochen hat)
 
 - Tileset = Aussehen eines Gebiets, Form bleibt frei. · v0.2-Themen als Platzhalter-Tilesets. · Gegner als markierte
   Platzhalter. · Formen aus geraden Teilen, unregelmäßige geparkt. · Weg der Dateien ins Repo: entschieden (Abschnitt 4).
+
+## 9. Verbindliche Anforderungen von Robin (gelten für jeden Lauf, neue werden hier ergänzt)
+
+Robin, 12.10.2026: „Wenn aktuelle Anforderungen sagen, rechtsklick platziert, dann sollen das alle Läufe automatisch
+berücksichtigen.“ Jede Anforderung bekommt einen automatischen Test aus Nutzersicht; Umsetzungsdetails, die Robin nicht
+festgelegt hat, unter „Auf Vorbehalt entschieden“ eintragen.
+
+| ID | Anforderung (Robin, Wortlaut) | Bedeutung für den Editor |
+|---|---|---|
+| A1 | „Ich möchte wie in Lunar Magic nicht versehentlich Elemente platzieren. Rechtsklick platziert, nicht Linksklick.“ – UX-Vorschlag M2 bestätigt: „Ich will auch verschieben können, wenn ich Shift + ziehe, nicht nur mit der mittleren Maustaste. Sonst gut.“ | Rechtsklick setzt das aktuelle Element (statt Werkzeug-Modus), Linksklick wählt und zieht und platziert nie etwas, mittlere Maustaste **und Shift+Ziehen** verschieben den Plan, Mausrad zoomt. Kein Browser-Kontextmenü im Plan. Mehrfachauswahl daher mit Strg+Klick, nicht Shift. |
+| A2 | „Der Zoom ist eine Katastrophe. Der ist viel zu unfein.“ – UX-Vorschlag M1 bestätigt („Ja“). | Stufenloser Zoom, ca. 15 % je Mausrad-Raste, um den Mauszeiger herum; Tasten; „Alles“ passt ohne Stufen ein; Zoomanzeige (in Bildschirmen) mit Eingabefeld. |
+| A3 | „…ein Level herausnehmen und es einzeln betrachten. Dafür möchte ich nicht auch alles andere sehen. Also Kartenansicht, Levelansicht.“ – M3 bestätigt („Gut“); „Rest in der Levelansicht: Ausgeblendet.“; „Es gibt eine Ausgangsperspektive pro Level, ansonsten Norden.“ | Ebenen Welt → Karte → Level: Doppelklick/Enter öffnet ein Level, Esc geht eine Ebene hoch, Brotkrume. In der Levelansicht ist alles außer dem Level und seinen beiden Knoten **ausgeblendet**. Jedes Level hat eine speicherbare **Ausgangsperspektive** (Drehung beim Öffnen, im Format am Gang); ohne Angabe Norden oben. |
+| A4 | UX-Vorschlag M4 bestätigt („ja“). | Hervorhebung unter der Maus, Auswahlrahmen (Linksziehen im Leeren), Mehrfachauswahl (Strg+Klick), Pfeiltasten verschieben die Auswahl im Raster, Kopieren/Einfügen mehrerer Objekte. |
+| A5 | UX-Vorschlag M5 bestätigt: „Ja und Strg + Z bzw Y tun was sie sollten.“ | Strg+Z macht den letzten Schritt rückgängig, Strg+Y (auch Strg+Umschalt+Z) wiederholt ihn – zuverlässig für jede Aktion, auch in jeder Ansicht; der Rückgängig-Knopf zeigt die letzte Aktion; nur Entf löscht (Backspace nicht); Ziehen erst ab 8 px; Ebenen sperrbar. |
+| A6 | „Feinere Lage: Erstmal nicht.“ | Kein Positionieren feiner als das 20-E-Raster. |
+| A0 | „Grundsätzlich Orientierung an Lunar Magic.“ (12.10.2026) | Grundsatz für alle Bedienfragen: wo Robin nichts festgelegt hat, so lösen, wie Lunar Magic es tut; Abweichungen nur mit Grund unter „Auf Vorbehalt“. |
+| A7 | Rechtsklick bei Auswahl – Robin: „ja genau so.“ (12.10.2026) | Ist ein Objekt ausgewählt, setzt Rechtsklick eine **Kopie des ausgewählten Objekts** an die Mausstelle (wie Lunar Magic); ist nichts ausgewählt, das aktuelle Palettenelement. Kein Kontextmenü. |
+| A8 | Tileset-Fenster wie in Lunar Magic – Robin: „ja“ (12.10.2026) | Eigenes, verschiebbares Fenster (wie „Add Objects“ in Lunar Magic) mit allen Teilen des Tilesets des aktuellen Gebiets als Bilder; Klick wählt das aktuelle Element für den Rechtsklick; ein-/ausblendbar per Taste. |

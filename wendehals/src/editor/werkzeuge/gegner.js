@@ -9,7 +9,7 @@ let schwebe = null;
 export default {
   id: 'gegner',
   name: 'Gegner',
-  hinweis: 'Klick setzt einen Gegner-Platzhalter (Art in der Palette rechts wählen). Sein Verhalten im Fenster ist ungeprüft.',
+  hinweis: 'Rechtsklick setzt einen Gegner-Platzhalter (Art in der Palette rechts wählen). Sein Verhalten im Fenster ist ungeprüft.',
   down: () => false,
   klick(k, p) {
     const art = GEGNER.includes(k.state.gegnerArt) ? k.state.gegnerArt : GEGNER[0];

@@ -56,6 +56,43 @@ export function erzeugeSpeicher(umgebung = {}) {
       setTimeout(() => URL.revokeObjectURL(url), 10000);
       return { wo: `Downloads/${name}` };
     },
+    /** Lässt mehrere Dateien wählen (Varianten): [{ name, text }], leer = abgebrochen. Merkt sich keine Datei-Handles (Varianten werden nie zurückgeschrieben). */
+    async ladeMehrere() {
+      if (s.art === 'datei' && fenster.showOpenFilePicker) {
+        try {
+          const hs = await fenster.showOpenFilePicker({ types: TYPEN, multiple: true });
+          return await Promise.all(hs.map(async (h) => {
+            const f = await h.getFile();
+            return { name: f.name, text: await f.text() };
+          }));
+        } catch (e) {
+          if (abgebrochen(e)) return [];
+          throw new Error('Öffnen der Dateien ging nicht: ' + e.message);
+        }
+      }
+      return new Promise((ok, fehler) => {
+        const eingabe = dok.createElement('input');
+        eingabe.type = 'file';
+        eingabe.multiple = true;
+        eingabe.accept = '.json,application/json';
+        eingabe.style.display = 'none';
+        eingabe.addEventListener('change', async () => {
+          const fs = [...eingabe.files];
+          eingabe.remove();
+          try {
+            ok(await Promise.all(fs.map(async (f) => ({ name: f.name, text: await f.text() }))));
+          } catch (e) {
+            fehler(new Error('Lesen der Dateien ging nicht: ' + e.message));
+          }
+        });
+        eingabe.addEventListener('cancel', () => {
+          eingabe.remove();
+          ok([]);
+        });
+        dok.body.append(eingabe);
+        eingabe.click();
+      });
+    },
     /** Lässt eine Datei wählen und gibt { name, text } zurück (null: abgebrochen). */
     async lade() {
       if (s.art === 'datei' && fenster.showOpenFilePicker) {

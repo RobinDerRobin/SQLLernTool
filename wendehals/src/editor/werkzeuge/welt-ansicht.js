@@ -34,7 +34,7 @@ let zug = null; // { id, start: [px, py], welt0, lage0: {x, y}, vorher, bewegt }
 export default {
   id: 'welt',
   name: 'Welt',
-  hinweis: 'Klick wählt ein Gebiet oder einen Übergang, Ziehen verschiebt das Gebiet im Plan (100 E), Doppelklick öffnet es. T oder zweimal Esc geht zurück ins Gebiet.',
+  hinweis: 'Klick wählt ein Gebiet oder einen Übergang, Ziehen verschiebt das Gebiet im Plan (100 E), Doppelklick (oder Enter) öffnet es, T geht zurück ins Gebiet.',
   down(k, p) {
     const t = weltTreffer(k, p.px, p.py);
     if (t?.art !== 'gebiet') return false;

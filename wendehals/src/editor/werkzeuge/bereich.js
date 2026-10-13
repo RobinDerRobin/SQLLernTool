@@ -13,7 +13,7 @@ const probe = (a, e) => {
 export default {
   id: 'bereich',
   name: 'Bereich',
-  hinweis: 'Ziehen zeichnet den Bereich des Gebiets (rastet auf 100 E, mindestens ein Bildschirm). Esc bricht ab. Eingabefelder und „An Inhalt anpassen“ stehen rechts.',
+  hinweis: 'Rechts ziehen zeichnet den Bereich des Gebiets (rastet auf 100 E, mindestens ein Bildschirm). Esc bricht ab. Eingabefelder und „An Inhalt anpassen“ stehen rechts.',
   down(k, p) {
     zug = { start: { x: p.x, y: p.y }, ende: { x: p.x, y: p.y }, px: [p.px, p.py], bewegt: false };
     return true;

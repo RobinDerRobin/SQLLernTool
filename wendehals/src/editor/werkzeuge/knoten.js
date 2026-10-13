@@ -9,7 +9,7 @@ let schwebe = null; // { x, y, gang? } oder null
 export default {
   id: 'knoten',
   name: 'Knoten',
-  hinweis: 'Klick setzt einen Knoten (Typ oben wählen). Auf einem Gang entsteht eine T-Kreuzung. Ziehen verschiebt den Plan.',
+  hinweis: 'Rechtsklick setzt einen Knoten (Typ oben wählen). Auf einem Gang entsteht eine T-Kreuzung. Linksklick wählt, mittlere Taste verschiebt den Plan.',
   down: () => false,
   klick(k, p) {
     const typ = k.state.knotenTyp;

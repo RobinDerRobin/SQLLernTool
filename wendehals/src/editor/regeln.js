@@ -4,7 +4,7 @@
 // Reine Rechnung auf den Daten – kein DOM, läuft auch unter Node (Tests).
 import { knotenMap, gangMasse, gangPunkt, bodenPolygone, punktInPolygon, rechteck } from './daten.js';
 import { spielbarkeit } from './spielen.js';
-import { DREHZONE, MIN_QUERWEG, PRUEF_SCHRITT, PRUEF_QUER, PRUEF_RAND, MIN_GANG_SOLL } from './konstanten.js';
+import { DREHZONE, MIN_QUERWEG, PRUEF_SCHRITT, PRUEF_QUER, PRUEF_RAND, MIN_GANG_SOLL, MAX_MESSSTELLEN } from './konstanten.js';
 
 const EPS = 1e-6;
 const RAD = 180 / Math.PI;
@@ -99,9 +99,10 @@ export const REGELN = [
           });
           strecke = null;
         };
-        const stellen = Math.max(1, Math.ceil(m.laenge / PRUEF_SCHRITT));
+        const schritt = Math.max(PRUEF_SCHRITT, m.laenge / MAX_MESSSTELLEN); // sehr lange Gänge: gröber messen, nie unbegrenzt
+        const stellen = Math.max(1, Math.ceil(m.laenge / schritt));
         for (let i = 0; i <= stellen; i++) {
-          const s = Math.min(m.laenge - 1, Math.max(1, i * PRUEF_SCHRITT)); // genau auf der Gangkante zählt der Punkt nicht als Boden
+          const s = Math.min(m.laenge - 1, Math.max(1, i * schritt)); // genau auf der Gangkante zählt der Punkt nicht als Boden
           const p = gangPunkt(m, s);
           let best = 0;
           let lauf = 0;
@@ -199,7 +200,20 @@ export const REGELN = [
     art: 'MUSS',
     text: 'Was der Fenster-Prototyp nicht spielen kann, wird als „noch nicht spielbar“ gemeldet.',
     pruefe(g) {
-      return spielbarkeit(g).probleme.map((p) => ({ text: 'Noch nicht spielbar: ' + p }));
+      const km = knotenMap(g);
+      return spielbarkeit(g).probleme.map((p) => {
+        const meldung = { text: 'Noch nicht spielbar: ' + p };
+        const gang = g.gaenge.find((x) => p.includes(`„${x.name || x.id}“`));
+        const m = gang && gangMasse(g, gang, km);
+        if (m && m.laenge > EPS) meldung.ort = { art: 'gang', id: gang.id, s: m.laenge / 2, ...gangPunkt(m, m.laenge / 2) };
+        else {
+          const k = g.knoten.find((x) => new RegExp(`\\b${x.id}\\b`).test(p));
+          const o = [...g.formteile, ...g.objekte].find((x) => new RegExp(`\\b${x.id}\\b`).test(p));
+          if (k) meldung.ort = { art: 'knoten', id: k.id, x: k.x, y: k.y };
+          else if (o) meldung.ort = { art: o.laenge !== undefined && !o.typ ? 'formteil' : 'objekt', id: o.id, x: o.x, y: o.y };
+        }
+        return meldung;
+      });
     },
   },
   {
