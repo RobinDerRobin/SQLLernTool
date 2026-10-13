@@ -2,7 +2,7 @@
 
 > Wird von jedem Bau-Lauf gepflegt (Brief: [`BRIEF.md`](BRIEF.md), Abschnitt 7). Zeiten in Europe/Berlin.
 
-**Sperre:** frei
+**Sperre:** belegt seit 13.10.2026 03:12, Lauf https://claude.ai/code/session_011ZEukSq4Vbt4BqHBGHetRT
 
 ## Stufen
 
