@@ -2,7 +2,7 @@
 
 > Wird von jedem Bau-Lauf gepflegt (Brief: [`BRIEF.md`](BRIEF.md), Abschnitt 7). Zeiten in Europe/Berlin.
 
-**Sperre:** frei
+**Sperre:** belegt seit 13.10.2026 02:45, Lauf 12 (Sonnet 5.5, Session 01UDCjzuRfJqVss4PzEeoauo)
 
 ## Stufen
 
