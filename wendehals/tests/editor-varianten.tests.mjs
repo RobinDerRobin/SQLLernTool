@@ -86,3 +86,20 @@ test('Varianten: Kennzahlen zählen Prüfer-Meldungen der Variante', () => {
   schlecht.gaenge = []; // Knoten ohne Gang → MUSS M5
   assert.ok(kennzahlen(schlecht).muss > kennzahlen(g).muss);
 });
+
+test('Varianten: andere Reihenfolge, unbekannte Felder und Schlüsselreihenfolge', () => {
+  const g = basis();
+  const umgekehrt = kopie(g);
+  umgekehrt.gaenge.reverse();
+  const u = unterschied(g, umgekehrt);
+  assert.equal(u.gleich, false, 'andere Gangreihenfolge ist ein Unterschied (Levelreihenfolge)');
+  assert.match(unterschiedText(u), /andere Reihenfolge der Gänge/);
+  const fremd = { ...kopie(g), foo: 1 };
+  assert.equal(unterschied(g, fremd).gleich, false, 'unbekanntes Feld wird beim Übernehmen mitkommen, also zählt es');
+  // Schlüssel in anderer Reihenfolge: kein Unterschied
+  const umsortiert = kopie(g);
+  umsortiert.knoten = umsortiert.knoten.map((k) => Object.fromEntries(Object.entries(k).reverse()));
+  const u2 = unterschied(g, umsortiert);
+  assert.equal(u2.gleich, true);
+  assert.equal(unterschiedText(u2), 'identisch');
+});

@@ -5,6 +5,9 @@ import { ladeGebiet, pruefeFormat, kopie, ausdehnung } from './daten.js';
 import { pruefeGebiet } from './pruefer.js';
 import { MAX_VARIANTEN } from './konstanten.js';
 
+/** JSON mit sortierten Schlüsseln: Schlüsselreihenfolge in der Datei zählt nicht als Unterschied. */
+const stabil = (v) => JSON.stringify(v, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, x[k]])) : x));
+
 const ARTEN = [
   ['knoten', 'Knoten'],
   ['gaenge', 'Gänge'],
@@ -40,17 +43,20 @@ export function ladeVariante(text, datei, nummer) {
  * außer ID und Name: die behält das aktuelle Gebiet beim Übernehmen).
  */
 export function unterschied(aktuell, variante) {
-  const u = { arten: {}, tileset: aktuell.tileset !== variante.tileset, bereich: JSON.stringify(aktuell.bereich) !== JSON.stringify(variante.bereich), gleich: true };
-  for (const [feld] of ARTEN) {
-    const a = new Map(aktuell[feld].map((d) => [d.id, JSON.stringify(d)]));
-    const b = new Map(variante[feld].map((d) => [d.id, JSON.stringify(d)]));
+  const u = { arten: {}, tileset: aktuell.tileset !== variante.tileset, bereich: stabil(aktuell.bereich) !== stabil(variante.bereich), reihenfolge: [], gleich: true };
+  for (const [feld, name] of ARTEN) {
+    const a = new Map(aktuell[feld].map((d) => [d.id, stabil(d)]));
+    const b = new Map(variante[feld].map((d) => [d.id, stabil(d)]));
     const neu = [...b.keys()].filter((id) => !a.has(id));
     const weg = [...a.keys()].filter((id) => !b.has(id));
     const anders = [...b.keys()].filter((id) => a.has(id) && a.get(id) !== b.get(id));
     u.arten[feld] = { neu, weg, anders };
-    if (neu.length || weg.length || anders.length) u.gleich = false;
+    // gleiche Dinge in anderer Reihenfolge: die Reihenfolge der Gänge ist die Levelreihenfolge
+    if (!neu.length && !weg.length && [...a.keys()].join('\u0000') !== [...b.keys()].join('\u0000')) u.reihenfolge.push(name);
   }
-  if (u.tileset || u.bereich) u.gleich = false;
+  // alles, was beim Übernehmen mitkäme (auch unbekannte Felder), muss „gleich“ mitbestimmen – id und name behält das aktuelle Gebiet
+  const ohne = (g) => stabil({ ...g, id: null, name: null });
+  u.gleich = ohne(aktuell) === ohne(variante);
   return u;
 }
 
@@ -65,9 +71,10 @@ export function unterschiedText(u) {
     anders += x.anders.length;
   }
   if (anders) teile.push(`${anders} geändert`);
+  for (const n of u.reihenfolge) teile.push(`andere Reihenfolge der ${n}`);
   if (u.tileset) teile.push('anderes Tileset');
   if (u.bereich) teile.push('anderer Bereich');
-  return teile.length ? teile.join(', ') : 'identisch';
+  return teile.length ? teile.join(', ') : u.gleich ? 'identisch' : 'weitere Felder anders';
 }
 
 /**

@@ -101,6 +101,18 @@ check((await gebietJetzt()) === original, 'Entfernen ändert keine Daten');
 await ed((e) => e.wechsle('beispiel'));
 check((await kacheln()).length === 1, 'Gebietswechsel: Varianten gehören zum Gebiet und sind weg');
 
+// ---- Übergangsknoten: Hinweis an der Kachel und Warnung nach dem Übernehmen (beispiel/K5 hat einen Übergang)
+await ed((e) => {
+  const v = JSON.parse(JSON.stringify(e.gebiet()));
+  const k = v.knoten.find((x) => x.id === 'K5');
+  k.x += 100;
+  e.variantenAufnehmen([{ name: 'k5-verschoben.json', text: JSON.stringify(v) }]);
+});
+check((await kacheln()).find((x) => x.id === 'v4' || x.id?.startsWith('v'))?.diff.includes('Übergangsknoten K5'), 'Kachel warnt vor dem Ändern des Übergangsknotens K5');
+await page.click('[data-variante^="v"] button:has-text("Übernehmen")');
+check((await page.locator('#melden').textContent()).includes('Knoten mit Übergang') , 'Übernehmen meldet den betroffenen Übergangsknoten');
+await page.keyboard.press('Control+KeyZ');
+
 // ---- Welt-Ansicht: Knopf aus, Fenster zu
 await ed((e) => e.zuWelt());
 check(await page.evaluate(() => document.getElementById('b-varianten').disabled), 'in der Welt-Ansicht ist der Knopf aus');

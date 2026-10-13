@@ -656,17 +656,28 @@ export function startEditor() {
     const v = state.varianten.find((x) => x.id === id);
     if (!v) return;
     if (unterschied(gebiet(), v.gebiet).gleich) return melde(`„${v.name}“ ist mit dem aktuellen Gebiet identisch – nichts zu übernehmen.`);
+    const vorher = new Map(gebiet().knoten.map((k) => [k.id, JSON.stringify(k)]));
     const erg = aendere(`Variante „${v.name}“ übernehmen`, (g) => uebernehmeVariante(g, v.gebiet));
     if (erg === true) {
+      const g = gebiet();
+      const jetzt = new Map(g.knoten.map((k) => [k.id, JSON.stringify(k)]));
+      const betroffen = [...vorher].filter(([id, t]) => jetzt.get(id) !== t && uebergaengeAn(state.welt, g.id, id).length).map(([id]) => id);
       state.auswahl = null;
       state.mehrfach = [];
       state.fahrt = null;
-      const g = gebiet();
-      if (g.gaenge.length) waehle({ art: 'gang', id: g.gaenge[0].id });
+      if (g.gaenge.length && !state.levelGang) waehle({ art: 'gang', id: g.gaenge[0].id });
       alles();
-      melde(`Variante „${v.name}“ übernommen (Strg+Z nimmt sie zurück). Speichern schreibt sie in ${g.id}.json.`);
+      const basis = `Variante „${v.name}“ übernommen (Strg+Z nimmt sie zurück). Speichern schreibt sie in ${g.id}.json.`;
+      if (betroffen.length) melde(`${basis}\nAchtung: Knoten mit Übergang geändert oder entfernt (${betroffen.join(', ')}) – der Welt-Prüfer (Taste T) meldet es (W1).`, 'fehler');
+      else melde(basis);
     }
     return erg;
+  }
+  /** Hinweis an der Kachel: würde Übernehmen einen Knoten mit Übergang ändern oder entfernen? */
+  function uebergangsHinweis(variante) {
+    const neu = new Map(variante.knoten.map((k) => [k.id, JSON.stringify(k)]));
+    const ids = gebiet().knoten.filter((k) => neu.get(k.id) !== JSON.stringify(k) && uebergaengeAn(state.welt, state.gebietId, k.id).length).map((k) => k.id);
+    return ids.length ? ` – Achtung: Übergangsknoten ${ids.join(', ')} würde sich ändern` : '';
   }
   function vorschauCanvas(g) {
     const c = el('canvas', { width: 280, height: 170 });
@@ -682,7 +693,7 @@ export function startEditor() {
       el('div', { class: 'vname', text: titel }),
       el('div', { class: 'vzahlen', text: `${k.knoten} Knoten · ${k.gaenge} Gänge · ${k.formteile} Formteile · ${k.objekte} Objekte · ${k.gegner} Gegner · ${k.notizen} Notizen` }),
       el('div', { class: 'vzahlen ' + (k.muss ? 'muss' : 'gut'), text: k.muss || k.soll ? `Prüfer: ${k.muss} MUSS · ${k.soll} SOLL` : 'Prüfer: ✓ in Ordnung' }),
-      ...(aktuell ? [] : [el('div', { class: 'vdiff', text: 'Unterschied zum aktuellen Gebiet: ' + unterschiedText(unterschied(gebiet(), g)) }), el('div', { class: 'vknoepfe' }, [
+      ...(aktuell ? [] : [el('div', { class: 'vdiff', text: 'Unterschied zum aktuellen Gebiet: ' + unterschiedText(unterschied(gebiet(), g)) + uebergangsHinweis(g) }), el('div', { class: 'vknoepfe' }, [
         knopf('Übernehmen', 'Das aktuelle Gebiet bekommt den Inhalt dieser Variante (Strg+Z nimmt es zurück)', () => variantUebernehmen(extra.id), 'b-v-uebernehmen-' + extra.id),
         knopf('Entfernen', 'Variante aus dem Vergleich nehmen (die Datei bleibt)', () => variantEntfernen(extra.id), 'b-v-entfernen-' + extra.id),
       ])]),
