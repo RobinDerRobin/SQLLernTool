@@ -2,7 +2,7 @@
 
 > Wird von jedem Bau-Lauf gepflegt (Brief: [`BRIEF.md`](BRIEF.md), Abschnitt 7). Zeiten in Europe/Berlin.
 
-**Sperre:** belegt seit 13.10.2026 01:47, Lauf https://claude.ai/code/session_01D1wHTVsLdDdxSHWVjxRThh (Stufe 9)
+**Sperre:** frei
 
 ## Stufen
 
@@ -18,7 +18,7 @@
 | 7 | Testmenü am Deck | fertig (`?testmenue` / `WENDEHALS_TESTMENUE=1`; Electron und echtes Gamepad ungetestet) | npm test 410, e2e, e2e:editor, beide Test-Agenten | Lauf 8 |
 | 7b | Bedienung (Brief: BRIEF-7b-bedienung.md) | fertig: A0–A8 und Fehler „Spielen ab hier“ erfüllt (Electron ungetestet; obere Leisten bei 1280 px scrollen waagerecht) | npm test 422, e2e, e2e:editor (neu: e2e/editor-bedienung.mjs), beide Test-Agenten | Lauf 9 |
 | 8 | Notizen und Stempel | fertig (Electron ungetestet; Stempel nur per Rechtsklick, kein Vorschaubild in der Liste) | npm test 435, e2e, e2e:editor (neu: e2e/editor-notizen.mjs), beide Test-Agenten | Lauf 10 |
-| 9 | Bot-Spieltest | offen | – | – |
+| 9 | Bot-Spieltest | fertig: Knopf/Taste Z, Liste mit Bezeichnung, Sprung zur Stelle (Electron ungetestet; Bot fliegt nur Hinweg, kein Rückweg; weicht nicht in Nischen außerhalb des Gangs aus; Diagonalen nicht spielbar) | npm test 444, e2e, e2e:editor (neu: e2e/editor-bot.mjs), beide Test-Agenten | Lauf 11 |
 | 10 | KI-Varianten nebeneinander | offen | – | – |
 | 11 | Abschluss | offen | – | – |
 
@@ -141,6 +141,7 @@ umsetzen** (höchste Priorität), danach weiter mit den Stufen. **Fehler zuerst 
 | 12.10.2026 07:42 | Lauf 8 (Sonnet 5.5) | Stufe 7 fertig, grün |
 | 12.10.2026 18:34 | Lauf 9 (Sonnet 5.5, Bau-Session 7b) | Stufe 7b gebaut (A0–A8), Agenten-Befunde behoben, gepusht |
 | 13.10.2026 01:12 | Lauf 10 (Sonnet 5.5) | Stufe 8 gebaut (Notizen, Stempel), Prüfkette grün, Agenten-Befunde (Fehler) behoben, gepusht |
+| 13.10.2026 01:47 | Lauf 11 (Sonnet 5.5) | Stufe 9 gebaut (Bot-Spieltest), Kette grün, Agenten ohne Fehler; Hinweise teils behoben. Einmaliger e2e-Smoke-Fehler (Drehscheibe) trat 2× auf, danach 3× grün, ohne Basisvergleich eindeutig: Flake |
 
 ## Auf Vorbehalt entschieden (Stufe 7b)
 
@@ -165,3 +166,12 @@ umsetzen** (höchste Priorität), danach weiter mit den Stufen. **Fehler zuerst 
 ## Fragen an Robin (7b)
 
 - (keine neuen)
+
+## Auf Vorbehalt entschieden (Stufe 9)
+
+- Bot (`src/editor/bot.js`) = Wegfinder aus `tests/helpers/netz-bot.mjs` (Kopie, weil der Build nichts aus tests/ nimmt), plus Quersteuerung am Weg (Hindernisse im Gang umfliegen) und Fallback auf 16 E Wandabstand. Je Gang: Start am Gang-Anfang, Ziel 30 E vor dem Ende; Meldungen ok/tod/stecken/zeit/nicht spielbar; Bezeichnung nennt die Stelle des Fehlers. Knopf „Bot-Spieltest“ und Taste Z (Strg+Z bleibt Rückgängig); nur im Gebiet, nicht in der Welt-Ansicht.
+- **Fund:** `FensterScene.pickTarget` lief bei einer Karte mit nur einem Knochen endlos (Editor-Karten, auch „Spielen ab hier“). Guard in `src/proto/fenster.js` (Verhalten ab zwei Knochen unverändert, Golden Master grün) – berührt eine Prototyp-Datei, bitte bei Gelegenheit ansehen.
+
+## Offen aus Stufe 9
+
+- Kein Rückweg, keine Gegner, Ausweichen in Nischen außerhalb des Gangs fehlt; Liste ohne Schließen-Kreuz, verdeckt Plan unten rechts; Lauf blockiert synchron (Netz ≈ 0,5 s).

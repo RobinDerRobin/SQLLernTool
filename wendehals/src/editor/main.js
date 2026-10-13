@@ -7,7 +7,7 @@ import { Ansicht, radFaktor } from './ansicht.js';
 import { zeichnePlan, zeichneGegner } from './zeichnen.js';
 import { WELT, GEBIETE, STEMPEL } from './startdaten.js';
 import { ladeStempel, formatiereStempel, stempelAnlegen, stempelLoeschen as stempelEntfernen, stempelUmbenennen, stempelInhalt } from './stempel.js';
-import { kopie, bezeichnung, knotenMap, gangMasse, gangPolygon, knotenPolygon, punktInPolygon, ausdehnung, rahmenEcken, formatiere, ladeGebiet, pruefeFormat, Verlauf } from './daten.js';
+import { kopie, bezeichnung, knotenMap, gangMasse, gangPunkt, gangPolygon, knotenPolygon, punktInPolygon, ausdehnung, rahmenEcken, formatiere, ladeGebiet, pruefeFormat, Verlauf } from './daten.js';
 import { formatiereWelt, ladeWelt, pruefeWelt, weltLagen, weltAusdehnung, lageSetzen, bereichFeld, bereichAnpassen, bereichMasse, uebergangAnlegen, uebergangLoeschen, uebergaengeVon, uebergaengeAn, andereSeite, teileEnde, ausserhalb } from './welt.js';
 import { KNOTENTYPEN, TILESETS, GEGNER, gegnerFuer, tilesetFarben } from './katalog.js';
 import { KUERZEL, MAUS, WINKEL_SCHRITT, SCREEN_W, SCREEN_H, SPEED, ZOOM_TASTE_FAKTOR, ZOOM_FESTWERTE, PFEIL_SCHRITT_PX, PFEIL_GROSS, KLICK_TOLERANZ_PX, KNOTEN_RADIUS_PX, FANG_PX, FLOOR, FLOOR2, WALL, FARBEN, PALETTE_PX, NOTIZ_MAX, STEMPEL_DATEI } from './konstanten.js';
@@ -16,6 +16,7 @@ import { teilBei, teilFinden, setzeTeil, istTeilArt, hatMasse, teilName, liste a
 import { erzeugeSpeicher } from './speicher.js';
 import { spielbarkeit, erzeugeSzene } from './spielen.js';
 import { pruefeGebiet, zusammenfassung } from './pruefer.js';
+import { fliegeGebiet, STATUS_TEXT } from './bot.js';
 import { SpielModus } from './spielmodus.js';
 import { levelInhalt } from './level.js';
 import { alleDinge, inRahmen, schrittFuer, verschiebeDinge, merkeDinge, fuegeDingeEin, fuegeDingeAn, loescheDinge, dreheDinge, duplikatVersatz, gleichesDing, dingFinden } from './mehrfach.js';
@@ -47,6 +48,11 @@ html, body { margin: 0; height: 100%; background: #14121a; color: #e8e6ee; font:
 #tf-zu { padding: 0 7px; line-height: 18px; }
 #tf-inhalt { overflow: auto; padding: 6px 8px 8px; }
 #tf-inhalt .palette-titel { font-size: 13px; margin: 6px 0 4px; }
+#botfeld { position: absolute; bottom: 8px; right: 8px; width: 440px; max-width: calc(100% - 16px); max-height: 45%; overflow: auto; background: rgba(34,31,43,.96); border: 1px solid #4b4560; border-radius: 6px; padding: 6px 8px; box-sizing: border-box; z-index: 4; }
+#botfeld h3 { font-size: 13px; margin: 0 0 4px; }
+#botfeld .bm { display: block; width: 100%; text-align: left; white-space: normal; margin: 2px 0; }
+#botfeld .bm.ok { border-color: #3f9d5e; } #botfeld .bm.tod, #botfeld .bm.stecken, #botfeld .bm.zeit { border-color: #ff6a5a; } #botfeld .bm.nicht-spielbar { border-color: #6b6780; color: #a9a5bd; }
+#b-bot.muss { background: #8c3b3b; } #b-bot.gut { background: #2f6b45; }
 #prueferfeld h3 { font-size: 13px; margin: 0 0 4px; }
 #prueferfeld .pm { display: block; width: 100%; text-align: left; white-space: normal; margin: 2px 0; }
 #prueferfeld .pm.MUSS { border-color: #ff6a5a; } #prueferfeld .pm.SOLL { border-color: #d9b43a; }
@@ -260,7 +266,11 @@ export function startEditor() {
   const prueferFeld = el('div', { id: 'prueferfeld' });
   prueferFeld.style.display = 'none';
   plan.append(prueferFeld);
-  const unten = el('div', { id: 'unten', class: 'leiste' }, [play, schieber, fahrtText, prueferKnopf, spielKnopf, bezKnopf, bezFeld, melden]);
+  const botKnopf = knopf('Bot-Spieltest', 'Ein Bot fliegt jedes Level des Gebiets im Fenster-Prototyp ab und meldet Tod, Steckenbleiben und nicht spielbare Level mit Bezeichnung (Klick auf eine Meldung springt zur Stelle)', () => botSpieltest(), 'b-bot');
+  const botFeld = el('div', { id: 'botfeld' });
+  botFeld.style.display = 'none';
+  plan.append(botFeld);
+  const unten = el('div', { id: 'unten', class: 'leiste' }, [play, schieber, fahrtText, prueferKnopf, botKnopf, spielKnopf, bezKnopf, bezFeld, melden]);
   const wurzel = el('div', { id: 'editor' }, [oben, werk, hinweisZeile, plan, rechts, unten]);
   document.body.append(wurzel);
 
@@ -538,6 +548,53 @@ export function startEditor() {
       ...r.meldungen.map((m) => {
         const b = el('button', { class: 'pm ' + m.art, title: m.ort ? 'Zur Stelle springen' : 'Betrifft das ganze Gebiet', text: `${m.regel} ${m.art}: ${m.text}` });
         b.addEventListener('click', () => springe(m));
+        return b;
+      }),
+    );
+  }
+
+  // ---------------------------------------------------------------- Bot-Spieltest (Stufe 9)
+  /** Ergebnis des letzten Laufs: { gebietId, text (Gebietsstand beim Lauf), liste } – wird nach einer Änderung als veraltet gezeigt. */
+  let botLauf = null;
+  function botSpieltest() {
+    if (state.ansichtArt === 'welt') return melde('Bot-Spieltest: erst ein Gebiet öffnen (Doppelklick in der Welt).', 'fehler');
+    if (botLauf && botFeld.style.display !== 'none' && botLauf.gebietId === state.gebietId && botLauf.text === formatiere(gebiet())) {
+      botFeld.style.display = 'none'; // zweiter Klick auf den Knopf schließt die Liste
+      return;
+    }
+    const g = gebiet();
+    melde('Bot fliegt alle Level …');
+    botLauf = { gebietId: state.gebietId, text: formatiere(g), liste: fliegeGebiet(g) };
+    melde('');
+    botFeld.style.display = '';
+    refresh();
+  }
+  /** Springt zur Stelle einer Bot-Meldung (Gang wählen, Rahmen an die Stelle) – wie ein Klick im Prüfer. */
+  function botSpringe(r) {
+    const g = gebiet();
+    const gang = g.gaenge.find((x) => x.id === r.gang);
+    const m = gang && gangMasse(g, gang);
+    if (!m) return;
+    const p = gangPunkt(m, r.stelle);
+    springe({ ort: { art: 'gang', id: gang.id, s: Math.round(r.stelle), x: p.x, y: p.y } });
+  }
+  function botZeigen() {
+    botKnopf.classList.remove('muss', 'gut');
+    if (!botLauf) return;
+    if (botLauf.gebietId !== state.gebietId || state.ansichtArt === 'welt') {
+      botFeld.style.display = 'none'; // Ergebnis eines anderen Gebiets: Liste zu, Knopf neutral
+      return;
+    }
+    const fehler = botLauf.liste.filter((r) => r.status !== 'ok' && r.status !== 'nicht-spielbar').length;
+    botKnopf.classList.add(fehler ? 'muss' : 'gut');
+    if (botFeld.style.display === 'none') return;
+    const veraltet = botLauf.gebietId !== state.gebietId || botLauf.text !== formatiere(gebiet());
+    const ok = botLauf.liste.filter((r) => r.status === 'ok').length;
+    botFeld.replaceChildren(
+      el('h3', { text: `Bot-Spieltest – ${ok} von ${botLauf.liste.length} Leveln geflogen${fehler ? `, ${fehler} Fehler` : ''}${veraltet ? ' (veraltet: Gebiet wurde geändert – Knopf drücken zum Neuprüfen)' : ''}` }),
+      ...botLauf.liste.map((r) => {
+        const b = el('button', { class: 'bm ' + r.status, title: `${r.text} Klick springt zur Stelle.`, text: `${STATUS_TEXT[r.status]}: ${r.bezeichnung}${r.status === 'ok' ? ` (${r.sekunden.toFixed(0)} s)` : ` – ${r.text}`}` });
+        b.addEventListener('click', () => botSpringe(r));
         return b;
       }),
     );
@@ -1564,7 +1621,7 @@ export function startEditor() {
         state.notizFokus = null;
       }
     }
-    rechts.append(el('p', { class: 'grau', text: 'Linksklick wählt (Strg+Klick ergänzt, Ziehen im Leeren = Rahmen, Strg+A alles), Ziehen und Pfeile (Umschalt ×5) verschieben die Auswahl. Rechtsklick setzt das Element, das du mit G K B W H X M U A oder in der Palette wählst; ist etwas gewählt, kopiert er es. Mittlere Taste oder Shift+Ziehen verschiebt den Plan, das Mausrad zoomt (+ − 1 2, Pos1 = alles). Doppelklick oder Enter öffnet das Level, Esc geht eine Ebene hoch. R dreht ein Teil, Strg+C/V/D, nur Entf löscht, Strg+Z/Y Rückgängig/Wiederholen, Strg+S Speichern, P Spielen ab hier (Esc zurück), N Bezeichnung kopieren, Q/E drehen die Ansicht, 0 Norden, F wie im Spiel, J Look, T Welt, Leertaste Fahrt.' }));
+    rechts.append(el('p', { class: 'grau', text: 'Linksklick wählt (Strg+Klick ergänzt, Ziehen im Leeren = Rahmen, Strg+A alles), Ziehen und Pfeile (Umschalt ×5) verschieben die Auswahl. Rechtsklick setzt das Element, das du mit G K B W H X M U A oder in der Palette wählst; ist etwas gewählt, kopiert er es. Mittlere Taste oder Shift+Ziehen verschiebt den Plan, das Mausrad zoomt (+ − 1 2, Pos1 = alles). Doppelklick oder Enter öffnet das Level, Esc geht eine Ebene hoch. R dreht ein Teil, Strg+C/V/D, nur Entf löscht, Strg+Z/Y Rückgängig/Wiederholen, Strg+S Speichern, P Spielen ab hier (Esc zurück), N Bezeichnung kopieren, Z Bot-Spieltest, Q/E drehen die Ansicht, 0 Norden, F wie im Spiel, J Look, T Welt, Leertaste Fahrt.' }));
   }
   function refreshFahrt() {
     if (state.ansichtArt === 'welt') {
@@ -1601,6 +1658,7 @@ export function startEditor() {
     undoKnopf.textContent = v.kannZurueck ? `Rückgängig: ${v.letzteAktion}` : 'Rückgängig';
     redoKnopf.textContent = v.kannVor ? `Wiederholen: ${v.naechsteAktion}` : 'Wiederholen';
     const au = state.auswahl;
+    botKnopf.disabled = inWelt;
     spielKnopf.disabled = inWelt || !(au?.art === 'gang' && state.fahrt);
     bezKnopf.disabled = inWelt || !(au?.art === 'gang' || au?.art === 'knoten');
     for (const w of WERKZEUGE) document.getElementById('t-' + w.id)?.classList.toggle('an', !inWelt && w.id === state.werkzeug);
@@ -1608,6 +1666,7 @@ export function startEditor() {
     typWahl.disabled = state.werkzeug !== 'knoten';
     for (const eb of EBENEN) document.getElementById('l-' + eb.id)?.classList.toggle('an', state.gesperrt.has(eb.id));
     prueferZeigen();
+    botZeigen();
     tilesetFensterZeigen();
     loeschKnopf.disabled = inWelt ? state.weltAuswahl?.art !== 'uebergang' : !(au && (au.art === 'gang' || au.art === 'knoten' || istTeilArt(au.art)));
     const offen = inWelt ? weltUngespeichert() : ungespeichert() || weltUngespeichert() || stempelUngespeichert();
@@ -1759,6 +1818,7 @@ export function startEditor() {
     else if (c === KUERZEL.zoomNormal) setzeZoom(ZOOM_FESTWERTE.normal);
     else if (c === KUERZEL.spielen) spielenAb();
     else if (c === KUERZEL.bezeichnung) kopiereBezeichnung();
+    else if (c === KUERZEL.bot) botSpieltest();
     else if (c === KUERZEL.fahrtStart) fahrtUmschalten();
     else if (c === KUERZEL.fahrtVor) setzeFahrt((state.fahrt?.s || 0) + 20);
     else if (c === KUERZEL.fahrtZurueck) setzeFahrt((state.fahrt?.s || 0) - 20);
@@ -1863,6 +1923,8 @@ export function startEditor() {
     spielenAb,
     pruefer,
     prueferUmschalten,
+    botSpieltest,
+    botErgebnis: () => botLauf,
     springe,
     kopiereBezeichnung,
     bezeichnungText,

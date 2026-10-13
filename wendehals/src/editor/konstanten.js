@@ -66,6 +66,7 @@ export const KUERZEL = {
   oeffnen: 'KeyO', // mit Strg/Cmd
   spielen: 'KeyP', // Spielen ab hier
   bezeichnung: 'KeyN', // Bezeichnung kopieren
+  bot: 'KeyZ', // Bot-Spieltest (ohne Strg; mit Strg ist Z Rückgängig)
   fahrtStart: 'Space',
   fahrtVor: 'BracketRight',
   fahrtZurueck: 'BracketLeft',
